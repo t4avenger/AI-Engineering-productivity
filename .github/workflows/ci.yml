@@ -11,6 +11,9 @@ permissions:
   contents: read
   security-events: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   verify:
     name: Required verification
@@ -49,9 +52,7 @@ jobs:
       - run: npm ci --prefix web
       - run: go install honnef.co/go/tools/cmd/staticcheck@v0.6.1
       - run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
-      - uses: golangci/golangci-lint-action@v8
-        with:
-          version: v2.2.2
+      - run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
