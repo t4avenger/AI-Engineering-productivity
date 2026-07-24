@@ -16,7 +16,11 @@ func TestHealthEndpointReturnsHealthy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET health: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Fatalf("close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
