@@ -1,0 +1,34 @@
+minimum_pre_commit_version: "3.7.1"
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-json
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.24.3
+    hooks:
+      - id: gitleaks
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.2.2
+    hooks:
+      - id: golangci-lint
+  - repo: local
+    hooks:
+      - id: gofmt
+        name: gofmt
+        entry: gofmt -w
+        language: system
+        types: [go]
+      - id: web-format-check
+        name: web format check
+        entry: npm run format:check --prefix web
+        language: system
+        pass_filenames: false
+      - id: web-lint
+        name: web lint
+        entry: npm run lint --prefix web
+        language: system
+        pass_filenames: false

@@ -1,0 +1,48 @@
+{
+  "name": "telemetryiq-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18.20.8"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "knip": "knip"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "4.7.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "typescript": "5.9.3",
+    "vite": "6.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.27.0",
+    "@playwright/test": "1.61.1",
+    "@testing-library/jest-dom": "6.6.3",
+    "@testing-library/react": "16.1.0",
+    "@types/node": "22.10.5",
+    "@types/react": "19.0.4",
+    "@types/react-dom": "19.0.2",
+    "@vitest/coverage-v8": "3.2.7",
+    "eslint": "9.27.0",
+    "eslint-plugin-react-hooks": "5.1.0",
+    "eslint-plugin-react-refresh": "0.4.16",
+    "globals": "15.14.0",
+    "jsdom": "25.0.1",
+    "knip": "5.80.0",
+    "prettier": "3.4.2",
+    "typescript-eslint": "8.65.0",
+    "vitest": "3.2.7"
+  }
+}
