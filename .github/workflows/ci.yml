@@ -53,7 +53,7 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: google/osv-scanner-action/osv-scanner-action@v2
+      - uses: google/osv-scanner-action@v2.3.8
         with:
           scan-args: |-
             scan source --recursive .
@@ -62,7 +62,7 @@ jobs:
           config: auto
         env:
           SEMGREP_SEND_METRICS: "off"
-      - uses: aquasecurity/trivy-action@0.31.0
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
