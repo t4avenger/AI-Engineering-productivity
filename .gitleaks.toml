@@ -1,0 +1,8 @@
+title = "TelemetryIQ gitleaks configuration"
+
+[allowlist]
+description = "Synthetic examples only"
+paths = [
+  '''fixtures/.*''',
+  '''web/tests/.*''',
+]

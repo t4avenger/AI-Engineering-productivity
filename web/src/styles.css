@@ -1,0 +1,153 @@
+:root {
+  color: #172026;
+  background: #f6f8fa;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+.shell {
+  align-items: center;
+  display: flex;
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.status-panel {
+  align-items: center;
+  display: grid;
+  gap: 32px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  margin: 0 auto;
+  max-width: 960px;
+  width: 100%;
+}
+
+.eyebrow {
+  color: #53616b;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+h1 {
+  font-size: clamp(2.5rem, 7vw, 5.25rem);
+  letter-spacing: 0;
+  line-height: 0.95;
+  margin: 0;
+}
+
+.summary {
+  color: #35434d;
+  font-size: 1.125rem;
+  line-height: 1.6;
+  margin: 20px 0 0;
+  max-width: 560px;
+}
+
+.health-card {
+  align-items: flex-start;
+  background: #ffffff;
+  border: 1px solid #dbe2e8;
+  border-radius: 8px;
+  box-shadow: 0 16px 40px rgb(23 32 38 / 10%);
+  display: flex;
+  gap: 16px;
+  min-height: 190px;
+  padding: 24px;
+}
+
+.health-card h2 {
+  font-size: 1.35rem;
+  letter-spacing: 0;
+  margin: 0 0 12px;
+}
+
+.health-card p {
+  color: #53616b;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.indicator,
+.pulse {
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 auto;
+  height: 14px;
+  margin-top: 7px;
+  width: 14px;
+}
+
+.indicator {
+  background: #0f9f6e;
+}
+
+.health-card--unhealthy .indicator {
+  background: #d64545;
+}
+
+.pulse {
+  animation: pulse 1.2s infinite ease-in-out;
+  background: #6d7f8f;
+}
+
+dl {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+dt {
+  color: #53616b;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 760px) {
+  .shell {
+    align-items: flex-start;
+    padding: 24px 18px;
+  }
+
+  .status-panel {
+    grid-template-columns: 1fr;
+  }
+}

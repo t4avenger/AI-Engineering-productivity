@@ -1,0 +1,14 @@
+/telemetryiq
+/coverage.out
+/dist/
+/node_modules/
+/web/node_modules/
+/web/coverage/
+/web/dist/
+/web/playwright-report/
+/web/test-results/
+/.cache/
+/.tokensave/
+/.vscode/
+/.idea/
+*.log
