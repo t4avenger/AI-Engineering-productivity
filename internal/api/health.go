@@ -39,6 +39,7 @@ func withCORS(next http.Handler) http.Handler {
 		origin := r.Header.Get("Origin")
 		if origin == "http://127.0.0.1:5173" || origin == "http://127.0.0.1:4173" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Add("Vary", "Origin")
 		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")

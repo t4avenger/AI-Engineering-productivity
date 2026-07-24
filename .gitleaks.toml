@@ -4,5 +4,4 @@ title = "TelemetryIQ gitleaks configuration"
 description = "Synthetic examples only"
 paths = [
   '''fixtures/.*''',
-  '''web/tests/.*''',
 ]

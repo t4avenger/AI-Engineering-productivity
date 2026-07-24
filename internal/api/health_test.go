@@ -41,6 +41,24 @@ func TestHealthEndpointReturnsHealthy(t *testing.T) {
 	}
 }
 
+func TestHealthEndpointSetsCORSHeadersForAllowedOrigin(t *testing.T) {
+	req := httptest.NewRequest(http.MethodOptions, "/api/v1/health", nil)
+	req.Header.Set("Origin", "http://127.0.0.1:5173")
+	rec := httptest.NewRecorder()
+
+	NewHandler(slog.Default()).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://127.0.0.1:5173" {
+		t.Fatalf("expected allowed origin header, got %q", got)
+	}
+	if got := rec.Header().Get("Vary"); got != "Origin" {
+		t.Fatalf("expected Vary Origin header, got %q", got)
+	}
+}
+
 func TestHealthEndpointRejectsUnsupportedMethod(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/health", nil)
 	rec := httptest.NewRecorder()
