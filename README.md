@@ -4,7 +4,7 @@ Local-first AI engineering intelligence and governance. Task 001 provides only t
 
 ## Requirements
 
-- Go 1.25.9 or newer
+- Go 1.25.12 or newer
 - Node.js 18.20.8 or newer
 - npm 10.x or newer
 - Optional local tools: `pre-commit`, `staticcheck`, `golangci-lint`, `govulncheck`, `gitleaks`, `osv-scanner`, `semgrep`, `trivy`, `shellcheck`, `actionlint`

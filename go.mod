@@ -1,3 +1,3 @@
 module github.com/wayne/telemetryiq
 
-go 1.25.9
+go 1.25.12
