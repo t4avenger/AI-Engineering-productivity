@@ -148,7 +148,7 @@ func (c Config) Validate() error {
 
 func (c Config) validateServer() error {
 	ip := net.ParseIP(c.Host)
-	if ip == nil || !ip.IsLoopback() {
+	if c.Host != "localhost" && (ip == nil || !ip.IsLoopback()) {
 		return fmt.Errorf("TELEMETRYIQ_HOST must be a loopback IP address, got %q", c.Host)
 	}
 	port, err := strconv.Atoi(c.Port)

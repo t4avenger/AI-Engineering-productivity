@@ -123,6 +123,19 @@ func TestLoadFromEnvRejectsNonLoopbackHost(t *testing.T) {
 	}
 }
 
+func TestLoadFromEnvAcceptsLocalhost(t *testing.T) {
+	t.Setenv("TELEMETRYIQ_CONFIG", "")
+	t.Setenv("TELEMETRYIQ_HOST", "localhost")
+	t.Setenv("TELEMETRYIQ_PORT", "")
+	cfg, err := LoadFromEnv()
+	if err != nil {
+		t.Fatalf("load localhost configuration: %v", err)
+	}
+	if cfg.Addr() != "localhost:8080" {
+		t.Fatalf("expected localhost address, got %q", cfg.Addr())
+	}
+}
+
 func TestLoadFromEnvRejectsInvalidPort(t *testing.T) {
 	t.Setenv("TELEMETRYIQ_CONFIG", "")
 	t.Setenv("TELEMETRYIQ_PORT", "70000")
