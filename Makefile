@@ -3,7 +3,7 @@ SHELL := /usr/bin/env bash
 WEB_DIR := web
 GO_PACKAGES := ./cmd/... ./internal/...
 
-.PHONY: bootstrap hooks-install format format-check lint static-analysis test test-unit test-component test-integration test-contract test-e2e test-race test-fuzz-smoke test-performance-smoke coverage security-scan build precommit verify verify-push run run-web run-daemon
+.PHONY: bootstrap hooks-install format format-check lint static-analysis test test-unit test-component test-integration test-contract test-e2e test-race test-fuzz-smoke test-performance-smoke coverage security-scan build precommit verify verify-ci verify-push run run-web run-daemon
 
 bootstrap:
 	npm ci --prefix $(WEB_DIR)
@@ -63,6 +63,8 @@ build:
 	npm run build --prefix $(WEB_DIR)
 
 precommit: format-check lint static-analysis test-unit test-component
+
+verify-ci: format-check lint static-analysis test-unit test-component test-integration test-race test-contract test-fuzz-smoke test-performance-smoke test-e2e coverage build
 
 verify: format-check lint static-analysis test-unit test-component test-integration coverage security-scan build
 
