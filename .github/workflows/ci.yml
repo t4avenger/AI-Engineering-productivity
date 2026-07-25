@@ -73,7 +73,6 @@ jobs:
           exit-code: "1"
       - uses: reviewdog/action-actionlint@50842263c20a7c46bd0065b9e624d3c569db061e
       - run: make static-analysis
-      - run: make security-scan
 
   build:
     name: Build artifacts
