@@ -50,7 +50,7 @@ func TestCanonicalEventAcceptsProviderExtensions(t *testing.T) {
 		t.Fatalf("compile schema: %v", err)
 	}
 	if err := schema.Validate(readJSON(t, filepath.Join(root, "fixtures", "schemas", "valid", "canonical-event.json"))); err != nil {
-		t.Fatalf("provider extensions must be preserved: %v", err)
+		t.Fatalf("provider extensions fixture must validate: %v", err)
 	}
 }
 
