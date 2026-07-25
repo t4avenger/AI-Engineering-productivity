@@ -30,15 +30,8 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci --prefix web
-      - run: go install github.com/zricethezav/gitleaks/v8@v8.24.3
-      - run: go install github.com/google/osv-scanner/cmd/osv-scanner@v1.9.2
-      - run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
-      - run: go install github.com/aquasecurity/trivy/cmd/trivy@v0.64.1
-      - run: pipx install semgrep==1.125.0
-      - run: pipx inject semgrep "setuptools<82"
-      - run: sudo apt-get update && sudo apt-get install --yes shellcheck
       - run: npm exec --prefix web -- playwright install --with-deps chromium
-      - run: make verify-push
+      - run: make verify-ci
 
   static-security:
     name: Static analysis and security
@@ -79,13 +72,6 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: "1"
       - uses: reviewdog/action-actionlint@50842263c20a7c46bd0065b9e624d3c569db061e
-      - run: go install github.com/zricethezav/gitleaks/v8@v8.24.3
-      - run: go install github.com/google/osv-scanner/cmd/osv-scanner@v1.9.2
-      - run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
-      - run: pipx install semgrep==1.125.0
-      - run: pipx inject semgrep "setuptools<82"
-      - run: go install github.com/aquasecurity/trivy/cmd/trivy@v0.64.1
-      - run: sudo apt-get update && sudo apt-get install --yes shellcheck
       - run: make static-analysis
       - run: make security-scan
 
