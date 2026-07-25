@@ -1,0 +1,1 @@
+{"schema_version":"0.1.0","mode":"local-only","collection":{"level":"operational","prompts":false,"responses":false,"source_code":false,"file_paths":"hash","command_arguments":"redact","tool_calls":true,"model_usage":true},"storage":{"destination":"local","retention_days":30},"sharing":{"diagnostics":false,"anonymous_analytics":false,"research_sessions":"explicit-only"}}
