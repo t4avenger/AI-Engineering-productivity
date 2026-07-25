@@ -47,7 +47,7 @@ test-race:
 	bash scripts/test-race.sh
 
 test-fuzz-smoke:
-	bash scripts/not-applicable.sh "fuzz smoke tests" "Task 001 has no ingestion, parsing, redaction, or normalisation boundary yet."
+	go test ./internal/config -run='^$$' -fuzz=FuzzLoad -fuzztime=3s
 
 test-performance-smoke:
 	bash scripts/performance-smoke.sh

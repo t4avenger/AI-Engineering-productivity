@@ -17,7 +17,11 @@ import (
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	cfg := config.FromEnv()
+	cfg, err := config.LoadFromEnv()
+	if err != nil {
+		logger.Error("invalid configuration", "error", err)
+		os.Exit(1)
+	}
 	server := &http.Server{
 		Addr:              cfg.Addr(),
 		Handler:           api.NewHandler(logger),
