@@ -1,15 +1,16 @@
 # TelemetryIQ
 
-Local-first AI engineering intelligence and governance. Task 001 provides only the repository scaffold, a loopback Go daemon, and a React health page. It does not ingest telemetry, use a database, or implement authentication yet.
+Local-first AI engineering intelligence and governance.
+
+Task 002 provides the repository scaffold, loopback Go daemon, React health page, and validated privacy-safe configuration. It does not ingest telemetry, use a database, or implement authentication.
 
 ## Requirements
 
 - Go 1.25.12 or newer
-- Node.js 18.20.8 or newer
+- Node.js 24.0.0 or newer
 - npm 10.x or newer
-- Optional local tools: `pre-commit`, `staticcheck`, `golangci-lint`, `govulncheck`, `gitleaks`, `osv-scanner`, `semgrep`, `trivy`, `shellcheck`, `actionlint`
 
-## Local Setup
+## Local setup
 
 ```bash
 make bootstrap
@@ -23,61 +24,48 @@ make run-daemon
 make run-web
 ```
 
-The daemon binds to `127.0.0.1:8080` by default and exposes:
+The daemon binds to `127.0.0.1:8080` by default and exposes `GET /api/v1/health`.
 
-```text
-GET http://127.0.0.1:8080/api/v1/health
+## Configuration and privacy
+
+The safe, local-only defaults use schema version `0.1.0`: operational collection, hashed file paths, redacted command arguments, 30-day local retention, and no diagnostics or analytics sharing. Prompts, responses, and source code are always disabled in this configuration version.
+
+Set `TELEMETRYIQ_CONFIG` to load an explicit YAML file:
+
+```yaml
+schema_version: "0.1.0"
+mode: local-only
+collection:
+  level: operational
+  prompts: false
+  responses: false
+  source_code: false
+  file_paths: hash
+  command_arguments: redact
+  tool_calls: true
+  model_usage: true
+storage:
+  destination: local
+  retention_days: 30
+sharing:
+  diagnostics: false
+  anonymous_analytics: false
+  research_sessions: explicit-only
 ```
 
-Configuration uses environment variables:
+The daemon rejects unknown fields, unsupported schema versions, content capture, non-local storage, unsafe sharing, non-loopback hosts, and invalid ports with actionable startup errors. `TELEMETRYIQ_HOST` (default `127.0.0.1`) and `TELEMETRYIQ_PORT` (default `8080`) override the loopback server address; `VITE_HEALTH_URL` configures the web health endpoint.
 
-- `TELEMETRYIQ_HOST`, default `127.0.0.1`
-- `TELEMETRYIQ_PORT`, default `8080`
-- `VITE_HEALTH_URL`, default `http://127.0.0.1:8080/api/v1/health`
+## Verification
 
-Authentication is intentionally not implemented in Task 001. TODO for Task 002+: introduce local-only authentication token handling without weakening loopback defaults.
+- `make format` / `make format-check`
+- `make lint`
+- `make static-analysis`
+- `make test-unit`, `make test-component`, `make test-e2e`, `make test-race`
+- `make coverage`, `make security-scan`, `make build`
+- `make verify` and `make verify-push`
 
-## Verification Commands
+Some integration, contract, and fuzz checks report not applicable until their corresponding product capabilities are implemented.
 
-- `make format`: apply Go and frontend formatting.
-- `make format-check`: verify Go and frontend formatting.
-- `make lint`: run `go vet` and ESLint with type-aware TypeScript rules.
-- `make static-analysis`: run Go vet, optional Go static tools when installed, TypeScript checking, and `knip`.
-- `make test-unit`: run Go unit tests, including the health endpoint.
-- `make test-component`: run Vitest component/unit tests with coverage for loading, healthy, and unhealthy UI states.
-- `make test-integration`: currently reports not applicable for Task 001.
-- `make test-contract`: currently reports not applicable for Task 001.
-- `make test-e2e`: run Playwright against a production-like local daemon and Vite preview.
-- `make test-race`: run Go tests with the race detector.
-- `make test-fuzz-smoke`: currently reports not applicable for Task 001.
-- `make test-performance-smoke`: starts the daemon and checks health endpoint latency.
-- `make coverage`: runs backend and frontend coverage reports.
-- `make security-scan`: runs optional installed security tools and shell/script/workflow lint checks.
-- `make build`: builds the daemon and frontend.
-- `make precommit`: fast commit-time checks.
-- `make verify`: required PR-equivalent local checks aligned to `QUALITY_GATES.md`.
-- `make verify-push`: broader pre-push checks including E2E and race tests.
+## Current scope
 
-## Static Analysis And Security Tools
-
-- `gofmt`: canonical Go formatting.
-- `go vet`: Go correctness checks included in the standard toolchain.
-- `staticcheck`: deeper Go static analysis; optional locally, installed in CI.
-- `golangci-lint`: pinned Go lint aggregator; optional locally, installed in CI and pre-commit.
-- `govulncheck`: Go vulnerability analysis; optional locally, installed in CI.
-- `tsc --noEmit`: strict TypeScript type checking.
-- `ESLint`: type-aware TypeScript and React linting.
-- `Prettier`: deterministic frontend formatting.
-- `knip`: unused frontend dependency and file checks.
-- `Vitest`: frontend unit/component tests and coverage.
-- `Playwright`: production-like browser smoke test.
-- `gitleaks`: secret scanning.
-- `osv-scanner`: dependency vulnerability scanning.
-- `Semgrep`: security-focused static analysis.
-- `Trivy`: filesystem, dependency, secret, and misconfiguration scanning.
-- `ShellCheck`: shell-script linting when shell scripts exist.
-- `actionlint`: GitHub Actions workflow linting.
-
-## Current Scope
-
-Task 001 deliberately excludes telemetry ingestion, database persistence, provider adapters, analytics, and third-party telemetry. Placeholder directories exist only to match the planned product layout where useful.
+Task 002 deliberately excludes telemetry ingestion, persistence, provider adapters, analytics, and third-party telemetry. Authentication will be introduced in a later local-only task without weakening loopback defaults.
