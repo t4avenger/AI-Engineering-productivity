@@ -19,12 +19,12 @@ jobs:
     name: Required verification
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
           go-version-file: go.mod
           check-latest: true
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: "24"
           cache: npm
@@ -37,14 +37,14 @@ jobs:
     name: Static analysis and security
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
           go-version-file: go.mod
           check-latest: true
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: "24"
           cache: npm
@@ -53,25 +53,34 @@ jobs:
       - run: go install honnef.co/go/tools/cmd/staticcheck@v0.6.1
       - run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
       - run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: google/osv-scanner-action/osv-scanner-action@v2.3.8
+      - uses: google/osv-scanner-action/osv-scanner-action@9a498708959aeaef5ef730655706c5a1df1edbc2
         with:
           scan-args: |-
-            scan source --recursive .
-      - uses: returntocorp/semgrep-action@v1
+            scan --recursive .
+      - uses: returntocorp/semgrep-action@713efdd345f3035192eaa63f56867b88e63e4e5d
         with:
-          config: auto
+          config: p/default
         env:
           SEMGREP_SEND_METRICS: "off"
-      - uses: aquasecurity/trivy-action@v0.36.0
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           scan-type: fs
           scan-ref: .
           severity: HIGH,CRITICAL
           exit-code: "1"
-      - uses: reviewdog/action-actionlint@v1
+      - uses: reviewdog/action-actionlint@50842263c20a7c46bd0065b9e624d3c569db061e
+      - run: go install github.com/zricethezav/gitleaks/v8@v8.24.3
+      - run: go install github.com/google/osv-scanner/cmd/osv-scanner@v1.9.2
+      - run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+      - run: pipx install semgrep==1.125.0
+      - run: pipx inject semgrep "setuptools<82"
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567
+        with:
+          version: v0.64.1
+      - run: sudo apt-get update && sudo apt-get install --yes shellcheck
       - run: make static-analysis
       - run: make security-scan
 
@@ -79,12 +88,12 @@ jobs:
     name: Build artifacts
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
           go-version-file: go.mod
           check-latest: true
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: "24"
           cache: npm
