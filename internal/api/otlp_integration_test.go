@@ -20,6 +20,12 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	}
 	closeBody(t, accepted)
 
+	logs := postOTLPToPath(t, server.URL, "/v1/logs", []byte(`{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"stringValue":"synthetic"}}]}]}]}`), "application/json")
+	if logs.StatusCode != http.StatusAccepted {
+		t.Fatalf("expected OTLP logs status 202, got %d", logs.StatusCode)
+	}
+	closeBody(t, logs)
+
 	malformed := postOTLP(t, server.URL, []byte(`{"resourceSpans":`))
 	assertIngestError(t, malformed, http.StatusBadRequest, "malformed_payload")
 
@@ -41,7 +47,7 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&counters); err != nil {
 		t.Fatalf("decode counters: %v", err)
 	}
-	if counters.AcceptedPayloads != 1 || counters.RejectedPayloads != 4 {
+	if counters.AcceptedPayloads != 2 || counters.RejectedPayloads != 4 {
 		t.Fatalf("unexpected counters: %+v", counters)
 	}
 }
@@ -53,7 +59,12 @@ func postOTLP(t *testing.T, serverURL string, body []byte) *http.Response {
 
 func postOTLPWithContentType(t *testing.T, serverURL string, body []byte, contentType string) *http.Response {
 	t.Helper()
-	req, err := http.NewRequest(http.MethodPost, serverURL+"/v1/traces", bytes.NewReader(body))
+	return postOTLPToPath(t, serverURL, "/v1/traces", body, contentType)
+}
+
+func postOTLPToPath(t *testing.T, serverURL, path string, body []byte, contentType string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodPost, serverURL+path, bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("create request: %v", err)
 	}

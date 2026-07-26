@@ -17,6 +17,12 @@ The validator rejects missing origin or tool-version metadata, prohibited field 
 
 The checked-in fixture is deliberately synthetic. It documents the wrapper format but is not evidence of a real Codex capability. A real observed fixture must use fixture_origin observed-sanitised and include the tool version observed during capture.
 
+## Bounded live receiver test
+
+The local receiver accepts Codex OTLP logs at `http://127.0.0.1:8080/v1/logs`. Use `test-harness/codex-otel-config.toml` only in an isolated temporary Codex home with a synthetic repository. It keeps prompt logging disabled and selects the JSON protocol required by the current receiver.
+
+Start the receiver, copy the template to the temporary home as `config.toml`, then run one synthetic Codex session with that home. Confirm the accepted ingest counter increases. Stop Codex to flush its asynchronous exporter, delete the temporary home, and sanitise any locally captured observation before attempting to create an `observed-sanitised` fixture. Never use a normal working repository or normal Codex configuration for this test.
+
 ## Review checklist
 
 - Confirm prompts, responses, source code, paths, command arguments, account identifiers, and credentials are absent.

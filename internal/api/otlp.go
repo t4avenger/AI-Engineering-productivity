@@ -36,7 +36,15 @@ func newOTLPHTTPIngest() *otlpHTTPIngest {
 	return &otlpHTTPIngest{}
 }
 
-func (i *otlpHTTPIngest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (i *otlpHTTPIngest) tracesHandler(w http.ResponseWriter, r *http.Request) {
+	i.receive(w, r, "resourceSpans")
+}
+
+func (i *otlpHTTPIngest) logsHandler(w http.ResponseWriter, r *http.Request) {
+	i.receive(w, r, "resourceLogs")
+}
+
+func (i *otlpHTTPIngest) receive(w http.ResponseWriter, r *http.Request, resourceField string) {
 	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || mediaType != "application/json" {
 		i.reject(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Content-Type must be application/json")
@@ -47,11 +55,8 @@ func (i *otlpHTTPIngest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var payload struct {
-		ResourceSpans json.RawMessage `json:"resourceSpans"`
-	}
+	var payload map[string]json.RawMessage
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxOTLPPayloadBytes))
-	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&payload); err != nil {
 		if isBodyTooLarge(err) {
 			i.reject(w, http.StatusRequestEntityTooLarge, "payload_too_large", "request body exceeds the 1 MiB limit")
@@ -65,9 +70,9 @@ func (i *otlpHTTPIngest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var resourceSpans []json.RawMessage
-	if len(payload.ResourceSpans) == 0 || json.Unmarshal(payload.ResourceSpans, &resourceSpans) != nil || len(resourceSpans) == 0 {
-		i.reject(w, http.StatusBadRequest, "invalid_payload", "request must contain a non-empty resourceSpans array")
+	var resources []json.RawMessage
+	if len(payload) != 1 || len(payload[resourceField]) == 0 || json.Unmarshal(payload[resourceField], &resources) != nil || len(resources) == 0 {
+		i.reject(w, http.StatusBadRequest, "invalid_payload", "request must contain a non-empty "+resourceField+" array")
 		return
 	}
 

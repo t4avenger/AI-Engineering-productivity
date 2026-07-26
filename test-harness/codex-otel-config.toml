@@ -1,0 +1,6 @@
+# Copy this file to an isolated temporary CODEX_HOME/config.toml for the
+# synthetic-only live telemetry test. Do not add it to normal Codex settings.
+[otel]
+environment = "telemetryiq-synthetic"
+log_user_prompt = false
+exporter = { otlp-http = { endpoint = "http://127.0.0.1:8080/v1/logs", protocol = "json" } }
