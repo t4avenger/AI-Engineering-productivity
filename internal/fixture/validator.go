@@ -14,7 +14,7 @@ import (
 
 var secretPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\b(?:bearer|basic)\s+[a-z0-9._~+/=-]{12,}\b`),
-	regexp.MustCompile(`\b(?:sk|ghp|github_pat)_[a-zA-Z0-9_-]{16,}\b`),
+	regexp.MustCompile(`\b(?:sk|ghp|github[_-]pat)[_-][a-zA-Z0-9_-]{16,}\b`),
 	regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`),
 	regexp.MustCompile(`-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----`),
 }
@@ -121,7 +121,7 @@ func likelySecret(value string) bool {
 
 func isSecretAlphabet(value string) bool {
 	for _, runeValue := range value {
-		if runeValue >= 'a' && runeValue <= 'z' || runeValue >= 'A' && runeValue <= 'Z' || runeValue >= '0' && runeValue <= '9' || strings.ContainsRune("+/=_-", runeValue) {
+		if runeValue >= 'a' && runeValue <= 'z' || runeValue >= 'A' && runeValue <= 'Z' || runeValue >= '0' && runeValue <= '9' || strings.ContainsRune(".+/=_-", runeValue) {
 			continue
 		}
 		return false
