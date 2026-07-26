@@ -35,7 +35,7 @@ test-component:
 	npm run test:coverage --prefix $(WEB_DIR)
 
 test-integration:
-	bash scripts/not-applicable.sh "integration tests" "Task 001 has no telemetry ingestion, storage, or provider integrations yet."
+	go test ./internal/api -run TestOTLPHTTPIngestProof
 
 test-contract:
 	bash scripts/not-applicable.sh "contract tests" "Task 001 exposes only the health endpoint covered by unit and E2E tests."

@@ -14,8 +14,11 @@ type HealthResponse struct {
 }
 
 func NewHandler(logger *slog.Logger) http.Handler {
+	ingest := newOTLPHTTPIngest()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", healthHandler(logger))
+	mux.Handle("POST /v1/traces", ingest)
+	mux.HandleFunc("GET /api/v1/ingest/counters", ingest.countersHandler)
 	return requestLogger(logger, withCORS(mux))
 }
 
@@ -41,7 +44,7 @@ func withCORS(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Add("Vary", "Origin")
 		}
-		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
