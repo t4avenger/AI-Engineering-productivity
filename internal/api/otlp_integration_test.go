@@ -29,6 +29,9 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	oversized := postOTLP(t, server.URL, bytes.Repeat([]byte("x"), int(maxOTLPPayloadBytes)+1))
 	assertIngestError(t, oversized, http.StatusRequestEntityTooLarge, "payload_too_large")
 
+	unsupportedMediaType := postOTLPWithContentType(t, server.URL, []byte(`{"resourceSpans":[{}]}`), "application/x-protobuf")
+	assertIngestError(t, unsupportedMediaType, http.StatusUnsupportedMediaType, "unsupported_media_type")
+
 	resp, err := http.Get(server.URL + "/api/v1/ingest/counters")
 	if err != nil {
 		t.Fatalf("GET ingest counters: %v", err)
@@ -38,18 +41,23 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&counters); err != nil {
 		t.Fatalf("decode counters: %v", err)
 	}
-	if counters.AcceptedPayloads != 1 || counters.RejectedPayloads != 3 {
+	if counters.AcceptedPayloads != 1 || counters.RejectedPayloads != 4 {
 		t.Fatalf("unexpected counters: %+v", counters)
 	}
 }
 
 func postOTLP(t *testing.T, serverURL string, body []byte) *http.Response {
 	t.Helper()
+	return postOTLPWithContentType(t, serverURL, body, "application/json")
+}
+
+func postOTLPWithContentType(t *testing.T, serverURL string, body []byte, contentType string) *http.Response {
+	t.Helper()
 	req, err := http.NewRequest(http.MethodPost, serverURL+"/v1/traces", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("create request: %v", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", contentType)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("POST OTLP payload: %v", err)

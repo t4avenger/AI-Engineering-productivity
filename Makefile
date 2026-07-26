@@ -35,7 +35,7 @@ test-component:
 	npm run test:coverage --prefix $(WEB_DIR)
 
 test-integration:
-	go test ./internal/api -run TestOTLPHTTPIngestProof
+	go test ./internal/api
 
 test-contract:
 	bash scripts/not-applicable.sh "contract tests" "Task 001 exposes only the health endpoint covered by unit and E2E tests."
