@@ -24,11 +24,11 @@ make run-daemon
 make run-web
 ```
 
-The daemon binds to `127.0.0.1:8080` by default and exposes `GET /api/v1/health`, `POST /v1/traces`, and `GET /api/v1/ingest/counters`.
+The daemon binds to `127.0.0.1:8080` by default and exposes `GET /api/v1/health`, `POST /v1/traces`, `POST /v1/logs`, and `GET /api/v1/ingest/counters`.
 
 ## OTLP/HTTP ingest proof
 
-`POST /v1/traces` accepts one JSON OTLP traces payload with a non-empty `resourceSpans` array. Requests must use `application/json` and are limited to 1 MiB. The endpoint returns `202 Accepted` for accepted payloads and JSON errors with a stable `error.code` for malformed, invalid, unsupported-media-type, or oversized requests.
+`POST /v1/traces` and `POST /v1/logs` accept one JSON OTLP payload with a non-empty `resourceSpans` or `resourceLogs` array. Requests must use `application/json` and are limited to 1 MiB. Each endpoint returns `202 Accepted` for accepted payloads and JSON errors with a stable `error.code` for malformed, invalid, unsupported-media-type, or oversized requests.
 
 This proof keeps only aggregate accepted/rejected counters in process memory. It neither logs nor persists raw telemetry content. Task 005 provides the privacy boundary that later normalisation and persistence work must use.
 

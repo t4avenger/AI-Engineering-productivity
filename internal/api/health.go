@@ -17,7 +17,8 @@ func NewHandler(logger *slog.Logger) http.Handler {
 	ingest := newOTLPHTTPIngest()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", healthHandler(logger))
-	mux.Handle("POST /v1/traces", ingest)
+	mux.HandleFunc("POST /v1/traces", ingest.tracesHandler)
+	mux.HandleFunc("POST /v1/logs", ingest.logsHandler)
 	mux.HandleFunc("GET /api/v1/ingest/counters", ingest.countersHandler)
 	return requestLogger(logger, withCORS(mux))
 }
