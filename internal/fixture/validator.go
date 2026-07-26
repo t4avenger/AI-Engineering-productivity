@@ -121,9 +121,10 @@ func likelySecret(value string) bool {
 
 func isSecretAlphabet(value string) bool {
 	for _, runeValue := range value {
-		if !(runeValue >= 'a' && runeValue <= 'z' || runeValue >= 'A' && runeValue <= 'Z' || runeValue >= '0' && runeValue <= '9' || strings.ContainsRune("+/=_-", runeValue)) {
-			return false
+		if runeValue >= 'a' && runeValue <= 'z' || runeValue >= 'A' && runeValue <= 'Z' || runeValue >= '0' && runeValue <= '9' || strings.ContainsRune("+/=_-", runeValue) {
+			continue
 		}
+		return false
 	}
 	return true
 }
