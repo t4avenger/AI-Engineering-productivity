@@ -2,7 +2,7 @@
 
 Local-first AI engineering intelligence and governance.
 
-Task 004 adds a minimal OTLP/HTTP traces ingest proof to the repository scaffold, loopback Go daemon, React health page, validated privacy-safe configuration, and canonical schemas. It does not persist telemetry, use a database, or implement authentication.
+Task 005 adds a privacy pipeline to the repository scaffold, loopback Go daemon, React health page, validated privacy-safe configuration, canonical schemas, and OTLP/HTTP ingest proof. It does not persist telemetry, use a database, or implement authentication.
 
 ## Requirements
 
@@ -30,7 +30,11 @@ The daemon binds to `127.0.0.1:8080` by default and exposes `GET /api/v1/health`
 
 `POST /v1/traces` accepts one JSON OTLP traces payload with a non-empty `resourceSpans` array. Requests must use `application/json` and are limited to 1 MiB. The endpoint returns `202 Accepted` for accepted payloads and JSON errors with a stable `error.code` for malformed, invalid, unsupported-media-type, or oversized requests.
 
-This proof keeps only aggregate accepted/rejected counters in process memory. It neither logs nor persists raw telemetry content; field redaction and canonical persistence are intentionally deferred to Task 005 and later work.
+This proof keeps only aggregate accepted/rejected counters in process memory. It neither logs nor persists raw telemetry content. Task 005 provides the privacy boundary that later normalisation and persistence work must use.
+
+## Privacy pipeline
+
+The local-only privacy pipeline removes prompts, responses, source code, and recognised secret-bearing fields; hashes file paths with an installation-specific HMAC salt; and redacts command arguments. Every retained or transformed field has provenance explaining the action. It is tested by serialising the safe output and proving synthetic prohibited content cannot cross the storage boundary.
 
 ## Configuration and privacy
 
@@ -74,4 +78,4 @@ Contract and fuzz checks report not applicable until their corresponding product
 
 ## Current scope
 
-Task 004 deliberately excludes telemetry persistence, provider adapters, analytics, and third-party telemetry. Authentication will be introduced in a later local-only task without weakening loopback defaults.
+Task 005 deliberately excludes telemetry persistence, provider adapters, analytics, and third-party telemetry. Authentication will be introduced in a later local-only task without weakening loopback defaults.
