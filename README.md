@@ -2,7 +2,7 @@
 
 Local-first AI engineering intelligence and governance.
 
-Task 002 provides the repository scaffold, loopback Go daemon, React health page, and validated privacy-safe configuration. It does not ingest telemetry, use a database, or implement authentication.
+Task 004 adds a minimal OTLP/HTTP traces ingest proof to the repository scaffold, loopback Go daemon, React health page, validated privacy-safe configuration, and canonical schemas. It does not persist telemetry, use a database, or implement authentication.
 
 ## Requirements
 
@@ -24,7 +24,13 @@ make run-daemon
 make run-web
 ```
 
-The daemon binds to `127.0.0.1:8080` by default and exposes `GET /api/v1/health`.
+The daemon binds to `127.0.0.1:8080` by default and exposes `GET /api/v1/health`, `POST /v1/traces`, and `GET /api/v1/ingest/counters`.
+
+## OTLP/HTTP ingest proof
+
+`POST /v1/traces` accepts one JSON OTLP traces payload with a non-empty `resourceSpans` array. Requests must use `application/json` and are limited to 1 MiB. The endpoint returns `202 Accepted` for accepted payloads and JSON errors with a stable `error.code` for malformed, invalid, unsupported-media-type, or oversized requests.
+
+This proof keeps only aggregate accepted/rejected counters in process memory. It neither logs nor persists raw telemetry content; field redaction and canonical persistence are intentionally deferred to Task 005 and later work.
 
 ## Configuration and privacy
 
@@ -64,8 +70,8 @@ The daemon rejects unknown fields, unsupported schema versions, content capture,
 - `make coverage`, `make security-scan`, `make build`
 - `make verify` and `make verify-push`
 
-Some integration, contract, and fuzz checks report not applicable until their corresponding product capabilities are implemented.
+Contract and fuzz checks report not applicable until their corresponding product capabilities are implemented.
 
 ## Current scope
 
-Task 002 deliberately excludes telemetry ingestion, persistence, provider adapters, analytics, and third-party telemetry. Authentication will be introduced in a later local-only task without weakening loopback defaults.
+Task 004 deliberately excludes telemetry persistence, provider adapters, analytics, and third-party telemetry. Authentication will be introduced in a later local-only task without weakening loopback defaults.
