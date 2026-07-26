@@ -67,11 +67,18 @@ func LoadOrCreateSalt(dataDir string) ([]byte, error) {
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return nil, fmt.Errorf("create privacy data directory: %w", err)
 	}
+	if err := os.Chmod(dataDir, 0o700); err != nil {
+		return nil, fmt.Errorf("secure privacy data directory: %w", err)
+	}
 
 	path := filepath.Join(dataDir, saltFileName)
 	salt, err := os.ReadFile(path)
 	if err == nil {
-		return validateSalt(salt)
+		validated, validationErr := validateSalt(salt)
+		if validationErr != nil {
+			return nil, fmt.Errorf("validate privacy salt %q: %w", path, validationErr)
+		}
+		return validated, nil
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf("read privacy salt: %w", err)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -35,7 +36,7 @@ func TestSanitizeRemovesSensitiveContentBeforeStorageBoundary(t *testing.T) {
 	if got := result.Value["command_arguments"]; got != "[REDACTED]" {
 		t.Fatalf("expected command arguments redacted, got %#v", got)
 	}
-	if got := result.Value["file_path"]; !strings.HasPrefix(got.(string), "hmac-sha256:") {
+	if got, ok := result.Value["file_path"].(string); !ok || !strings.HasPrefix(got, "hmac-sha256:") {
 		t.Fatalf("expected hashed file path, got %#v", got)
 	}
 	if _, found := result.Value["prompt"]; found {
@@ -78,6 +79,23 @@ func TestLoadOrCreateSaltIsStableAndPrivate(t *testing.T) {
 	if got := info.Mode().Perm(); got != 0o600 {
 		t.Fatalf("expected salt permissions 0600, got %o", got)
 	}
+	if runtime.GOOS != "windows" {
+		if got := mustStat(t, dir).Mode().Perm(); got != 0o700 {
+			t.Fatalf("expected salt directory permissions 0700, got %o", got)
+		}
+	}
+}
+
+func TestLoadOrCreateSaltReportsInvalidSaltPath(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, saltFileName)
+	if err := os.WriteFile(path, []byte("not-a-valid-salt"), 0o600); err != nil {
+		t.Fatalf("write invalid salt: %v", err)
+	}
+	_, err := LoadOrCreateSalt(dir)
+	if err == nil || !strings.Contains(err.Error(), path) {
+		t.Fatalf("expected invalid salt error with path %q, got %v", path, err)
+	}
 }
 
 func FuzzSanitize(f *testing.F) {
@@ -112,4 +130,13 @@ func hasProvenance(provenance []Provenance, path string, action Action) bool {
 		}
 	}
 	return false
+}
+
+func mustStat(t *testing.T, path string) os.FileInfo {
+	t.Helper()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat %q: %v", path, err)
+	}
+	return info
 }

@@ -34,7 +34,7 @@ This proof keeps only aggregate accepted/rejected counters in process memory. It
 
 ## Privacy pipeline
 
-The local-only privacy pipeline removes prompts, responses, source code, credentials, and secret values; hashes file paths with an installation-specific HMAC salt; and redacts command arguments. Every retained or transformed field has provenance explaining the action. It is tested by serialising the safe output and proving synthetic prohibited content cannot cross the storage boundary.
+The local-only privacy pipeline removes prompts, responses, source code, and recognised secret-bearing fields; hashes file paths with an installation-specific HMAC salt; and redacts command arguments. Every retained or transformed field has provenance explaining the action. It is tested by serialising the safe output and proving synthetic prohibited content cannot cross the storage boundary.
 
 ## Configuration and privacy
 

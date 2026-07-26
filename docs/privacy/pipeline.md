@@ -4,7 +4,7 @@ Task 005 provides the local-only privacy boundary for TelemetryIQ. Callers must 
 
 ## Transformations
 
-- Prompts, responses, source code, credentials, and secret values are removed.
+- Prompts, responses, source code, and recognised secret-bearing fields (for example `token` and `api_key`) are removed.
 - File paths and filenames are replaced with `hmac-sha256:` hashes.
 - Command arguments are replaced with `[REDACTED]`.
 - Other fields are retained as operational metadata, including unknown provider-extension fields unless they are themselves sensitive.
@@ -13,7 +13,7 @@ The result includes field-level provenance (`path`, `action`, and `reason`) but 
 
 ## Installation salt
 
-`privacy.LoadOrCreateSalt(dataDir)` creates a random 32-byte HMAC salt at `dataDir/privacy-hmac-salt`, with directory mode `0700` and file mode `0600`. The same local installation produces stable hashes; separate installations produce different hashes. The salt must never be sent in telemetry, diagnostics, or logs.
+`privacy.LoadOrCreateSalt(dataDir)` creates a random 32-byte HMAC salt at `dataDir/privacy-hmac-salt` and enforces directory mode `0700` and file mode `0600`. The same local installation produces stable hashes; separate installations produce different hashes. The salt must never be sent in telemetry, diagnostics, or logs.
 
 ## Current boundary
 
