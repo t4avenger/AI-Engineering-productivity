@@ -132,14 +132,35 @@ func (s *Sanitizer) sanitizeMap(input map[string]any, parentPath string) (map[st
 	for _, key := range keys {
 		path := joinPath(parentPath, key)
 		value := input[key]
-		switch classify(key) {
+		action := classify(key)
+		attributeName := ""
+		if key == "value" {
+			if name, ok := input["key"].(string); ok {
+				attributeName = name
+				action = classify(attributeName)
+			}
+		}
+		switch action {
 		case ActionRemoved:
+			if attributeName != "" {
+				result[key] = map[string]any{}
+				provenance = append(provenance, Provenance{Path: path + ".attribute_value", Action: ActionRemoved, Reason: removalReason(attributeName)})
+				continue
+			}
 			provenance = append(provenance, Provenance{Path: path, Action: ActionRemoved, Reason: removalReason(key)})
 		case ActionHashed:
-			result[key] = s.hash(value)
+			if attributeName != "" {
+				result[key] = map[string]any{"stringValue": s.hash(value)}
+			} else {
+				result[key] = s.hash(value)
+			}
 			provenance = append(provenance, Provenance{Path: path, Action: ActionHashed, Reason: "file_path"})
 		case ActionRedacted:
-			result[key] = "[REDACTED]"
+			if attributeName != "" {
+				result[key] = map[string]any{"stringValue": "[REDACTED]"}
+			} else {
+				result[key] = "[REDACTED]"
+			}
 			provenance = append(provenance, Provenance{Path: path, Action: ActionRedacted, Reason: "command_arguments"})
 		default:
 			sanitized, nestedProvenance := s.sanitizeValue(value, path)
@@ -176,9 +197,14 @@ func (s *Sanitizer) hash(value any) string {
 }
 
 func classify(key string) Action {
-	normalized := strings.NewReplacer("_", "", "-", "", " ", "").Replace(strings.ToLower(key))
+	normalized := strings.NewReplacer("_", "", "-", "", " ", "", ".", "").Replace(strings.ToLower(key))
+	for _, suffix := range []string{"email", "accountid", "conversationid", "hostname"} {
+		if strings.HasSuffix(normalized, suffix) {
+			return ActionRemoved
+		}
+	}
 	switch normalized {
-	case "prompt", "prompts", "response", "responses", "sourcecode", "command", "commandline", "commandarguments", "commandargs":
+	case "prompt", "prompts", "response", "responses", "sourcecode", "command", "commandline", "commandarguments", "commandargs", "body", "email", "accountid", "conversationid", "hostname":
 		if normalized == "commandarguments" || normalized == "commandargs" {
 			return ActionRedacted
 		}

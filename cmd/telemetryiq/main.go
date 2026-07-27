@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/api"
 	"github.com/wayne/telemetryiq/internal/config"
+	"github.com/wayne/telemetryiq/internal/privacy"
 )
 
 func main() {
@@ -22,9 +24,28 @@ func main() {
 		logger.Error("invalid configuration", "error", err)
 		os.Exit(1)
 	}
+	handler := api.NewHandler(logger)
+	if os.Getenv("TELEMETRYIQ_DEVELOPMENT_INSPECTOR") == "1" {
+		dataDir, err := os.UserConfigDir()
+		if err != nil {
+			logger.Error("locate development inspector data directory", "error", err)
+			os.Exit(1)
+		}
+		salt, err := privacy.LoadOrCreateSalt(filepath.Join(dataDir, "telemetryiq"))
+		if err != nil {
+			logger.Error("load development inspector privacy salt", "error", err)
+			os.Exit(1)
+		}
+		sanitizer, err := privacy.New(salt)
+		if err != nil {
+			logger.Error("create development inspector sanitizer", "error", err)
+			os.Exit(1)
+		}
+		handler = api.NewDevelopmentHandler(logger, sanitizer)
+	}
 	server := &http.Server{
 		Addr:              cfg.Addr(),
-		Handler:           api.NewHandler(logger),
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

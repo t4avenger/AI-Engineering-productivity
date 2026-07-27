@@ -47,6 +47,26 @@ func TestSanitizeRemovesSensitiveContentBeforeStorageBoundary(t *testing.T) {
 	}
 }
 
+func TestSanitizeRemovesSensitiveOTLPAttributeValues(t *testing.T) {
+	result := testSanitizer(t, 1).Sanitize(map[string]any{
+		"resourceLogs": []any{map[string]any{"attributes": []any{
+			map[string]any{"key": "user.email", "value": map[string]any{"stringValue": "synthetic@example.test"}},
+			map[string]any{"key": "user.account_id", "value": map[string]any{"stringValue": "synthetic-account"}},
+			map[string]any{"key": "host.name", "value": map[string]any{"stringValue": "synthetic-host"}},
+			map[string]any{"key": "conversation.id", "value": map[string]any{"stringValue": "synthetic-conversation"}},
+		}, "body": map[string]any{"stringValue": "synthetic body"}}},
+	})
+	persisted, err := json.Marshal(result.Value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, prohibited := range []string{"synthetic@example.test", "synthetic-account", "synthetic-host", "synthetic-conversation", "synthetic body"} {
+		if strings.Contains(string(persisted), prohibited) {
+			t.Fatalf("prohibited OTLP value retained: %q", prohibited)
+		}
+	}
+}
+
 func TestHashIsStablePerInstallationAndDifferentAcrossInstallations(t *testing.T) {
 	first := testSanitizer(t, 1)
 	second := testSanitizer(t, 2)
