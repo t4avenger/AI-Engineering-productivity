@@ -2,7 +2,7 @@
 
 Local-first AI engineering intelligence and governance.
 
-Task 007 adds a deterministic Codex OTLP trace-fixture normaliser to the repository scaffold, loopback Go daemon, React health page, validated privacy-safe configuration, canonical schemas, and OTLP/HTTP ingest proof. It does not persist telemetry, use a database, or implement authentication.
+Task 008 adds privacy-safe SQLite persistence and deterministic session reconstruction. It does not yet connect live ingestion to storage, expose session APIs, or implement authentication.
 
 ## Requirements
 
@@ -34,7 +34,7 @@ This proof keeps only aggregate accepted/rejected counters in process memory. It
 
 ## Codex fixture normalisation
 
-The Task 007 normaliser accepts only reviewed, sanitised Codex OTLP trace fixtures. It deterministically maps one trace span to one canonical event, preserves safe unknown fields in provider extensions, and explicitly marks capabilities absent from the synthetic fixture as unavailable. See docs/integrations/codex-normaliser.md; no telemetry is persisted by this task.
+The Task 007 normaliser accepts only reviewed, sanitised Codex OTLP trace fixtures. It deterministically maps one trace span to one canonical event, preserves safe unknown fields in provider extensions, and explicitly marks capabilities absent from the synthetic fixture as unavailable. Task 008 persists canonical events through a storage-agnostic interface after sanitisation.
 
 ## Privacy pipeline
 
@@ -82,4 +82,4 @@ Contract and fuzz checks report not applicable until their corresponding product
 
 ## Current scope
 
-Task 007 deliberately excludes telemetry persistence, session reconstruction, analytics, and third-party telemetry. Authentication will be introduced in a later local-only task without weakening loopback defaults.
+Task 008 deliberately excludes live ingest-to-storage wiring, session APIs, analytics, and third-party telemetry. Authentication will be introduced in a later local-only task without weakening loopback defaults.
