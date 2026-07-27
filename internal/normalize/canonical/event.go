@@ -24,3 +24,16 @@ type Event struct {
 	Attributes         map[string]any `json:"attributes"`
 	ProviderExtensions map[string]any `json:"provider_extensions"`
 }
+
+// Session is the reconstructed canonical session envelope.
+type Session struct {
+	SchemaVersion      string         `json:"schema_version"`
+	SessionID          string         `json:"session_id"`
+	Provider           string         `json:"provider"`
+	Tool               string         `json:"tool"`
+	State              string         `json:"state"`
+	StartedAt          time.Time      `json:"started_at"`
+	CompletedAt        *time.Time     `json:"completed_at"`
+	Attributes         map[string]any `json:"attributes"`
+	ProviderExtensions map[string]any `json:"provider_extensions"`
+}
