@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/wayne/telemetryiq/internal/privacy"
 )
 
 type HealthResponse struct {
@@ -14,12 +16,23 @@ type HealthResponse struct {
 }
 
 func NewHandler(logger *slog.Logger) http.Handler {
-	ingest := newOTLPHTTPIngest()
+	return newHandler(logger, nil)
+}
+
+func NewDevelopmentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer) http.Handler {
+	return newHandler(logger, newSanitizedInspector(sanitizer))
+}
+
+func newHandler(logger *slog.Logger, inspector *sanitizedInspector) http.Handler {
+	ingest := newOTLPHTTPIngest(inspector)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", healthHandler(logger))
 	mux.HandleFunc("POST /v1/traces", ingest.tracesHandler)
 	mux.HandleFunc("POST /v1/logs", ingest.logsHandler)
 	mux.HandleFunc("GET /api/v1/ingest/counters", ingest.countersHandler)
+	if inspector != nil {
+		mux.HandleFunc("GET /api/v1/development/last-ingest", inspector.handler)
+	}
 	return requestLogger(logger, withCORS(mux))
 }
 

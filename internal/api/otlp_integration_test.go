@@ -6,8 +6,12 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/wayne/telemetryiq/internal/privacy"
 )
 
 func TestOTLPHTTPIngestProof(t *testing.T) {
@@ -49,6 +53,57 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	}
 	if counters.AcceptedPayloads != 2 || counters.RejectedPayloads != 4 {
 		t.Fatalf("unexpected counters: %+v", counters)
+	}
+}
+
+func TestObservedSanitisedFixtureReplaysToLogsReceiver(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "fixtures", "codex", "observed-sanitised", "codex-0.145.0-logs.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Payload json.RawMessage `json:"payload"`
+	}
+	if err := json.Unmarshal(data, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(NewHandler(slog.Default()))
+	t.Cleanup(server.Close)
+	response := postOTLPToPath(t, server.URL, "/v1/logs", fixture.Payload, "application/json")
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("fixture replay status = %d", response.StatusCode)
+	}
+	closeBody(t, response)
+}
+
+func TestDevelopmentInspectorSanitizesOTLPAttributes(t *testing.T) {
+	sanitizer, err := privacy.New(make([]byte, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(NewDevelopmentHandler(slog.Default(), sanitizer))
+	t.Cleanup(server.Close)
+	payload := []byte(`{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"attributes":[{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"model","value":{"stringValue":"synthetic-model"}}],"body":{"stringValue":"synthetic body"}}]}]}]}`)
+	response := postOTLPToPath(t, server.URL, "/v1/logs", payload, "application/json")
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("inspector ingest status = %d", response.StatusCode)
+	}
+	closeBody(t, response)
+	inspected, err := http.Get(server.URL + "/api/v1/development/last-ingest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeBody(t, inspected)
+	var value any
+	if err := json.NewDecoder(inspected.Body).Decode(&value); err != nil {
+		t.Fatal(err)
+	}
+	serialized, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(serialized), "synthetic@example.test") || strings.Contains(string(serialized), "synthetic body") {
+		t.Fatalf("development inspector leaked sensitive content: %s", serialized)
 	}
 }
 

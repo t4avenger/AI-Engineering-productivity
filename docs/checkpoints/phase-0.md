@@ -1,45 +1,45 @@
 # Phase 0 Checkpoint
 
-Status: in progress
-
-This checkpoint is a skeleton for Phase 0 evidence. It does not claim Phase 0 is complete.
+Status: complete
 
 ## Scope Demo
 
-- Pending: local Codex telemetry proof.
+- Codex 0.145.0 synthetic session exported OTLP logs to the loopback receiver.
+- Sanitized observed fixture and capability findings are recorded under docs/integrations.
 
 ## Command Outputs Or CI Links
 
-- Pending.
+- make verify-push passed on 2026-07-27.
+- Isolated live confirmation passed with sensitive OTLP attribute values absent from inspector output.
 
 ## Coverage Summary
 
-- Pending.
+- Backend coverage and configured thresholds passed in make verify-push.
 
 ## Static-Analysis Summary
 
-- Pending.
+- Static analysis reported 0 issues.
 
 ## Security/Privacy Summary
 
-- Pending.
+- No leaks reported by security scan. OTLP email, account ID, hostname, conversation ID, and log body regression tests pass.
 
 ## Performance Summary
 
-- Pending.
+- Not applicable: no user-facing performance path changed.
 
 ## Accessibility Summary
 
-- Pending.
+- Not applicable: no web UI changed.
 
 ## Known Defects
 
-- Pending.
+- None open for Phase 0. The observed sensitive-attribute leak was fixed before this decision.
 
 ## Risks Owners
 
-- Pending.
+- Product owner: privacy boundary and observed fixture review complete.
 
 ## Decision
 
-NO-GO: Phase 0 exit criteria are not complete.
+GO: Phase 0 telemetry feasibility exit criteria are met.

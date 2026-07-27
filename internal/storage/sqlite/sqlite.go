@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	// Register the pure-Go SQLite driver with database/sql.
 	_ "modernc.org/sqlite"
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
@@ -27,8 +28,14 @@ func Open(path string, sanitizer *privacy.Sanitizer) (*Repository, error) {
 		return nil, errors.New("privacy sanitizer is required")
 	}
 	if path != ":memory:" {
-		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		directory := filepath.Dir(path)
+		if err := os.MkdirAll(directory, 0o700); err != nil {
 			return nil, fmt.Errorf("create database directory: %w", err)
+		}
+		if directory != "." {
+			if err := os.Chmod(directory, 0o700); err != nil {
+				return nil, fmt.Errorf("secure database directory: %w", err)
+			}
 		}
 	}
 	db, err := sql.Open("sqlite", path)
@@ -42,7 +49,10 @@ func Open(path string, sanitizer *privacy.Sanitizer) (*Repository, error) {
 		return nil, err
 	}
 	if path != ":memory:" {
-		_ = os.Chmod(path, 0o600)
+		if err := os.Chmod(path, 0o600); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("secure database file: %w", err)
+		}
 	}
 	return r, nil
 }
@@ -73,8 +83,14 @@ func (r *Repository) SaveEvents(ctx context.Context, events []canonical.Event) e
 		if err != nil {
 			return err
 		}
-		payload, _ := json.Marshal(safe)
-		provenanceJSON, _ := json.Marshal(provenance)
+		payload, err := json.Marshal(safe)
+		if err != nil {
+			return fmt.Errorf("marshal sanitized event: %w", err)
+		}
+		provenanceJSON, err := json.Marshal(provenance)
+		if err != nil {
+			return fmt.Errorf("marshal sanitization provenance: %w", err)
+		}
 		if _, err = tx.ExecContext(ctx, "INSERT OR IGNORE INTO events(event_id,session_id,occurred_at,event_json,provenance_json) VALUES(?,?,?,?,?)", safe.EventID, safe.SessionID, safe.OccurredAt.UTC().Format(timeFormat), payload, provenanceJSON); err != nil {
 			return err
 		}
@@ -112,29 +128,41 @@ func (r *Repository) safeEvent(event canonical.Event) (canonical.Event, []privac
 }
 
 func (r *Repository) rebuildSession(ctx context.Context, tx *sql.Tx, id string) error {
-	rows, err := tx.QueryContext(ctx, "SELECT event_json FROM events WHERE session_id=? ORDER BY occurred_at,event_id", id)
+	events, err := loadSessionEvents(ctx, tx, id)
 	if err != nil {
 		return err
+	}
+	if len(events) == 0 {
+		return nil
+	}
+	return upsertSession(ctx, tx, reconstructSession(id, events))
+}
+
+func loadSessionEvents(ctx context.Context, tx *sql.Tx, id string) ([]canonical.Event, error) {
+	rows, err := tx.QueryContext(ctx, "SELECT event_json FROM events WHERE session_id=? ORDER BY occurred_at,event_id", id)
+	if err != nil {
+		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 	var events []canonical.Event
 	for rows.Next() {
 		var data []byte
 		if err := rows.Scan(&data); err != nil {
-			return err
+			return nil, err
 		}
 		var e canonical.Event
 		if err := json.Unmarshal(data, &e); err != nil {
-			return err
+			return nil, err
 		}
 		events = append(events, e)
 	}
 	if err := rows.Err(); err != nil {
-		return err
+		return nil, err
 	}
-	if len(events) == 0 {
-		return nil
-	}
+	return events, nil
+}
+
+func reconstructSession(id string, events []canonical.Event) canonical.Session {
 	first := events[0]
 	session := canonical.Session{SchemaVersion: first.SchemaVersion, SessionID: id, Provider: first.Provider, Tool: first.Tool, State: "unknown", StartedAt: first.OccurredAt, Attributes: map[string]any{"event_count": len(events)}, ProviderExtensions: map[string]any{}}
 	for _, e := range events {
@@ -144,11 +172,20 @@ func (r *Repository) rebuildSession(ctx context.Context, tx *sql.Tx, id string) 
 			if terminal(state) {
 				at := e.OccurredAt
 				session.CompletedAt = &at
+			} else {
+				session.CompletedAt = nil
 			}
 		}
 	}
-	data, _ := json.Marshal(session)
-	_, err = tx.ExecContext(ctx, "INSERT INTO sessions(session_id,session_json) VALUES(?,?) ON CONFLICT(session_id) DO UPDATE SET session_json=excluded.session_json", id, data)
+	return session
+}
+
+func upsertSession(ctx context.Context, tx *sql.Tx, session canonical.Session) error {
+	data, err := json.Marshal(session)
+	if err != nil {
+		return fmt.Errorf("marshal reconstructed session: %w", err)
+	}
+	_, err = tx.ExecContext(ctx, "INSERT INTO sessions(session_id,session_json) VALUES(?,?) ON CONFLICT(session_id) DO UPDATE SET session_json=excluded.session_json", session.SessionID, data)
 	return err
 }
 func lifecycle(t string) string {
@@ -182,7 +219,7 @@ func (r *Repository) Session(ctx context.Context, id string) (canonical.Session,
 	}
 	var s canonical.Session
 	err = json.Unmarshal(data, &s)
-	return s, err == nil, err
+	return s, true, err
 }
 func (r *Repository) DeleteSession(ctx context.Context, id string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
