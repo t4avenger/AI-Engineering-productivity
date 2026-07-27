@@ -17,6 +17,16 @@ func TestValidateAcceptsReviewedSyntheticFixture(t *testing.T) {
 	}
 }
 
+func TestValidateAcceptsReviewedObservedSanitisedFixture(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "fixtures", "codex", "observed-sanitised", "codex-0.145.0-logs.json"))
+	if err != nil {
+		t.Fatalf("read observed fixture: %v", err)
+	}
+	if err := Validate(data); err != nil {
+		t.Fatalf("validate observed fixture: %v", err)
+	}
+}
+
 func TestValidateRejectsLikelySecretsAndProhibitedFields(t *testing.T) {
 	for _, test := range []struct{ name, payload, want, secret string }{
 		{name: "prompt", payload: `{"prompt":"synthetic"}`, want: "payload.prompt", secret: "synthetic"},

@@ -14,8 +14,9 @@ const maxOTLPPayloadBytes int64 = 1 << 20 // 1 MiB
 // otlpHTTPIngest is deliberately transient. Task 004 proves that TelemetryIQ
 // can receive OTLP/HTTP safely; later tasks redact and persist canonical data.
 type otlpHTTPIngest struct {
-	accepted atomic.Uint64
-	rejected atomic.Uint64
+	accepted  atomic.Uint64
+	rejected  atomic.Uint64
+	inspector *sanitizedInspector
 }
 
 type ingestCountersResponse struct {
@@ -32,8 +33,8 @@ type ingestError struct {
 	Message string `json:"message"`
 }
 
-func newOTLPHTTPIngest() *otlpHTTPIngest {
-	return &otlpHTTPIngest{}
+func newOTLPHTTPIngest(inspector *sanitizedInspector) *otlpHTTPIngest {
+	return &otlpHTTPIngest{inspector: inspector}
 }
 
 func (i *otlpHTTPIngest) tracesHandler(w http.ResponseWriter, r *http.Request) {
@@ -76,6 +77,9 @@ func (i *otlpHTTPIngest) receive(w http.ResponseWriter, r *http.Request, resourc
 		return
 	}
 
+	if i.inspector != nil {
+		i.inspector.capture(payload)
+	}
 	// Do not retain or log the raw payload. The proof only records its receipt.
 	i.accepted.Add(1)
 	w.WriteHeader(http.StatusAccepted)
