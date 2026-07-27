@@ -54,6 +54,25 @@ func TestCanonicalEventAcceptsProviderExtensions(t *testing.T) {
 	}
 }
 
+func TestCanonicalEventAcceptsCodexNormaliserGoldenFixture(t *testing.T) {
+	t.Parallel()
+
+	root := repositoryRoot(t)
+	schema, err := jsonschema.NewCompiler().Compile(filepath.Join(root, "schemas", "canonical-event.schema.json"))
+	if err != nil {
+		t.Fatalf("compile schema: %v", err)
+	}
+	events, ok := readJSON(t, filepath.Join(root, "fixtures", "codex", "expected", "fixture-001.canonical.json")).([]any)
+	if !ok {
+		t.Fatal("Codex golden fixture must be an array")
+	}
+	for index, event := range events {
+		if err := schema.Validate(event); err != nil {
+			t.Fatalf("Codex golden event %d must validate: %v", index, err)
+		}
+	}
+}
+
 func schemaFixtureName(schema string) string {
 	return schema[:len(schema)-len(".schema.json")] + ".json"
 }

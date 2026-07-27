@@ -2,7 +2,7 @@
 
 Local-first AI engineering intelligence and governance.
 
-Task 005 adds a privacy pipeline to the repository scaffold, loopback Go daemon, React health page, validated privacy-safe configuration, canonical schemas, and OTLP/HTTP ingest proof. It does not persist telemetry, use a database, or implement authentication.
+Task 007 adds a deterministic Codex OTLP trace-fixture normaliser to the repository scaffold, loopback Go daemon, React health page, validated privacy-safe configuration, canonical schemas, and OTLP/HTTP ingest proof. It does not persist telemetry, use a database, or implement authentication.
 
 ## Requirements
 
@@ -31,6 +31,10 @@ The daemon binds to `127.0.0.1:8080` by default and exposes `GET /api/v1/health`
 `POST /v1/traces` and `POST /v1/logs` accept one JSON OTLP payload with a non-empty `resourceSpans` or `resourceLogs` array. Requests must use `application/json` and are limited to 1 MiB. Each endpoint returns `202 Accepted` for accepted payloads and JSON errors with a stable `error.code` for malformed, invalid, unsupported-media-type, or oversized requests.
 
 This proof keeps only aggregate accepted/rejected counters in process memory. It neither logs nor persists raw telemetry content. Task 005 provides the privacy boundary that later normalisation and persistence work must use.
+
+## Codex fixture normalisation
+
+The Task 007 normaliser accepts only reviewed, sanitised Codex OTLP trace fixtures. It deterministically maps one trace span to one canonical event, preserves safe unknown fields in provider extensions, and explicitly marks capabilities absent from the synthetic fixture as unavailable. See docs/integrations/codex-normaliser.md; no telemetry is persisted by this task.
 
 ## Privacy pipeline
 
@@ -78,4 +82,4 @@ Contract and fuzz checks report not applicable until their corresponding product
 
 ## Current scope
 
-Task 005 deliberately excludes telemetry persistence, provider adapters, analytics, and third-party telemetry. Authentication will be introduced in a later local-only task without weakening loopback defaults.
+Task 007 deliberately excludes telemetry persistence, session reconstruction, analytics, and third-party telemetry. Authentication will be introduced in a later local-only task without weakening loopback defaults.
