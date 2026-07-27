@@ -33,18 +33,52 @@ func Validate(data []byte) error {
 }
 
 func validateMetadata(document map[string]any) error {
+	if err := requireMetadata(document); err != nil {
+		return err
+	}
+	if err := validateFixtureVersion(document); err != nil {
+		return err
+	}
+	if err := validateFixtureOrigin(document); err != nil {
+		return err
+	}
+	if err := validateTextMetadata(document); err != nil {
+		return err
+	}
+	if err := validateCapturedAt(document); err != nil {
+		return err
+	}
+	if err := validateReview(document); err != nil {
+		return err
+	}
+	return validatePayload(document)
+}
+
+func requireMetadata(document map[string]any) error {
 	for _, field := range []string{"fixture_version", "fixture_origin", "provider", "tool", "tool_version", "captured_at", "sanitisation_reviewed", "payload"} {
 		if _, found := document[field]; !found {
 			return fmt.Errorf("fixture metadata is missing %q", field)
 		}
 	}
+	return nil
+}
+
+func validateFixtureVersion(document map[string]any) error {
 	if version, ok := document["fixture_version"].(float64); !ok || version != 1 {
 		return errors.New("fixture_version must be 1")
 	}
+	return nil
+}
+
+func validateFixtureOrigin(document map[string]any) error {
 	origin, ok := document["fixture_origin"].(string)
 	if !ok || (origin != "synthetic" && origin != "observed-sanitised") {
 		return errors.New("fixture_origin must be synthetic or observed-sanitised")
 	}
+	return nil
+}
+
+func validateTextMetadata(document map[string]any) error {
 	for _, field := range []string{"provider", "tool", "tool_version"} {
 		if value, ok := document[field].(string); !ok || strings.TrimSpace(value) == "" {
 			return fmt.Errorf("fixture metadata %q must be a non-empty string", field)
@@ -53,6 +87,10 @@ func validateMetadata(document map[string]any) error {
 	if document["tool"] != "codex" {
 		return errors.New("fixture metadata tool must be codex")
 	}
+	return nil
+}
+
+func validateCapturedAt(document map[string]any) error {
 	capturedAt, ok := document["captured_at"].(string)
 	if !ok {
 		return errors.New("fixture metadata captured_at must be RFC3339")
@@ -60,9 +98,17 @@ func validateMetadata(document map[string]any) error {
 	if _, err := time.Parse(time.RFC3339, capturedAt); err != nil {
 		return errors.New("fixture metadata captured_at must be RFC3339")
 	}
+	return nil
+}
+
+func validateReview(document map[string]any) error {
 	if reviewed, ok := document["sanitisation_reviewed"].(bool); !ok || !reviewed {
 		return errors.New("fixture metadata sanitisation_reviewed must be true")
 	}
+	return nil
+}
+
+func validatePayload(document map[string]any) error {
 	if _, ok := document["payload"].(map[string]any); !ok {
 		return errors.New("fixture metadata payload must be an object")
 	}

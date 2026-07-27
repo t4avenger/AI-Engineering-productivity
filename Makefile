@@ -49,6 +49,7 @@ test-race:
 test-fuzz-smoke:
 	go test ./internal/config -run='^$$' -fuzz=FuzzLoad -fuzztime=3s
 	go test ./internal/privacy -run='^$$' -fuzz=FuzzSanitize -fuzztime=3s
+	go test ./internal/normalize/codex -run='^$$' -fuzz=FuzzNormalize -fuzztime=3s
 
 test-performance-smoke:
 	bash scripts/performance-smoke.sh

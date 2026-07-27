@@ -1,7 +1,12 @@
 version: "2"
 linters:
   enable:
+    - cyclop
     - govet
     - ineffassign
     - staticcheck
     - unused
+  settings:
+    cyclop:
+      max-complexity: 15
+      package-average: 0.0
