@@ -2,7 +2,7 @@
 
 Local-first AI engineering intelligence and governance.
 
-Task 008 adds privacy-safe SQLite persistence and deterministic session reconstruction. It does not yet connect live ingestion to storage, expose session APIs, or implement authentication.
+Task 009 adds a privacy-safe, SQLite-backed session API. It does not yet connect live ingestion to storage or implement local API authentication.
 
 ## Requirements
 
@@ -24,17 +24,23 @@ make run-daemon
 make run-web
 ```
 
-The daemon binds to `127.0.0.1:8080` by default and exposes `GET /api/v1/health`, `POST /v1/traces`, `POST /v1/logs`, and `GET /api/v1/ingest/counters`.
+The daemon binds to `127.0.0.1:8080` by default and exposes `GET /api/v1/health`, `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}`, `POST /v1/traces`, `POST /v1/logs`, and `GET /api/v1/ingest/counters`.
 
 ## OTLP/HTTP ingest proof
 
 `POST /v1/traces` and `POST /v1/logs` accept one JSON OTLP payload with a non-empty `resourceSpans` or `resourceLogs` array. Requests must use `application/json` and are limited to 1 MiB. Each endpoint returns `202 Accepted` for accepted payloads and JSON errors with a stable `error.code` for malformed, invalid, unsupported-media-type, or oversized requests.
 
-This proof keeps only aggregate accepted/rejected counters in process memory. It neither logs nor persists raw telemetry content. Task 005 provides the privacy boundary that later normalisation and persistence work must use.
+This proof keeps only aggregate accepted/rejected counters in process memory. It neither logs nor persists raw telemetry content. The live ingest-to-normalisation-to-storage connection remains a later task.
 
 ## Codex fixture normalisation
 
 The Task 007 normaliser accepts only reviewed, sanitised Codex OTLP trace fixtures. It deterministically maps one trace span to one canonical event, preserves safe unknown fields in provider extensions, and explicitly marks capabilities absent from the synthetic fixture as unavailable. Task 008 persists canonical events through a storage-agnostic interface after sanitisation.
+
+## Session API
+
+`GET /api/v1/sessions` returns the stable envelope `{data, pagination}`. It accepts `limit` (1–100), opaque `cursor`, `tool`, `model`, `outcome`, `started_after`, and `started_before` (RFC3339) filters. Results are reverse chronological and use `next_cursor` for pagination. A model filter only matches model metadata that was actually observed; unavailable model values are not invented.
+
+`GET /api/v1/sessions/{id}` returns `{data}` or a stable JSON error. The API reads the local database at the platform configuration directory (`telemetryiq/telemetryiq.db`); the database directory is mode `0700` and database file mode is `0600`.
 
 ## Privacy pipeline
 
@@ -82,4 +88,4 @@ Contract and fuzz checks report not applicable until their corresponding product
 
 ## Current scope
 
-Task 008 deliberately excludes live ingest-to-storage wiring, session APIs, analytics, and third-party telemetry. Authentication will be introduced in a later local-only task without weakening loopback defaults.
+Task 009 deliberately excludes live ingest-to-storage wiring, authentication, analytics, and third-party telemetry. Authentication will be introduced in a later local-only task without weakening loopback defaults.

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	// Register the pure-Go SQLite driver with database/sql.
@@ -16,6 +17,7 @@ import (
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/privacy"
+	"github.com/wayne/telemetryiq/internal/storage"
 )
 
 type Repository struct {
@@ -220,6 +222,85 @@ func (r *Repository) Session(ctx context.Context, id string) (canonical.Session,
 	var s canonical.Session
 	err = json.Unmarshal(data, &s)
 	return s, true, err
+}
+
+// ListSessions returns sessions in deterministic reverse chronological order.
+func (r *Repository) ListSessions(ctx context.Context, filter storage.SessionFilter) ([]canonical.Session, error) {
+	rows, err := r.db.QueryContext(ctx, "SELECT session_json FROM sessions")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var sessions []canonical.Session
+	for rows.Next() {
+		var data []byte
+		if err := rows.Scan(&data); err != nil {
+			return nil, err
+		}
+		var session canonical.Session
+		if err := json.Unmarshal(data, &session); err != nil {
+			return nil, err
+		}
+		if !matchesSessionFilter(session, filter) {
+			continue
+		}
+		if filter.Model != "" {
+			matches, err := r.sessionHasModel(ctx, session.SessionID, filter.Model)
+			if err != nil {
+				return nil, err
+			}
+			if !matches {
+				continue
+			}
+		}
+		sessions = append(sessions, session)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	sort.Slice(sessions, func(i, j int) bool {
+		if sessions[i].StartedAt.Equal(sessions[j].StartedAt) {
+			return sessions[i].SessionID > sessions[j].SessionID
+		}
+		return sessions[i].StartedAt.After(sessions[j].StartedAt)
+	})
+	return sessions, nil
+}
+
+func matchesSessionFilter(session canonical.Session, filter storage.SessionFilter) bool {
+	if filter.Tool != "" && session.Tool != filter.Tool {
+		return false
+	}
+	if filter.Outcome != "" && session.State != filter.Outcome {
+		return false
+	}
+	if filter.StartedAfter != nil && session.StartedAt.Before(*filter.StartedAfter) {
+		return false
+	}
+	return filter.StartedBefore == nil || session.StartedAt.Before(*filter.StartedBefore)
+}
+
+func (r *Repository) sessionHasModel(ctx context.Context, sessionID, model string) (bool, error) {
+	rows, err := r.db.QueryContext(ctx, "SELECT event_json FROM events WHERE session_id=?", sessionID)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var data []byte
+		if err := rows.Scan(&data); err != nil {
+			return false, err
+		}
+		var event canonical.Event
+		if err := json.Unmarshal(data, &event); err != nil {
+			return false, err
+		}
+		if reportedModel, ok := event.Attributes["model"].(string); ok && reportedModel == model {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 func (r *Repository) DeleteSession(ctx context.Context, id string) error {
 	tx, err := r.db.BeginTx(ctx, nil)

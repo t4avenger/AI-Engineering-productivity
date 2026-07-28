@@ -10,6 +10,7 @@ import (
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/privacy"
+	"github.com/wayne/telemetryiq/internal/storage"
 )
 
 func TestPersistenceAcceptance(t *testing.T) {
@@ -139,6 +140,43 @@ func TestOpenSecuresDatabaseAndDirectory(t *testing.T) {
 	defer func() { _ = repo.Close() }()
 	assertMode(t, filepath.Dir(path), 0o700)
 	assertMode(t, path, 0o600)
+}
+
+func TestListSessionsFiltersAndOrdersDeterministically(t *testing.T) {
+	sanitizer, err := privacy.New(make([]byte, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo, err := Open(":memory:", sanitizer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = repo.Close() }()
+	early := event(t, "early", "early", "session.completed", "2026-01-02T09:00:00Z")
+	early.Attributes["model"] = "model-a"
+	late := event(t, "late", "late", "session.failed", "2026-01-02T11:00:00Z")
+	late.Attributes["model"] = "model-b"
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{early, late}); err != nil {
+		t.Fatal(err)
+	}
+	startedAfter, err := time.Parse(time.RFC3339, "2026-01-02T10:00:00Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessions, err := repo.ListSessions(context.Background(), storage.SessionFilter{Model: "model-b", Outcome: "failed", StartedAfter: &startedAfter})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sessions) != 1 || sessions[0].SessionID != "late" {
+		t.Fatalf("filtered sessions = %#v", sessions)
+	}
+	all, err := repo.ListSessions(context.Background(), storage.SessionFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 2 || all[0].SessionID != "late" || all[1].SessionID != "early" {
+		t.Fatalf("session order = %#v", all)
+	}
 }
 
 func assertMode(t *testing.T, path string, want os.FileMode) {

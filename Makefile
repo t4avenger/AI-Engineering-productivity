@@ -38,7 +38,7 @@ test-integration:
 	go test ./internal/api
 
 test-contract:
-	bash scripts/not-applicable.sh "contract tests" "Task 001 exposes only the health endpoint covered by unit and E2E tests."
+	go test ./internal/api -run '^TestSessionAPIContract$$'
 
 test-e2e:
 	npm run test:e2e --prefix $(WEB_DIR)

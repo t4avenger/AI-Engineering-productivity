@@ -14,6 +14,7 @@ import (
 	"github.com/wayne/telemetryiq/internal/api"
 	"github.com/wayne/telemetryiq/internal/config"
 	"github.com/wayne/telemetryiq/internal/privacy"
+	"github.com/wayne/telemetryiq/internal/storage/sqlite"
 )
 
 func main() {
@@ -24,24 +25,32 @@ func main() {
 		logger.Error("invalid configuration", "error", err)
 		os.Exit(1)
 	}
-	handler := api.NewHandler(logger)
+	dataDir, err := os.UserConfigDir()
+	if err != nil {
+		logger.Error("locate application data directory", "error", err)
+		os.Exit(1)
+	}
+	telemetryDir := filepath.Join(dataDir, "telemetryiq")
+	salt, err := privacy.LoadOrCreateSalt(telemetryDir)
+	if err != nil {
+		logger.Error("load privacy salt", "error", err)
+		os.Exit(1)
+	}
+	sanitizer, err := privacy.New(salt)
+	if err != nil {
+		logger.Error("create privacy sanitizer", "error", err)
+		os.Exit(1)
+	}
+	repository, err := sqlite.Open(filepath.Join(telemetryDir, "telemetryiq.db"), sanitizer)
+	if err != nil {
+		logger.Error("open local session storage", "error", err)
+		os.Exit(1)
+	}
+	defer func() { _ = repository.Close() }()
+
+	handler := api.NewHandler(logger, repository)
 	if os.Getenv("TELEMETRYIQ_DEVELOPMENT_INSPECTOR") == "1" {
-		dataDir, err := os.UserConfigDir()
-		if err != nil {
-			logger.Error("locate development inspector data directory", "error", err)
-			os.Exit(1)
-		}
-		salt, err := privacy.LoadOrCreateSalt(filepath.Join(dataDir, "telemetryiq"))
-		if err != nil {
-			logger.Error("load development inspector privacy salt", "error", err)
-			os.Exit(1)
-		}
-		sanitizer, err := privacy.New(salt)
-		if err != nil {
-			logger.Error("create development inspector sanitizer", "error", err)
-			os.Exit(1)
-		}
-		handler = api.NewDevelopmentHandler(logger, sanitizer)
+		handler = api.NewDevelopmentHandler(logger, sanitizer, repository)
 	}
 	server := &http.Server{
 		Addr:              cfg.Addr(),
