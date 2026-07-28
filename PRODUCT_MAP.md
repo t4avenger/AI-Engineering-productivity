@@ -1431,6 +1431,42 @@ Validate team analytics and governance without employee ranking.
 
 ---
 
+## Phase 9: Observed telemetry capability planning
+
+### Objective
+Plan and validate, before implementation, two currently unscheduled capabilities:
+observed skill usage and service degradation under high context. This phase is a
+discovery and design gate; it does not authorise collection or presentation of
+either capability.
+
+### Deliverables
+- sanitised, versioned fixtures showing whether supported tools expose skill
+  identity or invocation evidence
+- a capability matrix that distinguishes observed, supported, partial,
+  unsupported, and unknown skill data
+- a privacy data inventory and retention decision for every candidate field
+- explicit measurement definitions for context pressure and service degradation,
+  including token, cache, latency, error, retry, and availability signals
+- controlled synthetic workload plan, baseline, threshold method, and false
+  certainty safeguards
+- UX wording and evidence requirements that label unavailable or insufficient
+  data rather than inferring skill use or degraded service
+- approved architecture decision and implementation-ready technical plan
+
+### Exit criteria
+- No candidate field is retained without observed fixture evidence and a
+  documented privacy transformation.
+- Skill usage is represented only when the provider exposes it; absent evidence
+  remains unavailable.
+- Service-degradation claims define their baseline, window, threshold, and
+  confidence; high context alone is never treated as degradation.
+- The plan includes deterministic fixtures and acceptance tests for each
+  approved capability.
+- A product, privacy, and architecture review explicitly authorises any
+  subsequent implementation work.
+
+---
+
 ## 20. Backlog after MVP
 
 - Cursor analytics integration
@@ -1731,6 +1767,10 @@ Initial questions:
 10. Which events remain accessible when the application is offline?
 11. What is the safest installation and configuration workflow?
 12. Which initial insights do alpha users consider genuinely useful?
+13. Does each supported tool expose a stable, privacy-safe skill identity or
+    invocation record?
+14. Which observed latency, error, retry, token, and cache signals can support
+    a bounded service-degradation measurement without making causal claims?
 
 Never resolve these by assumption. Resolve them through fixtures, experiments, or authoritative documentation.
 
