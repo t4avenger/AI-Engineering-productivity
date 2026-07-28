@@ -39,7 +39,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export async function fetchSessions(): Promise<Session[]> {
   const response = await request<SessionListResponse>('/sessions?limit=100');
   if (!Array.isArray(response.data)) {
-    throw new Error('Session list response was malformed');
+    throw new TypeError('Session list response was malformed');
   }
   return response.data;
 }
@@ -52,7 +52,7 @@ export async function fetchSession(id: string): Promise<Session> {
     response.data === undefined ||
     typeof response.data.session_id !== 'string'
   ) {
-    throw new Error('Session detail response was malformed');
+    throw new TypeError('Session detail response was malformed');
   }
   return response.data as Session;
 }

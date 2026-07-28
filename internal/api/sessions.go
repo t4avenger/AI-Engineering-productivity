@@ -16,6 +16,8 @@ const (
 	defaultSessionLimit  = 50
 	maximumSessionLimit  = 100
 	invalidCursorMessage = "cursor is invalid"
+	sessionUnavailable   = "session storage is unavailable"
+	sessionNotFound      = "session was not found"
 )
 
 type sessionAPI struct {
@@ -58,7 +60,7 @@ func newSessionAPI(sessions storage.SessionReader) sessionAPI {
 
 func (a sessionAPI) list(w http.ResponseWriter, r *http.Request) {
 	if a.sessions == nil {
-		writeSessionError(w, http.StatusServiceUnavailable, "sessions_unavailable", "session storage is unavailable")
+		writeSessionError(w, http.StatusServiceUnavailable, "sessions_unavailable", sessionUnavailable)
 		return
 	}
 	filter, limit, cursor, err := parseSessionListQuery(r)
@@ -80,12 +82,12 @@ func (a sessionAPI) list(w http.ResponseWriter, r *http.Request) {
 
 func (a sessionAPI) detail(w http.ResponseWriter, r *http.Request) {
 	if a.sessions == nil {
-		writeSessionError(w, http.StatusServiceUnavailable, "sessions_unavailable", "session storage is unavailable")
+		writeSessionError(w, http.StatusServiceUnavailable, "sessions_unavailable", sessionUnavailable)
 		return
 	}
 	id := r.PathValue("id")
 	if strings.TrimSpace(id) == "" {
-		writeSessionError(w, http.StatusNotFound, "session_not_found", "session was not found")
+		writeSessionError(w, http.StatusNotFound, "session_not_found", sessionNotFound)
 		return
 	}
 	session, found, err := a.sessions.Session(r.Context(), id)
@@ -94,7 +96,7 @@ func (a sessionAPI) detail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !found {
-		writeSessionError(w, http.StatusNotFound, "session_not_found", "session was not found")
+		writeSessionError(w, http.StatusNotFound, "session_not_found", sessionNotFound)
 		return
 	}
 	writeSessionJSON(w, http.StatusOK, sessionDetailResponse{Data: session})
@@ -102,12 +104,12 @@ func (a sessionAPI) detail(w http.ResponseWriter, r *http.Request) {
 
 func (a sessionAPI) delete(w http.ResponseWriter, r *http.Request) {
 	if a.deleter == nil {
-		writeSessionError(w, http.StatusServiceUnavailable, "sessions_unavailable", "session storage is unavailable")
+		writeSessionError(w, http.StatusServiceUnavailable, "sessions_unavailable", sessionUnavailable)
 		return
 	}
 	id := r.PathValue("id")
 	if strings.TrimSpace(id) == "" {
-		writeSessionError(w, http.StatusNotFound, "session_not_found", "session was not found")
+		writeSessionError(w, http.StatusNotFound, "session_not_found", sessionNotFound)
 		return
 	}
 	_, found, err := a.sessions.Session(r.Context(), id)
@@ -116,7 +118,7 @@ func (a sessionAPI) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !found {
-		writeSessionError(w, http.StatusNotFound, "session_not_found", "session was not found")
+		writeSessionError(w, http.StatusNotFound, "session_not_found", sessionNotFound)
 		return
 	}
 	if err := a.deleter.DeleteSession(r.Context(), id); err != nil {

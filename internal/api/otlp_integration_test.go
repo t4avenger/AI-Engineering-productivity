@@ -71,7 +71,7 @@ func TestCodexLogsPersistAsSanitizedCanonicalSession(t *testing.T) {
 	t.Cleanup(func() { _ = repository.Close() })
 	server := httptest.NewServer(NewPersistentHandler(slog.Default(), sanitizer, repository))
 	t.Cleanup(server.Close)
-	payload := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.version","value":{"stringValue":"0.145.0"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"synthetic-model"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"conversation.id","value":{"stringValue":"synthetic-conversation"}}],"body":{"stringValue":"synthetic body"}}]}]}]}`)
+	payload := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_cli_rs"}},{"key":"service.version","value":{"stringValue":"0.145.0"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"synthetic-model"}},{"key":"arguments","value":{"stringValue":"synthetic raw arguments"}},{"key":"output","value":{"stringValue":"synthetic raw output"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"conversation.id","value":{"stringValue":"synthetic-conversation"}}],"body":{"stringValue":"synthetic body"}}]}]}]}`)
 	response := postOTLPToPath(t, server.URL, "/v1/logs", payload, "application/json")
 	if response.StatusCode != http.StatusAccepted {
 		t.Fatalf("status = %d", response.StatusCode)

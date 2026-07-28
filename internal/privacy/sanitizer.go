@@ -208,7 +208,7 @@ func classify(key string) Action {
 		}
 	}
 	switch normalized {
-	case "prompt", "prompts", "response", "responses", "sourcecode", "command", "commandline", "commandarguments", "commandargs", "body", "email", "accountid", "conversationid", "hostname":
+	case "prompt", "prompts", "response", "responses", "sourcecode", "command", "commandline", "commandarguments", "commandargs", "arguments", "output", "body", "email", "accountid", "conversationid", "hostname":
 		if normalized == "commandarguments" || normalized == "commandargs" {
 			return ActionRedacted
 		}

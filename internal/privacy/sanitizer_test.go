@@ -18,6 +18,8 @@ func TestSanitizeRemovesSensitiveContentBeforeStorageBoundary(t *testing.T) {
 		"source_code":       "const syntheticSecret = true",
 		"file_path":         "/private/project/main.go",
 		"command_arguments": "--token synthetic-command-secret",
+		"arguments":         "synthetic raw command arguments",
+		"output":            "synthetic command output",
 		"provider_extensions": map[string]any{
 			"api_key": "synthetic-api-key",
 			"model":   "gpt-test",
@@ -28,7 +30,7 @@ func TestSanitizeRemovesSensitiveContentBeforeStorageBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal sanitized result: %v", err)
 	}
-	for _, prohibited := range []string{"synthetic prompt secret", "synthetic response secret", "syntheticSecret", "/private/project/main.go", "synthetic-command-secret", "synthetic-api-key"} {
+	for _, prohibited := range []string{"synthetic prompt secret", "synthetic response secret", "syntheticSecret", "/private/project/main.go", "synthetic-command-secret", "synthetic raw command arguments", "synthetic command output", "synthetic-api-key"} {
 		if strings.Contains(string(persisted), prohibited) {
 			t.Fatalf("prohibited value reached storage boundary: %q", prohibited)
 		}

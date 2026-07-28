@@ -121,12 +121,12 @@ function PageContent({
   health,
   sessions,
   onSelectSession,
-}: {
+}: Readonly<{
   page: Page;
   health: HealthState;
   sessions: SessionState;
   onSelectSession: (id: string) => void;
-}) {
+}>) {
   if (page === 'sessions')
     return <SessionsPage sessions={sessions} onSelect={onSelectSession} />;
   if (page === 'integrations')
@@ -138,10 +138,10 @@ function PageContent({
 function HomePage({
   health,
   sessions,
-}: {
+}: Readonly<{
   health: HealthState;
   sessions: Session[];
-}) {
+}>) {
   const outcomes = sessions.reduce<Partial<Record<Session['state'], number>>>(
     (counts, session) => {
       counts[session.state] = (counts[session.state] ?? 0) + 1;
@@ -177,10 +177,10 @@ function HomePage({
 function SessionsPage({
   sessions,
   onSelect,
-}: {
+}: Readonly<{
   sessions: SessionState;
   onSelect: (id: string) => void;
-}) {
+}>) {
   return (
     <section aria-labelledby="sessions-title" className="page">
       <p className="eyebrow">Session explorer</p>
@@ -190,7 +190,7 @@ function SessionsPage({
         rather than treated as zero.
       </p>
       {sessions.status === 'loading' ? (
-        <p role="status">Loading sessions…</p>
+        <output>Loading sessions…</output>
       ) : null}
       {sessions.status === 'error' ? (
         <p role="alert">{sessions.message}</p>
@@ -236,11 +236,11 @@ function SessionDetail({
   id,
   onBack,
   onDeleted,
-}: {
+}: Readonly<{
   id: string;
   onBack: () => void;
   onDeleted: () => void;
-}) {
+}>) {
   const [session, setSession] = useState<Session | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -271,7 +271,7 @@ function SessionDetail({
       </button>
       {error ? <p role="alert">{error}</p> : null}
       {!session ? (
-        <p role="status">Loading session…</p>
+        <output>Loading session…</output>
       ) : (
         <>
           <p className="eyebrow">Session detail</p>
@@ -347,7 +347,7 @@ function SessionDetail({
   );
 }
 
-function IntegrationsPage({ sessions }: { sessions: Session[] }) {
+function IntegrationsPage({ sessions }: Readonly<{ sessions: Session[] }>) {
   const tools = [...new Set(sessions.map((session) => session.tool))];
   return (
     <section aria-labelledby="integrations-title" className="page">
@@ -417,33 +417,38 @@ function PrivacyPage() {
   );
 }
 
-function HealthIndicator({ health }: { health: HealthState }) {
+function HealthIndicator({ health }: Readonly<{ health: HealthState }>) {
+  let label = 'Checking daemon';
+  if (health.status === 'healthy') {
+    label = 'Daemon healthy';
+  } else if (health.status === 'unhealthy') {
+    label = 'Daemon unavailable';
+  }
   return (
-    <span
+    <output
       className={health.status === 'healthy' ? 'health healthy' : 'health'}
-      role="status"
     >
-      {health.status === 'healthy'
-        ? 'Daemon healthy'
-        : health.status === 'unhealthy'
-          ? 'Daemon unavailable'
-          : 'Checking daemon'}
-    </span>
+      {label}
+    </output>
   );
 }
-function HealthSummary({ health }: { health: HealthState }) {
-  return health.status === 'healthy' ? (
-    <p>
-      <strong>Healthy.</strong> {health.data.service} was checked at{' '}
-      {formatDate(health.data.timestamp)}.
-    </p>
-  ) : health.status === 'unhealthy' ? (
-    <p role="alert">Daemon unavailable: {health.message}</p>
-  ) : (
-    <p role="status">Checking daemon…</p>
-  );
+
+function HealthSummary({ health }: Readonly<{ health: HealthState }>) {
+  if (health.status === 'healthy') {
+    return (
+      <p>
+        <strong>Healthy.</strong> {health.data.service} was checked at{' '}
+        {formatDate(health.data.timestamp)}.
+      </p>
+    );
+  }
+  if (health.status === 'unhealthy') {
+    return <p role="alert">Daemon unavailable: {health.message}</p>;
+  }
+  return <output>Checking daemon…</output>;
 }
-function Metric({ label, value }: { label: string; value: number }) {
+
+function Metric({ label, value }: Readonly<{ label: string; value: number }>) {
   return (
     <div className="metric">
       <dt>{label}</dt>
@@ -451,7 +456,10 @@ function Metric({ label, value }: { label: string; value: number }) {
     </div>
   );
 }
-function Detail({ label, value }: { label: string; value: string | number }) {
+function Detail({
+  label,
+  value,
+}: Readonly<{ label: string; value: string | number }>) {
   return (
     <div>
       <dt>{label}</dt>
