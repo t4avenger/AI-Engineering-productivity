@@ -17,6 +17,17 @@ func TestNormalizeLogsObservedShape(t *testing.T) {
 	}
 }
 
+func TestNormalizeLogsFingerprintIncludesBodyAndTimestamps(t *testing.T) {
+	data := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_cli_rs"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.tool_result"}}],"body":{"stringValue":"synthetic-first"},"observedTimeUnixNano":"1","timeUnixNano":"1"},{"attributes":[{"key":"event.name","value":{"stringValue":"codex.tool_result"}}],"body":{"stringValue":"synthetic-second"},"observedTimeUnixNano":"2","timeUnixNano":"2"}]}]}]}`)
+	events, err := NormalizeLogs(data, time.Now(), func(value []byte) string { return string(value) })
+	if err != nil || len(events) != 2 {
+		t.Fatalf("events = %#v, %v", events, err)
+	}
+	if events[0].EventID == events[1].EventID {
+		t.Fatalf("event IDs must differ: %#v", events)
+	}
+}
+
 func TestNormalizeLogsRejectsUnobservedService(t *testing.T) {
 	_, err := NormalizeLogs([]byte(`{"resourceLogs":[{"resource":{"attributes":[]},"scopeLogs":[]}]}`), time.Now(), func([]byte) string { return "x" })
 	if !errors.Is(err, ErrUnsupportedLogs) {

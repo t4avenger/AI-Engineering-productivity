@@ -156,12 +156,12 @@ function HomePage({
       <p className="lede">
         Only privacy-safe telemetry retained by this device appears here.
       </p>
-      <div className="metrics">
+      <dl className="metrics">
         <Metric label="Sessions" value={sessions.length} />
         <Metric label="Completed" value={outcomes.completed ?? 0} />
         <Metric label="Failed" value={outcomes.failed ?? 0} />
         <Metric label="Abandoned" value={outcomes.abandoned ?? 0} />
-      </div>
+      </dl>
       <section className="panel">
         <h2>Local service</h2>
         <HealthSummary health={health} />

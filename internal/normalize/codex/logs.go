@@ -29,8 +29,11 @@ type scopeLog struct {
 }
 
 type logRecord struct {
-	Attributes   []attribute `json:"attributes"`
-	SeverityText string      `json:"severityText"`
+	Attributes           []attribute     `json:"attributes"`
+	Body                 json.RawMessage `json:"body"`
+	ObservedTimeUnixNano string          `json:"observedTimeUnixNano"`
+	SeverityText         string          `json:"severityText"`
+	TimeUnixNano         string          `json:"timeUnixNano"`
 }
 
 // NormalizeLogs maps the reviewed Codex OTLP log shape directly to canonical

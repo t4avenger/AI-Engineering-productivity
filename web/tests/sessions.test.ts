@@ -1,8 +1,9 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { deleteSession, fetchSession, fetchSessions } from '../src/sessions';
 
 describe('session API client', () => {
+  afterEach(() => vi.restoreAllMocks());
   test('rejects malformed and unsuccessful responses', async () => {
     vi.stubGlobal(
       'fetch',
