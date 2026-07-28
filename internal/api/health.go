@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/privacy"
+	"github.com/wayne/telemetryiq/internal/storage"
 )
 
 type HealthResponse struct {
@@ -15,18 +16,28 @@ type HealthResponse struct {
 	Timestamp string `json:"timestamp"`
 }
 
-func NewHandler(logger *slog.Logger) http.Handler {
-	return newHandler(logger, nil)
+func NewHandler(logger *slog.Logger, sessions ...storage.SessionReader) http.Handler {
+	return newHandler(logger, nil, sessionReader(sessions))
 }
 
-func NewDevelopmentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer) http.Handler {
-	return newHandler(logger, newSanitizedInspector(sanitizer))
+func NewDevelopmentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer, sessions ...storage.SessionReader) http.Handler {
+	return newHandler(logger, newSanitizedInspector(sanitizer), sessionReader(sessions))
 }
 
-func newHandler(logger *slog.Logger, inspector *sanitizedInspector) http.Handler {
+func sessionReader(readers []storage.SessionReader) storage.SessionReader {
+	if len(readers) == 0 {
+		return nil
+	}
+	return readers[0]
+}
+
+func newHandler(logger *slog.Logger, inspector *sanitizedInspector, sessions storage.SessionReader) http.Handler {
 	ingest := newOTLPHTTPIngest(inspector)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", healthHandler(logger))
+	sessionAPI := newSessionAPI(sessions)
+	mux.HandleFunc("GET /api/v1/sessions", sessionAPI.list)
+	mux.HandleFunc("GET /api/v1/sessions/{id}", sessionAPI.detail)
 	mux.HandleFunc("POST /v1/traces", ingest.tracesHandler)
 	mux.HandleFunc("POST /v1/logs", ingest.logsHandler)
 	mux.HandleFunc("GET /api/v1/ingest/counters", ingest.countersHandler)
