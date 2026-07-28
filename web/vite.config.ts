@@ -18,7 +18,7 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     coverage: {
       provider: 'v8',
-      include: ['src/App.tsx', 'src/health.ts'],
+      include: ['src/App.tsx', 'src/health.ts', 'src/sessions.ts'],
       reporter: ['text', 'json-summary', 'lcov'],
       thresholds: {
         lines: 80,

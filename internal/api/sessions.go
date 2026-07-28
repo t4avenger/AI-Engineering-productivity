@@ -18,7 +18,10 @@ const (
 	invalidCursorMessage = "cursor is invalid"
 )
 
-type sessionAPI struct{ sessions storage.SessionReader }
+type sessionAPI struct {
+	sessions storage.SessionReader
+	deleter  storage.SessionDeleter
+}
 
 type sessionListResponse struct {
 	Data       []canonical.Session `json:"data"`
@@ -48,7 +51,10 @@ type sessionCursor struct {
 	SessionID string `json:"session_id"`
 }
 
-func newSessionAPI(sessions storage.SessionReader) sessionAPI { return sessionAPI{sessions: sessions} }
+func newSessionAPI(sessions storage.SessionReader) sessionAPI {
+	deleter, _ := sessions.(storage.SessionDeleter)
+	return sessionAPI{sessions: sessions, deleter: deleter}
+}
 
 func (a sessionAPI) list(w http.ResponseWriter, r *http.Request) {
 	if a.sessions == nil {
@@ -92,6 +98,32 @@ func (a sessionAPI) detail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSessionJSON(w, http.StatusOK, sessionDetailResponse{Data: session})
+}
+
+func (a sessionAPI) delete(w http.ResponseWriter, r *http.Request) {
+	if a.deleter == nil {
+		writeSessionError(w, http.StatusServiceUnavailable, "sessions_unavailable", "session storage is unavailable")
+		return
+	}
+	id := r.PathValue("id")
+	if strings.TrimSpace(id) == "" {
+		writeSessionError(w, http.StatusNotFound, "session_not_found", "session was not found")
+		return
+	}
+	_, found, err := a.sessions.Session(r.Context(), id)
+	if err != nil {
+		writeSessionError(w, http.StatusInternalServerError, "session_query_failed", "unable to query session")
+		return
+	}
+	if !found {
+		writeSessionError(w, http.StatusNotFound, "session_not_found", "session was not found")
+		return
+	}
+	if err := a.deleter.DeleteSession(r.Context(), id); err != nil {
+		writeSessionError(w, http.StatusInternalServerError, "session_delete_failed", "unable to delete session")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func parseSessionListQuery(r *http.Request) (storage.SessionFilter, int, *sessionCursor, error) {

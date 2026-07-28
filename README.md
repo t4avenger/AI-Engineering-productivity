@@ -2,7 +2,7 @@
 
 Local-first AI engineering intelligence and governance.
 
-Task 009 adds a privacy-safe, SQLite-backed session API. It does not yet connect live ingestion to storage or implement local API authentication.
+Task 010 adds a privacy-safe local dashboard over the SQLite-backed session API. It does not yet connect live ingestion to storage or implement local API authentication.
 
 ## Requirements
 
@@ -24,23 +24,36 @@ make run-daemon
 make run-web
 ```
 
-The daemon binds to `127.0.0.1:8080` by default and exposes `GET /api/v1/health`, `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}`, `POST /v1/traces`, `POST /v1/logs`, and `GET /api/v1/ingest/counters`.
+The daemon binds to `127.0.0.1:8080` by default and exposes `GET /api/v1/health`, `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}`, `DELETE /api/v1/sessions/{id}`, `POST /v1/traces`, `POST /v1/logs`, and `GET /api/v1/ingest/counters`.
 
 ## OTLP/HTTP ingest proof
 
 `POST /v1/traces` and `POST /v1/logs` accept one JSON OTLP payload with a non-empty `resourceSpans` or `resourceLogs` array. Requests must use `application/json` and are limited to 1 MiB. Each endpoint returns `202 Accepted` for accepted payloads and JSON errors with a stable `error.code` for malformed, invalid, unsupported-media-type, or oversized requests.
 
-This proof keeps only aggregate accepted/rejected counters in process memory. It neither logs nor persists raw telemetry content. The live ingest-to-normalisation-to-storage connection remains a later task.
+Raw OTLP payloads are never logged or persisted. The supported, observed Codex
+OTLP log shape is normalised and sanitised before its canonical event is saved
+locally. Other accepted OTLP payloads remain receive-only until an adapter has
+reviewed evidence.
 
 ## Codex fixture normalisation
 
-The Task 007 normaliser accepts only reviewed, sanitised Codex OTLP trace fixtures. It deterministically maps one trace span to one canonical event, preserves safe unknown fields in provider extensions, and explicitly marks capabilities absent from the synthetic fixture as unavailable. Task 008 persists canonical events through a storage-agnostic interface after sanitisation.
+The Codex adapter supports reviewed trace fixtures and the observed Codex CLI
+0.145.0 OTLP log shape. It retains model and available token metadata, never
+uses the sensitive conversation identifier as a session ID, and explicitly
+marks unavailable lifecycle and capability data. Canonical events pass through
+the privacy sanitizer before SQLite persistence.
 
 ## Session API
 
 `GET /api/v1/sessions` returns the stable envelope `{data, pagination}`. It accepts `limit` (1–100), opaque `cursor`, `tool`, `model`, `outcome`, `started_after`, and `started_before` (RFC3339) filters. Results are reverse chronological and use `next_cursor` for pagination. A model filter only matches model metadata that was actually observed; unavailable model values are not invented.
 
 `GET /api/v1/sessions/{id}` returns `{data}` or a stable JSON error. The API reads the local database at the platform configuration directory (`telemetryiq/telemetryiq.db`); the database directory is mode `0700` and database file mode is `0600`.
+
+`DELETE /api/v1/sessions/{id}` permanently deletes that session and its retained events. The local dashboard requires confirmation before it sends this request.
+
+## Local dashboard
+
+The dashboard provides Home, Sessions, Session Detail, Integrations, and Privacy pages. It labels missing data as unavailable, lists an integration only after local session data has been observed, and presents the enforced local-only privacy defaults. Configure `VITE_API_URL` when the session API has a non-default origin; `VITE_HEALTH_URL` configures the health endpoint.
 
 ## Privacy pipeline
 

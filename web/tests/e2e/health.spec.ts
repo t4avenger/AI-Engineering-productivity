@@ -1,11 +1,20 @@
 import { expect, test } from '@playwright/test';
 
-test('renders the production health journey', async ({ page }) => {
+test('renders the local dashboard journey', async ({ page }) => {
   await page.goto('/');
 
   await expect(
-    page.getByRole('heading', { name: 'TelemetryIQ' }),
+    page.getByRole('heading', { name: 'Your local AI activity' }),
   ).toBeVisible();
   await expect(page.getByText('Daemon healthy')).toBeVisible();
-  await expect(page.getByText('telemetryiq-daemon')).toBeVisible();
+  await page.getByRole('button', { name: 'Sessions' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Sessions', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'No sessions yet' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Privacy' }).click();
+  await expect(page.getByRole('heading', { name: 'Privacy' })).toBeVisible();
+  await expect(page.getByText('Prompts and responses')).toBeVisible();
 });

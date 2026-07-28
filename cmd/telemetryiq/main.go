@@ -48,9 +48,9 @@ func main() {
 	}
 	defer func() { _ = repository.Close() }()
 
-	handler := api.NewHandler(logger, repository)
+	handler := api.NewPersistentHandler(logger, sanitizer, repository)
 	if os.Getenv("TELEMETRYIQ_DEVELOPMENT_INSPECTOR") == "1" {
-		handler = api.NewDevelopmentHandler(logger, sanitizer, repository)
+		handler = api.NewPersistentDevelopmentHandler(logger, sanitizer, repository)
 	}
 	server := &http.Server{
 		Addr:              cfg.Addr(),

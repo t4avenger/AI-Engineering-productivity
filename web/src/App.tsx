@@ -1,109 +1,477 @@
 import { useEffect, useState } from 'react';
 
 import { fetchHealth, type HealthResponse } from './health';
+import {
+  deleteSession,
+  fetchSession,
+  fetchSessions,
+  type Session,
+} from './sessions';
 
+type Page = 'home' | 'sessions' | 'integrations' | 'privacy';
 type HealthState =
   | { status: 'loading' }
   | { status: 'healthy'; data: HealthResponse }
   | { status: 'unhealthy'; message: string };
+type SessionState =
+  | { status: 'loading'; data: Session[] }
+  | { status: 'ready'; data: Session[] }
+  | { status: 'error'; data: Session[]; message: string };
 
-const defaultHealthUrl = 'http://127.0.0.1:8080/api/v1/health';
-const env = import.meta.env as { readonly VITE_HEALTH_URL?: string };
-const healthUrl: string = env.VITE_HEALTH_URL ?? defaultHealthUrl;
+const healthURL =
+  (import.meta.env as { readonly VITE_HEALTH_URL?: string }).VITE_HEALTH_URL ??
+  'http://127.0.0.1:8080/api/v1/health';
 
 export function App() {
+  const [page, setPage] = useState<Page>('home');
   const [health, setHealth] = useState<HealthState>({ status: 'loading' });
+  const [sessions, setSessions] = useState<SessionState>({
+    status: 'loading',
+    data: [],
+  });
+  const [selectedID, setSelectedID] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-
-    fetchHealth(healthUrl)
+    fetchHealth(healthURL)
       .then((data) => {
-        if (!cancelled) {
-          setHealth({ status: 'healthy', data });
-        }
+        setHealth({ status: 'healthy', data });
       })
       .catch((error: unknown) => {
-        if (!cancelled) {
-          setHealth({
-            status: 'unhealthy',
-            message:
-              error instanceof Error ? error.message : 'Unable to reach daemon',
-          });
-        }
+        setHealth({
+          status: 'unhealthy',
+          message:
+            error instanceof Error ? error.message : 'Unable to reach daemon',
+        });
       });
-
-    return () => {
-      cancelled = true;
-    };
+    void refreshSessions();
   }, []);
 
+  async function refreshSessions() {
+    try {
+      const data = await fetchSessions();
+      setSessions({ status: 'ready', data });
+    } catch (error) {
+      setSessions((current) => ({
+        status: 'error',
+        data: current.data,
+        message:
+          error instanceof Error ? error.message : 'Unable to load sessions',
+      }));
+    }
+  }
+
+  const content = selectedID ? (
+    <SessionDetail
+      id={selectedID}
+      onBack={() => {
+        setSelectedID(null);
+      }}
+      onDeleted={() => {
+        setSelectedID(null);
+        void refreshSessions();
+      }}
+    />
+  ) : (
+    <PageContent
+      page={page}
+      health={health}
+      sessions={sessions}
+      onSelectSession={setSelectedID}
+    />
+  );
+
   return (
-    <main className="shell">
-      <section className="status-panel" aria-labelledby="app-title">
-        <div>
-          <p className="eyebrow">Local developer edition</p>
-          <h1 id="app-title">TelemetryIQ</h1>
-          <p className="summary">
-            Local-first AI engineering intelligence starts with a loopback-only
-            daemon.
-          </p>
-        </div>
-        <HealthCard health={health} />
-      </section>
-    </main>
+    <div className="app-shell">
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
+      <header className="app-header">
+        <p className="brand">
+          TelemetryIQ <span>Local developer edition</span>
+        </p>
+        <HealthIndicator health={health} />
+      </header>
+      <nav aria-label="Primary navigation" className="navigation">
+        {(['home', 'sessions', 'integrations', 'privacy'] as const).map(
+          (item) => (
+            <button
+              aria-current={!selectedID && page === item ? 'page' : undefined}
+              className={
+                !selectedID && page === item ? 'nav-link active' : 'nav-link'
+              }
+              key={item}
+              onClick={() => {
+                setSelectedID(null);
+                setPage(item);
+              }}
+              type="button"
+            >
+              {item[0].toUpperCase() + item.slice(1)}
+            </button>
+          ),
+        )}
+      </nav>
+      <main id="main-content">{content}</main>
+    </div>
   );
 }
 
-function HealthCard({ health }: { health: HealthState }) {
-  if (health.status === 'loading') {
-    return (
-      <div
-        className="health-card health-card--loading"
-        role="status"
-        aria-live="polite"
-      >
-        <span className="pulse" aria-hidden="true" />
-        <div>
-          <h2>Checking daemon</h2>
-          <p>Loading health state.</p>
-        </div>
-      </div>
-    );
-  }
+function PageContent({
+  page,
+  health,
+  sessions,
+  onSelectSession,
+}: {
+  page: Page;
+  health: HealthState;
+  sessions: SessionState;
+  onSelectSession: (id: string) => void;
+}) {
+  if (page === 'sessions')
+    return <SessionsPage sessions={sessions} onSelect={onSelectSession} />;
+  if (page === 'integrations')
+    return <IntegrationsPage sessions={sessions.data} />;
+  if (page === 'privacy') return <PrivacyPage />;
+  return <HomePage health={health} sessions={sessions.data} />;
+}
 
-  if (health.status === 'unhealthy') {
-    return (
-      <div className="health-card health-card--unhealthy" role="alert">
-        <span className="indicator" aria-hidden="true" />
-        <div>
-          <h2>Daemon unhealthy</h2>
-          <p>{health.message}</p>
-        </div>
-      </div>
-    );
-  }
-
+function HomePage({
+  health,
+  sessions,
+}: {
+  health: HealthState;
+  sessions: Session[];
+}) {
+  const outcomes = sessions.reduce<Partial<Record<Session['state'], number>>>(
+    (counts, session) => {
+      counts[session.state] = (counts[session.state] ?? 0) + 1;
+      return counts;
+    },
+    {},
+  );
   return (
-    <div
-      className="health-card health-card--healthy"
-      role="status"
-      aria-live="polite"
-    >
-      <span className="indicator" aria-hidden="true" />
-      <div>
-        <h2>Daemon healthy</h2>
-        <dl>
-          <div>
-            <dt>Service</dt>
-            <dd>{health.data.service}</dd>
-          </div>
-          <div>
-            <dt>Checked</dt>
-            <dd>{health.data.timestamp}</dd>
-          </div>
-        </dl>
+    <section aria-labelledby="home-title" className="page">
+      <p className="eyebrow">Overview</p>
+      <h1 id="home-title">Your local AI activity</h1>
+      <p className="lede">
+        Only privacy-safe telemetry retained by this device appears here.
+      </p>
+      <div className="metrics">
+        <Metric label="Sessions" value={sessions.length} />
+        <Metric label="Completed" value={outcomes.completed ?? 0} />
+        <Metric label="Failed" value={outcomes.failed ?? 0} />
+        <Metric label="Abandoned" value={outcomes.abandoned ?? 0} />
       </div>
+      <section className="panel">
+        <h2>Local service</h2>
+        <HealthSummary health={health} />
+      </section>
+      <p className="notice">
+        Cost and governance data are not available yet. They will be clearly
+        labelled when implemented.
+      </p>
+    </section>
+  );
+}
+
+function SessionsPage({
+  sessions,
+  onSelect,
+}: {
+  sessions: SessionState;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <section aria-labelledby="sessions-title" className="page">
+      <p className="eyebrow">Session explorer</p>
+      <h1 id="sessions-title">Sessions</h1>
+      <p className="lede">
+        Sessions are shown newest first. Missing fields are labelled unavailable
+        rather than treated as zero.
+      </p>
+      {sessions.status === 'loading' ? (
+        <p role="status">Loading sessions…</p>
+      ) : null}
+      {sessions.status === 'error' ? (
+        <p role="alert">{sessions.message}</p>
+      ) : null}
+      {sessions.status !== 'loading' && sessions.data.length === 0 ? (
+        <div className="empty">
+          <h2>No sessions yet</h2>
+          <p>
+            TelemetryIQ has not received a retained session. Check Integrations
+            for the next step.
+          </p>
+        </div>
+      ) : null}
+      {sessions.data.length > 0 ? (
+        <ul className="session-list">
+          {sessions.data.map((session) => (
+            <li key={session.session_id}>
+              <button
+                className="session-row"
+                onClick={() => {
+                  onSelect(session.session_id);
+                }}
+                type="button"
+              >
+                <span>
+                  <strong>{session.tool}</strong>
+                  <small>{formatDate(session.started_at)}</small>
+                </span>
+                <span className={`state state--${session.state}`}>
+                  {session.state}
+                </span>
+                <span>{modelOf(session) ?? 'Model unavailable'}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
+function SessionDetail({
+  id,
+  onBack,
+  onDeleted,
+}: {
+  id: string;
+  onBack: () => void;
+  onDeleted: () => void;
+}) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => {
+    fetchSession(id)
+      .then(setSession)
+      .catch((reason: unknown) => {
+        setError(
+          reason instanceof Error ? reason.message : 'Unable to load session',
+        );
+      });
+  }, [id]);
+  async function confirmDelete() {
+    try {
+      await deleteSession(id);
+      onDeleted();
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : 'Unable to delete session',
+      );
+      setConfirming(false);
+    }
+  }
+  return (
+    <section aria-labelledby="detail-title" className="page">
+      <button className="back" onClick={onBack} type="button">
+        ← Sessions
+      </button>
+      {error ? <p role="alert">{error}</p> : null}
+      {!session ? (
+        <p role="status">Loading session…</p>
+      ) : (
+        <>
+          <p className="eyebrow">Session detail</p>
+          <h1 id="detail-title">{session.tool} session</h1>
+          <dl className="details">
+            <Detail label="Outcome" value={session.state} />
+            <Detail label="Started" value={formatDate(session.started_at)} />
+            <Detail
+              label="Completed"
+              value={
+                session.completed_at
+                  ? formatDate(session.completed_at)
+                  : 'Unavailable'
+              }
+            />
+            <Detail label="Provider" value={session.provider} />
+            <Detail label="Model" value={modelOf(session) ?? 'Unavailable'} />
+            <Detail
+              label="Observed events"
+              value={numberAttribute(session, 'event_count') ?? 'Unavailable'}
+            />
+          </dl>
+          <section className="panel">
+            <h2>Data retention</h2>
+            <p>
+              Prompt text, responses, source code, and raw command arguments are
+              not retained by default.
+            </p>
+          </section>
+          <button
+            className="danger"
+            onClick={() => {
+              setConfirming(true);
+            }}
+            type="button"
+          >
+            Delete this session
+          </button>
+          {confirming ? (
+            <div
+              aria-labelledby="delete-title"
+              aria-modal="true"
+              className="dialog"
+              role="alertdialog"
+            >
+              <h2 id="delete-title">Delete this session?</h2>
+              <p>
+                This permanently removes the session and its retained events
+                from local storage.
+              </p>
+              <button
+                className="danger"
+                onClick={() => {
+                  void confirmDelete();
+                }}
+                type="button"
+              >
+                Delete permanently
+              </button>
+              <button
+                onClick={() => {
+                  setConfirming(false);
+                }}
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : null}
+        </>
+      )}
+    </section>
+  );
+}
+
+function IntegrationsPage({ sessions }: { sessions: Session[] }) {
+  const tools = [...new Set(sessions.map((session) => session.tool))];
+  return (
+    <section aria-labelledby="integrations-title" className="page">
+      <p className="eyebrow">Integration health</p>
+      <h1 id="integrations-title">Integrations</h1>
+      {tools.length === 0 ? (
+        <div className="empty">
+          <h2>Awaiting telemetry</h2>
+          <p>
+            No supported tool has supplied retained session data yet. Configure
+            Codex telemetry, then return here to confirm receipt.
+          </p>
+        </div>
+      ) : (
+        <ul className="cards">
+          {tools.map((tool) => (
+            <li key={tool}>
+              <h2>{tool}</h2>
+              <p>
+                <span className="state state--completed">
+                  Receiving retained session data
+                </span>
+              </p>
+              <p>
+                Capabilities are limited to observed fields; unavailable
+                information is not inferred.
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="notice">
+        Only observed tools are listed. This avoids reporting a detection that
+        has not occurred.
+      </p>
+    </section>
+  );
+}
+
+function PrivacyPage() {
+  return (
+    <section aria-labelledby="privacy-title" className="page">
+      <p className="eyebrow">Privacy controls</p>
+      <h1 id="privacy-title">Privacy</h1>
+      <p className="lede">
+        TelemetryIQ is local-only by default. These enforced defaults describe
+        what this version retains.
+      </p>
+      <dl className="details">
+        <Detail label="Telemetry level" value="Operational" />
+        <Detail label="Prompts and responses" value="Not retained" />
+        <Detail label="Source code" value="Not retained" />
+        <Detail label="File paths" value="Hashed" />
+        <Detail label="Command arguments" value="Redacted" />
+        <Detail label="Sharing" value="Disabled" />
+        <Detail label="Local retention" value="30 days by default" />
+      </dl>
+      <section className="panel">
+        <h2>What this means</h2>
+        <p>
+          Privacy transformations happen before local persistence and
+          diagnostics. Changes to the configuration file are validated so unsafe
+          collection cannot be enabled in this local-only release.
+        </p>
+      </section>
+    </section>
+  );
+}
+
+function HealthIndicator({ health }: { health: HealthState }) {
+  return (
+    <span
+      className={health.status === 'healthy' ? 'health healthy' : 'health'}
+      role="status"
+    >
+      {health.status === 'healthy'
+        ? 'Daemon healthy'
+        : health.status === 'unhealthy'
+          ? 'Daemon unavailable'
+          : 'Checking daemon'}
+    </span>
+  );
+}
+function HealthSummary({ health }: { health: HealthState }) {
+  return health.status === 'healthy' ? (
+    <p>
+      <strong>Healthy.</strong> {health.data.service} was checked at{' '}
+      {formatDate(health.data.timestamp)}.
+    </p>
+  ) : health.status === 'unhealthy' ? (
+    <p role="alert">Daemon unavailable: {health.message}</p>
+  ) : (
+    <p role="status">Checking daemon…</p>
+  );
+}
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="metric">
+      <dt>{label}</dt>
+      <dd>{value}</dd>
     </div>
   );
+}
+function Detail({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+function modelOf(session: Session): string | null {
+  return typeof session.attributes.model === 'string'
+    ? session.attributes.model
+    : null;
+}
+function numberAttribute(
+  session: Session,
+  key: string,
+): number | string | null {
+  const value = session.attributes[key];
+  return typeof value === 'number' || typeof value === 'string' ? value : null;
+}
+function formatDate(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Unavailable' : date.toLocaleString();
 }

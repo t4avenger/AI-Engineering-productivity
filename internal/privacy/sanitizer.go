@@ -49,6 +49,10 @@ type Sanitizer struct {
 	salt []byte
 }
 
+// Fingerprint returns an installation-specific, non-reversible identifier for
+// transient telemetry. It is safe to persist, unlike the input value.
+func (s *Sanitizer) Fingerprint(value any) string { return s.hash(value) }
+
 // New creates a Sanitizer from an installation-specific secret salt.
 func New(salt []byte) (*Sanitizer, error) {
 	if len(salt) != saltSize {

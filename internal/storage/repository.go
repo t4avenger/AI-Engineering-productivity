@@ -34,9 +34,14 @@ type SessionReader interface {
 	ListSessions(context.Context, SessionFilter) ([]canonical.Session, error)
 }
 
+// SessionDeleter removes one session and all events belonging to it.
+type SessionDeleter interface {
+	DeleteSession(context.Context, string) error
+}
+
 type Repository interface {
 	SaveEvents(context.Context, []canonical.Event) error
 	SessionReader
-	DeleteSession(context.Context, string) error
+	SessionDeleter
 	Close() error
 }
