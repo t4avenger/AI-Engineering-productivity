@@ -38,7 +38,11 @@ func TestSessionAPIContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeBody(t, response)
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("detail status = %d", response.StatusCode)
 	}
@@ -57,32 +61,43 @@ func TestSessionAPIRejectsInvalidQueriesAndMissingSessions(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	for _, path := range []string{"/api/v1/sessions?limit=0", "/api/v1/sessions?started_after=nope", "/api/v1/sessions?cursor=not-a-cursor"} {
-		response, err := http.Get(server.URL + path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if response.StatusCode != http.StatusBadRequest {
-			closeBody(t, response)
-			t.Fatalf("%s status = %d", path, response.StatusCode)
-		}
-		var body sessionErrorResponse
-		if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
-			closeBody(t, response)
-			t.Fatal(err)
-		}
-		closeBody(t, response)
-		if body.Error.Code != "invalid_query" {
-			t.Fatalf("%s error = %#v", path, body.Error)
-		}
+		assertInvalidSessionQuery(t, server.URL+path)
 	}
 
 	response, err := http.Get(server.URL + "/api/v1/sessions/missing")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeBody(t, response)
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	if response.StatusCode != http.StatusNotFound {
 		t.Fatalf("missing session status = %d", response.StatusCode)
+	}
+}
+
+func assertInvalidSessionQuery(t *testing.T, rawURL string) {
+	t.Helper()
+	response, err := http.Get(rawURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	if response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("%s status = %d", rawURL, response.StatusCode)
+	}
+	var body sessionErrorResponse
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Error.Code != "invalid_query" {
+		t.Fatalf("%s error = %#v", rawURL, body.Error)
 	}
 }
 
@@ -123,7 +138,11 @@ func getSessionList(t *testing.T, rawURL string) sessionListResponse {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeBody(t, response)
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("list status = %d", response.StatusCode)
 	}

@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	defaultSessionLimit = 50
-	maximumSessionLimit = 100
+	defaultSessionLimit  = 50
+	maximumSessionLimit  = 100
+	invalidCursorMessage = "cursor is invalid"
 )
 
 type sessionAPI struct{ sessions storage.SessionReader }
@@ -59,12 +60,13 @@ func (a sessionAPI) list(w http.ResponseWriter, r *http.Request) {
 		writeSessionError(w, http.StatusBadRequest, "invalid_query", err.Error())
 		return
 	}
+	filter.Cursor = storageCursor(cursor)
+	filter.Limit = limit
 	sessions, err := a.sessions.ListSessions(r.Context(), filter)
 	if err != nil {
 		writeSessionError(w, http.StatusInternalServerError, "session_query_failed", "unable to query sessions")
 		return
 	}
-	sessions = afterCursor(sessions, cursor)
 	page, next := sessionPage(sessions, limit)
 	response := sessionListResponse{Data: page, Pagination: sessionPagination{Limit: limit, NextCursor: next}}
 	writeSessionJSON(w, http.StatusOK, response)
@@ -145,29 +147,24 @@ func decodeSessionCursor(raw string) (*sessionCursor, error) {
 	}
 	data, err := base64.RawURLEncoding.DecodeString(raw)
 	if err != nil {
-		return nil, sessionQueryError("cursor is invalid")
+		return nil, sessionQueryError(invalidCursorMessage)
 	}
 	var cursor sessionCursor
 	if json.Unmarshal(data, &cursor) != nil || cursor.SessionID == "" {
-		return nil, sessionQueryError("cursor is invalid")
+		return nil, sessionQueryError(invalidCursorMessage)
 	}
 	if _, err := time.Parse(time.RFC3339Nano, cursor.StartedAt); err != nil {
-		return nil, sessionQueryError("cursor is invalid")
+		return nil, sessionQueryError(invalidCursorMessage)
 	}
 	return &cursor, nil
 }
 
-func afterCursor(sessions []canonical.Session, cursor *sessionCursor) []canonical.Session {
+func storageCursor(cursor *sessionCursor) *storage.SessionCursor {
 	if cursor == nil {
-		return sessions
+		return nil
 	}
 	at, _ := time.Parse(time.RFC3339Nano, cursor.StartedAt)
-	for index, session := range sessions {
-		if session.StartedAt.Before(at) || (session.StartedAt.Equal(at) && session.SessionID < cursor.SessionID) {
-			return sessions[index:]
-		}
-	}
-	return nil
+	return &storage.SessionCursor{StartedAt: at, SessionID: cursor.SessionID}
 }
 
 func sessionPage(sessions []canonical.Session, limit int) ([]canonical.Session, *string) {

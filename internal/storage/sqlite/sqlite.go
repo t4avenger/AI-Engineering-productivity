@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
+	"time"
 
 	// Register the pure-Go SQLite driver with database/sql.
 	_ "modernc.org/sqlite"
@@ -226,13 +226,58 @@ func (r *Repository) Session(ctx context.Context, id string) (canonical.Session,
 
 // ListSessions returns sessions in deterministic reverse chronological order.
 func (r *Repository) ListSessions(ctx context.Context, filter storage.SessionFilter) ([]canonical.Session, error) {
-	rows, err := r.db.QueryContext(ctx, "SELECT session_json FROM sessions")
+	query, args, err := sessionListQuery(filter)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
+	return decodeSessions(rows, filter.Limit)
+}
 
-	var sessions []canonical.Session
+func sessionListQuery(filter storage.SessionFilter) (string, []any, error) {
+	if filter.Limit < 1 {
+		return "", nil, errors.New("session query limit must be positive")
+	}
+	var conditions []string
+	var args []any
+	appendCondition := func(condition, value string) {
+		conditions = append(conditions, condition)
+		args = append(args, value)
+	}
+	if filter.Tool != "" {
+		appendCondition("json_extract(session_json, '$.tool') = ?", filter.Tool)
+	}
+	if filter.Outcome != "" {
+		appendCondition("json_extract(session_json, '$.state') = ?", filter.Outcome)
+	}
+	if filter.Model != "" {
+		appendCondition("EXISTS (SELECT 1 FROM events WHERE events.session_id=sessions.session_id AND json_extract(events.event_json, '$.attributes.model') = ?)", filter.Model)
+	}
+	if filter.StartedAfter != nil {
+		appendCondition("json_extract(session_json, '$.started_at') >= ?", filter.StartedAfter.UTC().Format(time.RFC3339Nano))
+	}
+	if filter.StartedBefore != nil {
+		appendCondition("json_extract(session_json, '$.started_at') < ?", filter.StartedBefore.UTC().Format(time.RFC3339Nano))
+	}
+	if filter.Cursor != nil {
+		conditions = append(conditions, "(json_extract(session_json, '$.started_at') < ? OR (json_extract(session_json, '$.started_at') = ? AND session_id < ?))")
+		cursorTime := filter.Cursor.StartedAt.UTC().Format(time.RFC3339Nano)
+		args = append(args, cursorTime, cursorTime, filter.Cursor.SessionID)
+	}
+	query := "SELECT session_json FROM sessions"
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
+	}
+	query += " ORDER BY json_extract(session_json, '$.started_at') DESC, session_id DESC LIMIT ?"
+	return query, append(args, filter.Limit+1), nil
+}
+
+func decodeSessions(rows *sql.Rows, limit int) ([]canonical.Session, error) {
+	sessions := make([]canonical.Session, 0, limit+1)
 	for rows.Next() {
 		var data []byte
 		if err := rows.Scan(&data); err != nil {
@@ -242,65 +287,12 @@ func (r *Repository) ListSessions(ctx context.Context, filter storage.SessionFil
 		if err := json.Unmarshal(data, &session); err != nil {
 			return nil, err
 		}
-		if !matchesSessionFilter(session, filter) {
-			continue
-		}
-		if filter.Model != "" {
-			matches, err := r.sessionHasModel(ctx, session.SessionID, filter.Model)
-			if err != nil {
-				return nil, err
-			}
-			if !matches {
-				continue
-			}
-		}
 		sessions = append(sessions, session)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	sort.Slice(sessions, func(i, j int) bool {
-		if sessions[i].StartedAt.Equal(sessions[j].StartedAt) {
-			return sessions[i].SessionID > sessions[j].SessionID
-		}
-		return sessions[i].StartedAt.After(sessions[j].StartedAt)
-	})
 	return sessions, nil
-}
-
-func matchesSessionFilter(session canonical.Session, filter storage.SessionFilter) bool {
-	if filter.Tool != "" && session.Tool != filter.Tool {
-		return false
-	}
-	if filter.Outcome != "" && session.State != filter.Outcome {
-		return false
-	}
-	if filter.StartedAfter != nil && session.StartedAt.Before(*filter.StartedAfter) {
-		return false
-	}
-	return filter.StartedBefore == nil || session.StartedAt.Before(*filter.StartedBefore)
-}
-
-func (r *Repository) sessionHasModel(ctx context.Context, sessionID, model string) (bool, error) {
-	rows, err := r.db.QueryContext(ctx, "SELECT event_json FROM events WHERE session_id=?", sessionID)
-	if err != nil {
-		return false, err
-	}
-	defer func() { _ = rows.Close() }()
-	for rows.Next() {
-		var data []byte
-		if err := rows.Scan(&data); err != nil {
-			return false, err
-		}
-		var event canonical.Event
-		if err := json.Unmarshal(data, &event); err != nil {
-			return false, err
-		}
-		if reportedModel, ok := event.Attributes["model"].(string); ok && reportedModel == model {
-			return true, nil
-		}
-	}
-	return false, rows.Err()
 }
 func (r *Repository) DeleteSession(ctx context.Context, id string) error {
 	tx, err := r.db.BeginTx(ctx, nil)

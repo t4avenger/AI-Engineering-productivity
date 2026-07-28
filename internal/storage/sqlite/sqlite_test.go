@@ -163,14 +163,16 @@ func TestListSessionsFiltersAndOrdersDeterministically(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sessions, err := repo.ListSessions(context.Background(), storage.SessionFilter{Model: "model-b", Outcome: "failed", StartedAfter: &startedAfter})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	sessions, err := repo.ListSessions(ctx, storage.SessionFilter{Model: "model-b", Outcome: "failed", StartedAfter: &startedAfter, Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(sessions) != 1 || sessions[0].SessionID != "late" {
 		t.Fatalf("filtered sessions = %#v", sessions)
 	}
-	all, err := repo.ListSessions(context.Background(), storage.SessionFilter{})
+	all, err := repo.ListSessions(context.Background(), storage.SessionFilter{Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}

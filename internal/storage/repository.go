@@ -17,6 +17,15 @@ type SessionFilter struct {
 	Outcome       string
 	StartedAfter  *time.Time
 	StartedBefore *time.Time
+	Cursor        *SessionCursor
+	Limit         int
+}
+
+// SessionCursor identifies the last session returned by a reverse-chronological
+// session page.
+type SessionCursor struct {
+	StartedAt time.Time
+	SessionID string
 }
 
 // SessionReader is the read-only session contract used by the local API.
