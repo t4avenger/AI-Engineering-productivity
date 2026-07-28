@@ -3,10 +3,17 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
+	"strings"
 	"sync/atomic"
+	"time"
+
+	"github.com/wayne/telemetryiq/internal/normalize/codex"
+	"github.com/wayne/telemetryiq/internal/privacy"
+	"github.com/wayne/telemetryiq/internal/storage"
 )
 
 const maxOTLPPayloadBytes int64 = 1 << 20 // 1 MiB
@@ -14,9 +21,11 @@ const maxOTLPPayloadBytes int64 = 1 << 20 // 1 MiB
 // otlpHTTPIngest is deliberately transient. Task 004 proves that TelemetryIQ
 // can receive OTLP/HTTP safely; later tasks redact and persist canonical data.
 type otlpHTTPIngest struct {
-	accepted  atomic.Uint64
-	rejected  atomic.Uint64
-	inspector *sanitizedInspector
+	accepted   atomic.Uint64
+	rejected   atomic.Uint64
+	inspector  *sanitizedInspector
+	sanitizer  *privacy.Sanitizer
+	repository storage.Repository
 }
 
 type ingestCountersResponse struct {
@@ -33,8 +42,8 @@ type ingestError struct {
 	Message string `json:"message"`
 }
 
-func newOTLPHTTPIngest(inspector *sanitizedInspector) *otlpHTTPIngest {
-	return &otlpHTTPIngest{inspector: inspector}
+func newOTLPHTTPIngest(inspector *sanitizedInspector, sanitizer *privacy.Sanitizer, repository storage.Repository) *otlpHTTPIngest {
+	return &otlpHTTPIngest{inspector: inspector, sanitizer: sanitizer, repository: repository}
 }
 
 func (i *otlpHTTPIngest) tracesHandler(w http.ResponseWriter, r *http.Request) {
@@ -80,9 +89,47 @@ func (i *otlpHTTPIngest) receive(w http.ResponseWriter, r *http.Request, resourc
 	if i.inspector != nil {
 		i.inspector.capture(payload)
 	}
-	// Do not retain or log the raw payload. The proof only records its receipt.
+	if resourceField == "resourceLogs" {
+		if err := i.persistCodexLogs(r, payload); err != nil {
+			status, code, message := ingestPersistenceError(err)
+			i.reject(w, status, code, message)
+			return
+		}
+	}
+	// Raw payloads are never persisted or logged; only canonical sanitised events are stored.
 	i.accepted.Add(1)
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func (i *otlpHTTPIngest) persistCodexLogs(request *http.Request, payload map[string]json.RawMessage) error {
+	if i.repository == nil || i.sanitizer == nil {
+		return nil
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	events, err := codex.NormalizeLogs(raw, time.Now().UTC(), func(value []byte) string { return i.sanitizer.Fingerprint(value) })
+	if errors.Is(err, codex.ErrUnsupportedLogs) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("normalise: %w", err)
+	}
+	if len(events) == 0 {
+		return nil
+	}
+	if err := i.repository.SaveEvents(request.Context(), events); err != nil {
+		return fmt.Errorf("persist: %w", err)
+	}
+	return nil
+}
+
+func ingestPersistenceError(err error) (int, string, string) {
+	if strings.HasPrefix(err.Error(), "normalise:") {
+		return http.StatusUnprocessableEntity, "normalization_failed", "supported telemetry could not be normalised"
+	}
+	return http.StatusInternalServerError, "persistence_failed", "supported telemetry could not be stored"
 }
 
 func (i *otlpHTTPIngest) countersHandler(w http.ResponseWriter, _ *http.Request) {

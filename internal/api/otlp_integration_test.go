@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -12,6 +13,8 @@ import (
 	"testing"
 
 	"github.com/wayne/telemetryiq/internal/privacy"
+	"github.com/wayne/telemetryiq/internal/storage"
+	"github.com/wayne/telemetryiq/internal/storage/sqlite"
 )
 
 func TestOTLPHTTPIngestProof(t *testing.T) {
@@ -53,6 +56,37 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	}
 	if counters.AcceptedPayloads != 2 || counters.RejectedPayloads != 4 {
 		t.Fatalf("unexpected counters: %+v", counters)
+	}
+}
+
+func TestCodexLogsPersistAsSanitizedCanonicalSession(t *testing.T) {
+	sanitizer, err := privacy.New(make([]byte, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository, err := sqlite.Open(":memory:", sanitizer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = repository.Close() })
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), sanitizer, repository))
+	t.Cleanup(server.Close)
+	payload := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_cli_rs"}},{"key":"service.version","value":{"stringValue":"0.145.0"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"synthetic-model"}},{"key":"arguments","value":{"stringValue":"synthetic raw arguments"}},{"key":"output","value":{"stringValue":"synthetic raw output"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"conversation.id","value":{"stringValue":"synthetic-conversation"}}],"body":{"stringValue":"synthetic body"}}]}]}]}`)
+	response := postOTLPToPath(t, server.URL, "/v1/logs", payload, "application/json")
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("status = %d", response.StatusCode)
+	}
+	closeBody(t, response)
+	sessions, err := repository.ListSessions(context.Background(), storage.SessionFilter{Limit: 10})
+	if err != nil || len(sessions) != 1 {
+		t.Fatalf("sessions = %#v, %v", sessions, err)
+	}
+	data, err := json.Marshal(sessions[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "synthetic@example.test") || strings.Contains(string(data), "synthetic-conversation") || strings.Contains(string(data), "synthetic body") {
+		t.Fatalf("privacy leak: %s", data)
 	}
 }
 

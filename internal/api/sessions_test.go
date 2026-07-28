@@ -78,6 +78,34 @@ func TestSessionAPIRejectsInvalidQueriesAndMissingSessions(t *testing.T) {
 	}
 }
 
+func TestSessionAPIDeletesAnExistingSession(t *testing.T) {
+	repo := sessionTestRepository(t)
+	server := httptest.NewServer(NewHandler(slog.Default(), repo))
+	t.Cleanup(server.Close)
+
+	request, err := http.NewRequest(http.MethodDelete, server.URL+"/api/v1/sessions/session-middle", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusNoContent {
+		t.Fatalf("delete status = %d", response.StatusCode)
+	}
+
+	response, err = http.Get(server.URL + "/api/v1/sessions/session-middle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("deleted session status = %d", response.StatusCode)
+	}
+}
+
 func assertInvalidSessionQuery(t *testing.T, rawURL string) {
 	t.Helper()
 	response, err := http.Get(rawURL)

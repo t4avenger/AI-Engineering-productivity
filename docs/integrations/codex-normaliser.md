@@ -24,6 +24,17 @@ diagnostics boundary.
 fixtures/codex/expected/fixture-001.canonical.json is the golden output for
 the checked-in synthetic input. Adding a real observed fixture requires the
 Task 006 capture procedure, a recorded tool version, an expected canonical
+
+## Observed log support
+
+Codex CLI 0.145.0 was observed exporting OTLP JSON logs with `service.name`
+`codex_cli_rs`. The log adapter retains only reviewed operational attributes
+(`event.name`, `model`, `input_token_count`, and `output_token_count`) plus
+sanitised provider extensions. Since the observed logs lack trace correlation
+and a safe retained session identifier, each retained log forms an explicitly
+`unknown` lifecycle session identified by an installation-specific HMAC
+fingerprint. Account, hostname, email, conversation ID, raw command arguments, tool output, and body fields are
+removed by the privacy pipeline before storage.
 fixture, and a review of any newly evidenced capabilities.
 
 The static-analysis gate enforces cyclomatic complexity of 15 or lower for

@@ -1,153 +1,249 @@
 :root {
   color: #172026;
   background: #f6f8fa;
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
 }
-
 * {
   box-sizing: border-box;
 }
-
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
 }
-
-.shell {
-  align-items: center;
-  display: flex;
-  min-height: 100vh;
-  padding: 32px;
+button {
+  font: inherit;
 }
-
-.status-panel {
-  align-items: center;
-  display: grid;
-  gap: 32px;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #0969da;
+  outline-offset: 3px;
+}
+.app-shell {
   margin: 0 auto;
-  max-width: 960px;
-  width: 100%;
-}
-
-.eyebrow {
-  color: #53616b;
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  margin: 0 0 8px;
-  text-transform: uppercase;
-}
-
-h1 {
-  font-size: clamp(2.5rem, 7vw, 5.25rem);
-  letter-spacing: 0;
-  line-height: 0.95;
-  margin: 0;
-}
-
-.summary {
-  color: #35434d;
-  font-size: 1.125rem;
-  line-height: 1.6;
-  margin: 20px 0 0;
-  max-width: 560px;
-}
-
-.health-card {
-  align-items: flex-start;
-  background: #ffffff;
-  border: 1px solid #dbe2e8;
-  border-radius: 8px;
-  box-shadow: 0 16px 40px rgb(23 32 38 / 10%);
-  display: flex;
-  gap: 16px;
-  min-height: 190px;
+  max-width: 1120px;
   padding: 24px;
 }
-
-.health-card h2 {
-  font-size: 1.35rem;
-  letter-spacing: 0;
-  margin: 0 0 12px;
+.app-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
 }
-
-.health-card p {
-  color: #53616b;
-  line-height: 1.5;
+.brand {
+  font-size: 1.25rem;
+  font-weight: 800;
   margin: 0;
 }
-
-.indicator,
-.pulse {
-  border-radius: 50%;
-  display: inline-block;
-  flex: 0 0 auto;
-  height: 14px;
-  margin-top: 7px;
-  width: 14px;
-}
-
-.indicator {
-  background: #0f9f6e;
-}
-
-.health-card--unhealthy .indicator {
-  background: #d64545;
-}
-
-.pulse {
-  animation: pulse 1.2s infinite ease-in-out;
-  background: #6d7f8f;
-}
-
-dl {
-  display: grid;
-  gap: 12px;
-  margin: 0;
-}
-
-dt {
+.brand span,
+.eyebrow {
   color: #53616b;
   font-size: 0.8rem;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
-
-dd {
-  margin: 2px 0 0;
+.brand span {
+  display: block;
+  letter-spacing: 0.02em;
+  margin-top: 2px;
+}
+.navigation {
+  border-bottom: 1px solid #d8dee4;
+  display: flex;
+  gap: 8px;
+  margin: 28px 0;
+}
+.nav-link {
+  background: none;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  padding: 12px 16px;
+}
+.nav-link.active {
+  border-color: #0969da;
+  color: #0969da;
+  font-weight: 700;
+}
+.health {
+  color: #53616b;
+  font-size: 0.9rem;
+}
+.health.healthy {
+  color: #087443;
+  font-weight: 700;
+}
+.page {
+  max-width: 920px;
+}
+h1 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1.05;
+  margin: 0;
+}
+h2 {
+  margin-top: 0;
+}
+.lede {
+  color: #46545e;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  max-width: 700px;
+}
+.metrics,
+.cards {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin: 28px 0;
+  padding: 0;
+}
+.metric,
+.panel,
+.empty,
+.cards li {
+  background: white;
+  border: 1px solid #d8dee4;
+  border-radius: 8px;
+  padding: 20px;
+}
+.metric dt,
+.details dt {
+  color: #53616b;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.metric dd {
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 6px 0 0;
+}
+.panel,
+.empty {
+  margin: 24px 0;
+}
+.notice {
+  color: #53616b;
+  font-size: 0.9rem;
+}
+.session-list {
+  list-style: none;
+  margin: 24px 0;
+  padding: 0;
+}
+.session-list li {
+  border-bottom: 1px solid #d8dee4;
+}
+.session-row {
+  align-items: center;
+  background: white;
+  border: 0;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 1fr auto minmax(150px, auto);
+  gap: 16px;
+  padding: 16px;
+  text-align: left;
+  width: 100%;
+}
+.session-row:hover {
+  background: #edf6ff;
+}
+.session-row small {
+  color: #53616b;
+  display: block;
+  margin-top: 4px;
+}
+.state {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  text-transform: capitalize;
+}
+.state--completed {
+  background: #dafbe1;
+  color: #087443;
+}
+.state--failed,
+.state--abandoned {
+  background: #ffebe9;
+  color: #b42318;
+}
+.state--active,
+.state--created {
+  background: #ddf4ff;
+  color: #0969da;
+}
+.state--unknown,
+.state--cancelled {
+  background: #eaeef2;
+  color: #53616b;
+}
+.details {
+  display: grid;
+  gap: 1px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin: 28px 0;
+}
+.details div {
+  background: white;
+  border: 1px solid #d8dee4;
+  padding: 16px;
+}
+.details dd {
+  margin: 6px 0 0;
   overflow-wrap: anywhere;
 }
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 0.35;
-    transform: scale(0.85);
-  }
-
-  50% {
-    opacity: 1;
-    transform: scale(1);
-  }
+.back {
+  background: none;
+  border: 0;
+  color: #0969da;
+  cursor: pointer;
+  margin-bottom: 24px;
+  padding: 0;
 }
-
-@media (max-width: 760px) {
-  .shell {
-    align-items: flex-start;
-    padding: 24px 18px;
+.danger {
+  background: #b42318;
+  border: 1px solid #8e1c13;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  padding: 10px 14px;
+}
+.dialog {
+  background: white;
+  border: 2px solid #172026;
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 20%);
+  margin-top: 20px;
+  max-width: 500px;
+  padding: 20px;
+}
+.dialog button + button {
+  margin-left: 12px;
+}
+.skip-link {
+  left: -999px;
+  position: absolute;
+  top: 0;
+}
+.skip-link:focus {
+  background: white;
+  left: 12px;
+  padding: 8px;
+  z-index: 1;
+}
+@media (max-width: 600px) {
+  .app-shell {
+    padding: 18px;
   }
-
-  .status-panel {
+  .session-row {
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .navigation {
+    overflow-x: auto;
   }
 }
