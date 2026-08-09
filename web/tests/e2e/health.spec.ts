@@ -2,7 +2,8 @@ import { expect, test } from '@playwright/test';
 
 test('renders the local dashboard journey', async ({ page }) => {
   await page.goto('/');
-
+  await page.getByLabel('Local API token').fill('playwright-token');
+  await page.getByRole('button', { name: 'Connect securely' }).click();
   await expect(
     page.getByRole('heading', { name: 'Your local AI activity' }),
   ).toBeVisible();
