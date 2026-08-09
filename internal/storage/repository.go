@@ -37,6 +37,7 @@ type SessionReader interface {
 // SessionDeleter removes one session and all events belonging to it.
 type SessionDeleter interface {
 	DeleteSession(context.Context, string) error
+	DeleteAllSessions(context.Context) error
 }
 
 type Repository interface {

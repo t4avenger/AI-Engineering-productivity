@@ -214,6 +214,7 @@ Codex may change an implementation choice when justified in an architecture deci
 - TypeScript
 - React
 - Vite
+- Mantine Core and Hooks for accessible dashboard primitives (ADR 0001)
 - Localhost-only by default
 - No third-party analytics in local mode
 

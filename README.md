@@ -2,7 +2,7 @@
 
 Local-first AI engineering intelligence and governance.
 
-Task 010 adds a privacy-safe local dashboard over the SQLite-backed session API. It does not yet connect live ingestion to storage or implement local API authentication.
+Task 010 provides a privacy-safe local dashboard over the authenticated SQLite-backed session API. Supported Codex OTLP logs are normalised, sanitised, and persisted locally.
 
 ## Requirements
 
@@ -24,7 +24,7 @@ make run-daemon
 make run-web
 ```
 
-The daemon binds to `127.0.0.1:8080` by default and exposes `GET /api/v1/health`, `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}`, `DELETE /api/v1/sessions/{id}`, `POST /v1/traces`, `POST /v1/logs`, and `GET /api/v1/ingest/counters`.
+The daemon binds to `127.0.0.1:8080` by default. Run `telemetryiq auth-token` and paste the result into the dashboard once per browser session; the token is never logged or retained by the browser after that session. The daemon exposes `GET /api/v1/health`, `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}`, `DELETE /api/v1/sessions/{id}`, `DELETE /api/v1/sessions`, `POST /v1/traces`, `POST /v1/logs`, and `GET /api/v1/ingest/counters`.
 
 ## OTLP/HTTP ingest proof
 
@@ -53,7 +53,7 @@ the privacy sanitizer before SQLite persistence.
 
 ## Local dashboard
 
-The dashboard provides Home, Sessions, Session Detail, Integrations, and Privacy pages. It labels missing data as unavailable, lists an integration only after local session data has been observed, and presents the enforced local-only privacy defaults. Configure `VITE_API_URL` when the session API has a non-default origin; `VITE_HEALTH_URL` configures the health endpoint.
+The Mantine-based dashboard provides Home, Sessions, Session Detail, Integrations, and Privacy pages. It labels missing data as unavailable, lists an integration only after local session data has been observed, and presents the enforced local-only privacy defaults. The token-entry flow retains the value only for the browser session; the Privacy page uses a typed confirmation before bulk deletion. Configure `VITE_API_URL` when the session API has a non-default origin; `VITE_HEALTH_URL` configures the health endpoint.
 
 ## Privacy pipeline
 
@@ -101,4 +101,4 @@ Contract and fuzz checks report not applicable until their corresponding product
 
 ## Current scope
 
-Task 009 deliberately excludes live ingest-to-storage wiring, authentication, analytics, and third-party telemetry. Authentication will be introduced in a later local-only task without weakening loopback defaults.
+Cost insights, analytics, and third-party telemetry remain out of scope. Management API authentication is local-token based and preserves loopback defaults.
