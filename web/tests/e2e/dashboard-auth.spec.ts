@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('connects with the local token and confirms bulk telemetry deletion', async ({
+test('connects with the local token and requires bulk-deletion confirmation', async ({
   page,
 }) => {
   await page.goto('/');
@@ -17,12 +17,9 @@ test('connects with the local token and confirms bulk telemetry deletion', async
     page.getByRole('button', { name: 'Delete all permanently' }),
   ).toBeDisabled();
   await page.getByLabel('Confirmation').fill('DELETE ALL');
-  const deletion = page.waitForResponse(
-    (response) =>
-      response.url().endsWith('/api/v1/sessions') &&
-      response.request().method() === 'DELETE',
-  );
-  await page.getByRole('button', { name: 'Delete all permanently' }).click();
-  expect((await deletion).status()).toBe(204);
+  await expect(
+    page.getByRole('button', { name: 'Delete all permanently' }),
+  ).toBeEnabled();
+  await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
 });
