@@ -20,6 +20,7 @@ import {
   fetchSession,
   fetchSessions,
   type Session,
+  SessionAPIError,
 } from './sessions';
 
 type Page = 'home' | 'sessions' | 'integrations' | 'privacy';
@@ -70,6 +71,11 @@ export function App() {
       const data = await fetchSessions();
       setSessions({ status: 'ready', data });
     } catch (error) {
+      if (error instanceof SessionAPIError && error.status === 401) {
+        sessionStorage.removeItem('telemetryiq-auth-token');
+        setToken(null);
+        return;
+      }
       setSessions((current) => ({
         status: 'error',
         data: current.data,

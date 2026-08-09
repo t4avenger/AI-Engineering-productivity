@@ -90,6 +90,43 @@ describe('local API access and bulk deletion', () => {
     expect(fetch).toHaveBeenCalled();
   });
 
+  test('returns to token setup when the stored token is unauthorized', async () => {
+    sessionStorage.setItem('telemetryiq-auth-token', 'stale-token');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url =
+          input instanceof Request
+            ? input.url
+            : input instanceof URL
+              ? input.href
+              : input;
+        if (url.endsWith('/health')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                status: 'healthy',
+                service: 'telemetryiq-daemon',
+                timestamp: '2026-07-24T12:00:00Z',
+              }),
+              { status: 200 },
+            ),
+          );
+        }
+        return Promise.resolve(new Response(null, { status: 401 }));
+      }),
+    );
+    render(
+      <MantineProvider env="test">
+        <App />
+      </MantineProvider>,
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'Connect your dashboard' }),
+    ).toBeInTheDocument();
+    expect(sessionStorage.getItem('telemetryiq-auth-token')).toBeNull();
+  });
+
   test('requires an exact confirmation before deleting all retained telemetry', async () => {
     sessionStorage.setItem('telemetryiq-auth-token', 'test-token');
     mockAPI();
