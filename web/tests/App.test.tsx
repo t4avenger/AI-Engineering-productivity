@@ -1,5 +1,6 @@
+import { MantineProvider } from '@mantine/core';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { App } from '../src/App';
 
@@ -66,11 +67,21 @@ function mockAPI(
 }
 
 describe('App dashboard', () => {
-  afterEach(() => vi.restoreAllMocks());
+  beforeEach(() => {
+    sessionStorage.setItem('telemetryiq-auth-token', 'test-token');
+  });
+  afterEach(() => {
+    sessionStorage.clear();
+    vi.restoreAllMocks();
+  });
 
   test('shows an empty session journey without inventing integration data', async () => {
     mockAPI([]);
-    render(<App />);
+    render(
+      <MantineProvider env="test">
+        <App />
+      </MantineProvider>,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
     expect(
@@ -84,7 +95,11 @@ describe('App dashboard', () => {
 
   test('shows unavailable fields and requires confirmation before deleting', async () => {
     mockAPI();
-    render(<App />);
+    render(
+      <MantineProvider env="test">
+        <App />
+      </MantineProvider>,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
     fireEvent.click(await screen.findByRole('button', { name: /codex/i }));
@@ -106,7 +121,11 @@ describe('App dashboard', () => {
 
   test('shows the privacy defaults', async () => {
     mockAPI();
-    render(<App />);
+    render(
+      <MantineProvider env="test">
+        <App />
+      </MantineProvider>,
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Privacy' }));
     expect(
       await screen.findByText('Prompts and responses'),
@@ -124,7 +143,11 @@ describe('App dashboard', () => {
         state: 'abandoned',
       },
     ]);
-    render(<App />);
+    render(
+      <MantineProvider env="test">
+        <App />
+      </MantineProvider>,
+    );
     expect(await screen.findByText('Failed')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Integrations' }));
     expect(
@@ -135,7 +158,11 @@ describe('App dashboard', () => {
 
   test('shows daemon and session-detail errors and can cancel deletion', async () => {
     mockAPI([session], { detailFails: true, healthFails: true });
-    render(<App />);
+    render(
+      <MantineProvider env="test">
+        <App />
+      </MantineProvider>,
+    );
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Daemon offline',
     );
@@ -148,7 +175,11 @@ describe('App dashboard', () => {
 
   test('keeps the detail view when deletion fails and allows cancellation', async () => {
     mockAPI([session], { deleteFails: true });
-    render(<App />);
+    render(
+      <MantineProvider env="test">
+        <App />
+      </MantineProvider>,
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
     fireEvent.click(await screen.findByRole('button', { name: /codex/i }));
     await screen.findByRole('heading', { name: 'codex session' });

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/api"
+	"github.com/wayne/telemetryiq/internal/auth"
 	"github.com/wayne/telemetryiq/internal/config"
 	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
@@ -19,6 +20,9 @@ import (
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	if authTokenCommand(logger, os.Args[1:]) {
+		return
+	}
 
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
@@ -31,6 +35,11 @@ func main() {
 		os.Exit(1)
 	}
 	telemetryDir := filepath.Join(dataDir, "telemetryiq")
+	token, err := auth.LoadOrCreate(telemetryDir, os.Getenv("TELEMETRYIQ_AUTH_TOKEN"))
+	if err != nil {
+		logger.Error("load local API authentication token", "error", err)
+		os.Exit(1)
+	}
 	salt, err := privacy.LoadOrCreateSalt(telemetryDir)
 	if err != nil {
 		logger.Error("load privacy salt", "error", err)
@@ -48,9 +57,9 @@ func main() {
 	}
 	defer func() { _ = repository.Close() }()
 
-	handler := api.NewPersistentHandler(logger, sanitizer, repository)
+	handler := api.NewAuthenticatedPersistentHandler(logger, sanitizer, repository, token)
 	if os.Getenv("TELEMETRYIQ_DEVELOPMENT_INSPECTOR") == "1" {
-		handler = api.NewPersistentDevelopmentHandler(logger, sanitizer, repository)
+		handler = api.NewAuthenticatedPersistentDevelopmentHandler(logger, sanitizer, repository, token)
 	}
 	server := &http.Server{
 		Addr:              cfg.Addr(),
@@ -82,4 +91,29 @@ func main() {
 			os.Exit(1)
 		}
 	}
+}
+
+func authTokenCommand(logger *slog.Logger, args []string) bool {
+	if len(args) != 1 || args[0] != "auth-token" {
+		return false
+	}
+	if !printAuthToken(logger) {
+		os.Exit(1)
+	}
+	return true
+}
+
+func printAuthToken(logger *slog.Logger) bool {
+	dataDir, err := os.UserConfigDir()
+	if err != nil {
+		logger.Error("locate application data directory", "error", err)
+		return false
+	}
+	token, err := auth.Read(filepath.Join(dataDir, "telemetryiq"))
+	if err != nil {
+		logger.Error("read local API authentication token", "error", err)
+		return false
+	}
+	_, _ = os.Stdout.WriteString(token + "\n")
+	return true
 }

@@ -28,8 +28,18 @@ const defaultAPIURL = 'http://127.0.0.1:8080/api/v1';
 const env = import.meta.env as { readonly VITE_API_URL?: string };
 const apiURL = env.VITE_API_URL ?? defaultAPIURL;
 
+function authHeaders(init?: RequestInit): Headers {
+  const headers = new Headers(init?.headers);
+  const token = sessionStorage.getItem('telemetryiq-auth-token');
+  if (token) headers.set('Authorization', 'Bearer ' + token);
+  return headers;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${apiURL}${path}`, init);
+  const response = await fetch(apiURL + path, {
+    ...init,
+    headers: authHeaders(init),
+  });
   if (!response.ok) {
     throw new Error(`Request failed with status ${String(response.status)}`);
   }
@@ -60,8 +70,19 @@ export async function fetchSession(id: string): Promise<Session> {
 export async function deleteSession(id: string): Promise<void> {
   const response = await fetch(`${apiURL}/sessions/${encodeURIComponent(id)}`, {
     method: 'DELETE',
+    headers: authHeaders(),
   });
   if (!response.ok) {
     throw new Error(`Delete failed with status ${String(response.status)}`);
+  }
+}
+
+export async function deleteAllSessions(): Promise<void> {
+  const response = await fetch(apiURL + '/sessions', {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Delete failed with status ' + String(response.status));
   }
 }

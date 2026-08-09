@@ -1,7 +1,21 @@
+import {
+  Badge,
+  Button,
+  Card,
+  Modal,
+  TextInput,
+  Code,
+  Group,
+  PasswordInput,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core';
 import { useEffect, useState } from 'react';
 
 import { fetchHealth, type HealthResponse } from './health';
 import {
+  deleteAllSessions,
   deleteSession,
   fetchSession,
   fetchSessions,
@@ -30,6 +44,9 @@ export function App() {
     data: [],
   });
   const [selectedID, setSelectedID] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(() =>
+    sessionStorage.getItem('telemetryiq-auth-token'),
+  );
 
   useEffect(() => {
     fetchHealth(healthURL)
@@ -60,6 +77,18 @@ export function App() {
     }
   }
 
+  if (!token) {
+    return (
+      <AuthSetup
+        onAuthenticated={(value) => {
+          sessionStorage.setItem('telemetryiq-auth-token', value);
+          setToken(value);
+          void refreshSessions();
+        }}
+      />
+    );
+  }
+
   const content = selectedID ? (
     <SessionDetail
       id={selectedID}
@@ -77,6 +106,10 @@ export function App() {
       health={health}
       sessions={sessions}
       onSelectSession={setSelectedID}
+      onAllDeleted={() => {
+        setSelectedID(null);
+        void refreshSessions();
+      }}
     />
   );
 
@@ -121,17 +154,19 @@ function PageContent({
   health,
   sessions,
   onSelectSession,
+  onAllDeleted,
 }: Readonly<{
   page: Page;
   health: HealthState;
   sessions: SessionState;
   onSelectSession: (id: string) => void;
+  onAllDeleted: () => void;
 }>) {
   if (page === 'sessions')
     return <SessionsPage sessions={sessions} onSelect={onSelectSession} />;
   if (page === 'integrations')
     return <IntegrationsPage sessions={sessions.data} />;
-  if (page === 'privacy') return <PrivacyPage />;
+  if (page === 'privacy') return <PrivacyPage onDeleted={onAllDeleted} />;
   return <HomePage health={health} sessions={sessions.data} />;
 }
 
@@ -387,7 +422,24 @@ function IntegrationsPage({ sessions }: Readonly<{ sessions: Session[] }>) {
   );
 }
 
-function PrivacyPage() {
+function PrivacyPage({ onDeleted }: Readonly<{ onDeleted: () => void }>) {
+  const [confirming, setConfirming] = useState(false);
+  const [confirmation, setConfirmation] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  async function confirmDeleteAll() {
+    try {
+      await deleteAllSessions();
+      setConfirming(false);
+      setConfirmation('');
+      onDeleted();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : 'Unable to delete retained telemetry',
+      );
+    }
+  }
   return (
     <section aria-labelledby="privacy-title" className="page">
       <p className="eyebrow">Privacy controls</p>
@@ -413,7 +465,109 @@ function PrivacyPage() {
           collection cannot be enabled in this local-only release.
         </p>
       </section>
+      {error ? <p role="alert">{error}</p> : null}
+      <section className="panel">
+        <h2>Delete retained telemetry</h2>
+        <p>
+          Permanently remove every retained session and event from this device.
+          Configuration and local privacy identity remain.
+        </p>
+        <button
+          className="danger"
+          onClick={() => {
+            setConfirming(true);
+          }}
+          type="button"
+        >
+          Delete all retained telemetry
+        </button>
+        <Modal
+          centered
+          onClose={() => {
+            setConfirming(false);
+            setConfirmation('');
+          }}
+          opened={confirming}
+          title="Delete all retained telemetry?"
+        >
+          <Stack>
+            <Text>This cannot be undone. Type DELETE ALL to continue.</Text>
+            <TextInput
+              id="delete-all-confirmation"
+              label="Confirmation"
+              onChange={(event) => {
+                setConfirmation(event.target.value);
+              }}
+              value={confirmation}
+            />
+            <Group justify="flex-end">
+              <Button
+                onClick={() => {
+                  setConfirming(false);
+                  setConfirmation('');
+                }}
+                variant="default"
+              >
+                Cancel
+              </Button>
+              <Button
+                color="red"
+                disabled={confirmation !== 'DELETE ALL'}
+                onClick={() => {
+                  void confirmDeleteAll();
+                }}
+              >
+                Delete all permanently
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
+      </section>
     </section>
+  );
+}
+
+function AuthSetup({
+  onAuthenticated,
+}: Readonly<{ onAuthenticated: (token: string) => void }>) {
+  const [value, setValue] = useState('');
+  return (
+    <main id="main-content">
+      <Card maw={480} mx="auto" p="xl" radius="lg" shadow="lg" withBorder>
+        <Stack gap="lg">
+          <Badge variant="light" w="fit-content">
+            Local access
+          </Badge>
+          <div>
+            <Title order={1}>Connect your dashboard</Title>
+            <Text c="dimmed" mt="sm">
+              Run <Code>telemetryiq auth-token</Code> in a terminal, then paste
+              the token below. It remains only for this browser session.
+            </Text>
+          </div>
+          <PasswordInput
+            autoComplete="off"
+            id="auth-token"
+            label="Local API token"
+            onChange={(event) => {
+              setValue(event.target.value);
+            }}
+            placeholder="Paste your local token"
+            size="md"
+            value={value}
+          />
+          <Button
+            disabled={value.trim() === ''}
+            onClick={() => {
+              onAuthenticated(value.trim());
+            }}
+            size="md"
+          >
+            Connect securely
+          </Button>
+        </Stack>
+      </Card>
+    </main>
   );
 }
 

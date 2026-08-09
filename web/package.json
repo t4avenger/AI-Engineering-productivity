@@ -20,6 +20,8 @@
     "knip": "knip"
   },
   "dependencies": {
+    "@mantine/core": "^8.3.17",
+    "@mantine/hooks": "^8.3.17",
     "@vitejs/plugin-react": "4.7.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",

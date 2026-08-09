@@ -9,7 +9,7 @@ and requires confirmation before permanently deleting a session and its events.
 
 ## Verification evidence
 
-Completed on 2026-07-28:
+Original dashboard evidence completed on 2026-07-28. Phase 2 reconciliation completed on 2026-08-09: `make verify-push` passed, including format, lint, static analysis, unit, component, integration, contract, race, fuzz-smoke, performance-smoke, browser E2E, coverage, security scan, and build.
 
 - `make format-check` — passed.
 - `make lint` — passed (`go vet`, ESLint).
@@ -39,11 +39,8 @@ or raw command arguments; its Privacy page communicates the enforced defaults.
 
 ## Known defects and risks
 
-No blocking defects are known. Live ingest-to-storage wiring and local API
-authentication remain intentionally outside the completed task sequence and
-are documented limitations.
+No blocking defects are known. The local management API now requires a generated bearer token, and the dashboard supports authenticated individual and bulk retained-telemetry deletion.
 
 ## Decision
 
-**GO** for Phase 2 / Task 010 acceptance. The next task may begin the cost
-engine and explainable-insights scope.
+**GO** for Phase 2 acceptance after the current verification commands in this repository pass. The next task may begin the cost engine and explainable-insights scope.

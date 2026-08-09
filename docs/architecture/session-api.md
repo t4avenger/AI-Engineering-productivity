@@ -1,6 +1,6 @@
 # Session API
 
-Task 009 provides local read-only session endpoints:
+The Phase 2 local management API provides authenticated session endpoints:
 
 - `GET /api/v1/sessions`
 - `GET /api/v1/sessions/{id}`
