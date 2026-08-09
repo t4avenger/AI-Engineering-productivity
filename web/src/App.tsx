@@ -63,7 +63,7 @@ export function App() {
     if (token) {
       void refreshSessions();
     }
-  }, []);
+  }, [token]);
 
   async function refreshSessions() {
     try {
@@ -85,7 +85,6 @@ export function App() {
         onAuthenticated={(value) => {
           sessionStorage.setItem('telemetryiq-auth-token', value);
           setToken(value);
-          void refreshSessions();
         }}
       />
     );
