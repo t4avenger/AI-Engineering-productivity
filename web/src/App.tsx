@@ -60,7 +60,9 @@ export function App() {
             error instanceof Error ? error.message : 'Unable to reach daemon',
         });
       });
-    void refreshSessions();
+    if (token) {
+      void refreshSessions();
+    }
   }, []);
 
   async function refreshSessions() {
@@ -339,6 +341,7 @@ function SessionDetail({
           <button
             className="danger"
             onClick={() => {
+              setError(null);
               setConfirming(true);
             }}
             type="button"
@@ -429,6 +432,7 @@ function PrivacyPage({ onDeleted }: Readonly<{ onDeleted: () => void }>) {
   async function confirmDeleteAll() {
     try {
       await deleteAllSessions();
+      setError(null);
       setConfirming(false);
       setConfirmation('');
       onDeleted();
@@ -475,6 +479,7 @@ function PrivacyPage({ onDeleted }: Readonly<{ onDeleted: () => void }>) {
         <button
           className="danger"
           onClick={() => {
+            setError(null);
             setConfirming(true);
           }}
           type="button"
@@ -486,6 +491,7 @@ function PrivacyPage({ onDeleted }: Readonly<{ onDeleted: () => void }>) {
           onClose={() => {
             setConfirming(false);
             setConfirmation('');
+            setError(null);
           }}
           opened={confirming}
           title="Delete all retained telemetry?"
@@ -505,6 +511,7 @@ function PrivacyPage({ onDeleted }: Readonly<{ onDeleted: () => void }>) {
                 onClick={() => {
                   setConfirming(false);
                   setConfirmation('');
+                  setError(null);
                 }}
                 variant="default"
               >

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const tokenFileName = "auth.token"
@@ -28,10 +29,11 @@ func LoadOrCreate(directory, override string) (string, error) {
 		if err := os.Chmod(path, 0o600); err != nil {
 			return "", fmt.Errorf("secure token file: %w", err)
 		}
-		if len(token) == 0 {
+		value := strings.TrimSpace(string(token))
+		if value == "" {
 			return "", errors.New("local authentication token is empty")
 		}
-		return string(token), nil
+		return value, nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf("read local authentication token: %w", err)
 	}
@@ -56,11 +58,12 @@ func Read(directory string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read local authentication token: %w", err)
 	}
-	if len(token) == 0 {
+	value := strings.TrimSpace(string(token))
+	if value == "" {
 		return "", errors.New("local authentication token is empty")
 	}
 	if err := os.Chmod(path, 0o600); err != nil {
 		return "", fmt.Errorf("secure token file: %w", err)
 	}
-	return string(token), nil
+	return value, nil
 }

@@ -4,6 +4,8 @@ The Phase 2 local management API provides authenticated session endpoints:
 
 - `GET /api/v1/sessions`
 - `GET /api/v1/sessions/{id}`
+- `DELETE /api/v1/sessions/{id}`
+- `DELETE /api/v1/sessions`
 
 Responses use stable JSON envelopes: list responses contain `data` and
 `pagination`; detail responses contain `data`; errors contain `error.code` and
@@ -19,6 +21,4 @@ values.
 
 The daemon opens the existing local SQLite repository at the platform
 configuration directory and reuses its installation-specific privacy salt.
-The API never reads raw intake payloads and the live ingest-to-storage path is
-not part of this task. Authentication is also deferred; the daemon remains
-loopback-only by default.
+The API never reads raw intake payloads. Session endpoints require a bearer token; the auth-token CLI command deliberately prints the protected local token for dashboard setup. Health and OTLP intake remain unauthenticated, and the daemon remains loopback-only by default.
