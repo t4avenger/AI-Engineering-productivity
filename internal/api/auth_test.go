@@ -16,12 +16,17 @@ func TestManagementAuthProtectsSessionsOnly(t *testing.T) {
 		status int
 	}{
 		{name: "health remains available", path: "/api/v1/health", status: http.StatusNoContent},
+		{name: "session CORS preflight remains available", path: "/api/v1/sessions", status: http.StatusNoContent},
 		{name: "missing token", path: "/api/v1/sessions", status: http.StatusUnauthorized},
 		{name: "invalid token", path: "/api/v1/sessions/a", token: "wrong", status: http.StatusUnauthorized},
 		{name: "valid token", path: "/api/v1/sessions", token: "test-token", status: http.StatusNoContent},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, test.path, nil)
+			method := http.MethodGet
+			if test.name == "session CORS preflight remains available" {
+				method = http.MethodOptions
+			}
+			req := httptest.NewRequest(method, test.path, nil)
 			if test.token != "" {
 				req.Header.Set("Authorization", "Bearer "+test.token)
 			}

@@ -12,7 +12,7 @@ import (
 func withManagementAuth(token string, next http.Handler) http.Handler {
 	expected := sha256.Sum256([]byte(token))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/sessions" && !strings.HasPrefix(r.URL.Path, "/api/v1/sessions/") {
+		if r.Method == http.MethodOptions || (r.URL.Path != "/api/v1/sessions" && !strings.HasPrefix(r.URL.Path, "/api/v1/sessions/")) {
 			next.ServeHTTP(w, r)
 			return
 		}
