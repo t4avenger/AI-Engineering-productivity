@@ -27,8 +27,14 @@ describe('session API client', () => {
   });
 
   test('keeps untrusted identifiers and cursors inside the API route', async () => {
-    const fetchMock = vi.fn(() =>
-      Promise.resolve(
+    const requestedURLs: URL[] = [];
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      requestedURLs.push(
+        input instanceof URL
+          ? input
+          : new URL(input instanceof Request ? input.url : input),
+      );
+      return Promise.resolve(
         new Response(
           JSON.stringify({
             data: [],
@@ -36,8 +42,8 @@ describe('session API client', () => {
           }),
           { status: 200 },
         ),
-      ),
-    );
+      );
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     await fetchSessionEvents(
@@ -46,7 +52,7 @@ describe('session API client', () => {
     );
     await fetchEventProvenance('../sessions');
 
-    const timelineURL = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    const timelineURL = requestedURLs[0];
     expect(timelineURL.origin).toBe('http://127.0.0.1:8080');
     expect(timelineURL.pathname).toBe(
       '/api/v1/sessions/..%2F..%2Fhealth%3Fredirect%3Dhttps%3A%2F%2Fexample.invalid/events',
@@ -54,7 +60,7 @@ describe('session API client', () => {
     expect(timelineURL.searchParams.get('cursor')).toBe('a&limit=1');
     expect(timelineURL.searchParams.get('limit')).toBe('100');
 
-    const provenanceURL = new URL(String(fetchMock.mock.calls[1]?.[0]));
+    const provenanceURL = requestedURLs[1];
     expect(provenanceURL.pathname).toBe(
       '/api/v1/events/..%2Fsessions/provenance',
     );
