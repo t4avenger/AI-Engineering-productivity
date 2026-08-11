@@ -287,16 +287,7 @@ function SessionsPage({
   );
 }
 
-function SessionDetail({
-  id,
-  onBack,
-  onDeleted,
-}: Readonly<{
-  id: string;
-  onBack: () => void;
-  onDeleted: () => void;
-}>) {
-  const [session, setSession] = useState<Session | null>(null);
+function EventTimeline({ sessionID }: Readonly<{ sessionID: string }>) {
   const [timeline, setTimeline] = useState<TimelineState>({
     status: 'loading',
     data: [],
@@ -307,17 +298,9 @@ function SessionDetail({
     data: Provenance[];
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
-    fetchSession(id)
-      .then(setSession)
-      .catch((reason: unknown) => {
-        setError(
-          reason instanceof Error ? reason.message : 'Unable to load session',
-        );
-      });
-    fetchSessionEvents(id)
+    fetchSessionEvents(sessionID)
       .then((page) => {
         setTimeline({
           status: 'ready',
@@ -336,12 +319,12 @@ function SessionDetail({
               : 'Unable to load session timeline',
         });
       });
-  }, [id]);
+  }, [sessionID]);
 
   async function loadMore() {
     if (!timeline.nextCursor) return;
     try {
-      const page = await fetchSessionEvents(id, timeline.nextCursor);
+      const page = await fetchSessionEvents(sessionID, timeline.nextCursor);
       setTimeline((current) => ({
         status: 'ready',
         data: [...current.data, ...page.data],
@@ -362,7 +345,10 @@ function SessionDetail({
 
   async function loadProvenance(eventID: string) {
     try {
-      setProvenance({ eventID, data: await fetchEventProvenance(eventID) });
+      setProvenance({
+        eventID,
+        data: await fetchEventProvenance(eventID),
+      });
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -371,6 +357,95 @@ function SessionDetail({
       );
     }
   }
+
+  return (
+    <section aria-labelledby="timeline-title" className="panel">
+      <h2 id="timeline-title">Event timeline</h2>
+      <p>Only privacy-safe, retained event metadata appears here.</p>
+      {error ? <p role="alert">{error}</p> : null}
+      {timeline.status === 'loading' ? (
+        <output>Loading event timeline…</output>
+      ) : null}
+      {timeline.status === 'error' ? (
+        <p role="alert">{timeline.message}</p>
+      ) : null}
+      {timeline.status !== 'loading' && timeline.data.length === 0 ? (
+        <p>No retained events are available for this session.</p>
+      ) : null}
+      {timeline.data.length > 0 ? (
+        <ol className="event-timeline">
+          {timeline.data.map((event) => (
+            <li key={event.event_id}>
+              <h3>{event.event_type}</h3>
+              <p>{formatDate(event.occurred_at)}</p>
+              <p>
+                Model: {event.model ?? 'Unavailable'}; input tokens:{' '}
+                {event.input_token_count ?? 'Unavailable'}; output tokens:{' '}
+                {event.output_token_count ?? 'Unavailable'}
+              </p>
+              {event.unavailable_fields.length > 0 ? (
+                <p>Unavailable: {event.unavailable_fields.join(', ')}</p>
+              ) : null}
+              <button
+                onClick={() => {
+                  void loadProvenance(event.event_id);
+                }}
+                type="button"
+              >
+                View provenance
+              </button>
+              {provenance?.eventID === event.event_id ? (
+                <dl aria-label="Event provenance" className="details">
+                  {provenance.data.map((entry) => (
+                    <div key={entry.path}>
+                      <dt>{entry.path}</dt>
+                      <dd>
+                        {entry.action}: {entry.reason}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+      ) : null}
+      {timeline.nextCursor ? (
+        <button
+          onClick={() => {
+            void loadMore();
+          }}
+          type="button"
+        >
+          Load more events
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
+function SessionDetail({
+  id,
+  onBack,
+  onDeleted,
+}: Readonly<{
+  id: string;
+  onBack: () => void;
+  onDeleted: () => void;
+}>) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    fetchSession(id)
+      .then(setSession)
+      .catch((reason: unknown) => {
+        setError(
+          reason instanceof Error ? reason.message : 'Unable to load session',
+        );
+      });
+  }, [id]);
 
   async function confirmDelete() {
     try {
@@ -414,67 +489,7 @@ function SessionDetail({
               value={numberAttribute(session, 'event_count') ?? 'Unavailable'}
             />
           </dl>
-          <section aria-labelledby="timeline-title" className="panel">
-            <h2 id="timeline-title">Event timeline</h2>
-            <p>Only privacy-safe, retained event metadata appears here.</p>
-            {timeline.status === 'loading' ? (
-              <output>Loading event timeline…</output>
-            ) : null}
-            {timeline.status === 'error' ? (
-              <p role="alert">{timeline.message}</p>
-            ) : null}
-            {timeline.status !== 'loading' && timeline.data.length === 0 ? (
-              <p>No retained events are available for this session.</p>
-            ) : null}
-            {timeline.data.length > 0 ? (
-              <ol className="event-timeline">
-                {timeline.data.map((event) => (
-                  <li key={event.event_id}>
-                    <h3>{event.event_type}</h3>
-                    <p>{formatDate(event.occurred_at)}</p>
-                    <p>
-                      Model: {event.model ?? 'Unavailable'}; input tokens:{' '}
-                      {event.input_token_count ?? 'Unavailable'}; output tokens:{' '}
-                      {event.output_token_count ?? 'Unavailable'}
-                    </p>
-                    {event.unavailable_fields.length > 0 ? (
-                      <p>Unavailable: {event.unavailable_fields.join(', ')}</p>
-                    ) : null}
-                    <button
-                      onClick={() => {
-                        void loadProvenance(event.event_id);
-                      }}
-                      type="button"
-                    >
-                      View provenance
-                    </button>
-                    {provenance?.eventID === event.event_id ? (
-                      <dl aria-label="Event provenance" className="details">
-                        {provenance.data.map((entry) => (
-                          <div key={entry.path}>
-                            <dt>{entry.path}</dt>
-                            <dd>
-                              {entry.action}: {entry.reason}
-                            </dd>
-                          </div>
-                        ))}
-                      </dl>
-                    ) : null}
-                  </li>
-                ))}
-              </ol>
-            ) : null}
-            {timeline.nextCursor ? (
-              <button
-                onClick={() => {
-                  void loadMore();
-                }}
-                type="button"
-              >
-                Load more events
-              </button>
-            ) : null}
-          </section>
+          <EventTimeline sessionID={id} />
           <section className="panel">
             <h2>Data retention</h2>
             <p>
