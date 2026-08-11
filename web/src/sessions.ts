@@ -89,12 +89,19 @@ export interface EventPage {
   pagination: { limit: number; next_cursor: string | null };
 }
 
+function validCursor(cursor: string): string {
+  if (cursor === '' || /[^A-Za-z0-9_-]/.test(cursor)) {
+    throw new TypeError('Session event cursor was malformed');
+  }
+  return cursor;
+}
+
 export async function fetchSessionEvents(
   id: string,
   cursor?: string,
 ): Promise<EventPage> {
   const query = cursor
-    ? '?limit=100&cursor=' + encodeURIComponent(cursor)
+    ? '?limit=100&cursor=' + encodeURIComponent(validCursor(cursor))
     : '?limit=100';
   const response = await request<EventPage>(
     '/sessions/' + encodeURIComponent(id) + '/events' + query,
