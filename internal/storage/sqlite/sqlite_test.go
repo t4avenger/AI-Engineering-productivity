@@ -200,3 +200,37 @@ func event(t *testing.T, id, sessionID, kind, at string) canonical.Event {
 	}
 	return canonical.Event{SchemaVersion: "0.1.0", EventID: id, EventType: kind, OccurredAt: occurred, ReceivedAt: occurred, Provider: "openai", Tool: "codex", SourceSchema: "otel", SourceVersion: "test", ActorID: "unavailable", DeviceID: "unavailable", SessionID: sessionID, PrivacyLevel: "operational", Attributes: map[string]any{}, ProviderExtensions: map[string]any{}}
 }
+
+func TestEventTimelineReadsAndProvenance(t *testing.T) {
+	sanitizer, err := privacy.New(make([]byte, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo, err := Open(":memory:", sanitizer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = repo.Close() }()
+	first := event(t, "first", "timeline", "session.active", "2026-01-02T09:00:00Z")
+	first.ProviderExtensions = map[string]any{"prompt": "synthetic"}
+	second := event(t, "second", "timeline", "session.completed", "2026-01-02T10:00:00Z")
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{second, first}); err != nil {
+		t.Fatal(err)
+	}
+	page, err := repo.ListEvents(context.Background(), storage.EventFilter{SessionID: "timeline", Limit: 1})
+	if err != nil || len(page) != 2 || page[0].EventID != "first" {
+		t.Fatalf("page = %#v, %v", page, err)
+	}
+	cursor := &storage.EventCursor{OccurredAt: page[0].OccurredAt, EventID: page[0].EventID}
+	remaining, err := repo.ListEvents(context.Background(), storage.EventFilter{SessionID: "timeline", Cursor: cursor, Limit: 1})
+	if err != nil || len(remaining) != 1 || remaining[0].EventID != "second" {
+		t.Fatalf("remaining = %#v, %v", remaining, err)
+	}
+	provenance, found, err := repo.EventProvenance(context.Background(), "first")
+	if err != nil || !found || len(provenance) == 0 {
+		t.Fatalf("provenance = %#v, %v, %v", provenance, found, err)
+	}
+	if _, err := repo.ListEvents(context.Background(), storage.EventFilter{SessionID: "timeline"}); err == nil {
+		t.Fatal("expected invalid limit")
+	}
+}

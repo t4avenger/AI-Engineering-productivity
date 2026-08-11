@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -179,4 +180,85 @@ func getSessionList(t *testing.T, rawURL string) sessionListResponse {
 		t.Fatal(err)
 	}
 	return list
+}
+
+func TestSessionEventTimelineAndProvenanceAPI(t *testing.T) {
+	server := timelineTestServer(t)
+	firstPage := timelinePage(t, server.URL+"/api/v1/sessions/timeline-session/events?limit=1")
+	assertFirstTimelinePage(t, firstPage)
+	assertSecondTimelinePage(t, server.URL, firstPage)
+	assertTimelineProvenance(t, server.URL)
+}
+
+func timelineTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	repo := sessionTestRepository(t)
+	first := sessionTestEvent(t, "timeline-first", "timeline-session", "codex", "active", "2026-01-03T09:00:00Z", "model-a")
+	first.Attributes["input_token_count"] = "100"
+	first.ProviderExtensions = map[string]any{"prompt": "synthetic-private-prompt"}
+	second := sessionTestEvent(t, "timeline-second", "timeline-session", "codex", "completed", "2026-01-03T10:00:00Z", "model-a")
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{second, first}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(NewHandler(slog.Default(), repo))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func timelinePage(t *testing.T, address string) eventListResponse {
+	t.Helper()
+	response, err := http.Get(address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("timeline status = %d", response.StatusCode)
+	}
+	var page eventListResponse
+	if err := json.NewDecoder(response.Body).Decode(&page); err != nil {
+		t.Fatal(err)
+	}
+	return page
+}
+
+func assertFirstTimelinePage(t *testing.T, page eventListResponse) {
+	t.Helper()
+	if len(page.Data) != 1 || page.Data[0].EventID != "timeline-first" || page.Pagination.NextCursor == nil {
+		t.Fatalf("first timeline page = %#v", page)
+	}
+	serialized, err := json.Marshal(page)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(serialized), "synthetic-private-prompt") || strings.Contains(string(serialized), "provider_extensions") {
+		t.Fatalf("timeline leaked non-public data: %s", serialized)
+	}
+}
+
+func assertSecondTimelinePage(t *testing.T, baseURL string, first eventListResponse) {
+	t.Helper()
+	page := timelinePage(t, baseURL+"/api/v1/sessions/timeline-session/events?limit=1&cursor="+url.QueryEscape(*first.Pagination.NextCursor))
+	if len(page.Data) != 1 || page.Data[0].EventID != "timeline-second" || page.Pagination.NextCursor != nil {
+		t.Fatalf("second timeline page = %#v", page)
+	}
+}
+
+func assertTimelineProvenance(t *testing.T, baseURL string) {
+	t.Helper()
+	response, err := http.Get(baseURL + "/api/v1/events/timeline-first/provenance")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	var provenance eventProvenanceResponse
+	if err := json.NewDecoder(response.Body).Decode(&provenance); err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range provenance.Data {
+		if entry.Action == privacy.ActionRemoved {
+			return
+		}
+	}
+	t.Fatalf("provenance = %#v", provenance)
 }

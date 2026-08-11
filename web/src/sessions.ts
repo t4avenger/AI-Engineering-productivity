@@ -19,6 +19,26 @@ export interface Session {
   provider_extensions: Record<string, unknown>;
 }
 
+export interface TimelineEvent {
+  event_id: string;
+  event_type: string;
+  occurred_at: string;
+  received_at: string;
+  provider: string;
+  tool: string;
+  source_version: string;
+  model: string | null;
+  input_token_count: string | null;
+  output_token_count: string | null;
+  unavailable_fields: string[];
+}
+
+export interface Provenance {
+  path: string;
+  action: string;
+  reason: string;
+}
+
 interface SessionListResponse {
   data: Session[];
   pagination: { limit: number; next_cursor: string | null };
@@ -60,6 +80,37 @@ export async function fetchSessions(): Promise<Session[]> {
   const response = await request<SessionListResponse>('/sessions?limit=100');
   if (!Array.isArray(response.data)) {
     throw new TypeError('Session list response was malformed');
+  }
+  return response.data;
+}
+
+export interface EventPage {
+  data: TimelineEvent[];
+  pagination: { limit: number; next_cursor: string | null };
+}
+
+export async function fetchSessionEvents(
+  id: string,
+  cursor?: string,
+): Promise<EventPage> {
+  const query = cursor
+    ? '?limit=100&cursor=' + encodeURIComponent(cursor)
+    : '?limit=100';
+  const response = await request<EventPage>(
+    '/sessions/' + encodeURIComponent(id) + '/events' + query,
+  );
+  if (!Array.isArray(response.data)) {
+    throw new TypeError('Session event response was malformed');
+  }
+  return response;
+}
+
+export async function fetchEventProvenance(id: string): Promise<Provenance[]> {
+  const response = await request<{ data?: Provenance[] }>(
+    '/events/' + encodeURIComponent(id) + '/provenance',
+  );
+  if (!Array.isArray(response.data)) {
+    throw new TypeError('Event provenance response was malformed');
   }
   return response.data;
 }

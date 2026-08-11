@@ -2,12 +2,16 @@
 
 ## Scope and demo
 
+The reconciliation adds a chronological authenticated safe-event timeline and per-event sanitisation provenance view. Provider extensions and raw intake are never returned by these endpoints.
+
 The local dashboard now provides Home, Sessions, Session Detail, Integrations,
 and Privacy pages. It reads only from the loopback API, labels unavailable
 telemetry explicitly, derives integration status only from observed sessions,
 and requires confirmation before permanently deleting a session and its events.
 
 ## Verification evidence
+
+- Phase 2 timeline reconciliation: `make verify-push` passed on 2026-08-11, including format, lint, static analysis, unit, component, integration, contract, race, fuzz-smoke, performance-smoke, E2E, coverage, security scan, and build.
 
 Original dashboard evidence completed on 2026-07-28. Phase 2 reconciliation completed on 2026-08-09: `make verify-push` passed, including format, lint, static analysis, unit, component, integration, contract, race, fuzz-smoke, performance-smoke, browser E2E, coverage, security scan, and build.
 

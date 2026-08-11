@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
+	"github.com/wayne/telemetryiq/internal/privacy"
 )
 
 // SessionFilter constrains a session query. Empty fields do not filter results.
@@ -28,6 +29,19 @@ type SessionCursor struct {
 	SessionID string
 }
 
+// EventFilter constrains a chronological event timeline for one session.
+type EventFilter struct {
+	SessionID string
+	Cursor    *EventCursor
+	Limit     int
+}
+
+// EventCursor identifies the last event returned by a chronological page.
+type EventCursor struct {
+	OccurredAt time.Time
+	EventID    string
+}
+
 // SessionReader is the read-only session contract used by the local API.
 type SessionReader interface {
 	Session(context.Context, string) (canonical.Session, bool, error)
@@ -40,9 +54,16 @@ type SessionDeleter interface {
 	DeleteAllSessions(context.Context) error
 }
 
+// EventReader exposes sanitised canonical events and their provenance.
+type EventReader interface {
+	ListEvents(context.Context, EventFilter) ([]canonical.Event, error)
+	EventProvenance(context.Context, string) ([]privacy.Provenance, bool, error)
+}
+
 type Repository interface {
 	SaveEvents(context.Context, []canonical.Event) error
 	SessionReader
 	SessionDeleter
+	EventReader
 	Close() error
 }

@@ -17,9 +17,13 @@ import { fetchHealth, type HealthResponse } from './health';
 import {
   deleteAllSessions,
   deleteSession,
+  fetchEventProvenance,
   fetchSession,
+  fetchSessionEvents,
   fetchSessions,
+  type Provenance,
   type Session,
+  type TimelineEvent,
   SessionAPIError,
 } from './sessions';
 
@@ -32,6 +36,15 @@ type SessionState =
   | { status: 'loading'; data: Session[] }
   | { status: 'ready'; data: Session[] }
   | { status: 'error'; data: Session[]; message: string };
+type TimelineState =
+  | { status: 'loading'; data: TimelineEvent[]; nextCursor: string | null }
+  | { status: 'ready'; data: TimelineEvent[]; nextCursor: string | null }
+  | {
+      status: 'error';
+      data: TimelineEvent[];
+      nextCursor: string | null;
+      message: string;
+    };
 
 const healthURL =
   (import.meta.env as { readonly VITE_HEALTH_URL?: string }).VITE_HEALTH_URL ??
@@ -284,8 +297,18 @@ function SessionDetail({
   onDeleted: () => void;
 }>) {
   const [session, setSession] = useState<Session | null>(null);
+  const [timeline, setTimeline] = useState<TimelineState>({
+    status: 'loading',
+    data: [],
+    nextCursor: null,
+  });
+  const [provenance, setProvenance] = useState<{
+    eventID: string;
+    data: Provenance[];
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+
   useEffect(() => {
     fetchSession(id)
       .then(setSession)
@@ -294,7 +317,61 @@ function SessionDetail({
           reason instanceof Error ? reason.message : 'Unable to load session',
         );
       });
+    fetchSessionEvents(id)
+      .then((page) => {
+        setTimeline({
+          status: 'ready',
+          data: page.data,
+          nextCursor: page.pagination.next_cursor,
+        });
+      })
+      .catch((reason: unknown) => {
+        setTimeline({
+          status: 'error',
+          data: [],
+          nextCursor: null,
+          message:
+            reason instanceof Error
+              ? reason.message
+              : 'Unable to load session timeline',
+        });
+      });
   }, [id]);
+
+  async function loadMore() {
+    if (!timeline.nextCursor) return;
+    try {
+      const page = await fetchSessionEvents(id, timeline.nextCursor);
+      setTimeline((current) => ({
+        status: 'ready',
+        data: [...current.data, ...page.data],
+        nextCursor: page.pagination.next_cursor,
+      }));
+    } catch (reason) {
+      setTimeline((current) => ({
+        status: 'error',
+        data: current.data,
+        nextCursor: current.nextCursor,
+        message:
+          reason instanceof Error
+            ? reason.message
+            : 'Unable to load more session events',
+      }));
+    }
+  }
+
+  async function loadProvenance(eventID: string) {
+    try {
+      setProvenance({ eventID, data: await fetchEventProvenance(eventID) });
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : 'Unable to load event provenance',
+      );
+    }
+  }
+
   async function confirmDelete() {
     try {
       await deleteSession(id);
@@ -306,6 +383,7 @@ function SessionDetail({
       setConfirming(false);
     }
   }
+
   return (
     <section aria-labelledby="detail-title" className="page">
       <button className="back" onClick={onBack} type="button">
@@ -336,6 +414,67 @@ function SessionDetail({
               value={numberAttribute(session, 'event_count') ?? 'Unavailable'}
             />
           </dl>
+          <section aria-labelledby="timeline-title" className="panel">
+            <h2 id="timeline-title">Event timeline</h2>
+            <p>Only privacy-safe, retained event metadata appears here.</p>
+            {timeline.status === 'loading' ? (
+              <output>Loading event timeline…</output>
+            ) : null}
+            {timeline.status === 'error' ? (
+              <p role="alert">{timeline.message}</p>
+            ) : null}
+            {timeline.status !== 'loading' && timeline.data.length === 0 ? (
+              <p>No retained events are available for this session.</p>
+            ) : null}
+            {timeline.data.length > 0 ? (
+              <ol className="event-timeline">
+                {timeline.data.map((event) => (
+                  <li key={event.event_id}>
+                    <h3>{event.event_type}</h3>
+                    <p>{formatDate(event.occurred_at)}</p>
+                    <p>
+                      Model: {event.model ?? 'Unavailable'}; input tokens:{' '}
+                      {event.input_token_count ?? 'Unavailable'}; output tokens:{' '}
+                      {event.output_token_count ?? 'Unavailable'}
+                    </p>
+                    {event.unavailable_fields.length > 0 ? (
+                      <p>Unavailable: {event.unavailable_fields.join(', ')}</p>
+                    ) : null}
+                    <button
+                      onClick={() => {
+                        void loadProvenance(event.event_id);
+                      }}
+                      type="button"
+                    >
+                      View provenance
+                    </button>
+                    {provenance?.eventID === event.event_id ? (
+                      <dl aria-label="Event provenance" className="details">
+                        {provenance.data.map((entry) => (
+                          <div key={entry.path}>
+                            <dt>{entry.path}</dt>
+                            <dd>
+                              {entry.action}: {entry.reason}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            ) : null}
+            {timeline.nextCursor ? (
+              <button
+                onClick={() => {
+                  void loadMore();
+                }}
+                type="button"
+              >
+                Load more events
+              </button>
+            ) : null}
+          </section>
           <section className="panel">
             <h2>Data retention</h2>
             <p>

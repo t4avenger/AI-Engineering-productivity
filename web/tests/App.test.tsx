@@ -55,6 +55,16 @@ function mockAPI(
             { status: 200 },
           ),
         );
+      if (url.includes('/sessions/session-1/events?'))
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: [],
+              pagination: { limit: 100, next_cursor: null },
+            }),
+            { status: 200 },
+          ),
+        );
       if (url.endsWith('/sessions/session-1') && options.detailFails)
         return Promise.resolve(new Response(null, { status: 500 }));
       if (url.endsWith('/sessions/session-1'))
