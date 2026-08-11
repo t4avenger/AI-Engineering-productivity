@@ -30,6 +30,8 @@ type SessionCursor struct {
 }
 
 // EventFilter constrains a chronological event timeline for one session.
+// Limit is the number of events visible to the caller, not the repository
+// result size.
 type EventFilter struct {
 	SessionID string
 	Cursor    *EventCursor
@@ -55,6 +57,8 @@ type SessionDeleter interface {
 }
 
 // EventReader exposes sanitised canonical events and their provenance.
+// ListEvents returns at most EventFilter.Limit+1 events so callers can detect
+// whether another cursor page exists without issuing a separate count query.
 type EventReader interface {
 	ListEvents(context.Context, EventFilter) ([]canonical.Event, error)
 	EventProvenance(context.Context, string) ([]privacy.Provenance, bool, error)

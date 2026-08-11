@@ -112,6 +112,7 @@ export function App() {
   const content = selectedID ? (
     <SessionDetail
       id={selectedID}
+      key={selectedID}
       onBack={() => {
         setSelectedID(null);
       }}
