@@ -14,6 +14,7 @@ import (
 	"github.com/wayne/telemetryiq/internal/api"
 	"github.com/wayne/telemetryiq/internal/auth"
 	"github.com/wayne/telemetryiq/internal/config"
+	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
 )
@@ -50,7 +51,12 @@ func main() {
 		logger.Error("create privacy sanitizer", "error", err)
 		os.Exit(1)
 	}
-	repository, err := sqlite.Open(filepath.Join(telemetryDir, "telemetryiq.db"), sanitizer)
+	calculator, err := cost.LoadDefault(cfg.Pricing.OverridePath)
+	if err != nil {
+		logger.Error("load local price catalog", "error", err)
+		os.Exit(1)
+	}
+	repository, err := sqlite.Open(filepath.Join(telemetryDir, "telemetryiq.db"), sanitizer, calculator)
 	if err != nil {
 		logger.Error("open local session storage", "error", err)
 		os.Exit(1)

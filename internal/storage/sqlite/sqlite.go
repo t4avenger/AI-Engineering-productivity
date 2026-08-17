@@ -15,17 +15,19 @@ import (
 	// Register the pure-Go SQLite driver with database/sql.
 	_ "modernc.org/sqlite"
 
+	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
 type Repository struct {
-	db        *sql.DB
-	sanitizer *privacy.Sanitizer
+	db         *sql.DB
+	sanitizer  *privacy.Sanitizer
+	calculator *cost.Calculator
 }
 
-func Open(path string, sanitizer *privacy.Sanitizer) (*Repository, error) {
+func Open(path string, sanitizer *privacy.Sanitizer, calculators ...*cost.Calculator) (*Repository, error) {
 	if sanitizer == nil {
 		return nil, errors.New("privacy sanitizer is required")
 	}
@@ -46,6 +48,9 @@ func Open(path string, sanitizer *privacy.Sanitizer) (*Repository, error) {
 	}
 	db.SetMaxOpenConns(1)
 	r := &Repository{db: db, sanitizer: sanitizer}
+	if len(calculators) > 0 {
+		r.calculator = calculators[0]
+	}
 	if err := r.migrate(context.Background()); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -65,12 +70,18 @@ func (r *Repository) migrate(ctx context.Context) error {
 	_, err := r.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS events (event_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, occurred_at TEXT NOT NULL, event_json BLOB NOT NULL, provenance_json BLOB NOT NULL);
 CREATE INDEX IF NOT EXISTS events_session_occurred ON events(session_id, occurred_at, event_id);
-CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, session_json BLOB NOT NULL);`)
+CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, session_json BLOB NOT NULL); CREATE TABLE IF NOT EXISTS cost_records (event_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, cost_json BLOB NOT NULL); CREATE INDEX IF NOT EXISTS cost_records_session ON cost_records(session_id);`)
 	if err != nil {
 		return fmt.Errorf("migrate database: %w", err)
 	}
 	_, err = r.db.ExecContext(ctx, "INSERT OR IGNORE INTO schema_migrations(version) VALUES (1)")
-	return err
+	if err != nil {
+		return fmt.Errorf("record migration 1: %w", err)
+	}
+	if _, err = r.db.ExecContext(ctx, "INSERT OR IGNORE INTO schema_migrations(version) VALUES (2)"); err != nil {
+		return fmt.Errorf("record migration 2: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) SaveEvents(ctx context.Context, events []canonical.Event) error {
@@ -93,8 +104,16 @@ func (r *Repository) SaveEvents(ctx context.Context, events []canonical.Event) e
 		if err != nil {
 			return fmt.Errorf("marshal sanitization provenance: %w", err)
 		}
-		if _, err = tx.ExecContext(ctx, "INSERT OR IGNORE INTO events(event_id,session_id,occurred_at,event_json,provenance_json) VALUES(?,?,?,?,?)", safe.EventID, safe.SessionID, safe.OccurredAt.UTC().Format(timeFormat), payload, provenanceJSON); err != nil {
+		result, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO events(event_id,session_id,occurred_at,event_json,provenance_json) VALUES(?,?,?,?,?)", safe.EventID, safe.SessionID, safe.OccurredAt.UTC().Format(timeFormat), payload, provenanceJSON)
+		if err != nil {
 			return err
+		}
+		if r.calculator != nil {
+			if inserted, _ := result.RowsAffected(); inserted > 0 {
+				if err := r.saveCostRecord(ctx, tx, r.calculator.Calculate(safe)); err != nil {
+					return err
+				}
+			}
 		}
 		ids[safe.SessionID] = struct{}{}
 	}
@@ -104,6 +123,15 @@ func (r *Repository) SaveEvents(ctx context.Context, events []canonical.Event) e
 		}
 	}
 	return tx.Commit()
+}
+
+func (r *Repository) saveCostRecord(ctx context.Context, tx *sql.Tx, record cost.Record) error {
+	payload, err := json.Marshal(record)
+	if err != nil {
+		return fmt.Errorf("marshal cost record: %w", err)
+	}
+	_, err = tx.ExecContext(ctx, "INSERT INTO cost_records(event_id,session_id,cost_json) VALUES(?,?,?)", record.EventID, record.SessionID, payload)
+	return err
 }
 
 const timeFormat = "2006-01-02T15:04:05.999999999Z07:00"

@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://telemetryiq.local/schemas/price-catalog/0.1.0","type":"object","required":["schema_version","catalog_version","currency","records"],"properties":{"schema_version":{"const":"0.1.0"},"catalog_version":{"type":"string","minLength":1},"currency":{"const":"USD"},"records":{"type":"array"}}}

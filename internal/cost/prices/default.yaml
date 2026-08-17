@@ -1,0 +1,6 @@
+schema_version: "0.1.0"
+catalog_version: "2026-08-17-empty-observed-models"
+currency: USD
+# No record is bundled until a public model identifier is retained in a reviewed
+# sanitised fixture and verified against the official OpenAI pricing page.
+records: []

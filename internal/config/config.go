@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"gopkg.in/yaml.v3"
@@ -25,6 +26,7 @@ type Config struct {
 	Collection    Collection `yaml:"collection"`
 	Storage       Storage    `yaml:"storage"`
 	Sharing       Sharing    `yaml:"sharing"`
+	Pricing       Pricing    `yaml:"pricing"`
 	Host          string     `yaml:"-"`
 	Port          string     `yaml:"-"`
 }
@@ -51,12 +53,18 @@ type Sharing struct {
 	ResearchSessions   string `yaml:"research_sessions"`
 }
 
+// Pricing only selects a local override file; it never enables network pricing.
+type Pricing struct {
+	OverridePath string `yaml:"override_path"`
+}
+
 // Default returns the safe local-only configuration specified in PRODUCT_MAP.md.
 func Default() Config {
 	return Config{SchemaVersion: SchemaVersion, Mode: ModeLocalOnly,
 		Collection: Collection{Level: "operational", FilePaths: "hash", CommandArguments: "redact", ToolCalls: true, ModelUsage: true},
 		Storage:    Storage{Destination: "local", RetentionDays: 30},
-		Sharing:    Sharing{ResearchSessions: "explicit-only"}, Host: defaultHost, Port: defaultPort}
+		Sharing:    Sharing{ResearchSessions: "explicit-only"},
+		Pricing:    Pricing{}, Host: defaultHost, Port: defaultPort}
 }
 
 // FromEnv remains for backwards compatibility with Task 001 callers.
@@ -142,6 +150,13 @@ func (c Config) Validate() error {
 	}
 	if c.Sharing.ResearchSessions != "explicit-only" {
 		return fmt.Errorf("sharing.research_sessions must be \"explicit-only\", got %q", c.Sharing.ResearchSessions)
+	}
+	return c.validatePricing()
+}
+
+func (c Config) validatePricing() error {
+	if c.Pricing.OverridePath != "" && !filepath.IsAbs(c.Pricing.OverridePath) {
+		return errors.New("pricing.override_path must be an absolute local path")
 	}
 	return nil
 }
