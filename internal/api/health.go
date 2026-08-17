@@ -49,6 +49,8 @@ func newHandler(logger *slog.Logger, inspector *sanitizedInspector, repository s
 	sessionAPI := newSessionAPI(sessions)
 	mux.HandleFunc("GET /api/v1/sessions", sessionAPI.list)
 	mux.HandleFunc("GET /api/v1/sessions/{id}", sessionAPI.detail)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/events", sessionAPI.events)
+	mux.HandleFunc("GET /api/v1/events/{id}/provenance", sessionAPI.provenance)
 	mux.HandleFunc("DELETE /api/v1/sessions/{id}", sessionAPI.delete)
 	mux.HandleFunc("POST /v1/traces", ingest.tracesHandler)
 	mux.HandleFunc("POST /v1/logs", ingest.logsHandler)

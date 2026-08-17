@@ -19,6 +19,26 @@ export interface Session {
   provider_extensions: Record<string, unknown>;
 }
 
+export interface TimelineEvent {
+  event_id: string;
+  event_type: string;
+  occurred_at: string;
+  received_at: string;
+  provider: string;
+  tool: string;
+  source_version: string;
+  model: string | null;
+  input_token_count: string | null;
+  output_token_count: string | null;
+  unavailable_fields: string[];
+}
+
+export interface Provenance {
+  path: string;
+  action: string;
+  reason: string;
+}
+
 interface SessionListResponse {
   data: Session[];
   pagination: { limit: number; next_cursor: string | null };
@@ -27,6 +47,7 @@ interface SessionListResponse {
 const defaultAPIURL = 'http://127.0.0.1:8080/api/v1';
 const env = import.meta.env as { readonly VITE_API_URL?: string };
 const apiURL = env.VITE_API_URL ?? defaultAPIURL;
+const apiBase = new URL(apiURL.endsWith('/') ? apiURL : apiURL + '/');
 
 export class SessionAPIError extends Error {
   constructor(
@@ -45,8 +66,19 @@ function authHeaders(init?: RequestInit): Headers {
   return headers;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(apiURL + path, {
+function apiRequestURL(
+  segments: readonly string[],
+  parameters?: URLSearchParams,
+): URL {
+  const url = new URL(apiBase);
+  const encodedPath = segments.map((segment) => encodeURIComponent(segment));
+  url.pathname += encodedPath.join('/');
+  if (parameters) url.search = parameters.toString();
+  return url;
+}
+
+async function request<T>(url: URL, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
     ...init,
     headers: authHeaders(init),
   });
@@ -57,16 +89,48 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function fetchSessions(): Promise<Session[]> {
-  const response = await request<SessionListResponse>('/sessions?limit=100');
+  const response = await request<SessionListResponse>(
+    apiRequestURL(['sessions'], new URLSearchParams({ limit: '100' })),
+  );
   if (!Array.isArray(response.data)) {
     throw new TypeError('Session list response was malformed');
   }
   return response.data;
 }
 
+export interface EventPage {
+  data: TimelineEvent[];
+  pagination: { limit: number; next_cursor: string | null };
+}
+
+export async function fetchSessionEvents(
+  id: string,
+  cursor?: string,
+): Promise<EventPage> {
+  const parameters = new URLSearchParams({ limit: '100' });
+  if (cursor) parameters.set('cursor', cursor);
+  const response = await request<EventPage>(
+    apiRequestURL(['sessions', id, 'events'], parameters),
+  );
+  if (!Array.isArray(response.data)) {
+    throw new TypeError('Session event response was malformed');
+  }
+  return response;
+}
+
+export async function fetchEventProvenance(id: string): Promise<Provenance[]> {
+  const response = await request<{ data?: Provenance[] }>(
+    apiRequestURL(['events', id, 'provenance']),
+  );
+  if (!Array.isArray(response.data)) {
+    throw new TypeError('Event provenance response was malformed');
+  }
+  return response.data;
+}
+
 export async function fetchSession(id: string): Promise<Session> {
   const response = await request<{ data?: Partial<Session> }>(
-    `/sessions/${encodeURIComponent(id)}`,
+    apiRequestURL(['sessions', id]),
   );
   if (
     response.data === undefined ||
@@ -78,7 +142,7 @@ export async function fetchSession(id: string): Promise<Session> {
 }
 
 export async function deleteSession(id: string): Promise<void> {
-  const response = await fetch(`${apiURL}/sessions/${encodeURIComponent(id)}`, {
+  const response = await fetch(apiRequestURL(['sessions', id]), {
     method: 'DELETE',
     headers: authHeaders(),
   });
@@ -88,7 +152,7 @@ export async function deleteSession(id: string): Promise<void> {
 }
 
 export async function deleteAllSessions(): Promise<void> {
-  const response = await fetch(apiURL + '/sessions', {
+  const response = await fetch(apiRequestURL(['sessions']), {
     method: 'DELETE',
     headers: authHeaders(),
   });

@@ -9,5 +9,4 @@ in-memory inspection. Regression tests cover the observed sensitive categories.
 Raw payloads are never persisted, and the checked-in observed fixture replaces
 all retained values with synthetic equivalents.
 
-The initial normalizer supports trace fixtures only; the observed log fixture
-is Phase 0 evidence, not a claim that logs have Phase 1 canonical support.
+The Codex log normaliser retains only model, input-token, and output-token metadata from the reviewed log shape. Other telemetry remains explicitly unavailable until fixture-backed.

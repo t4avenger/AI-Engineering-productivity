@@ -21,8 +21,9 @@ const (
 )
 
 type sessionAPI struct {
-	sessions storage.SessionReader
-	deleter  storage.SessionDeleter
+	sessions    storage.SessionReader
+	deleter     storage.SessionDeleter
+	eventReader storage.EventReader
 }
 
 type sessionListResponse struct {
@@ -55,7 +56,8 @@ type sessionCursor struct {
 
 func newSessionAPI(sessions storage.SessionReader) sessionAPI {
 	deleter, _ := sessions.(storage.SessionDeleter)
-	return sessionAPI{sessions: sessions, deleter: deleter}
+	eventReader, _ := sessions.(storage.EventReader)
+	return sessionAPI{sessions: sessions, deleter: deleter, eventReader: eventReader}
 }
 
 func (a sessionAPI) list(w http.ResponseWriter, r *http.Request) {
