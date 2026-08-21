@@ -152,12 +152,11 @@ func (c *Calculator) Calculate(event canonical.Event) Record {
 			r.ObservedTokens[category] = value
 		}
 	}
-	if model == "" {
-		r.Status = "unknown_model"
+	if len(r.ObservedTokens) == 0 {
 		return r
 	}
-	if len(r.ObservedTokens) == 0 {
-		r.Status = "missing_usage"
+	if model == "" {
+		r.Status = "unknown_model"
 		return r
 	}
 	price := c.selectPrice(event.Provider, model, event.OccurredAt)

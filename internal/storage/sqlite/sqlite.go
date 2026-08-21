@@ -109,7 +109,11 @@ func (r *Repository) SaveEvents(ctx context.Context, events []canonical.Event) e
 			return err
 		}
 		if r.calculator != nil {
-			if inserted, _ := result.RowsAffected(); inserted > 0 {
+			inserted, err := result.RowsAffected()
+			if err != nil {
+				return fmt.Errorf("determine event insertion: %w", err)
+			}
+			if inserted > 0 {
 				if err := r.saveCostRecord(ctx, tx, r.calculator.Calculate(safe)); err != nil {
 					return err
 				}
@@ -130,8 +134,10 @@ func (r *Repository) saveCostRecord(ctx context.Context, tx *sql.Tx, record cost
 	if err != nil {
 		return fmt.Errorf("marshal cost record: %w", err)
 	}
-	_, err = tx.ExecContext(ctx, "INSERT INTO cost_records(event_id,session_id,cost_json) VALUES(?,?,?)", record.EventID, record.SessionID, payload)
-	return err
+	if _, err = tx.ExecContext(ctx, "INSERT INTO cost_records(event_id,session_id,cost_json) VALUES(?,?,?)", record.EventID, record.SessionID, payload); err != nil {
+		return fmt.Errorf("insert cost record: %w", err)
+	}
+	return nil
 }
 
 const timeFormat = "2006-01-02T15:04:05.999999999Z07:00"

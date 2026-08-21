@@ -30,7 +30,7 @@ func TestCalculateStatusesAndRates(t *testing.T) {
 		t.Fatalf("status=%s", got)
 	}
 	event.Attributes = map[string]any{"model": "model-a"}
-	if got := calculator.Calculate(event).Status; got != "missing_usage" {
+	if got := calculator.Calculate(event).Status; got != "not_applicable" {
 		t.Fatalf("status=%s", got)
 	}
 }

@@ -1,0 +1,1 @@
+{"schema_version":"0.1.0","catalog_version":"synthetic-v1","currency":"USD","records":[{"id":"synthetic-model","provider":"openai","model_matcher":"synthetic-*","effective_at":"2026-01-01T00:00:00Z","source":"synthetic","rates_microusd_per_million_tokens":{"input":1000000,"output":2000000}}]}
