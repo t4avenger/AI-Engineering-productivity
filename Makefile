@@ -3,7 +3,7 @@ SHELL := /usr/bin/env bash
 WEB_DIR := web
 GO_PACKAGES := ./cmd/... ./internal/...
 
-.PHONY: bootstrap hooks-install format format-check lint static-analysis test test-unit test-component test-integration test-contract test-e2e test-race test-fuzz-smoke test-performance-smoke coverage security-scan build precommit verify verify-ci verify-push run run-web run-daemon
+.PHONY: bootstrap hooks-install format format-check lint static-analysis test test-unit test-component test-integration test-contract test-e2e test-race test-fuzz-smoke test-performance-smoke coverage security-scan build precommit verify verify-ci verify-push run run-web run-daemon auth-token
 
 bootstrap:
 	npm ci --prefix $(WEB_DIR)
@@ -74,6 +74,9 @@ verify-push: verify test-race test-contract test-fuzz-smoke test-performance-smo
 
 run-daemon:
 	go run ./cmd/telemetryiq
+
+auth-token:
+	go run ./cmd/telemetryiq auth-token
 
 run-web:
 	npm run dev --prefix $(WEB_DIR)

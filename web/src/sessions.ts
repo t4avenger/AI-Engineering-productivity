@@ -151,6 +151,48 @@ export async function deleteSession(id: string): Promise<void> {
   }
 }
 
+export interface CostRecord {
+  event_id: string;
+  session_id: string;
+  calculated_at: string;
+  calculation_version: string;
+  catalog_version: string;
+  currency: string;
+  status: string;
+  amount_microusd: number | null;
+  price_record_id: string | null;
+  observed_tokens: Record<string, number>;
+}
+
+export interface CostSummary {
+  currency: string;
+  calculated_amount_microusd: number | null;
+  statuses: Record<string, number>;
+}
+
+export async function fetchCostSummary(): Promise<CostSummary> {
+  const response = await request<{ data?: CostSummary }>(
+    apiRequestURL(['costs', 'summary']),
+  );
+  if (
+    response.data === undefined ||
+    typeof response.data.statuses !== 'object'
+  ) {
+    throw new TypeError('Cost summary response was malformed');
+  }
+  return response.data;
+}
+
+export async function fetchSessionCosts(id: string): Promise<CostRecord[]> {
+  const response = await request<{ data?: CostRecord[] }>(
+    apiRequestURL(['sessions', id, 'costs']),
+  );
+  if (!Array.isArray(response.data)) {
+    throw new TypeError('Session cost response was malformed');
+  }
+  return response.data;
+}
+
 export async function deleteAllSessions(): Promise<void> {
   const response = await fetch(apiRequestURL(['sessions']), {
     method: 'DELETE',

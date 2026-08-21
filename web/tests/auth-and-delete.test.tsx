@@ -78,6 +78,7 @@ describe('local API access and bulk deletion', () => {
     expect(
       screen.getByRole('heading', { name: 'Connect your dashboard' }),
     ).toBeInTheDocument();
+    expect(screen.getByText('make auth-token')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Local API token'), {
       target: { value: 'test-token' },
     });

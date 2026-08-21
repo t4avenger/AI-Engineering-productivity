@@ -6,6 +6,8 @@ import {
   fetchSession,
   fetchSessionEvents,
   fetchSessions,
+  fetchCostSummary,
+  fetchSessionCosts,
 } from '../src/sessions';
 
 describe('session API client', () => {
@@ -64,5 +66,29 @@ describe('session API client', () => {
     expect(provenanceURL.pathname).toBe(
       '/api/v1/events/..%2Fsessions/provenance',
     );
+  });
+
+  test('reads cost summary and session records', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                currency: 'USD',
+                calculated_amount_microusd: null,
+                statuses: { unknown_price: 1 },
+              },
+            }),
+            { status: 200 },
+          ),
+        ),
+      ),
+    );
+    await expect(fetchCostSummary()).resolves.toMatchObject({
+      statuses: { unknown_price: 1 },
+    });
+    await expect(fetchSessionCosts('session a')).rejects.toThrow('malformed');
   });
 });

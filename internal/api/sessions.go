@@ -24,6 +24,7 @@ type sessionAPI struct {
 	sessions    storage.SessionReader
 	deleter     storage.SessionDeleter
 	eventReader storage.EventReader
+	costReader  storage.CostReader
 }
 
 type sessionListResponse struct {
@@ -57,7 +58,8 @@ type sessionCursor struct {
 func newSessionAPI(sessions storage.SessionReader) sessionAPI {
 	deleter, _ := sessions.(storage.SessionDeleter)
 	eventReader, _ := sessions.(storage.EventReader)
-	return sessionAPI{sessions: sessions, deleter: deleter, eventReader: eventReader}
+	costReader, _ := sessions.(storage.CostReader)
+	return sessionAPI{sessions: sessions, deleter: deleter, eventReader: eventReader, costReader: costReader}
 }
 
 func (a sessionAPI) list(w http.ResponseWriter, r *http.Request) {

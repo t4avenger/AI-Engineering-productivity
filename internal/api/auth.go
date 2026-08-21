@@ -28,7 +28,7 @@ func withManagementAuth(token string, next http.Handler) http.Handler {
 }
 
 func isManagementPath(path string) bool {
-	return path == "/api/v1/sessions" ||
+	return path == "/api/v1/costs/summary" || path == "/api/v1/sessions" ||
 		strings.HasPrefix(path, "/api/v1/sessions/") ||
 		strings.HasPrefix(path, "/api/v1/events/")
 }
