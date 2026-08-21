@@ -22,6 +22,7 @@ func TestSchemasValidateSyntheticFixtures(t *testing.T) {
 		{name: "session", schema: "session.schema.json"},
 		{name: "policy", schema: "policy.schema.json"},
 		{name: "config", schema: "config.schema.json"},
+		{name: "price catalog", schema: "price-catalog.schema.json"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
@@ -36,6 +37,43 @@ func TestPersistenceAcceptance(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertSessionDeleted(t, ctx, repo)
+}
+
+func TestCostRecordsPersistAndDelete(t *testing.T) {
+	sanitizer, err := privacy.New(make([]byte, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	calculator, err := cost.LoadDefault("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo, err := Open(":memory:", sanitizer, calculator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = repo.Close() }()
+	e := event(t, "cost-event", "cost-session", "session.completed", "2026-01-02T09:00:00Z")
+	e.Attributes = map[string]any{"model": "unpriced", "input_token_count": "10"}
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{e, e}); err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	if err := repo.db.QueryRow("SELECT COUNT(*) FROM cost_records WHERE event_id=?", e.EventID).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("cost records=%d", count)
+	}
+	if err := repo.DeleteSession(context.Background(), e.SessionID); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.db.QueryRow("SELECT COUNT(*) FROM cost_records").Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("cost records after delete=%d", count)
+	}
 }
 
 func assertMigration(t *testing.T, repo *Repository) {
