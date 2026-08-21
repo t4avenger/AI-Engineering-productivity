@@ -6,7 +6,7 @@ Task 010 provides a privacy-safe local dashboard over the authenticated SQLite-b
 
 ## Requirements
 
-- Go 1.25.13 or newer
+- Go 1.26.6 or newer
 - Node.js 24.0.0 or newer
 - npm 10.x or newer
 
