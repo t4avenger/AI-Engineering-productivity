@@ -328,6 +328,9 @@ func (r *Repository) DeleteSession(ctx context.Context, id string) error {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if _, err = tx.ExecContext(ctx, "DELETE FROM cost_records WHERE session_id=?", id); err != nil {
+		return err
+	}
 	if _, err = tx.ExecContext(ctx, "DELETE FROM events WHERE session_id=?", id); err != nil {
 		return err
 	}

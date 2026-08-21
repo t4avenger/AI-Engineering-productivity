@@ -1,6 +1,6 @@
 module github.com/wayne/telemetryiq
 
-go 1.25.12
+go 1.25.13
 
 require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
