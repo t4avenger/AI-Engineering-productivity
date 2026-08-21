@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
@@ -53,6 +54,22 @@ func TestSessionAPIContract(t *testing.T) {
 	}
 	if detail.Data.SessionID != "session-middle" || detail.Data.State != "failed" {
 		t.Fatalf("detail = %#v", detail)
+	}
+}
+
+func TestCostAPIProvidesSummaryAndSessionProvenance(t *testing.T) {
+	repo := sessionTestRepository(t)
+	server := httptest.NewServer(NewHandler(slog.Default(), repo))
+	t.Cleanup(server.Close)
+	for _, path := range []string{"/api/v1/costs/summary", "/api/v1/sessions/session-newest/costs"} {
+		response, err := http.Get(server.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = response.Body.Close() }()
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("%s status = %d", path, response.StatusCode)
+		}
 	}
 }
 
@@ -136,7 +153,11 @@ func sessionTestRepository(t *testing.T) *sqlite.Repository {
 	if err != nil {
 		t.Fatal(err)
 	}
-	repo, err := sqlite.Open(":memory:", sanitizer)
+	calculator, err := cost.LoadDefault("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo, err := sqlite.Open(":memory:", sanitizer, calculator)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -48,6 +48,8 @@ func newHandler(logger *slog.Logger, inspector *sanitizedInspector, repository s
 	mux.HandleFunc("GET /api/v1/health", healthHandler(logger))
 	sessionAPI := newSessionAPI(sessions)
 	mux.HandleFunc("GET /api/v1/sessions", sessionAPI.list)
+	mux.HandleFunc("GET /api/v1/costs/summary", sessionAPI.costSummary)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/costs", sessionAPI.costs)
 	mux.HandleFunc("GET /api/v1/sessions/{id}", sessionAPI.detail)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/events", sessionAPI.events)
 	mux.HandleFunc("GET /api/v1/events/{id}/provenance", sessionAPI.provenance)

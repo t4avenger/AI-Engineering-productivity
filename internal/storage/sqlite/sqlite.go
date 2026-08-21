@@ -55,6 +55,10 @@ func Open(path string, sanitizer *privacy.Sanitizer, calculators ...*cost.Calcul
 		_ = db.Close()
 		return nil, err
 	}
+	if err := r.rebuildAllSessions(context.Background()); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("rebuild derived sessions: %w", err)
+	}
 	if path != ":memory:" {
 		if err := os.Chmod(path, 0o600); err != nil {
 			_ = db.Close()
@@ -122,6 +126,39 @@ func (r *Repository) SaveEvents(ctx context.Context, events []canonical.Event) e
 		ids[safe.SessionID] = struct{}{}
 	}
 	for id := range ids {
+		if err := r.rebuildSession(ctx, tx, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (r *Repository) rebuildAllSessions(ctx context.Context) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	rows, err := tx.QueryContext(ctx, "SELECT DISTINCT session_id FROM events ORDER BY session_id")
+	if err != nil {
+		return err
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, id := range ids {
 		if err := r.rebuildSession(ctx, tx, id); err != nil {
 			return err
 		}
@@ -202,6 +239,11 @@ func reconstructSession(id string, events []canonical.Event) canonical.Session {
 	first := events[0]
 	session := canonical.Session{SchemaVersion: first.SchemaVersion, SessionID: id, Provider: first.Provider, Tool: first.Tool, State: "unknown", StartedAt: first.OccurredAt, Attributes: map[string]any{"event_count": len(events)}, ProviderExtensions: map[string]any{}}
 	for _, e := range events {
+		if _, observed := session.Attributes["model"]; !observed {
+			if model, ok := e.Attributes["model"].(string); ok && model != "" {
+				session.Attributes["model"] = model
+			}
+		}
 		state := lifecycle(e.EventType)
 		if state != "" {
 			session.State = state
@@ -328,6 +370,36 @@ func decodeSessions(rows *sql.Rows, limit int) ([]canonical.Session, error) {
 	}
 	return sessions, nil
 }
+
+// ListCostRecords returns immutable, sanitised calculation provenance for a session.
+func (r *Repository) ListCostRecords(ctx context.Context, sessionID string) ([]cost.Record, error) {
+	query := "SELECT cost_json FROM cost_records"
+	args := []any{}
+	if sessionID != "" {
+		query += " WHERE session_id=?"
+		args = append(args, sessionID)
+	}
+	query += " ORDER BY event_id"
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	records := []cost.Record{}
+	for rows.Next() {
+		var data []byte
+		if err := rows.Scan(&data); err != nil {
+			return nil, err
+		}
+		var record cost.Record
+		if err := json.Unmarshal(data, &record); err != nil {
+			return nil, err
+		}
+		records = append(records, record)
+	}
+	return records, rows.Err()
+}
+
 func (r *Repository) DeleteSession(ctx context.Context, id string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {

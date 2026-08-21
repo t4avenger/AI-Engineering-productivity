@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
@@ -140,6 +141,68 @@ func publicTimelineEvent(event canonical.Event) timelineEvent {
 		EventID: event.EventID, EventType: event.EventType, OccurredAt: event.OccurredAt.UTC().Format(time.RFC3339Nano), ReceivedAt: event.ReceivedAt.UTC().Format(time.RFC3339Nano), Provider: event.Provider, Tool: event.Tool, SourceVersion: event.SourceVersion,
 		Model: optionalString(event.Attributes["model"]), InputTokenCount: optionalString(event.Attributes["input_token_count"]), OutputTokenCount: optionalString(event.Attributes["output_token_count"]), UnavailableFields: unavailableFields(event.Attributes["unavailable_fields"]),
 	}
+}
+
+type costRecordsResponse struct {
+	Data []cost.Record `json:"data"`
+}
+
+type costSummary struct {
+	Currency                 string         `json:"currency"`
+	CalculatedAmountMicrousd *int64         `json:"calculated_amount_microusd"`
+	Statuses                 map[string]int `json:"statuses"`
+}
+
+type costSummaryResponse struct {
+	Data costSummary `json:"data"`
+}
+
+func (a sessionAPI) costs(w http.ResponseWriter, r *http.Request) {
+	if a.costReader == nil {
+		writeSessionError(w, http.StatusServiceUnavailable, "costs_unavailable", "cost storage is unavailable")
+		return
+	}
+	id := r.PathValue("id")
+	if _, found, err := a.sessions.Session(r.Context(), id); err != nil {
+		writeSessionError(w, http.StatusInternalServerError, "session_query_failed", "unable to query session")
+		return
+	} else if !found {
+		writeSessionError(w, http.StatusNotFound, "session_not_found", sessionNotFound)
+		return
+	}
+	records, err := a.costReader.ListCostRecords(r.Context(), id)
+	if err != nil {
+		writeSessionError(w, http.StatusInternalServerError, "cost_query_failed", "unable to query costs")
+		return
+	}
+	writeSessionJSON(w, http.StatusOK, costRecordsResponse{Data: records})
+}
+
+func (a sessionAPI) costSummary(w http.ResponseWriter, r *http.Request) {
+	if a.costReader == nil {
+		writeSessionError(w, http.StatusServiceUnavailable, "costs_unavailable", "cost storage is unavailable")
+		return
+	}
+	records, err := a.costReader.ListCostRecords(r.Context(), "")
+	if err != nil {
+		writeSessionError(w, http.StatusInternalServerError, "cost_query_failed", "unable to query costs")
+		return
+	}
+	summary := costSummary{Statuses: map[string]int{}}
+	var amount int64
+	for _, record := range records {
+		if summary.Currency == "" {
+			summary.Currency = record.Currency
+		}
+		summary.Statuses[record.Status]++
+		if record.AmountMicrousd != nil {
+			amount += *record.AmountMicrousd
+		}
+	}
+	if amount != 0 {
+		summary.CalculatedAmountMicrousd = &amount
+	}
+	writeSessionJSON(w, http.StatusOK, costSummaryResponse{Data: summary})
 }
 
 func optionalString(value any) *string {

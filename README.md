@@ -24,7 +24,7 @@ make run-daemon
 make run-web
 ```
 
-The daemon binds to `127.0.0.1:8080` by default. Run `telemetryiq auth-token` and paste the result into the dashboard once per browser session; the token is never logged or retained by the browser after that session. The daemon exposes `GET /api/v1/health`, `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}`, `DELETE /api/v1/sessions/{id}`, `DELETE /api/v1/sessions`, `POST /v1/traces`, `POST /v1/logs`, and `GET /api/v1/ingest/counters`.
+The daemon binds to `127.0.0.1:8080` by default. After starting it once, run `make auth-token` and paste the result into the dashboard once per browser session; the token is never logged or retained by the browser after that session. The daemon exposes `GET /api/v1/health`, `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}`, `DELETE /api/v1/sessions/{id}`, `DELETE /api/v1/sessions`, `POST /v1/traces`, `POST /v1/logs`, and `GET /api/v1/ingest/counters`.
 
 ## OTLP/HTTP ingest proof
 

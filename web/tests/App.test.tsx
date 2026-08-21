@@ -22,6 +22,7 @@ function mockAPI(
     detailFails?: boolean;
     deleteFails?: boolean;
     healthFails?: boolean;
+    costFails?: boolean;
   } = {},
 ) {
   vi.stubGlobal(
@@ -41,6 +42,21 @@ function mockAPI(
               status: 'healthy',
               service: 'telemetryiq-daemon',
               timestamp: '2026-07-24T12:00:00Z',
+            }),
+            { status: 200 },
+          ),
+        );
+      if (url.endsWith('/costs/summary') && options.costFails)
+        return Promise.reject(new Error('Cost service offline'));
+      if (url.endsWith('/costs/summary'))
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                currency: 'USD',
+                calculated_amount_microusd: 1250000,
+                statuses: { calculated: 1, unknown_price: 2 },
+              },
             }),
             { status: 200 },
           ),
@@ -203,5 +219,36 @@ describe('App dashboard', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Delete permanently' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Delete failed');
+  });
+
+  test('shows calculated and unknown costs without treating unknown as zero', async () => {
+    mockAPI();
+    render(
+      <MantineProvider env="test">
+        <App />
+      </MantineProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Costs' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Costs' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/1\.25/)).toBeInTheDocument();
+    expect(
+      screen.getByText('Unknown prices are not shown as zero.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('unknown_price')).toBeInTheDocument();
+  });
+
+  test('shows a cost loading failure', async () => {
+    mockAPI([session], { costFails: true });
+    render(
+      <MantineProvider env="test">
+        <App />
+      </MantineProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Costs' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Cost service offline',
+    );
   });
 });

@@ -5,6 +5,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/wayne/telemetryiq/internal/cost"
+
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/privacy"
 )
@@ -64,10 +66,16 @@ type EventReader interface {
 	EventProvenance(context.Context, string) ([]privacy.Provenance, bool, error)
 }
 
+// CostReader returns calculation provenance without exposing raw intake data.
+type CostReader interface {
+	ListCostRecords(context.Context, string) ([]cost.Record, error)
+}
+
 type Repository interface {
 	SaveEvents(context.Context, []canonical.Event) error
 	SessionReader
 	SessionDeleter
 	EventReader
+	CostReader
 	Close() error
 }

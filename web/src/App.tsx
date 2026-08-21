@@ -20,6 +20,8 @@ import {
   fetchEventProvenance,
   fetchSession,
   fetchSessionEvents,
+  fetchCostSummary,
+  type CostSummary,
   fetchSessions,
   type Provenance,
   type Session,
@@ -27,7 +29,7 @@ import {
   SessionAPIError,
 } from './sessions';
 
-type Page = 'home' | 'sessions' | 'integrations' | 'privacy';
+type Page = 'home' | 'sessions' | 'costs' | 'integrations' | 'privacy';
 type HealthState =
   | { status: 'loading' }
   | { status: 'healthy'; data: HealthResponse }
@@ -146,24 +148,24 @@ export function App() {
         <HealthIndicator health={health} />
       </header>
       <nav aria-label="Primary navigation" className="navigation">
-        {(['home', 'sessions', 'integrations', 'privacy'] as const).map(
-          (item) => (
-            <button
-              aria-current={!selectedID && page === item ? 'page' : undefined}
-              className={
-                !selectedID && page === item ? 'nav-link active' : 'nav-link'
-              }
-              key={item}
-              onClick={() => {
-                setSelectedID(null);
-                setPage(item);
-              }}
-              type="button"
-            >
-              {item[0].toUpperCase() + item.slice(1)}
-            </button>
-          ),
-        )}
+        {(
+          ['home', 'sessions', 'costs', 'integrations', 'privacy'] as const
+        ).map((item) => (
+          <button
+            aria-current={!selectedID && page === item ? 'page' : undefined}
+            className={
+              !selectedID && page === item ? 'nav-link active' : 'nav-link'
+            }
+            key={item}
+            onClick={() => {
+              setSelectedID(null);
+              setPage(item);
+            }}
+            type="button"
+          >
+            {item[0].toUpperCase() + item.slice(1)}
+          </button>
+        ))}
       </nav>
       <main id="main-content">{content}</main>
     </div>
@@ -185,6 +187,7 @@ function PageContent({
 }>) {
   if (page === 'sessions')
     return <SessionsPage sessions={sessions} onSelect={onSelectSession} />;
+  if (page === 'costs') return <CostsPage />;
   if (page === 'integrations')
     return <IntegrationsPage sessions={sessions.data} />;
   if (page === 'privacy') return <PrivacyPage onDeleted={onAllDeleted} />;
@@ -226,6 +229,54 @@ function HomePage({
         Cost and governance data are not available yet. They will be clearly
         labelled when implemented.
       </p>
+    </section>
+  );
+}
+
+function CostsPage() {
+  const [summary, setSummary] = useState<CostSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    fetchCostSummary()
+      .then(setSummary)
+      .catch((reason: unknown) => {
+        setError(
+          reason instanceof Error ? reason.message : 'Unable to load costs',
+        );
+      });
+  }, []);
+  return (
+    <section aria-labelledby="costs-title" className="page">
+      <p className="eyebrow">Estimates</p>
+      <h1 id="costs-title">Costs</h1>
+      <p className="lede">
+        Costs are estimates from retained token usage and a versioned local
+        price catalog.
+      </p>
+      {error ? <p role="alert">{error}</p> : null}
+      {!summary && !error ? <output>Loading costs…</output> : null}
+      {summary ? (
+        <>
+          <dl className="metrics">
+            <Metric
+              label="Calculated cost"
+              value={formatCost(
+                summary.calculated_amount_microusd,
+                summary.currency,
+              )}
+            />
+          </dl>
+          <section className="panel">
+            <h2>Cost status</h2>
+            <dl className="details">
+              {Object.entries(summary.statuses).map(([status, count]) => (
+                <Detail key={status} label={status} value={count} />
+              ))}
+            </dl>
+            <p>Unknown prices are not shown as zero.</p>
+          </section>
+        </>
+      ) : null}
     </section>
   );
 }
@@ -708,8 +759,8 @@ function AuthSetup({
           <div>
             <Title order={1}>Connect your dashboard</Title>
             <Text c="dimmed" mt="sm">
-              Run <Code>telemetryiq auth-token</Code> in a terminal, then paste
-              the token below. It remains only for this browser session.
+              Run <Code>make auth-token</Code> in a terminal, then paste the
+              token below. It remains only for this browser session.
             </Text>
           </div>
           <PasswordInput
@@ -769,7 +820,10 @@ function HealthSummary({ health }: Readonly<{ health: HealthState }>) {
   return <output>Checking daemon…</output>;
 }
 
-function Metric({ label, value }: Readonly<{ label: string; value: number }>) {
+function Metric({
+  label,
+  value,
+}: Readonly<{ label: string; value: string | number }>) {
   return (
     <div className="metric">
       <dt>{label}</dt>
@@ -800,6 +854,14 @@ function numberAttribute(
   const value = session.attributes[key];
   return typeof value === 'number' || typeof value === 'string' ? value : null;
 }
+function formatCost(amount: number | null, currency: string): string {
+  if (amount === null) return 'Unknown price';
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: currency || 'USD',
+  }).format(amount / 1_000_000);
+}
+
 function formatDate(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? 'Unavailable' : date.toLocaleString();
