@@ -65,6 +65,17 @@ func TestCostRecordsPersistAndDelete(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("cost records=%d", count)
 	}
+	records, err := repo.ListCostRecords(context.Background(), e.SessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 1 || records[0].Status != "unknown_price" {
+		t.Fatalf("cost records = %#v", records)
+	}
+	all, err := repo.ListCostRecords(context.Background(), "")
+	if err != nil || len(all) != 1 {
+		t.Fatalf("all cost records = %#v, %v", all, err)
+	}
 	if err := repo.DeleteSession(context.Background(), e.SessionID); err != nil {
 		t.Fatal(err)
 	}
