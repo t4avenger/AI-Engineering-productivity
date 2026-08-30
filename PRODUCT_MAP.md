@@ -8,16 +8,71 @@
 
 ---
 
+## 0. Reorientation directive (2026-08-30)
+
+This directive overrides conflicting emphasis and ordering elsewhere in this document.
+Where a later section disagrees with this one, this section wins until it is deliberately revised.
+
+**The MVP is behaviour & efficiency observability, not cost accounting.** The headline
+questions are:
+
+1. Which tools, models, MCP servers, and skills are being used?
+2. Are they token- and context-efficient, or are unused MCPs/skills wasting context?
+3. Are the models actually performing (task outcomes, retries/errors, efficiency, latency)?
+4. Are agents doing risky things (e.g. reading `.env`/credential files)?
+5. Exactly what data is collected, retained, and shared?
+
+**What changed and why.** The written principles said "outcomes, not activity," but the
+build order front-loaded the cost engine while the normaliser stayed a skeleton that
+extracts no model, token, tool-call, MCP, or file-operation data. Cost was being priced on
+fields the pipeline never populated. Cost is therefore **demoted to a secondary, versioned,
+optional estimate** — kept, never deleted, never on the Home headline, never gating a phase.
+
+**First-class providers:** Claude Code, Codex, and Cursor. Devin is deferred (audit-log only).
+
+**Guiding correction.** Do not design canonical types or dashboards for a signal until a
+real, version-pinned fixture proves the provider emits it. Type only stable primitives; keep
+provider-specific shapes in `provider_extensions` until two independent providers produce
+semantically equivalent data. Separate immutable **observations** from versioned derived
+**findings** (each finding carries detector version, source event IDs, confidence, and an
+`observed | inferred | unknown` marker).
+
+**Revised delivery order (replaces the phase order in section 19):**
+
+- **P0 — Capability & privacy spike (gate).** Capture version-pinned fixtures for Codex,
+  Claude Code, and Cursor. Fill the multi-provider capability matrix
+  (`docs/integrations/capability-matrix.md`). Settle the ingestion-wide redaction boundary
+  and privacy threat model (`docs/privacy/threat-model.md`) *before* extraction. No canonical
+  type or dashboard is committed before this passes.
+- **P1 — Minimal observation envelope + real Codex extraction.** Add only stable-primitive
+  records (model interaction; generic operation/invocation). Make the Codex normaliser
+  extract real model/token/tool data. Make correlation (dedup keys, ordering, task
+  boundaries) first-class. Redaction lands here, proven by canary-string leakage tests.
+- **P2 — Claude Code adapter + capability-driven conformance suite.** OTLP + session JSONL.
+  Skill detection marked `explicit | inferred | unavailable`. Cross-tool session view with
+  honest "unavailable" cells.
+- **P3 — Behaviour, efficiency & model-performance insights.** MCP inventory & context cost
+  (incl. "connected but unused"); skill usage; model-performance scorecard on outcome
+  contracts; context-waste insight.
+- **P4 — Risky-behaviour governance (detect-and-report).** Observed risky access to
+  credential/secret files (filesystem *and* shell forms; allowlist `.env.example`;
+  `indeterminate` when blind). Unapproved MCP server. Privacy-safe path handling only.
+- **P5 — Cursor partial adapter.** Only its verified capability subset; no empty scorecards.
+- **Cost — secondary, parallel, never gating** throughout.
+
+---
+
 ## 1. Product mission
 
 Build a vendor-neutral platform that collects, normalises, and analyses telemetry from AI coding tools and model providers so developers and organisations can understand:
 
-1. Which AI tools and models are being used.
-2. What those tools cost.
-3. Whether AI-assisted work is efficient.
-4. Whether it improves engineering outcomes.
+1. Which AI tools, models, MCP servers, and skills are being used.
+2. Whether AI-assisted work is token- and context-efficient (including MCPs/skills that waste context).
+3. Whether the models are actually performing (task outcomes, retries/errors, efficiency, latency).
+4. Whether agents are doing risky things (e.g. reading `.env`/credential files).
 5. Whether usage complies with organisational policy.
 6. Exactly what data is collected, retained, and shared.
+7. What those tools cost — a secondary, optional estimate (see section 0).
 
 The initial product must be useful to one developer running locally. The same architecture must later support voluntary cloud sharing, teams, managed enterprise deployment, and self-hosting.
 
@@ -94,11 +149,17 @@ An organisation that needs central deployment, policy enforcement, audit evidenc
 - Local application
 - Local OpenTelemetry ingestion
 - Codex integration as the first provider
-- Claude Code integration after Codex
-- Canonical event normalisation
+- Claude Code integration (first-class; MCP + skill signals)
+- Cursor integration (partial adapter, verified capability subset only)
+- Canonical event normalisation with real model/token/tool/MCP/file extraction
 - Local analytical storage
 - Session explorer
-- Cost estimation
+- MCP inventory & context-cost insight (incl. "connected but unused")
+- Skill usage insight
+- Model-performance scorecard (outcomes, retries/errors, efficiency, latency)
+- Context-waste insight
+- Risky-behaviour detection (observed access to `.env`/credential files)
+- Cost estimation (secondary, optional, versioned — see section 0)
 - Integration health
 - Privacy controls
 - Data deletion
@@ -116,7 +177,7 @@ An organisation that needs central deployment, policy enforcement, audit evidenc
 - Prompt or source-code storage by default
 - Billing system
 - Mobile application
-- Full Cursor or Devin integration
+- Devin integration (audit-log only; deferred)
 - SIEM export
 - Automated blocking of tool actions
 - Machine-learning recommendations
@@ -527,7 +588,34 @@ sharing:
 
 ## 13. Initial insights
 
-All insights must be deterministic and explainable.
+All insights must be deterministic and explainable. Per section 0, the headline insights are
+the behaviour/efficiency/performance ones below (13.7–13.10); cost-only insights are secondary.
+
+### 13.7 MCP inventory & context-cost insight
+Show how many MCP servers are connected, which were actually used, and the request-level
+tokens for requests where an MCP was used. Flag "connected but unused" MCP servers as context
+waste. Per-MCP token *allocation* is shown only as an explicitly labelled heuristic — a single
+MCP call has no defensible standalone token cost.
+
+Evidence:
+- connected MCP servers (identity hashed)
+- used vs unused
+- request-level tokens where MCP present
+- confidence marker (`observed | inferred | unknown`)
+
+### 13.8 Skill usage insight
+Show which skills were invoked, frequency, and outcome — only where the provider exposes skill
+identity. Skill detection is marked `explicit | inferred | unavailable`.
+
+### 13.9 Model-performance scorecard
+Per model, report raw metrics with sample size: success/failed/abandoned, retry rate, error
+codes, tokens-per-completed-task, latency p50/p95. Built on **outcome contracts** (test/build
+result, reverted patch, PR result, or provider completion status), not raw session state. No
+cross-model ranking without workload caveats and sufficient sample size.
+
+### 13.10 Context-waste insight
+Trigger when cached-context ratio or input-token growth exceeds a configurable threshold.
+(Supersedes/absorbs 13.2 as a first-class behaviour signal.)
 
 ### 13.1 Repeated-attempt insight
 Trigger when multiple failed or superseded attempts occur within one session.
@@ -1211,6 +1299,10 @@ Use pagination and stable response envelopes from the start.
 
 ## 19. Delivery roadmap
 
+**Superseded by section 0.** The reorientation directive's P0–P5 order replaces the phase
+order below. The phases here remain as a source of task detail, but their sequencing and
+cost-first emphasis no longer govern delivery — follow section 0 for order and priority.
+
 ## Phase 0: Discovery and proof
 
 ### Objective
@@ -1783,6 +1875,7 @@ The immediate goal is not to build the enterprise platform.
 
 The immediate goal is:
 
-> Produce a privacy-safe local application that receives real Codex telemetry, converts it into stable canonical sessions, and lets one developer inspect what happened, what it cost where calculable, and what data was retained.
+> Produce a privacy-safe local application that receives real Codex, Claude Code, and Cursor telemetry, converts it into stable canonical sessions, and lets one developer inspect what happened — which tools, models, MCP servers, and skills were used, whether they were token- and context-efficient, whether the model performed, and whether any risky access (e.g. reading `.env`) occurred — plus what data was retained. Cost is shown only as a secondary, optional estimate where calculable.
 
-Everything else follows from proving this vertical slice.
+Everything else follows from proving this vertical slice. The gating first step is the P0
+capability & privacy spike in section 0 — no canonical types or dashboards are built before it.
