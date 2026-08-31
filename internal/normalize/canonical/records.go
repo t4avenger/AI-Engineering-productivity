@@ -2,9 +2,10 @@ package canonical
 
 import "time"
 
-// recordSchemaVersion is the independent schema version for the stable-primitive
-// records. It tracks each record's own contract, not the Event envelope's.
-const recordSchemaVersion = "0.1.0"
+// RecordSchemaVersion is the independent schema version for the stable-primitive
+// records. It tracks each record's own contract, not the Event envelope's, and
+// is exported so provider adapters can stamp the records they build.
+const RecordSchemaVersion = "0.1.0"
 
 // Provenance marks how a field or record was established: directly observed from
 // provider telemetry, inferred by TelemetryIQ, or unknown.
@@ -37,7 +38,7 @@ const (
 )
 
 // ModelInteraction is a stable-primitive record of one model request/response,
-// at schema version 0.1.0 (recordSchemaVersion). It carries only stable
+// at schema version 0.1.0 (RecordSchemaVersion). It carries only stable
 // primitives shared across providers; cost is deliberately excluded per the
 // reorientation (roadmap §0). Token categories are nullable so an absent value
 // is distinguishable from a genuine zero, and ErrorCode is nullable so "no
@@ -65,7 +66,7 @@ type ModelInteraction struct {
 }
 
 // Operation is a stable-primitive record of one tool invocation, at schema
-// version 0.1.0 (recordSchemaVersion). Category is drawn from OperationCategory
+// version 0.1.0 (RecordSchemaVersion). Category is drawn from OperationCategory
 // (§10.5) and is stored independently of the provider-specific Tool name.
 // Provider-specific detail (MCP/skill/file specifics) stays in ProviderExtensions
 // until two providers validate identical semantics.

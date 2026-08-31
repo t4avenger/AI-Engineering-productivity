@@ -64,7 +64,7 @@ func NormalizeLogs(data []byte, receivedAt time.Time, fingerprint func([]byte) s
 
 func normalizeResourceLog(raw resourceLog, receivedAt time.Time, fingerprint func([]byte) string) ([]canonical.Event, error) {
 	resource := attributes(raw.Resource.Attributes)
-	if resource["service.name"] != "codex_cli_rs" {
+	if !isCodexLogService(resource["service.name"]) {
 		return nil, nil
 	}
 	var events []canonical.Event
@@ -123,4 +123,16 @@ func stringValue(value any, fallback string) string {
 		return fallback
 	}
 	return result
+}
+
+// isCodexLogService reports whether a resource service.name is one of the
+// observed Codex OTLP log exporters: codex_cli_rs (interactive TUI) or
+// codex_exec (the non-interactive `codex exec` subcommand). Both were observed
+// exporting the same reviewed log shape at Codex CLI 0.145.0.
+func isCodexLogService(value any) bool {
+	name, ok := value.(string)
+	if !ok {
+		return false
+	}
+	return name == "codex_cli_rs" || name == "codex_exec"
 }

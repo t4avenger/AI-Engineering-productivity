@@ -1,0 +1,32 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "request_id": "codex-log:fixture",
+    "session_id": "codex-log:fixture",
+    "provider": "openai",
+    "tool": "codex",
+    "model": "synthetic-model",
+    "started_at": "2026-07-28T12:00:00Z",
+    "completed_at": "2026-07-28T12:00:00Z",
+    "duration_ms": null,
+    "input_tokens": 100,
+    "output_tokens": 10,
+    "cached_input_tokens": null,
+    "reasoning_tokens": null,
+    "result": "unknown",
+    "error_code": null,
+    "provenance": "observed",
+    "provider_extensions": {
+      "log_attributes": {
+        "event.name": "codex.sse_event"
+      },
+      "resource_attributes": {
+        "env": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.145.0",
+        "telemetry.sdk.version": "synthetic-0.31.0"
+      },
+      "severity": "INFO"
+    }
+  }
+]
