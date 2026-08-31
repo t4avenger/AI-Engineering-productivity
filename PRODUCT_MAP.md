@@ -427,6 +427,14 @@ For local mode, Organisation and Workspace may use generated local identifiers.
 }
 ```
 
+The envelope schema stays at `0.1.0`. The stable-primitive records below — the
+model-interaction record (§10.3) and the generic operation record (§10.5) — are
+versioned independently at their own `0.1.0` (`schemas/model-interaction.schema.json`,
+`schemas/operation.schema.json`), so introducing them does not bump the envelope.
+Each record carries a `provenance` marker (`observed | inferred | unknown`).
+Provider-specific detail (MCP/skill/file specifics) stays in `provider_extensions`
+until two providers validate identical semantics (roadmap §0).
+
 ### 10.3 Model request record
 
 ```json
@@ -451,6 +459,12 @@ For local mode, Organisation and Workspace may use generated local identifiers.
   "policy_context": {}
 }
 ```
+
+The typed `ModelInteraction` record (`internal/normalize/canonical/records.go`,
+`schemas/model-interaction.schema.json`) implements the stable primitives of this
+shape plus a `provenance` marker. Cost fields (`estimated_cost_usd`, `cost_status`)
+are deliberately excluded per the reorientation (roadmap §0); token categories are
+nullable so an absent value stays distinct from a genuine zero.
 
 ### 10.4 Session states
 
@@ -480,6 +494,10 @@ State transitions must be explicit and tested.
 - unknown
 
 Store category independently from provider-specific tool names.
+
+The typed `Operation` record (`internal/normalize/canonical/records.go`,
+`schemas/operation.schema.json`) draws its `category` from this enum (all twelve
+values, including the `unknown` fallback) and carries a `provenance` marker.
 
 ---
 

@@ -1,0 +1,1 @@
+{"schema_version":"0.1.0","operation_id":"op-001","session_id":"session-001","provider":"openai","tool":"codex","category":"filesystem rename","outcome":"success","provenance":"observed","provider_extensions":{}}
