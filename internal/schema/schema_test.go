@@ -19,6 +19,8 @@ func TestSchemasValidateSyntheticFixtures(t *testing.T) {
 		schema string
 	}{
 		{name: "canonical event", schema: "canonical-event.schema.json"},
+		{name: "model interaction", schema: "model-interaction.schema.json"},
+		{name: "operation", schema: "operation.schema.json"},
 		{name: "session", schema: "session.schema.json"},
 		{name: "policy", schema: "policy.schema.json"},
 		{name: "config", schema: "config.schema.json"},
