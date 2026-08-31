@@ -1,0 +1,37 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "cursor",
+  "tool": "cursor-agent",
+  "tool_version": "2026.05.16-0338208",
+  "captured_at": "2026-08-31T13:42:00Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "source_type": "local_cli_print_json",
+    "capture": {
+      "workspace": "isolated_tmp",
+      "mode": "ask",
+      "trust_scope": "isolated_tmp",
+      "telemetryiq_endpoint": "loopback_development_inspector",
+      "accepted_payloads_before_capture": 2,
+      "accepted_payloads_after_capture": 2,
+      "otlp_http_json_logs": "not_observed"
+    },
+    "result": {
+      "type": "result",
+      "subtype": "success",
+      "is_error": false,
+      "duration_ms": 8897,
+      "duration_api_ms": 8897,
+      "result_summary": "synthetic_ok",
+      "session_id": "synthetic-session-id",
+      "request_id": "synthetic-request-id",
+      "usage": {
+        "inputTokens": 16941,
+        "outputTokens": 1,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0
+      }
+    }
+  }
+}
