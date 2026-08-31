@@ -13,7 +13,7 @@ func TestModelInteractionJSONRoundTrip(t *testing.T) {
 	t.Parallel()
 
 	original := ModelInteraction{
-		SchemaVersion:     recordSchemaVersion,
+		SchemaVersion:     RecordSchemaVersion,
 		RequestID:         "req-001",
 		SessionID:         "session-001",
 		Provider:          "openai",
@@ -53,7 +53,7 @@ func TestOperationJSONRoundTrip(t *testing.T) {
 	t.Parallel()
 
 	original := Operation{
-		SchemaVersion: recordSchemaVersion,
+		SchemaVersion: RecordSchemaVersion,
 		OperationID:   "op-001",
 		SessionID:     "session-001",
 		Provider:      "openai",
@@ -112,8 +112,8 @@ func TestProviderSpecificsStayInProviderExtensions(t *testing.T) {
 	}
 
 	for name, encoded := range map[string][]byte{
-		"model interaction": mustMarshal(t, ModelInteraction{SchemaVersion: recordSchemaVersion, Provenance: ProvenanceObserved, ProviderExtensions: extensions}),
-		"operation":         mustMarshal(t, Operation{SchemaVersion: recordSchemaVersion, Provenance: ProvenanceObserved, ProviderExtensions: extensions}),
+		"model interaction": mustMarshal(t, ModelInteraction{SchemaVersion: RecordSchemaVersion, Provenance: ProvenanceObserved, ProviderExtensions: extensions}),
+		"operation":         mustMarshal(t, Operation{SchemaVersion: RecordSchemaVersion, Provenance: ProvenanceObserved, ProviderExtensions: extensions}),
 	} {
 		var fields map[string]any
 		if err := json.Unmarshal(encoded, &fields); err != nil {
