@@ -1,0 +1,68 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.251",
+  "captured_at": "2026-08-31T13:37:07Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "source_type": "otlp_http_json_logs",
+    "capture": {
+      "workspace": "isolated_tmp",
+      "content_logging": "disabled",
+      "telemetryiq_endpoint": "loopback_development_inspector",
+      "accepted_payloads_after_capture": 2
+    },
+    "observations": [
+      {
+        "name": "model_identity",
+        "state": "supported",
+        "evidence": "api_request event included model claude-opus-4-8"
+      },
+      {
+        "name": "token_counts",
+        "state": "supported",
+        "evidence": "api_request event included input, output, cache-read, and cache-creation token counts"
+      },
+      {
+        "name": "session_boundaries",
+        "state": "partial",
+        "evidence": "events shared a session identifier, replaced by synthetic-session-id before commit"
+      },
+      {
+        "name": "mcp_connections",
+        "state": "partial",
+        "evidence": "mcp_server_connection events included connection status, transport type, scope, and duration"
+      }
+    ],
+    "sample_events": [
+      {
+        "event_name": "api_request",
+        "session_id": "synthetic-session-id",
+        "event_timestamp": "2026-08-31T13:37:07.791Z",
+        "event_sequence": 9,
+        "model": "claude-opus-4-8",
+        "input_tokens": 2,
+        "output_tokens": 4,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 6258,
+        "duration_ms": 3077,
+        "request_id": "synthetic-request-id",
+        "query_source": "sdk",
+        "effort": "high"
+      },
+      {
+        "event_name": "mcp_server_connection",
+        "session_id": "synthetic-session-id",
+        "event_timestamp": "2026-08-31T13:37:04.548Z",
+        "event_sequence": 7,
+        "status": "connected",
+        "transport_type": "stdio",
+        "server_scope": "user",
+        "duration_ms": 1589,
+        "is_plugin": false
+      }
+    ]
+  }
+}

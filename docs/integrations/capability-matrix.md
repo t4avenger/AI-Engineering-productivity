@@ -17,25 +17,25 @@ Provider-specific per-tool findings:
 | Provider | Version observed | Sources |
 |---|---|---|
 | Codex | CLI 0.145.0 fixture; local CLI 0.151.0 probed on 2026-08-31 | OTLP JSON logs to loopback receiver; `fixtures/codex/observed-sanitised/codex-0.145.0-logs.json` |
-| Claude Code | 2.1.251 probed on 2026-08-31 | Local CLI version probe only; `fixtures/claude/observed-sanitised/claude-code-2.1.251-capability-probe.json` |
-| Cursor Agent | 2026.05.16-0338208 probed on 2026-08-31 | Local CLI version probe only; `fixtures/cursor/observed-sanitised/cursor-agent-2026.05.16-0338208-capability-probe.json` |
+| Claude Code | 2.1.251 probed on 2026-08-31 | Local CLI version probe; OTLP HTTP/JSON log events from synthetic run; `fixtures/claude/observed-sanitised/claude-code-2.1.251-capability-probe.json`, `fixtures/claude/observed-sanitised/claude-code-2.1.251-otlp-events.json` |
+| Cursor Agent | 2026.05.16-0338208 probed on 2026-08-31 | Local CLI version probe; authenticated print JSON result from synthetic run; local OTLP HTTP/JSON export not observed; `fixtures/cursor/observed-sanitised/cursor-agent-2026.05.16-0338208-capability-probe.json`, `fixtures/cursor/observed-sanitised/cursor-agent-2026.05.16-0338208-print-result.json` |
 
 ## Capability matrix
 
 | Capability | Codex | Claude Code | Cursor | Notes |
 |---|---|---|---|---|
-| Model identity | supported | unknown | unknown | Codex: `model` attribute observed in `fixtures/codex/observed-sanitised/codex-0.145.0-logs.json`. Claude/Cursor probes prove installed versions only, not event-level model telemetry. |
-| Token: input/output | partial | unknown | unknown | Codex: input/output token attributes observed in `fixtures/codex/observed-sanitised/codex-0.145.0-logs.json`; cached/reasoning unconfirmed. |
-| Token: cached | unknown | unknown | unknown | No reviewed provider event fixture proves cached-token data. |
+| Model identity | supported | supported | unknown | Codex: `model` attribute observed in `fixtures/codex/observed-sanitised/codex-0.145.0-logs.json`. Claude Code: `model` observed in `fixtures/claude/observed-sanitised/claude-code-2.1.251-otlp-events.json`. Cursor Agent result in `fixtures/cursor/observed-sanitised/cursor-agent-2026.05.16-0338208-print-result.json` did not include model identity. |
+| Token: input/output | partial | supported | supported | Codex: input/output token attributes observed in `fixtures/codex/observed-sanitised/codex-0.145.0-logs.json`; cached/reasoning unconfirmed. Claude Code: input/output token counts observed in `fixtures/claude/observed-sanitised/claude-code-2.1.251-otlp-events.json`. Cursor Agent: input/output token counts observed in `fixtures/cursor/observed-sanitised/cursor-agent-2026.05.16-0338208-print-result.json`. |
+| Token: cached | unknown | supported | supported | Claude Code: cache-read and cache-creation token counts observed in `fixtures/claude/observed-sanitised/claude-code-2.1.251-otlp-events.json`. Cursor Agent: cache-read and cache-write token counts observed in `fixtures/cursor/observed-sanitised/cursor-agent-2026.05.16-0338208-print-result.json`. Codex fixture does not prove cached-token data. |
 | Token: reasoning | unknown | unknown | unknown | No reviewed provider event fixture proves reasoning-token data. |
-| Tool calls (generic) | unknown | unknown | unknown | Codex fixture did not expose tool-call spans; Claude/Cursor probes have no event-level telemetry. |
-| MCP calls | unknown | unknown | unknown | Must be proven from event data, not inferred from configuration or CLI support. |
+| Tool calls (generic) | unknown | unknown | unknown | Codex fixture did not expose tool-call spans. Claude Code fixture does not include an executed tool-call event. Cursor Agent result does not include tool calls. |
+| MCP calls | unknown | partial | unknown | Claude Code emitted MCP server connection events in `fixtures/claude/observed-sanitised/claude-code-2.1.251-otlp-events.json`, but no MCP call invocation was observed. Codex and Cursor fixtures do not prove MCP calls. |
 | Skill invocations | unknown | unknown | unknown | Mark `explicit | inferred | unavailable` only after event fixture evidence. |
 | File operations | unknown | unknown | unknown | Needed for risky-access governance; no reviewed event fixture proves file-operation telemetry. |
-| Session boundaries | partial | unknown | unknown | Codex: `conversation.id` observed and privacy-removed in `fixtures/codex/observed-sanitised/codex-0.145.0-logs.json`; correlation remains unresolved. |
+| Session boundaries | partial | partial | partial | Codex: `conversation.id` observed and privacy-removed in `fixtures/codex/observed-sanitised/codex-0.145.0-logs.json`; correlation remains unresolved. Claude Code: session identifier observed in `fixtures/claude/observed-sanitised/claude-code-2.1.251-otlp-events.json`. Cursor Agent: session identifier observed in `fixtures/cursor/observed-sanitised/cursor-agent-2026.05.16-0338208-print-result.json`. |
 | Trace/span correlation | unsupported | unknown | unknown | Codex fixture `fixtures/codex/observed-sanitised/codex-0.145.0-logs.json` had empty trace/span IDs. |
-| Task outcome | unknown | unknown | unknown | Needed for model-performance scorecard; likely needs outcome contracts. |
-| Prompt/response content | unsupported | unknown | unknown | Codex fixture `fixtures/codex/observed-sanitised/codex-0.145.0-logs.json` has no retained log body; content capture remains out of scope by default. |
+| Task outcome | unknown | unknown | partial | Cursor Agent result includes command success/error status in `fixtures/cursor/observed-sanitised/cursor-agent-2026.05.16-0338208-print-result.json`, but not a broader task outcome contract. Codex and Claude Code fixtures do not prove task outcome. |
+| Prompt/response content | unsupported | unsupported | unsupported | Codex fixture `fixtures/codex/observed-sanitised/codex-0.145.0-logs.json` has no retained log body; content capture remains out of scope by default. Claude Code capture disabled content logging and committed fixture excludes content in `fixtures/claude/observed-sanitised/claude-code-2.1.251-otlp-events.json`. Cursor Agent fixture records only a synthetic result summary in `fixtures/cursor/observed-sanitised/cursor-agent-2026.05.16-0338208-print-result.json`. |
 
 ## How to raise a cell above `unknown`
 
