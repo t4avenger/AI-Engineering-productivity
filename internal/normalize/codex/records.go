@@ -3,7 +3,9 @@ package codex
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
@@ -20,8 +22,10 @@ var modelInteractionEvents = map[string]struct{}{
 
 // extractedLogFields are the attribute keys promoted onto a ModelInteraction.
 // They are excluded from provider_extensions.log_attributes so evidence is not
-// duplicated between the typed record and its extensions.
-var extractedLogFields = []string{"event.name", "model", "input_token_count", "output_token_count"}
+// duplicated between the typed record and its extensions. event.name is NOT
+// listed: it drives eligibility but has no typed field, so it is preserved as
+// evidence under provider_extensions.log_attributes rather than dropped.
+var extractedLogFields = []string{"model", "input_token_count", "output_token_count"}
 
 // ExtractLogModelInteractions maps the reviewed Codex OTLP log shape into
 // stable-primitive canonical.ModelInteraction records. It is the honest,
@@ -121,33 +125,46 @@ func isModelInteraction(fields map[string]any) bool {
 }
 
 // observedString returns the trimmed string value and whether a non-empty
-// value was actually observed. An absent value yields ("unknown", false) so an
-// absent model is never mistaken for a real one.
+// value was actually observed. Absent, non-string, or whitespace-only values
+// yield ("unknown", false) so a blank model is never mistaken for a real one.
 func observedString(value any) (string, bool) {
 	text, ok := value.(string)
-	if !ok || text == "" {
+	if !ok {
+		return "unknown", false
+	}
+	text = strings.TrimSpace(text)
+	if text == "" {
 		return "unknown", false
 	}
 	return text, true
 }
 
-// optionalTokenCount parses an OTLP token attribute (stringValue or intValue)
-// into a *int64. An absent or unparseable value yields nil — never a
-// fabricated zero — so a genuine absence stays distinguishable from a real 0.
+// optionalTokenCount parses an OTLP token attribute into a *int64. OTLP JSON
+// encodes intValue as a string and doubleValue as a JSON number (float64). An
+// absent, unparseable, negative, non-integral, or out-of-range value yields nil
+// — never a fabricated or silently truncated count — so a genuine absence stays
+// distinguishable from a real 0.
 func optionalTokenCount(value any) *int64 {
+	var count int64
 	switch typed := value.(type) {
 	case string:
 		parsed, err := strconv.ParseInt(typed, 10, 64)
 		if err != nil {
 			return nil
 		}
-		return &parsed
+		count = parsed
 	case float64:
-		count := int64(typed)
-		return &count
+		if math.Trunc(typed) != typed || typed < math.MinInt64 || typed >= math.MaxInt64 {
+			return nil
+		}
+		count = int64(typed)
 	default:
 		return nil
 	}
+	if count < 0 {
+		return nil
+	}
+	return &count
 }
 
 // nanoTimestamp carries a parsed timestamp and whether it was observed from the

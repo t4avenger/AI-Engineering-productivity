@@ -17,7 +17,9 @@
     "error_code": null,
     "provenance": "observed",
     "provider_extensions": {
-      "log_attributes": {},
+      "log_attributes": {
+        "event.name": "codex.sse_event"
+      },
       "resource_attributes": {
         "env": "telemetryiq-synthetic",
         "service.name": "codex_exec",

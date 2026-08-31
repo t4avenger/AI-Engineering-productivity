@@ -134,6 +134,27 @@ func TestExtractMalformedTokenIsNilNotZero(t *testing.T) {
 	}
 }
 
+func TestExtractParsesNumericTokenValue(t *testing.T) {
+	t.Parallel()
+
+	// OTLP doubleValue arrives as a JSON number (float64 after decoding). An
+	// integral value parses; a non-integral one must be nil, never truncated.
+	payload := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_cli_rs"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"m"}},{"key":"input_token_count","value":{"doubleValue":42}},{"key":"output_token_count","value":{"doubleValue":7.5}}],"severityText":"INFO"}]}]}]}`)
+	records, err := ExtractLogModelInteractions(payload, fixtureReceivedAt, stubFingerprint)
+	if err != nil {
+		t.Fatalf("extract: %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("records = %d, want 1", len(records))
+	}
+	if records[0].InputTokens == nil || *records[0].InputTokens != 42 {
+		t.Fatalf("numeric input token = %v, want 42", records[0].InputTokens)
+	}
+	if records[0].OutputTokens != nil {
+		t.Fatalf("non-integral token must be nil (not truncated), got %v", *records[0].OutputTokens)
+	}
+}
+
 func TestExtractMissingModelIsUnknown(t *testing.T) {
 	t.Parallel()
 

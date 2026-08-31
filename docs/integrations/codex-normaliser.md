@@ -24,6 +24,7 @@ diagnostics boundary.
 fixtures/codex/expected/fixture-001.canonical.json is the golden output for
 the checked-in synthetic input. Adding a real observed fixture requires the
 Task 006 capture procedure, a recorded tool version, an expected canonical
+fixture, and a review of any newly evidenced capabilities.
 
 ## Observed log support
 
@@ -37,7 +38,6 @@ each retained log forms an explicitly `unknown` lifecycle session identified by
 an installation-specific HMAC fingerprint. Account, hostname, email,
 conversation ID, raw command arguments, tool output, and body fields are
 removed by the privacy pipeline before storage.
-fixture, and a review of any newly evidenced capabilities.
 
 ## Model-interaction records
 
