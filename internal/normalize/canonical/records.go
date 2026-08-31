@@ -40,8 +40,10 @@ const (
 // at schema version 0.1.0 (recordSchemaVersion). It carries only stable
 // primitives shared across providers; cost is deliberately excluded per the
 // reorientation (roadmap §0). Token categories are nullable so an absent value
-// is distinguishable from a genuine zero. Anything provider-specific stays in
-// ProviderExtensions until two providers validate identical semantics.
+// is distinguishable from a genuine zero, and ErrorCode is nullable so "no
+// error" (null) is distinct from an empty-string error code. Anything
+// provider-specific stays in ProviderExtensions until two providers validate
+// identical semantics.
 type ModelInteraction struct {
 	SchemaVersion      string         `json:"schema_version"`
 	RequestID          string         `json:"request_id"`
@@ -57,7 +59,7 @@ type ModelInteraction struct {
 	CachedInputTokens  *int64         `json:"cached_input_tokens"`
 	ReasoningTokens    *int64         `json:"reasoning_tokens"`
 	Result             string         `json:"result"`
-	ErrorCode          string         `json:"error_code"`
+	ErrorCode          *string        `json:"error_code"`
 	Provenance         Provenance     `json:"provenance"`
 	ProviderExtensions map[string]any `json:"provider_extensions"`
 }

@@ -464,7 +464,8 @@ The typed `ModelInteraction` record (`internal/normalize/canonical/records.go`,
 `schemas/model-interaction.schema.json`) implements the stable primitives of this
 shape plus a `provenance` marker. Cost fields (`estimated_cost_usd`, `cost_status`)
 are deliberately excluded per the reorientation (roadmap §0); token categories are
-nullable so an absent value stays distinct from a genuine zero.
+nullable so an absent value stays distinct from a genuine zero, and `error_code`
+is nullable so "no error" (null) stays distinct from a reported empty code.
 
 ### 10.4 Session states
 

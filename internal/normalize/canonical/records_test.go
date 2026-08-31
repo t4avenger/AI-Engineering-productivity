@@ -27,7 +27,7 @@ func TestModelInteractionJSONRoundTrip(t *testing.T) {
 		CachedInputTokens: int64Ptr(5000),
 		ReasoningTokens:   nil,
 		Result:            "success",
-		ErrorCode:         "",
+		ErrorCode:         nil,
 		Provenance:        ProvenanceObserved,
 		ProviderExtensions: map[string]any{
 			"mcp_call": map[string]any{"server": "filesystem", "method": "read_file"},
@@ -84,8 +84,8 @@ func TestRecordsCarryProvenanceMarker(t *testing.T) {
 	t.Parallel()
 
 	for name, encoded := range map[string][]byte{
-		"model interaction": mustMarshal(t, ModelInteraction{Provenance: ProvenanceObserved}),
-		"operation":         mustMarshal(t, Operation{Provenance: ProvenanceObserved}),
+		"model interaction": mustMarshal(t, ModelInteraction{Provenance: ProvenanceObserved, ProviderExtensions: map[string]any{}}),
+		"operation":         mustMarshal(t, Operation{Provenance: ProvenanceObserved, ProviderExtensions: map[string]any{}}),
 	} {
 		var fields map[string]any
 		if err := json.Unmarshal(encoded, &fields); err != nil {
@@ -112,8 +112,8 @@ func TestProviderSpecificsStayInProviderExtensions(t *testing.T) {
 	}
 
 	for name, encoded := range map[string][]byte{
-		"model interaction": mustMarshal(t, ModelInteraction{Provenance: ProvenanceObserved, ProviderExtensions: extensions}),
-		"operation":         mustMarshal(t, Operation{Provenance: ProvenanceObserved, ProviderExtensions: extensions}),
+		"model interaction": mustMarshal(t, ModelInteraction{SchemaVersion: recordSchemaVersion, Provenance: ProvenanceObserved, ProviderExtensions: extensions}),
+		"operation":         mustMarshal(t, Operation{SchemaVersion: recordSchemaVersion, Provenance: ProvenanceObserved, ProviderExtensions: extensions}),
 	} {
 		var fields map[string]any
 		if err := json.Unmarshal(encoded, &fields); err != nil {
