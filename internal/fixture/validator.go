@@ -84,10 +84,19 @@ func validateTextMetadata(document map[string]any) error {
 			return fmt.Errorf("fixture metadata %q must be a non-empty string", field)
 		}
 	}
-	if document["tool"] != "codex" {
-		return errors.New("fixture metadata tool must be codex")
+	if !supportedTool(document["tool"].(string)) {
+		return errors.New("fixture metadata tool must be codex, claude-code, or cursor-agent")
 	}
 	return nil
+}
+
+func supportedTool(tool string) bool {
+	switch tool {
+	case "codex", "claude-code", "cursor-agent":
+		return true
+	default:
+		return false
+	}
 }
 
 func validateCapturedAt(document map[string]any) error {
