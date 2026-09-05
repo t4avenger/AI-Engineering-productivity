@@ -17,6 +17,14 @@
     "error_code": null,
     "provenance": "observed",
     "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex-log:fixture",
+        "ordering_key": "01785240000000000000:codex-log:fixture",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex log telemetry has no reviewed task-boundary signal"
+        }
+      },
       "log_attributes": {
         "event.name": "codex.sse_event"
       },

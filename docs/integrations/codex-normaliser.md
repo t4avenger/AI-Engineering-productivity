@@ -4,7 +4,11 @@ Task 007 supports one deliberately narrow fixture shape: a reviewed, sanitised
 Codex OTLP trace wrapper with payload.resourceSpans[].scopeSpans[].spans[].
 Each span becomes one canonical event. The normaliser is deterministic: its
 event ID is codex:<traceId>:<spanId>, its session ID is codex:<traceId>, and
-it uses the OTLP startTimeUnixNano plus the fixture captured_at timestamp.
+it uses the OTLP startTimeUnixNano plus the fixture captured_at timestamp. It
+sorts spans by observed time plus stable identifiers, collapses duplicate
+trace/span IDs, and stores dedup, ordering, trace/span, parent-span, and
+task-boundary confidence evidence under `provider_extensions.correlation` (see
+`docs/architecture/correlation.md`).
 
 The synthetic fixture is not evidence of any real Codex field beyond the shape
 it contains. Model, token, cache, tool-call, file-operation, command,
@@ -58,6 +62,10 @@ Codex log shape into stable-primitive `canonical.ModelInteraction` records
   `nil`/`"unknown"`; no `Operation` records are fabricated from Codex logs.
 - **Session/request identity** derives from the installation HMAC fingerprint,
   because `conversation.id` is stripped by the privacy pipeline.
+- **Correlation evidence** records the dedup key, ordering key, and explicit
+  unknown task-boundary confidence under `provider_extensions.correlation`; log
+  records are sorted by `started_at`, `request_id`, and `completed_at`, then
+  deduplicated by `request_id` before being returned.
 
 A record is emitted only when the log `event.name` is a whitelisted
 model-interaction event (`codex.sse_event`) and it carries at least a model or a

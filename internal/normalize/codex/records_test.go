@@ -52,6 +52,42 @@ func TestExtractLogModelInteractionsGolden(t *testing.T) {
 	}
 }
 
+func TestExtractLogModelInteractionsCorrelatesShuffledDuplicates(t *testing.T) {
+	t.Parallel()
+
+	ordered := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_cli_rs"}}]},"scopeLogs":[{"logRecords":[{"timeUnixNano":"1785059999000000000","observedTimeUnixNano":"1785059999001000000","attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"a"}},{"key":"input_token_count","value":{"stringValue":"1"}}],"severityText":"INFO"},{"timeUnixNano":"1785060000000000000","observedTimeUnixNano":"1785060000001000000","attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"b"}},{"key":"input_token_count","value":{"stringValue":"2"}}],"severityText":"INFO"}]}]}]}`)
+	shuffledDuplicate := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_cli_rs"}}]},"scopeLogs":[{"logRecords":[{"timeUnixNano":"1785060000000000000","observedTimeUnixNano":"1785060000001000000","attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"b"}},{"key":"input_token_count","value":{"stringValue":"2"}}],"severityText":"INFO"},{"timeUnixNano":"1785059999000000000","observedTimeUnixNano":"1785059999001000000","attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"a"}},{"key":"input_token_count","value":{"stringValue":"1"}}],"severityText":"INFO"},{"timeUnixNano":"1785060000000000000","observedTimeUnixNano":"1785060000001000000","attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"b"}},{"key":"input_token_count","value":{"stringValue":"2"}}],"severityText":"INFO"}]}]}]}`)
+	fingerprint := func(value []byte) string { return string(value) }
+
+	want, err := ExtractLogModelInteractions(ordered, fixtureReceivedAt, fingerprint)
+	if err != nil {
+		t.Fatalf("extract ordered: %v", err)
+	}
+	got, err := ExtractLogModelInteractions(shuffledDuplicate, fixtureReceivedAt, fingerprint)
+	if err != nil {
+		t.Fatalf("extract shuffled: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("deduplicated records = %d, want 2", len(got))
+	}
+	wantJSON, err := json.Marshal(want)
+	if err != nil {
+		t.Fatalf("marshal ordered: %v", err)
+	}
+	gotJSON, err := json.Marshal(got)
+	if err != nil {
+		t.Fatalf("marshal shuffled: %v", err)
+	}
+	if string(gotJSON) != string(wantJSON) {
+		t.Fatalf("shuffled log replay must be byte-identical\nwant: %s\n got: %s", wantJSON, gotJSON)
+	}
+	correlation := got[0].ProviderExtensions["correlation"].(map[string]any)
+	taskBoundary := correlation["task_boundary"].(map[string]any)
+	if correlation["dedup_key"] != got[0].RequestID || taskBoundary["confidence"] != "unknown" {
+		t.Fatalf("correlation = %#v", correlation)
+	}
+}
+
 // logPayload builds a raw OTLP logs payload wrapping a single record's
 // attributes, for the negative tests.
 func logPayload(t *testing.T, service string, recordAttrs map[string]any) []byte {

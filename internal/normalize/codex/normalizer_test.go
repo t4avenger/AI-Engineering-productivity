@@ -34,6 +34,67 @@ func TestNormalizeGoldenFixtureIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestNormalizeCorrelatesShuffledDuplicateSpansDeterministically(t *testing.T) {
+	root := span("root", map[string]any{"spanId": "0000000000000001", "startTimeUnixNano": "1785059999000000000"})
+	child := span("child", map[string]any{"spanId": "0000000000000002", "parentSpanId": "0000000000000001", "startTimeUnixNano": "1785060000000000000"})
+	later := span("later", map[string]any{"spanId": "0000000000000003", "parentSpanId": "0000000000000001", "startTimeUnixNano": "1785060001000000000"})
+
+	ordered := fixtureJSON(t, map[string]any{"resourceSpans": []any{map[string]any{"scopeSpans": []any{map[string]any{"spans": []any{root, child, later}}}}}})
+	shuffledWithDuplicate := fixtureJSON(t, map[string]any{"resourceSpans": []any{map[string]any{"scopeSpans": []any{map[string]any{"spans": []any{later, child, root, child}}}}}})
+
+	want, err := Normalize(ordered)
+	if err != nil {
+		t.Fatalf("normalise ordered: %v", err)
+	}
+	got, err := Normalize(shuffledWithDuplicate)
+	if err != nil {
+		t.Fatalf("normalise shuffled: %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("deduplicated event count = %d, want 3", len(got))
+	}
+	wantJSON, err := json.Marshal(want)
+	if err != nil {
+		t.Fatalf("marshal ordered: %v", err)
+	}
+	gotJSON, err := json.Marshal(got)
+	if err != nil {
+		t.Fatalf("marshal shuffled: %v", err)
+	}
+	if string(gotJSON) != string(wantJSON) {
+		t.Fatalf("shuffled replay must be byte-identical\nwant: %s\n got: %s", wantJSON, gotJSON)
+	}
+	if got[0].EventType != "root" || got[1].EventType != "child" || got[2].EventType != "later" {
+		t.Fatalf("event order = %s, %s, %s", got[0].EventType, got[1].EventType, got[2].EventType)
+	}
+}
+
+func TestNormalizeAddsTraceCorrelationAndTaskBoundaryConfidence(t *testing.T) {
+	input := fixtureJSON(t, map[string]any{"resourceSpans": []any{map[string]any{
+		"scopeSpans": []any{map[string]any{
+			"spans": []any{span("synthetic", map[string]any{"parentSpanId": "fedcba9876543210"})},
+		}},
+	}}})
+	events, err := Normalize(input)
+	if err != nil {
+		t.Fatalf("normalise: %v", err)
+	}
+	correlation := events[0].ProviderExtensions["correlation"].(map[string]any)
+	if correlation["dedup_key"] != events[0].EventID || correlation["trace_id"] != "0123456789abcdef0123456789abcdef" || correlation["span_id"] != "0123456789abcdef" {
+		t.Fatalf("correlation identifiers = %#v", correlation)
+	}
+	if correlation["parent_span_id"] != "fedcba9876543210" {
+		t.Fatalf("parent span = %#v", correlation["parent_span_id"])
+	}
+	taskBoundary := correlation["task_boundary"].(map[string]any)
+	if taskBoundary["confidence"] != "unknown" || events[0].TaskID != nil {
+		t.Fatalf("task boundary = %#v, task id = %v", taskBoundary, events[0].TaskID)
+	}
+	if _, duplicated := events[0].ProviderExtensions["span"].(map[string]any)["parentSpanId"]; duplicated {
+		t.Fatal("parentSpanId should be promoted to correlation metadata, not duplicated in unknown span fields")
+	}
+}
+
 func TestNormalizePreservesUnknownSafeFields(t *testing.T) {
 	input := fixtureJSON(t, map[string]any{"resourceSpans": []any{map[string]any{
 		"resource_unknown": "preserved",
