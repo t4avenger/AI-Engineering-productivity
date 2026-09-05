@@ -838,6 +838,33 @@ assertions:
 - Installation smoke test
 - Upgrade smoke test
 - Diagnostics sanitisation test
+- Capability-driven conformance suite
+
+### 16.4 Capability-driven conformance suite
+
+Beyond per-adapter golden tests, a single cross-adapter suite
+(`internal/conformance`) asserts the contracts that a shared adapter interface
+must not be allowed to violate. Each adapter declares a capability profile drawn
+directly from its column in the capability matrix (§15.2), and the suite enforces:
+
+- **No promotion of unknown/unsupported signals.** A signal a provider's matrix
+  cell marks `unknown` or `unsupported` must never appear as a populated
+  first-class canonical field; absent evidence stays `nil` / `"unknown"`, never a
+  fabricated value. Provider-specific raw evidence may still be preserved under
+  `provider_extensions`.
+- **Honest promotion of supported signals.** A signal marked `supported` or
+  `partial` is actually promoted, and when model identity and tokens are both
+  observed the record's provenance attributes the promotion rather than leaving
+  it unexplained.
+- **Explicit unknowns.** An unknown signal is reported as an explicit unknown
+  (e.g. task-boundary confidence `"unknown"`), not silently omitted.
+- **Redaction boundary parity.** A provider-shaped canary payload seeded with a
+  marker across every redaction vector is driven through the real privacy
+  sanitiser and each adapter's event and record entry points; the marker must
+  never survive into canonical output, identically across provider shapes.
+
+Adding a provider to the suite subjects it to the full contract, so a matrix
+claim and its enforcement cannot drift apart silently.
 
 ---
 
