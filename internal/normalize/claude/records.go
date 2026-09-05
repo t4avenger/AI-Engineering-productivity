@@ -39,7 +39,7 @@ func ExtractModelInteractions(data []byte, fingerprint func([]byte) string) ([]c
 	switch document.Payload.SourceType {
 	case sourceTypeOTLPEvents:
 	case sourceTypeCapabilityProbe:
-		return nil, nil
+		return []canonical.ModelInteraction{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported Claude payload source_type %q", document.Payload.SourceType)
 	}
@@ -76,7 +76,7 @@ func sampleModelInteraction(fingerprint func([]byte) string, raw map[string]any)
 	}
 
 	sessionFingerprint := "claude-code:" + fingerprint([]byte(sessionID))
-	requestID := sessionFingerprint + ":" + sequenceString(raw)
+	requestID := sessionFingerprint + ":" + sequenceSuffix(raw, completed)
 	if rawRequest := normalize.OptionalString(raw, "request_id"); rawRequest != nil {
 		requestID = "claude-code:" + fingerprint([]byte(*rawRequest))
 	}
@@ -133,11 +133,14 @@ func recordExtensions(raw map[string]any, requestID string, started time.Time, s
 	}
 }
 
-// sequenceString renders event_sequence as the request-ID suffix used when no
-// request_id is observed, so the fallback identifier stays deterministic.
-func sequenceString(raw map[string]any) string {
+// sequenceSuffix renders the request-ID suffix used when no request_id is
+// observed. It prefers the integral event_sequence, falling back to the
+// observed completed timestamp so two api_request events in one session that
+// both lack request_id and event_sequence stay distinct rather than colliding
+// on a constant suffix and being silently deduplicated.
+func sequenceSuffix(raw map[string]any, completed time.Time) string {
 	if number, ok := raw["event_sequence"].(float64); ok && number == float64(int64(number)) {
 		return strconv.FormatInt(int64(number), 10)
 	}
-	return "0"
+	return "ts" + strconv.FormatInt(completed.UnixNano(), 10)
 }

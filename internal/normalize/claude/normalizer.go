@@ -36,8 +36,11 @@ const (
 )
 
 // NormalizeEvents maps the reviewed Claude Code OTLP event fixture into
-// canonical events, one per sample event. It validates and sanitises through
-// the shared boundary before mapping, and never persists or logs the fixture.
+// canonical events, one per sample event. It validates through the shared
+// fixture boundary (fixture.Validate rejects prohibited fields and likely
+// secrets) before mapping; it does not itself run the privacy sanitiser, so a
+// live payload must be sanitised upstream first. It never persists or logs the
+// fixture.
 //
 // A capability-probe fixture carries no events, so it yields an empty slice
 // rather than a fabricated all-unknown record. session_id/request_id are
@@ -53,7 +56,7 @@ func NormalizeEvents(data []byte, fingerprint func([]byte) string) ([]canonical.
 	switch document.Payload.SourceType {
 	case sourceTypeOTLPEvents:
 	case sourceTypeCapabilityProbe:
-		return nil, nil
+		return []canonical.Event{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported Claude payload source_type %q", document.Payload.SourceType)
 	}
