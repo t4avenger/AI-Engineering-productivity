@@ -28,8 +28,8 @@ type sessionAPI struct {
 }
 
 type sessionListResponse struct {
-	Data       []canonical.Session `json:"data"`
-	Pagination sessionPagination   `json:"pagination"`
+	Data       []publicSession   `json:"data"`
+	Pagination sessionPagination `json:"pagination"`
 }
 
 type sessionPagination struct {
@@ -38,7 +38,20 @@ type sessionPagination struct {
 }
 
 type sessionDetailResponse struct {
-	Data canonical.Session `json:"data"`
+	Data publicSession `json:"data"`
+}
+
+type publicSession struct {
+	SchemaVersion      string            `json:"schema_version"`
+	SessionID          string            `json:"session_id"`
+	Provider           string            `json:"provider"`
+	Tool               string            `json:"tool"`
+	State              string            `json:"state"`
+	StartedAt          time.Time         `json:"started_at"`
+	CompletedAt        *time.Time        `json:"completed_at"`
+	Attributes         map[string]any    `json:"attributes"`
+	ProviderExtensions map[string]any    `json:"provider_extensions"`
+	Availability       map[string]string `json:"availability"`
 }
 
 type sessionErrorResponse struct {
@@ -80,7 +93,7 @@ func (a sessionAPI) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	page, next := sessionPage(sessions, limit)
-	response := sessionListResponse{Data: page, Pagination: sessionPagination{Limit: limit, NextCursor: next}}
+	response := sessionListResponse{Data: publicSessions(page), Pagination: sessionPagination{Limit: limit, NextCursor: next}}
 	writeSessionJSON(w, http.StatusOK, response)
 }
 
@@ -103,7 +116,7 @@ func (a sessionAPI) detail(w http.ResponseWriter, r *http.Request) {
 		writeSessionError(w, http.StatusNotFound, "session_not_found", sessionNotFound)
 		return
 	}
-	writeSessionJSON(w, http.StatusOK, sessionDetailResponse{Data: session})
+	writeSessionJSON(w, http.StatusOK, sessionDetailResponse{Data: newPublicSession(session)})
 }
 
 func (a sessionAPI) delete(w http.ResponseWriter, r *http.Request) {
@@ -214,6 +227,98 @@ func sessionPage(sessions []canonical.Session, limit int) ([]canonical.Session, 
 	data, _ := json.Marshal(sessionCursor{StartedAt: last.StartedAt.UTC().Format(time.RFC3339Nano), SessionID: last.SessionID})
 	cursor := base64.RawURLEncoding.EncodeToString(data)
 	return page, &cursor
+}
+
+func publicSessions(sessions []canonical.Session) []publicSession {
+	result := make([]publicSession, len(sessions))
+	for index, session := range sessions {
+		result[index] = newPublicSession(session)
+	}
+	return result
+}
+
+func newPublicSession(session canonical.Session) publicSession {
+	return publicSession{
+		SchemaVersion:      session.SchemaVersion,
+		SessionID:          session.SessionID,
+		Provider:           session.Provider,
+		Tool:               session.Tool,
+		State:              session.State,
+		StartedAt:          session.StartedAt,
+		CompletedAt:        session.CompletedAt,
+		Attributes:         session.Attributes,
+		ProviderExtensions: session.ProviderExtensions,
+		Availability:       sessionAvailability(session),
+	}
+}
+
+func sessionAvailability(session canonical.Session) map[string]string {
+	return map[string]string{
+		"provider":        observedIf(session.Provider != ""),
+		"tool":            observedIf(session.Tool != ""),
+		"outcome":         outcomeAvailability(session.State),
+		"started_at":      observedIf(!session.StartedAt.IsZero()),
+		"completed_at":    observedIf(session.CompletedAt != nil),
+		"model":           modelAvailability(session),
+		"observed_events": observedIf(numericAttribute(session.Attributes, "event_count")),
+		"token_usage":     tokenUsageAvailability(session),
+	}
+}
+
+func outcomeAvailability(state string) string {
+	if state == "" {
+		return "unavailable"
+	}
+	if state == "unknown" {
+		return "unknown"
+	}
+	return "observed"
+}
+
+func observedIf(ok bool) string {
+	if ok {
+		return "observed"
+	}
+	return "unavailable"
+}
+
+func modelAvailability(session canonical.Session) string {
+	if value, ok := session.Attributes["model"].(string); ok && strings.TrimSpace(value) != "" {
+		return "observed"
+	}
+	switch session.Tool {
+	case "codex", "claude-code":
+		return "unavailable"
+	default:
+		return "unknown"
+	}
+}
+
+func tokenUsageAvailability(session canonical.Session) string {
+	for _, key := range []string{"input_token_count", "output_token_count", "cached_input_tokens"} {
+		if numericAttribute(session.Attributes, key) {
+			return "observed"
+		}
+	}
+	switch session.Tool {
+	case "codex":
+		return "partial"
+	case "claude-code":
+		return "unavailable"
+	default:
+		return "unknown"
+	}
+}
+
+func numericAttribute(attributes map[string]any, key string) bool {
+	switch value := attributes[key].(type) {
+	case int, int32, int64, uint, uint32, uint64, float32, float64:
+		return true
+	case string:
+		return strings.TrimSpace(value) != ""
+	default:
+		return false
+	}
 }
 
 func writeSessionJSON(w http.ResponseWriter, status int, value any) {

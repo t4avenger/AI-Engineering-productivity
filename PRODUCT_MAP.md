@@ -899,6 +899,12 @@ Session detail:
 - data-retention view
 - delete action
 
+Cross-tool session rows and detail fields must use the same shared availability
+semantics for Codex and Claude Code: `observed`, `partial`, `unavailable`,
+`unsupported`, or `unknown`. A provider/tool missing a signal renders an explicit
+`unavailable`/`unknown` cell rather than a blank value or zero, and no dashboard
+field may imply provider parity that is not backed by the capability matrix.
+
 ### 17.3 Costs
 - cost by day
 - cost by tool

@@ -329,7 +329,14 @@ function SessionsPage({
                 <span className={`state state--${session.state}`}>
                   {session.state}
                 </span>
-                <span>{modelOf(session) ?? 'Model unavailable'}</span>
+                <span>
+                  {availabilityLabel(
+                    session,
+                    'model',
+                    modelOf(session),
+                    'Model',
+                  )}
+                </span>
               </button>
             </li>
           ))}
@@ -524,21 +531,64 @@ function SessionDetail({
           <p className="eyebrow">Session detail</p>
           <h1 id="detail-title">{session.tool} session</h1>
           <dl className="details">
-            <Detail label="Outcome" value={session.state} />
+            <Detail
+              label="Outcome"
+              value={availabilityLabel(
+                session,
+                'outcome',
+                session.state,
+                'Outcome',
+              )}
+            />
             <Detail label="Started" value={formatDate(session.started_at)} />
             <Detail
               label="Completed"
-              value={
-                session.completed_at
-                  ? formatDate(session.completed_at)
-                  : 'Unavailable'
-              }
+              value={availabilityLabel(
+                session,
+                'completed_at',
+                session.completed_at ? formatDate(session.completed_at) : null,
+                'Completed',
+              )}
             />
-            <Detail label="Provider" value={session.provider} />
-            <Detail label="Model" value={modelOf(session) ?? 'Unavailable'} />
+            <Detail
+              label="Provider"
+              value={availabilityLabel(
+                session,
+                'provider',
+                session.provider,
+                'Provider',
+              )}
+            />
+            <Detail
+              label="Tool"
+              value={availabilityLabel(session, 'tool', session.tool, 'Tool')}
+            />
+            <Detail
+              label="Model"
+              value={availabilityLabel(
+                session,
+                'model',
+                modelOf(session),
+                'Model',
+              )}
+            />
+            <Detail
+              label="Token usage"
+              value={availabilityLabel(
+                session,
+                'token_usage',
+                null,
+                'Token usage',
+              )}
+            />
             <Detail
               label="Observed events"
-              value={numberAttribute(session, 'event_count') ?? 'Unavailable'}
+              value={availabilityLabel(
+                session,
+                'observed_events',
+                numberAttribute(session, 'event_count'),
+                'Observed events',
+              )}
             />
           </dl>
           <EventTimeline sessionID={id} />
@@ -842,6 +892,23 @@ function Detail({
     </div>
   );
 }
+
+function availabilityLabel(
+  session: Session,
+  field: string,
+  value: string | number | null,
+  label: string,
+): string {
+  const state = session.availability?.[field];
+  if (state === 'observed') {
+    return value === null ? label + ' unavailable' : String(value);
+  }
+  if (state === 'partial') return label + ' partially available';
+  if (state === 'unsupported') return label + ' unsupported';
+  if (state === 'unknown') return label + ' unknown';
+  return label + ' unavailable';
+}
+
 function modelOf(session: Session): string | null {
   return typeof session.attributes.model === 'string'
     ? session.attributes.model

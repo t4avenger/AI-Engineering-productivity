@@ -19,6 +19,13 @@ observed event attribute named `model`. Sessions whose model is unavailable do
 not match, preserving the distinction between unknown and zero or fabricated
 values.
 
+Session list and detail responses include an `availability` object for the
+shared cross-tool fields rendered by the dashboard: `provider`, `tool`,
+`outcome`, `started_at`, `completed_at`, `model`, `observed_events`, and
+`token_usage`. Values are `observed`, `partial`, `unavailable`, `unsupported`,
+or `unknown`. The UI must render non-observed states as labelled cells, never
+as blanks or numeric zeroes.
+
 The daemon opens the existing local SQLite repository at the platform
 configuration directory and reuses its installation-specific privacy salt.
 The API never reads raw intake payloads. Session endpoints require a bearer token; the auth-token CLI command deliberately prints the protected local token for dashboard setup. Health and OTLP intake remain unauthenticated, and the daemon remains loopback-only by default.
