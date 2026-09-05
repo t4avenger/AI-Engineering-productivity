@@ -101,15 +101,32 @@ func (i *otlpHTTPIngest) receive(w http.ResponseWriter, r *http.Request, resourc
 	w.WriteHeader(http.StatusAccepted)
 }
 
+func (i *otlpHTTPIngest) sanitizedPayload(payload map[string]json.RawMessage) ([]byte, error) {
+	raw := make(map[string]any, len(payload))
+	for key, value := range payload {
+		var decoded any
+		if err := json.Unmarshal(value, &decoded); err != nil {
+			return nil, fmt.Errorf("decode payload for sanitization: %w", err)
+		}
+		raw[key] = decoded
+	}
+	result := i.sanitizer.Sanitize(raw)
+	safe, err := json.Marshal(result.Value)
+	if err != nil {
+		return nil, fmt.Errorf("marshal sanitized payload: %w", err)
+	}
+	return safe, nil
+}
+
 func (i *otlpHTTPIngest) persistCodexLogs(request *http.Request, payload map[string]json.RawMessage) error {
 	if i.repository == nil || i.sanitizer == nil {
 		return nil
 	}
-	raw, err := json.Marshal(payload)
+	safePayload, err := i.sanitizedPayload(payload)
 	if err != nil {
 		return err
 	}
-	events, err := codex.NormalizeLogs(raw, time.Now().UTC(), func(value []byte) string { return i.sanitizer.Fingerprint(value) })
+	events, err := codex.NormalizeLogs(safePayload, time.Now().UTC(), func(value []byte) string { return i.sanitizer.Fingerprint(value) })
 	if errors.Is(err, codex.ErrUnsupportedLogs) {
 		return nil
 	}

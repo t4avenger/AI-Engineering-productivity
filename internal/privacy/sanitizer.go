@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	saltFileName = "privacy-hmac-salt"
-	saltSize     = 32
+	saltFileName  = "privacy-hmac-salt"
+	saltSize      = 32
+	redactedValue = "[REDACTED]"
 )
 
 // Action documents how a field was treated at the privacy boundary.
@@ -161,15 +162,17 @@ func (s *Sanitizer) sanitizeMap(input map[string]any, parentPath string) (map[st
 			provenance = append(provenance, Provenance{Path: path, Action: ActionHashed, Reason: "file_path"})
 		case ActionRedacted:
 			if attributeName != "" {
-				result[key] = map[string]any{"stringValue": "[REDACTED]"}
+				result[key] = map[string]any{"stringValue": redactedValue}
 			} else {
-				result[key] = "[REDACTED]"
+				result[key] = redactedValue
 			}
 			provenance = append(provenance, Provenance{Path: path, Action: ActionRedacted, Reason: "command_arguments"})
 		default:
 			sanitized, nestedProvenance := s.sanitizeValue(value, path)
 			result[key] = sanitized
-			provenance = append(provenance, Provenance{Path: path, Action: ActionRetained, Reason: "operational_metadata"})
+			if !hasTransformProvenance(nestedProvenance, path) {
+				provenance = append(provenance, Provenance{Path: path, Action: ActionRetained, Reason: "operational_metadata"})
+			}
 			provenance = append(provenance, nestedProvenance...)
 		}
 	}
@@ -189,9 +192,23 @@ func (s *Sanitizer) sanitizeValue(value any, path string) (any, []Provenance) {
 			provenance = append(provenance, nestedProvenance...)
 		}
 		return result, provenance
+	case string:
+		if looksSecretLike(typed) {
+			return redactedValue, []Provenance{{Path: path, Action: ActionRedacted, Reason: "secret_pattern"}}
+		}
+		return typed, nil
 	default:
 		return value, nil
 	}
+}
+
+func hasTransformProvenance(provenance []Provenance, path string) bool {
+	for _, entry := range provenance {
+		if entry.Path == path && entry.Action != ActionRetained {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Sanitizer) hash(value any) string {
@@ -208,10 +225,9 @@ func classify(key string) Action {
 		}
 	}
 	switch normalized {
-	case "prompt", "prompts", "response", "responses", "sourcecode", "command", "commandline", "commandarguments", "commandargs", "arguments", "output", "body", "email", "accountid", "conversationid", "hostname":
-		if normalized == "commandarguments" || normalized == "commandargs" {
-			return ActionRedacted
-		}
+	case "command", "commandline", "commandarguments", "commandargs", "arguments":
+		return ActionRedacted
+	case "prompt", "prompts", "response", "responses", "sourcecode", "output", "body", "email", "accountid", "conversationid", "hostname":
 		return ActionRemoved
 	case "filepath", "filepaths", "filename", "filenames":
 		return ActionHashed
@@ -220,6 +236,25 @@ func classify(key string) Action {
 	default:
 		return ActionRetained
 	}
+}
+
+func looksSecretLike(value string) bool {
+	normalized := strings.ToLower(value)
+	for _, marker := range []string{
+		"api_key=",
+		"apikey=",
+		"authorization:",
+		"bearer ",
+		"password=",
+		"secret=",
+		"token=",
+		"-----begin private key-----",
+	} {
+		if strings.Contains(normalized, marker) {
+			return true
+		}
+	}
+	return strings.HasPrefix(normalized, "sk-")
 }
 
 func removalReason(key string) string {

@@ -572,7 +572,8 @@ sharing:
 - Bind the local API to loopback only.
 - Generate a local authentication token.
 - Never log captured prompt, response, source-code, or secret values.
-- Redact before persistent storage.
+- Redact every raw provider payload recursively before normalisation, persistent storage, diagnostics, or logs.
+- Redact again before persistent storage as a defense-in-depth boundary.
 - Redact before diagnostics.
 - Provide field-level provenance showing why a field was retained.
 - Support complete local deletion.
