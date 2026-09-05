@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -42,7 +43,11 @@ func Normalize(data []byte) ([]canonical.Event, error) {
 	if !ok || len(resourceSpans) == 0 {
 		return nil, errors.New("supported Codex fixture requires non-empty payload.resourceSpans")
 	}
-	return normaliseResourceSpans(document, capturedAt.UTC(), resourceSpans)
+	events, err := normaliseResourceSpans(document, capturedAt.UTC(), resourceSpans)
+	if err != nil {
+		return nil, err
+	}
+	return correlateEvents(events), nil
 }
 
 func normaliseResourceSpans(document fixtureDocument, capturedAt time.Time, resourceSpans []any) ([]canonical.Event, error) {
@@ -126,18 +131,69 @@ func normaliseSpan(document fixtureDocument, capturedAt time.Time, resource, sco
 	if err != nil {
 		return canonical.Event{}, err
 	}
+	parentSpanID := optionalString(span, "parentSpanId")
+	eventID := "codex:" + traceID + ":" + spanID
 	return canonical.Event{
-		SchemaVersion: canonicalSchemaVersion, EventID: "codex:" + traceID + ":" + spanID, EventType: name,
+		SchemaVersion: canonicalSchemaVersion, EventID: eventID, EventType: name,
 		OccurredAt: occurredAt, ReceivedAt: capturedAt, Provider: document.Provider, Tool: document.Tool,
 		SourceSchema: sourceSchema, SourceVersion: document.ToolVersion, ActorID: unavailable, DeviceID: unavailable,
 		SessionID: "codex:" + traceID, TaskID: nil, RepositoryID: nil, PrivacyLevel: "operational",
 		Attributes: map[string]any{"unavailable_fields": []string{"model", "token_usage", "cache_usage", "tool_calls", "file_operations", "command_execution", "approvals", "prompt_content", "response_content", "repository_context", "task_outcome", "provider_cost"}},
 		ProviderExtensions: map[string]any{
-			"resource": unknownFields(resource, "scopeSpans"),
-			"scope":    unknownFields(scope, "spans"),
-			"span":     unknownFields(span, "traceId", "spanId", "name", "startTimeUnixNano"),
+			"correlation": traceCorrelation(eventID, traceID, spanID, parentSpanID, occurredAt),
+			"resource":    unknownFields(resource, "scopeSpans"),
+			"scope":       unknownFields(scope, "spans"),
+			"span":        unknownFields(span, "traceId", "spanId", "parentSpanId", "name", "startTimeUnixNano"),
 		},
 	}, nil
+}
+
+func correlateEvents(events []canonical.Event) []canonical.Event {
+	ordered := append([]canonical.Event(nil), events...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		return eventLess(ordered[i], ordered[j])
+	})
+	seen := make(map[string]struct{}, len(ordered))
+	correlated := make([]canonical.Event, 0, len(ordered))
+	for _, event := range ordered {
+		if _, ok := seen[event.EventID]; ok {
+			continue
+		}
+		seen[event.EventID] = struct{}{}
+		correlated = append(correlated, event)
+	}
+	return correlated
+}
+
+func eventLess(left, right canonical.Event) bool {
+	if !left.OccurredAt.Equal(right.OccurredAt) {
+		return left.OccurredAt.Before(right.OccurredAt)
+	}
+	if left.EventID != right.EventID {
+		return left.EventID < right.EventID
+	}
+	if left.EventType != right.EventType {
+		return left.EventType < right.EventType
+	}
+	return left.ReceivedAt.Before(right.ReceivedAt)
+}
+
+func traceCorrelation(eventID, traceID, spanID string, parentSpanID *string, occurredAt time.Time) map[string]any {
+	var parent any
+	if parentSpanID != nil {
+		parent = *parentSpanID
+	}
+	return map[string]any{
+		"dedup_key":      eventID,
+		"ordering_key":   fmt.Sprintf("%020d:%s", occurredAt.UnixNano(), eventID),
+		"trace_id":       traceID,
+		"span_id":        spanID,
+		"parent_span_id": parent,
+		"task_boundary": map[string]any{
+			"confidence": "unknown",
+			"reason":     "Codex trace telemetry has no reviewed task-boundary signal",
+		},
+	}
 }
 
 func requiredString(value map[string]any, key string) (string, error) {
@@ -146,6 +202,18 @@ func requiredString(value map[string]any, key string) (string, error) {
 		return "", fmt.Errorf("%s must be a non-empty string", key)
 	}
 	return stringValue, nil
+}
+
+func optionalString(value map[string]any, key string) *string {
+	stringValue, ok := value[key].(string)
+	if !ok {
+		return nil
+	}
+	stringValue = strings.TrimSpace(stringValue)
+	if stringValue == "" {
+		return nil
+	}
+	return &stringValue
 }
 
 func unixNanoTime(value map[string]any, key string) (time.Time, error) {

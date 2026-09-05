@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -64,7 +65,7 @@ func ExtractLogModelInteractions(data []byte, receivedAt time.Time, fingerprint 
 			}
 		}
 	}
-	return records, nil
+	return correlateModelInteractions(records), nil
 }
 
 // logRecordModelInteraction builds one ModelInteraction from a log record,
@@ -104,7 +105,7 @@ func logRecordModelInteraction(resource map[string]any, record logRecord, receiv
 		Result:             "unknown",
 		ErrorCode:          nil,
 		Provenance:         interactionProvenance(modelObserved, inputTokens, outputTokens),
-		ProviderExtensions: logProviderExtensions(resource, fields, record.SeverityText),
+		ProviderExtensions: logProviderExtensions(resource, fields, record.SeverityText, id, started.value),
 	}
 	return interaction, true, nil
 }
@@ -208,11 +209,46 @@ func interactionProvenance(modelObserved bool, inputTokens, outputTokens *int64)
 	return canonical.ProvenanceUnknown
 }
 
+func correlateModelInteractions(records []canonical.ModelInteraction) []canonical.ModelInteraction {
+	ordered := append([]canonical.ModelInteraction(nil), records...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		return modelInteractionLess(ordered[i], ordered[j])
+	})
+	seen := make(map[string]struct{}, len(ordered))
+	correlated := make([]canonical.ModelInteraction, 0, len(ordered))
+	for _, record := range ordered {
+		if _, ok := seen[record.RequestID]; ok {
+			continue
+		}
+		seen[record.RequestID] = struct{}{}
+		correlated = append(correlated, record)
+	}
+	return correlated
+}
+
+func modelInteractionLess(left, right canonical.ModelInteraction) bool {
+	if !left.StartedAt.Equal(right.StartedAt) {
+		return left.StartedAt.Before(right.StartedAt)
+	}
+	if left.RequestID != right.RequestID {
+		return left.RequestID < right.RequestID
+	}
+	return left.CompletedAt.Before(right.CompletedAt)
+}
+
 // logProviderExtensions preserves the non-extracted evidence verbatim, mirroring
 // the Event path in normalizeLogRecord: full resource attributes, the log
 // attributes not already promoted onto the typed record, and the severity.
-func logProviderExtensions(resource, fields map[string]any, severity string) map[string]any {
+func logProviderExtensions(resource, fields map[string]any, severity, id string, startedAt time.Time) map[string]any {
 	return map[string]any{
+		"correlation": map[string]any{
+			"dedup_key":    id,
+			"ordering_key": fmt.Sprintf("%020d:%s", startedAt.UnixNano(), id),
+			"task_boundary": map[string]any{
+				"confidence": "unknown",
+				"reason":     "Codex log telemetry has no reviewed task-boundary signal",
+			},
+		},
 		"resource_attributes": resource,
 		"log_attributes":      unknownFields(fields, extractedLogFields...),
 		"severity":            severity,

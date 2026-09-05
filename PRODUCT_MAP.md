@@ -402,6 +402,7 @@ Do not add every tool merely to create a long toolchain. Each tool must have a d
 - IntegrationHealthEvent
 
 For local mode, Organisation and Workspace may use generated local identifiers.
+Correlation semantics for deduplication, ordering, parent relationships, and task-boundary confidence are defined in `docs/architecture/correlation.md`.
 
 ### 10.2 Canonical event envelope
 
