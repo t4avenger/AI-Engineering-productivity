@@ -2,6 +2,7 @@ version: "2"
 linters:
   enable:
     - cyclop
+    - gocognit
     - govet
     - ineffassign
     - staticcheck
@@ -10,3 +11,30 @@ linters:
     cyclop:
       max-complexity: 15
       package-average: 0.0
+    # gocognit mirrors SonarCloud's cognitive-complexity rule (S3776, threshold
+    # 15). cyclop measures cyclomatic complexity, which does not penalise
+    # nesting, so a deeply nested function can pass cyclop yet fail Sonar; this
+    # gate closes that gap locally and in CI.
+    gocognit:
+      min-complexity: 15
+  exclusions:
+    # Functions that predate the gocognit gate. SonarCloud grandfathers them
+    # under "Clean as You Code" (they are not new code), so the local gate does
+    # the same rather than forcing a refactor of security-critical paths here.
+    # Remove an entry when its function is brought under the threshold.
+    rules:
+      - path: internal/storage/sqlite/sqlite.go
+        linters: [gocognit]
+        text: "Open|SaveEvents"
+      - path: internal/privacy/sanitizer.go
+        linters: [gocognit]
+        text: "sanitizeMap"
+      - path: internal/fixture/validator.go
+        linters: [gocognit]
+        text: "func `scan`"
+      - path: internal/fixture/capability_matrix_test.go
+        linters: [gocognit]
+        text: "TestCapabilityMatrixClaimsReferenceCommittedFixtureEvidence"
+      - path: internal/normalize/codex/records.go
+        linters: [gocognit]
+        text: "ExtractLogModelInteractions"
