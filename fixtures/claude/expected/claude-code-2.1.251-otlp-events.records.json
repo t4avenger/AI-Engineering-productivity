@@ -1,0 +1,40 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "request_id": "claude-code:fixture",
+    "session_id": "claude-code:fixture",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "model": "claude-opus-4-8",
+    "started_at": "2026-08-31T13:37:04.714Z",
+    "completed_at": "2026-08-31T13:37:07.791Z",
+    "duration_ms": 3077,
+    "input_tokens": 2,
+    "output_tokens": 4,
+    "cached_input_tokens": 0,
+    "reasoning_tokens": null,
+    "result": "unknown",
+    "error_code": null,
+    "provenance": "observed",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:fixture",
+        "ordering_key": "01788183424714000000:claude-code:fixture",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "cache_creation_tokens": 6258,
+        "effort": "high",
+        "query_source": "sdk"
+      },
+      "skill_detection": "unavailable",
+      "timestamps": {
+        "completed_at": "observed",
+        "started_at": "derived_from_duration"
+      }
+    }
+  }
+]
