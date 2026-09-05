@@ -256,13 +256,23 @@ func sessionAvailability(session canonical.Session) map[string]string {
 	return map[string]string{
 		"provider":        observedIf(session.Provider != ""),
 		"tool":            observedIf(session.Tool != ""),
-		"outcome":         observedIf(session.State != "" && session.State != "unknown"),
+		"outcome":         outcomeAvailability(session.State),
 		"started_at":      observedIf(!session.StartedAt.IsZero()),
 		"completed_at":    observedIf(session.CompletedAt != nil),
 		"model":           modelAvailability(session),
 		"observed_events": observedIf(numericAttribute(session.Attributes, "event_count")),
 		"token_usage":     tokenUsageAvailability(session),
 	}
+}
+
+func outcomeAvailability(state string) string {
+	if state == "" {
+		return "unavailable"
+	}
+	if state == "unknown" {
+		return "unknown"
+	}
+	return "observed"
 }
 
 func observedIf(ok bool) string {

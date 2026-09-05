@@ -197,6 +197,35 @@ describe('App dashboard', () => {
     expect(screen.getByText('Token usage unavailable')).toBeInTheDocument();
   });
 
+  test('labels partial and legacy-missing availability by field', async () => {
+    mockAPI([
+      session,
+      {
+        ...session,
+        session_id: 'session-2',
+        tool: 'legacy-tool',
+        attributes: { event_count: 1 },
+        availability: undefined,
+      },
+    ]);
+    render(
+      <MantineProvider env="test">
+        <App />
+      </MantineProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
+    fireEvent.click(await screen.findByRole('button', { name: /codex/i }));
+    expect(
+      await screen.findByText('Token usage partially available'),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '← Sessions' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /legacy-tool/i }),
+    );
+    expect(await screen.findByText('Model unavailable')).toBeInTheDocument();
+  });
+
   test('shows the privacy defaults', async () => {
     mockAPI();
     render(

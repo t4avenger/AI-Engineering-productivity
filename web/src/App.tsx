@@ -899,10 +899,11 @@ function availabilityLabel(
   value: string | number | null,
   label: string,
 ): string {
-  const state = session.availability[field];
-  if (state === 'observed')
-    return value === null ? 'Unavailable' : String(value);
-  if (state === 'partial') return 'Partial';
+  const state = session.availability?.[field];
+  if (state === 'observed') {
+    return value === null ? label + ' unavailable' : String(value);
+  }
+  if (state === 'partial') return label + ' partially available';
   if (state === 'unsupported') return label + ' unsupported';
   if (state === 'unknown') return label + ' unknown';
   return label + ' unavailable';

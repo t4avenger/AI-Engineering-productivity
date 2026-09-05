@@ -57,6 +57,14 @@ func TestSessionAPIContract(t *testing.T) {
 	}
 }
 
+func TestSessionAPIReportsUnknownOutcomeAsUnknownAvailability(t *testing.T) {
+	session := canonical.Session{State: "unknown"}
+	availability := sessionAvailability(session)
+	if availability["outcome"] != "unknown" {
+		t.Fatalf("outcome availability = %q", availability["outcome"])
+	}
+}
+
 func TestSessionAPIReportsMixedProviderAvailability(t *testing.T) {
 	repo := sessionTestRepository(t)
 	claude := sessionTestEvent(t, "event-claude-unavailable", "session-claude-unavailable", "claude-code", "completed", "2026-01-02T12:00:00Z", "")
