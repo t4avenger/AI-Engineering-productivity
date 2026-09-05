@@ -14,6 +14,16 @@ const session = {
   completed_at: null,
   attributes: { event_count: 2 },
   provider_extensions: {},
+  availability: {
+    provider: 'observed',
+    tool: 'observed',
+    outcome: 'observed',
+    started_at: 'observed',
+    completed_at: 'unavailable',
+    model: 'observed',
+    observed_events: 'observed',
+    token_usage: 'partial',
+  },
 };
 const event = {
   event_id: 'event-1',

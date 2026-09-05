@@ -57,6 +57,43 @@ func TestSessionAPIContract(t *testing.T) {
 	}
 }
 
+func TestSessionAPIReportsMixedProviderAvailability(t *testing.T) {
+	repo := sessionTestRepository(t)
+	claude := sessionTestEvent(t, "event-claude-unavailable", "session-claude-unavailable", "claude-code", "completed", "2026-01-02T12:00:00Z", "")
+	claude.Provider = "anthropic"
+	claude.Attributes = map[string]any{"event_count": 1}
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{claude}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(NewHandler(slog.Default(), repo))
+	t.Cleanup(server.Close)
+
+	list := getSessionList(t, server.URL+"/api/v1/sessions?limit=10")
+	availabilityByID := map[string]map[string]string{}
+	for _, session := range list.Data {
+		availabilityByID[session.SessionID] = session.Availability
+	}
+	if availabilityByID["session-newest"]["model"] != "observed" || availabilityByID["session-newest"]["token_usage"] != "partial" {
+		t.Fatalf("codex availability = %#v", availabilityByID["session-newest"])
+	}
+	if availabilityByID["session-claude-unavailable"]["model"] != "unavailable" || availabilityByID["session-claude-unavailable"]["token_usage"] != "unavailable" {
+		t.Fatalf("claude availability = %#v", availabilityByID["session-claude-unavailable"])
+	}
+
+	response, err := http.Get(server.URL + "/api/v1/sessions/session-claude-unavailable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	var detail sessionDetailResponse
+	if err := json.NewDecoder(response.Body).Decode(&detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail.Data.Availability["model"] != "unavailable" || detail.Data.Availability["token_usage"] != "unavailable" {
+		t.Fatalf("detail availability = %#v", detail.Data.Availability)
+	}
+}
+
 func TestCostAPIProvidesSummaryAndSessionProvenance(t *testing.T) {
 	repo := sessionTestRepository(t)
 	server := httptest.NewServer(NewHandler(slog.Default(), repo))

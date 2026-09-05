@@ -7,6 +7,13 @@ export type SessionState =
   | 'abandoned'
   | 'unknown';
 
+export type AvailabilityState =
+  | 'observed'
+  | 'partial'
+  | 'unavailable'
+  | 'unsupported'
+  | 'unknown';
+
 export interface Session {
   schema_version: string;
   session_id: string;
@@ -17,6 +24,7 @@ export interface Session {
   completed_at: string | null;
   attributes: Record<string, unknown>;
   provider_extensions: Record<string, unknown>;
+  availability: Record<string, AvailabilityState>;
 }
 
 export interface TimelineEvent {

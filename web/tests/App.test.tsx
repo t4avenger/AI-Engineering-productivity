@@ -3,8 +3,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { App } from '../src/App';
+import type { Session } from '../src/sessions';
 
-const session = {
+const session: Session = {
   schema_version: '0.1.0',
   session_id: 'session-1',
   provider: 'openai',
@@ -14,6 +15,16 @@ const session = {
   completed_at: null,
   attributes: { event_count: 1 },
   provider_extensions: {},
+  availability: {
+    provider: 'observed',
+    tool: 'observed',
+    outcome: 'observed',
+    started_at: 'observed',
+    completed_at: 'unavailable',
+    model: 'unavailable',
+    observed_events: 'observed',
+    token_usage: 'partial',
+  },
 };
 
 function mockAPI(
@@ -71,7 +82,8 @@ function mockAPI(
             { status: 200 },
           ),
         );
-      if (url.includes('/sessions/session-1/events?'))
+      const sessionEventMatch = url.match(/\/sessions\/([^/?]+)\/events\?/);
+      if (sessionEventMatch)
         return Promise.resolve(
           new Response(
             JSON.stringify({
@@ -81,11 +93,16 @@ function mockAPI(
             { status: 200 },
           ),
         );
-      if (url.endsWith('/sessions/session-1') && options.detailFails)
+      const sessionDetail = sessions.find((candidate) =>
+        url.endsWith('/sessions/' + candidate.session_id),
+      );
+      if (sessionDetail && options.detailFails)
         return Promise.resolve(new Response(null, { status: 500 }));
-      if (url.endsWith('/sessions/session-1'))
+      if (sessionDetail)
         return Promise.resolve(
-          new Response(JSON.stringify({ data: session }), { status: 200 }),
+          new Response(JSON.stringify({ data: sessionDetail }), {
+            status: 200,
+          }),
         );
       return Promise.reject(new Error(`Unexpected request: ${url}`));
     }),
@@ -130,7 +147,8 @@ describe('App dashboard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
     fireEvent.click(await screen.findByRole('button', { name: /codex/i }));
     expect(await screen.findByText('Model')).toBeInTheDocument();
-    expect(screen.getAllByText('Unavailable').length).toBeGreaterThan(0);
+    expect(screen.getByText('Model unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Completed unavailable')).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole('button', { name: 'Delete this session' }),
     );
@@ -143,6 +161,40 @@ describe('App dashboard', () => {
         screen.getByRole('heading', { name: 'Sessions' }),
       ).toBeInTheDocument();
     });
+  });
+
+  test('renders mixed-provider availability states honestly', async () => {
+    mockAPI([
+      {
+        ...session,
+        attributes: { event_count: 1, model: 'gpt-5-codex' },
+        availability: { ...session.availability, model: 'observed' },
+      },
+      {
+        ...session,
+        session_id: 'session-2',
+        provider: 'anthropic',
+        tool: 'claude-code',
+        attributes: { event_count: 1 },
+        availability: {
+          ...session.availability,
+          model: 'unavailable',
+          token_usage: 'unavailable',
+        },
+      },
+    ]);
+    render(
+      <MantineProvider env="test">
+        <App />
+      </MantineProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
+    expect(await screen.findByText('gpt-5-codex')).toBeInTheDocument();
+    expect(screen.getByText('Model unavailable')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /claude-code/i }));
+    expect(await screen.findByText('Model unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Token usage unavailable')).toBeInTheDocument();
   });
 
   test('shows the privacy defaults', async () => {
