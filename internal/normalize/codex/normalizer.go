@@ -5,12 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/fixture"
+	"github.com/wayne/telemetryiq/internal/normalize"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
@@ -47,7 +46,7 @@ func Normalize(data []byte) ([]canonical.Event, error) {
 	if err != nil {
 		return nil, err
 	}
-	return correlateEvents(events), nil
+	return normalize.CorrelateEvents(events), nil
 }
 
 func normaliseResourceSpans(document fixtureDocument, capturedAt time.Time, resourceSpans []any) ([]canonical.Event, error) {
@@ -115,15 +114,15 @@ type fixtureDocument struct {
 }
 
 func normaliseSpan(document fixtureDocument, capturedAt time.Time, resource, scope, span map[string]any) (canonical.Event, error) {
-	traceID, err := requiredString(span, "traceId")
+	traceID, err := normalize.RequiredString(span, "traceId")
 	if err != nil {
 		return canonical.Event{}, err
 	}
-	spanID, err := requiredString(span, "spanId")
+	spanID, err := normalize.RequiredString(span, "spanId")
 	if err != nil {
 		return canonical.Event{}, err
 	}
-	name, err := requiredString(span, "name")
+	name, err := normalize.RequiredString(span, "name")
 	if err != nil {
 		return canonical.Event{}, err
 	}
@@ -131,7 +130,7 @@ func normaliseSpan(document fixtureDocument, capturedAt time.Time, resource, sco
 	if err != nil {
 		return canonical.Event{}, err
 	}
-	parentSpanID := optionalString(span, "parentSpanId")
+	parentSpanID := normalize.OptionalString(span, "parentSpanId")
 	eventID := "codex:" + traceID + ":" + spanID
 	return canonical.Event{
 		SchemaVersion: canonicalSchemaVersion, EventID: eventID, EventType: name,
@@ -141,41 +140,11 @@ func normaliseSpan(document fixtureDocument, capturedAt time.Time, resource, sco
 		Attributes: map[string]any{"unavailable_fields": []string{"model", "token_usage", "cache_usage", "tool_calls", "file_operations", "command_execution", "approvals", "prompt_content", "response_content", "repository_context", "task_outcome", "provider_cost"}},
 		ProviderExtensions: map[string]any{
 			"correlation": traceCorrelation(eventID, traceID, spanID, parentSpanID, occurredAt),
-			"resource":    unknownFields(resource, "scopeSpans"),
-			"scope":       unknownFields(scope, "spans"),
-			"span":        unknownFields(span, "traceId", "spanId", "parentSpanId", "name", "startTimeUnixNano"),
+			"resource":    normalize.UnknownFields(resource, "scopeSpans"),
+			"scope":       normalize.UnknownFields(scope, "spans"),
+			"span":        normalize.UnknownFields(span, "traceId", "spanId", "parentSpanId", "name", "startTimeUnixNano"),
 		},
 	}, nil
-}
-
-func correlateEvents(events []canonical.Event) []canonical.Event {
-	ordered := append([]canonical.Event(nil), events...)
-	sort.SliceStable(ordered, func(i, j int) bool {
-		return eventLess(ordered[i], ordered[j])
-	})
-	seen := make(map[string]struct{}, len(ordered))
-	correlated := make([]canonical.Event, 0, len(ordered))
-	for _, event := range ordered {
-		if _, ok := seen[event.EventID]; ok {
-			continue
-		}
-		seen[event.EventID] = struct{}{}
-		correlated = append(correlated, event)
-	}
-	return correlated
-}
-
-func eventLess(left, right canonical.Event) bool {
-	if !left.OccurredAt.Equal(right.OccurredAt) {
-		return left.OccurredAt.Before(right.OccurredAt)
-	}
-	if left.EventID != right.EventID {
-		return left.EventID < right.EventID
-	}
-	if left.EventType != right.EventType {
-		return left.EventType < right.EventType
-	}
-	return left.ReceivedAt.Before(right.ReceivedAt)
 }
 
 func traceCorrelation(eventID, traceID, spanID string, parentSpanID *string, occurredAt time.Time) map[string]any {
@@ -196,28 +165,8 @@ func traceCorrelation(eventID, traceID, spanID string, parentSpanID *string, occ
 	}
 }
 
-func requiredString(value map[string]any, key string) (string, error) {
-	stringValue, ok := value[key].(string)
-	if !ok || strings.TrimSpace(stringValue) == "" {
-		return "", fmt.Errorf("%s must be a non-empty string", key)
-	}
-	return stringValue, nil
-}
-
-func optionalString(value map[string]any, key string) *string {
-	stringValue, ok := value[key].(string)
-	if !ok {
-		return nil
-	}
-	stringValue = strings.TrimSpace(stringValue)
-	if stringValue == "" {
-		return nil
-	}
-	return &stringValue
-}
-
 func unixNanoTime(value map[string]any, key string) (time.Time, error) {
-	raw, err := requiredString(value, key)
+	raw, err := normalize.RequiredString(value, key)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -226,18 +175,4 @@ func unixNanoTime(value map[string]any, key string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("%s must be a positive Unix-nanoseconds string", key)
 	}
 	return time.Unix(0, nanoseconds).UTC(), nil
-}
-
-func unknownFields(value map[string]any, knownKeys ...string) map[string]any {
-	known := make(map[string]struct{}, len(knownKeys))
-	for _, key := range knownKeys {
-		known[key] = struct{}{}
-	}
-	unknown := make(map[string]any)
-	for key, fieldValue := range value {
-		if _, found := known[key]; !found {
-			unknown[key] = fieldValue
-		}
-	}
-	return unknown
 }

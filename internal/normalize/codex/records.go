@@ -3,12 +3,10 @@ package codex
 import (
 	"encoding/json"
 	"fmt"
-	"math"
-	"sort"
 	"strconv"
-	"strings"
 	"time"
 
+	"github.com/wayne/telemetryiq/internal/normalize"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
@@ -65,7 +63,7 @@ func ExtractLogModelInteractions(data []byte, receivedAt time.Time, fingerprint 
 			}
 		}
 	}
-	return correlateModelInteractions(records), nil
+	return normalize.CorrelateModelInteractions(records), nil
 }
 
 // logRecordModelInteraction builds one ModelInteraction from a log record,
@@ -81,9 +79,9 @@ func logRecordModelInteraction(resource map[string]any, record logRecord, receiv
 	}
 	id := "codex-log:" + fingerprint(recordData)
 
-	model, modelObserved := observedString(fields["model"])
-	inputTokens := optionalTokenCount(fields["input_token_count"])
-	outputTokens := optionalTokenCount(fields["output_token_count"])
+	model, modelObserved := normalize.ObservedString(fields["model"])
+	inputTokens := normalize.OptionalTokenCount(fields["input_token_count"])
+	outputTokens := normalize.OptionalTokenCount(fields["output_token_count"])
 
 	started := tolerantNano(record.TimeUnixNano, receivedAt)
 	completed := tolerantNano(record.ObservedTimeUnixNano, receivedAt)
@@ -104,7 +102,7 @@ func logRecordModelInteraction(resource map[string]any, record logRecord, receiv
 		ReasoningTokens:    nil,
 		Result:             "unknown",
 		ErrorCode:          nil,
-		Provenance:         interactionProvenance(modelObserved, inputTokens, outputTokens),
+		Provenance:         normalize.InteractionProvenance(modelObserved, inputTokens, outputTokens),
 		ProviderExtensions: logProviderExtensions(resource, fields, record.SeverityText, id, started.value),
 	}
 	return interaction, true, nil
@@ -119,53 +117,10 @@ func isModelInteraction(fields map[string]any) bool {
 	if _, ok := modelInteractionEvents[name]; !ok {
 		return false
 	}
-	if _, ok := observedString(fields["model"]); ok {
+	if _, ok := normalize.ObservedString(fields["model"]); ok {
 		return true
 	}
 	return fields["input_token_count"] != nil || fields["output_token_count"] != nil
-}
-
-// observedString returns the trimmed string value and whether a non-empty
-// value was actually observed. Absent, non-string, or whitespace-only values
-// yield ("unknown", false) so a blank model is never mistaken for a real one.
-func observedString(value any) (string, bool) {
-	text, ok := value.(string)
-	if !ok {
-		return "unknown", false
-	}
-	text = strings.TrimSpace(text)
-	if text == "" {
-		return "unknown", false
-	}
-	return text, true
-}
-
-// optionalTokenCount parses an OTLP token attribute into a *int64. OTLP JSON
-// encodes intValue as a string and doubleValue as a JSON number (float64). An
-// absent, unparseable, negative, non-integral, or out-of-range value yields nil
-// — never a fabricated or silently truncated count — so a genuine absence stays
-// distinguishable from a real 0.
-func optionalTokenCount(value any) *int64 {
-	var count int64
-	switch typed := value.(type) {
-	case string:
-		parsed, err := strconv.ParseInt(typed, 10, 64)
-		if err != nil {
-			return nil
-		}
-		count = parsed
-	case float64:
-		if math.Trunc(typed) != typed || typed < math.MinInt64 || typed >= math.MaxInt64 {
-			return nil
-		}
-		count = int64(typed)
-	default:
-		return nil
-	}
-	if count < 0 {
-		return nil
-	}
-	return &count
 }
 
 // nanoTimestamp carries a parsed timestamp and whether it was observed from the
@@ -200,42 +155,6 @@ func durationMs(started, completed nanoTimestamp) *int64 {
 	return &ms
 }
 
-// interactionProvenance is observed when the model and at least one token count
-// were directly observed; otherwise the record is explicitly unknown.
-func interactionProvenance(modelObserved bool, inputTokens, outputTokens *int64) canonical.Provenance {
-	if modelObserved && (inputTokens != nil || outputTokens != nil) {
-		return canonical.ProvenanceObserved
-	}
-	return canonical.ProvenanceUnknown
-}
-
-func correlateModelInteractions(records []canonical.ModelInteraction) []canonical.ModelInteraction {
-	ordered := append([]canonical.ModelInteraction(nil), records...)
-	sort.SliceStable(ordered, func(i, j int) bool {
-		return modelInteractionLess(ordered[i], ordered[j])
-	})
-	seen := make(map[string]struct{}, len(ordered))
-	correlated := make([]canonical.ModelInteraction, 0, len(ordered))
-	for _, record := range ordered {
-		if _, ok := seen[record.RequestID]; ok {
-			continue
-		}
-		seen[record.RequestID] = struct{}{}
-		correlated = append(correlated, record)
-	}
-	return correlated
-}
-
-func modelInteractionLess(left, right canonical.ModelInteraction) bool {
-	if !left.StartedAt.Equal(right.StartedAt) {
-		return left.StartedAt.Before(right.StartedAt)
-	}
-	if left.RequestID != right.RequestID {
-		return left.RequestID < right.RequestID
-	}
-	return left.CompletedAt.Before(right.CompletedAt)
-}
-
 // logProviderExtensions preserves the non-extracted evidence verbatim, mirroring
 // the Event path in normalizeLogRecord: full resource attributes, the log
 // attributes not already promoted onto the typed record, and the severity.
@@ -250,7 +169,7 @@ func logProviderExtensions(resource, fields map[string]any, severity, id string,
 			},
 		},
 		"resource_attributes": resource,
-		"log_attributes":      unknownFields(fields, extractedLogFields...),
+		"log_attributes":      normalize.UnknownFields(fields, extractedLogFields...),
 		"severity":            severity,
 	}
 }

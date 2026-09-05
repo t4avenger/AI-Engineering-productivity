@@ -14,12 +14,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/fixture"
+	"github.com/wayne/telemetryiq/internal/normalize"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
@@ -66,15 +65,15 @@ func NormalizeEvents(data []byte, fingerprint func([]byte) string) ([]canonical.
 		}
 		events = append(events, event)
 	}
-	return correlateEvents(events), nil
+	return normalize.CorrelateEvents(events), nil
 }
 
 func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, fingerprint func([]byte) string, index int, raw map[string]any) (canonical.Event, error) {
-	name, err := requiredString(raw, "event_name")
+	name, err := normalize.RequiredString(raw, "event_name")
 	if err != nil {
 		return canonical.Event{}, err
 	}
-	sessionID, err := requiredString(raw, "session_id")
+	sessionID, err := normalize.RequiredString(raw, "session_id")
 	if err != nil {
 		return canonical.Event{}, err
 	}
@@ -88,9 +87,9 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, finger
 	extensions := map[string]any{
 		"correlation":     eventCorrelation(eventID, occurredAt),
 		"skill_detection": unavailable,
-		"event":           unknownFields(raw, "event_name", "event_timestamp", "event_sequence", "session_id", "request_id"),
+		"event":           normalize.UnknownFields(raw, "event_name", "event_timestamp", "event_sequence", "session_id", "request_id"),
 	}
-	if requestID := optionalString(raw, "request_id"); requestID != nil {
+	if requestID := normalize.OptionalString(raw, "request_id"); requestID != nil {
 		extensions["request_fingerprint"] = "claude-code:" + fingerprint([]byte(*requestID))
 	}
 	return canonical.Event{
@@ -125,31 +124,6 @@ func eventCorrelation(eventID string, occurredAt time.Time) map[string]any {
 			"reason":     "Claude Code event telemetry has no reviewed task-boundary signal",
 		},
 	}
-}
-
-func correlateEvents(events []canonical.Event) []canonical.Event {
-	ordered := append([]canonical.Event(nil), events...)
-	sort.SliceStable(ordered, func(i, j int) bool { return eventLess(ordered[i], ordered[j]) })
-	seen := make(map[string]struct{}, len(ordered))
-	correlated := make([]canonical.Event, 0, len(ordered))
-	for _, event := range ordered {
-		if _, ok := seen[event.EventID]; ok {
-			continue
-		}
-		seen[event.EventID] = struct{}{}
-		correlated = append(correlated, event)
-	}
-	return correlated
-}
-
-func eventLess(left, right canonical.Event) bool {
-	if !left.OccurredAt.Equal(right.OccurredAt) {
-		return left.OccurredAt.Before(right.OccurredAt)
-	}
-	if left.EventID != right.EventID {
-		return left.EventID < right.EventID
-	}
-	return left.EventType < right.EventType
 }
 
 // fixtureDocument is the reviewed Claude Code fixture wrapper. Sample events are
@@ -188,31 +162,11 @@ func decodeDocument(data []byte) (fixtureDocument, time.Time, error) {
 	return document, capturedAt.UTC(), nil
 }
 
-func requiredString(value map[string]any, key string) (string, error) {
-	stringValue, ok := value[key].(string)
-	if !ok || strings.TrimSpace(stringValue) == "" {
-		return "", fmt.Errorf("%s must be a non-empty string", key)
-	}
-	return stringValue, nil
-}
-
-func optionalString(value map[string]any, key string) *string {
-	stringValue, ok := value[key].(string)
-	if !ok {
-		return nil
-	}
-	stringValue = strings.TrimSpace(stringValue)
-	if stringValue == "" {
-		return nil
-	}
-	return &stringValue
-}
-
 // eventTime parses an RFC3339 event timestamp (fractional seconds allowed). A
 // missing or invalid timestamp is rejected rather than defaulted, so a
 // canonical event never carries a fabricated time.
 func eventTime(value map[string]any, key string) (time.Time, error) {
-	raw, err := requiredString(value, key)
+	raw, err := normalize.RequiredString(value, key)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -231,18 +185,4 @@ func sequenceKey(value map[string]any, index int) string {
 		return strconv.FormatInt(int64(number), 10)
 	}
 	return "idx" + strconv.Itoa(index)
-}
-
-func unknownFields(value map[string]any, knownKeys ...string) map[string]any {
-	known := make(map[string]struct{}, len(knownKeys))
-	for _, key := range knownKeys {
-		known[key] = struct{}{}
-	}
-	unknown := make(map[string]any)
-	for key, fieldValue := range value {
-		if _, found := known[key]; !found {
-			unknown[key] = fieldValue
-		}
-	}
-	return unknown
 }
