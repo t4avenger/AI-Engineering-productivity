@@ -17,4 +17,6 @@ The result includes field-level provenance (`path`, `action`, and `reason`) but 
 
 ## Current boundary
 
-The Task 004 receiver intentionally does not retain raw payloads. Task 007 normalisation and Task 008 persistence must call this pipeline before any record is stored or exported. Tests serialize pipeline output and assert synthetic prohibited values do not cross that boundary.
+Every supported ingestion path decodes raw provider payloads into a generic map and runs this pipeline before normalisation, storage, diagnostics, or logging. The persistent Codex OTLP log path normalises only the sanitised payload; SQLite applies the same sanitizer again before committing canonical events as a defense-in-depth storage boundary.
+
+Canary tests seed synthetic secrets into OTLP resource attributes, log attributes, log bodies, command/tool argument fields, and provider-extension-like metadata. They then scan derived sessions, event timelines, stored provenance, and the development inspector response to assert prohibited values do not cross either the persistence or diagnostics boundary.

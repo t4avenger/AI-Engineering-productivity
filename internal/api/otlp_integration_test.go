@@ -71,7 +71,7 @@ func TestCodexLogsPersistAsSanitizedCanonicalSession(t *testing.T) {
 	t.Cleanup(func() { _ = repository.Close() })
 	server := httptest.NewServer(NewPersistentHandler(slog.Default(), sanitizer, repository))
 	t.Cleanup(server.Close)
-	payload := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_cli_rs"}},{"key":"service.version","value":{"stringValue":"0.145.0"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"synthetic-model"}},{"key":"arguments","value":{"stringValue":"synthetic raw arguments"}},{"key":"output","value":{"stringValue":"synthetic raw output"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"conversation.id","value":{"stringValue":"synthetic-conversation"}}],"body":{"stringValue":"synthetic body"}}]}]}]}`)
+	payload := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_cli_rs"}},{"key":"service.version","value":{"stringValue":"0.145.0"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"synthetic-model"}},{"key":"arguments","value":{"stringValue":"--token=tiq-canary-argument-token"}},{"key":"output","value":{"stringValue":"tiq-canary-output"}},{"key":"custom_metadata","value":{"stringValue":"token=tiq-canary-provider-extension"}},{"key":"api_key","value":{"stringValue":"tiq-canary-api-key"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"conversation.id","value":{"stringValue":"synthetic-conversation"}}],"body":{"stringValue":"synthetic body"}}]}]}]}`)
 	response := postOTLPToPath(t, server.URL, "/v1/logs", payload, "application/json")
 	if response.StatusCode != http.StatusAccepted {
 		t.Fatalf("status = %d", response.StatusCode)
@@ -85,9 +85,25 @@ func TestCodexLogsPersistAsSanitizedCanonicalSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(data), "synthetic@example.test") || strings.Contains(string(data), "synthetic-conversation") || strings.Contains(string(data), "synthetic body") {
-		t.Fatalf("privacy leak: %s", data)
+	assertNoCanaryLeak(t, data)
+	events, err := repository.ListEvents(context.Background(), storage.EventFilter{SessionID: sessions[0].SessionID, Limit: 10})
+	if err != nil || len(events) != 1 {
+		t.Fatalf("events = %#v, %v", events, err)
 	}
+	eventData, err := json.Marshal(events[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNoCanaryLeak(t, eventData)
+	provenance, found, err := repository.EventProvenance(context.Background(), events[0].EventID)
+	if err != nil || !found {
+		t.Fatalf("provenance found = %v, err = %v", found, err)
+	}
+	provenanceData, err := json.Marshal(provenance)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNoCanaryLeak(t, provenanceData)
 }
 
 func TestObservedSanitisedFixtureReplaysToLogsReceiver(t *testing.T) {
@@ -138,6 +154,23 @@ func TestDevelopmentInspectorSanitizesOTLPAttributes(t *testing.T) {
 	}
 	if strings.Contains(string(serialized), "synthetic@example.test") || strings.Contains(string(serialized), "synthetic body") {
 		t.Fatalf("development inspector leaked sensitive content: %s", serialized)
+	}
+}
+
+func assertNoCanaryLeak(t *testing.T, data []byte) {
+	t.Helper()
+	for _, prohibited := range []string{
+		"tiq-canary-argument-token",
+		"tiq-canary-output",
+		"tiq-canary-provider-extension",
+		"tiq-canary-api-key",
+		"synthetic.test",
+		"synthetic-conversation",
+		"synthetic body",
+	} {
+		if strings.Contains(string(data), prohibited) {
+			t.Fatalf("privacy leak %q in %s", prohibited, data)
+		}
 	}
 }
 

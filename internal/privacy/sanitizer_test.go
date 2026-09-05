@@ -49,6 +49,28 @@ func TestSanitizeRemovesSensitiveContentBeforeStorageBoundary(t *testing.T) {
 	}
 }
 
+func TestSanitizeSecretLikeScalarHasOnlyRedactedProvenance(t *testing.T) {
+	result := testSanitizer(t, 1).Sanitize(map[string]any{
+		"provider_extensions": map[string]any{
+			"metadata": "SK-synthetic-secret",
+		},
+	})
+
+	extension, ok := result.Value["provider_extensions"].(map[string]any)
+	if !ok {
+		t.Fatalf("provider_extensions = %#v", result.Value["provider_extensions"])
+	}
+	if got := extension["metadata"]; got != redactedValue {
+		t.Fatalf("expected redacted metadata, got %#v", got)
+	}
+	if hasProvenance(result.Provenance, "provider_extensions.metadata", ActionRetained) {
+		t.Fatalf("secret-like scalar must not have retained provenance at same path: %#v", result.Provenance)
+	}
+	if !hasProvenance(result.Provenance, "provider_extensions.metadata", ActionRedacted) {
+		t.Fatalf("expected redacted provenance, got %#v", result.Provenance)
+	}
+}
+
 func TestSanitizeRemovesSensitiveOTLPAttributeValues(t *testing.T) {
 	result := testSanitizer(t, 1).Sanitize(map[string]any{
 		"resourceLogs": []any{map[string]any{"attributes": []any{
