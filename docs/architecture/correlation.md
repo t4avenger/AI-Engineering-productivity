@@ -12,7 +12,7 @@ codex:<traceId>:<spanId>
 
 The same value is used as the canonical `event_id` and is copied to `provider_extensions.correlation.dedup_key` so downstream storage, diagnostics, and tests can explain why a duplicate collapsed. Replaying a fixture twice must not create a second observation. If two source spans present the same trace/span identity, the normaliser sorts first and keeps one deterministic canonical event for that key.
 
-Codex OTLP log records observed in 0.145.0 do not expose a reviewed stable trace or session identifier. Log-derived records therefore continue to use the local installation fingerprint described by the Codex normaliser; no raw conversation identifier is retained.
+Codex OTLP log records observed in 0.145.0 do not expose a reviewed stable trace or session identifier. Log-derived `canonical.ModelInteraction` records therefore continue to use the local installation fingerprint described by the Codex normaliser; no raw conversation identifier is retained. Their deduplication key is the `request_id`, which is copied to `provider_extensions.correlation.dedup_key`.
 
 ## Ordering
 
@@ -29,7 +29,19 @@ Codex trace events also expose `provider_extensions.correlation.ordering_key` as
 <zero-padded occurred_at unix nanoseconds>:<event_id>
 ```
 
-This makes shuffled fixture replay byte-identical after JSON serialisation and gives storage a stable tie-breaker that does not depend on intake order.
+Codex log-derived `canonical.ModelInteraction` records are sorted by:
+
+1. observed start time, ascending
+2. request ID, ascending
+3. observed completion time, ascending
+
+Their `provider_extensions.correlation.ordering_key` uses the same zero-padded timestamp form with `started_at` and `request_id`:
+
+```text
+<zero-padded started_at unix nanoseconds>:<request_id>
+```
+
+These rules make shuffled fixture replay byte-identical after JSON serialisation and give storage a stable tie-breaker that does not depend on intake order.
 
 ## Trace and span relationships
 
@@ -43,7 +55,7 @@ For Codex OTLP traces, source trace relationships are retained in `provider_exte
 
 ## Task boundaries
 
-The current reviewed Codex trace fixture does not expose a privacy-safe task-boundary signal. The canonical `task_id` therefore remains `null`, and each trace event carries:
+The current reviewed Codex trace and log fixtures do not expose a privacy-safe task-boundary signal. The canonical trace `task_id` therefore remains `null`, and each trace event carries:
 
 ```json
 {
@@ -53,6 +65,8 @@ The current reviewed Codex trace fixture does not expose a privacy-safe task-bou
   }
 }
 ```
+
+Log-derived model-interaction records carry the same `confidence: "unknown"` marker with a log-specific reason under `provider_extensions.correlation.task_boundary`.
 
 Adapters must not infer a task boundary from timing, ordering, model name, or content. A future provider-specific task signal can only become a canonical task ID after fixture evidence and a privacy review.
 

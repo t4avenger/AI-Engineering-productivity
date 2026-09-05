@@ -64,7 +64,8 @@ Codex log shape into stable-primitive `canonical.ModelInteraction` records
   because `conversation.id` is stripped by the privacy pipeline.
 - **Correlation evidence** records the dedup key, ordering key, and explicit
   unknown task-boundary confidence under `provider_extensions.correlation`; log
-  records are sorted and deduplicated by request ID before being returned.
+  records are sorted by `started_at`, `request_id`, and `completed_at`, then
+  deduplicated by `request_id` before being returned.
 
 A record is emitted only when the log `event.name` is a whitelisted
 model-interaction event (`codex.sse_event`) and it carries at least a model or a
