@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/wayne/telemetryiq/internal/governance"
 	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
@@ -29,6 +30,10 @@ type modelPerformanceResponse struct {
 
 type contextWasteResponse struct {
 	Data insights.ContextWaste `json:"data"`
+}
+
+type riskyAccessResponse struct {
+	Data governance.RiskyAccess `json:"data"`
 }
 
 func (a sessionAPI) mcpInventory(w http.ResponseWriter, r *http.Request) {
@@ -61,6 +66,14 @@ func (a sessionAPI) contextWaste(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSessionJSON(w, http.StatusOK, contextWasteResponse{Data: insights.ContextWasteFromEvents(events, a.thresholds.ContextWaste)})
+}
+
+func (a sessionAPI) riskyAccess(w http.ResponseWriter, r *http.Request) {
+	events, ok := a.loadInsightEvents(w, r)
+	if !ok {
+		return
+	}
+	writeSessionJSON(w, http.StatusOK, riskyAccessResponse{Data: governance.RiskyAccessFromEvents(events)})
 }
 
 // loadInsightEvents returns retained events for an insight handler, or writes

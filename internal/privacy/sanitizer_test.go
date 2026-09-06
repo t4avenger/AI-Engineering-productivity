@@ -146,6 +146,133 @@ func TestClassifiedPathsAreNotDictionaryReversible(t *testing.T) {
 	}
 }
 
+func TestClassifyPathAllowlistsEnvTemplates(t *testing.T) {
+	// Committed dotenv templates carry no secrets and must not classify as the
+	// dotenv secret class, so risky-access detection can allowlist them.
+	for _, template := range []string{".env.example", ".env.sample", ".env.template", ".env.dist"} {
+		class, _ := ClassifyPath(template)
+		if class == PathDotenv {
+			t.Fatalf("template %q must not classify as dotenv secret", template)
+		}
+	}
+	// Real dotenv files stay classified as secrets, including compound suffixes
+	// that merely end in an allowlisted word.
+	for _, secret := range []string{".env", ".env.production", ".env.local", ".env.local.example"} {
+		if class, _ := ClassifyPath(secret); class != PathDotenv {
+			t.Fatalf("secret %q must classify as dotenv, got %q", secret, class)
+		}
+	}
+}
+
+func TestParseTokenRejectsCraftedPayloads(t *testing.T) {
+	// A crafted attribute that only mimics the token grammar must not be trusted
+	// as an already-sanitised token, or its raw payload would survive the
+	// idempotency fast-path across the privacy boundary.
+	craftedPaths := []string{
+		"path-class:/home/dev/app/.env;boundary:project",
+		"path-class:dotenv;boundary:/etc/shadow",
+		"path-class:secret;boundary:project",
+	}
+	for _, token := range craftedPaths {
+		if _, _, ok := ParsePathToken(token); ok {
+			t.Fatalf("crafted path token %q must be rejected", token)
+		}
+		// Re-classification must strip the raw payload rather than echo it back.
+		if class, _ := ClassifyPath(token); strings.Contains(string(PathToken(class, BoundaryProject)), ".env;") {
+			t.Fatalf("crafted path token %q leaked raw payload after re-classification", token)
+		}
+	}
+	craftedCommands := []string{
+		"command-access:cat /home/dev/.env;boundary:project",
+		"command-access:credential_access;boundary:rm -rf /",
+	}
+	for _, token := range craftedCommands {
+		if _, _, ok := ParseCommandAccessToken(token); ok {
+			t.Fatalf("crafted command token %q must be rejected", token)
+		}
+	}
+	// Genuine tokens still round-trip.
+	if _, _, ok := ParsePathToken(PathToken(PathDotenv, BoundaryIndeterminate)); !ok {
+		t.Fatal("genuine path token must parse")
+	}
+	if _, _, ok := ParseCommandAccessToken(CommandAccessToken(CommandAccessCredential, BoundaryProject)); !ok {
+		t.Fatal("genuine command token must parse")
+	}
+}
+
+func TestClassifyCommandAccessDetectsCredentialReads(t *testing.T) {
+	credential := []string{
+		"cat .env",
+		"grep API_KEY .env.production",
+		`python -c "print(open('.env').read())"`,
+		"cp ~/.aws/credentials /tmp/x",
+		"base64 ~/.ssh/id_rsa",
+	}
+	for _, command := range credential {
+		if class, _ := ClassifyCommandAccess(command); class != CommandAccessCredential {
+			t.Fatalf("command %q must flag credential access, got %q", command, class)
+		}
+	}
+	benign := []string{
+		"",
+		"go test ./...",
+		"cat README.md",
+		"cat .env.example", // allowlisted template
+		"git status",
+	}
+	for _, command := range benign {
+		if class, _ := ClassifyCommandAccess(command); class != CommandAccessNone {
+			t.Fatalf("command %q must not flag credential access, got %q", command, class)
+		}
+	}
+}
+
+func TestSanitizeClassifiesCommandWithoutRetainingRawArguments(t *testing.T) {
+	result := testSanitizer(t, 1).Sanitize(map[string]any{
+		"command": "cat .env --password synthetic-command-secret",
+	})
+	persisted, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshal sanitized result: %v", err)
+	}
+	for _, prohibited := range []string{"synthetic-command-secret", "--password", "cat .env"} {
+		if strings.Contains(string(persisted), prohibited) {
+			t.Fatalf("raw command fragment %q reached storage boundary", prohibited)
+		}
+	}
+	if got, _ := result.Value["command"].(string); got != "command-access:credential_access;boundary:project" {
+		t.Fatalf("expected classified command token, got %#v", result.Value["command"])
+	}
+	if !hasProvenance(result.Provenance, "command", ActionCommandClassified) {
+		t.Fatalf("expected command-classified provenance, got %#v", result.Provenance)
+	}
+}
+
+func TestSanitizeIsIdempotentOnClassifiedTokens(t *testing.T) {
+	// The pipeline sanitises at ingest and again at storage. A second pass over
+	// an already-classified path or command token must preserve its class and
+	// boundary, or governance detection that depends on the class would break.
+	sanitizer := testSanitizer(t, 1)
+	first := sanitizer.Sanitize(map[string]any{
+		"file_path": "/home/dev/app/.env",
+		"command":   "cat /home/dev/app/.env",
+	})
+	second := sanitizer.Sanitize(first.Value)
+
+	if got := second.Value["file_path"]; got != first.Value["file_path"] {
+		t.Fatalf("path token not idempotent: first %#v second %#v", first.Value["file_path"], got)
+	}
+	if got := second.Value["command"]; got != first.Value["command"] {
+		t.Fatalf("command token not idempotent: first %#v second %#v", first.Value["command"], got)
+	}
+	if got, _ := second.Value["file_path"].(string); got != "path-class:dotenv;boundary:indeterminate" {
+		t.Fatalf("expected preserved dotenv path token, got %#v", second.Value["file_path"])
+	}
+	if got, _ := second.Value["command"].(string); got != "command-access:credential_access;boundary:indeterminate" {
+		t.Fatalf("expected preserved credential command token, got %#v", second.Value["command"])
+	}
+}
+
 func TestFingerprintScopedIsDomainSeparatedStableAndInstallationSpecific(t *testing.T) {
 	first := testSanitizer(t, 1)
 	second := testSanitizer(t, 2)

@@ -25,11 +25,12 @@ const (
 type Action string
 
 const (
-	ActionRetained   Action = "retained"
-	ActionRemoved    Action = "removed"
-	ActionHashed     Action = "hashed"
-	ActionRedacted   Action = "redacted"
-	ActionClassified Action = "classified"
+	ActionRetained          Action = "retained"
+	ActionRemoved           Action = "removed"
+	ActionHashed            Action = "hashed"
+	ActionRedacted          Action = "redacted"
+	ActionClassified        Action = "classified"
+	ActionCommandClassified Action = "command_classified"
 )
 
 // Provenance provides the reason a field was retained or transformed without
@@ -113,6 +114,32 @@ var certExtensions = map[string]struct{}{
 	".pem": {}, ".crt": {}, ".cer": {}, ".der": {}, ".p12": {}, ".pfx": {},
 }
 
+// envTemplateSuffixes name the conventional non-secret dotenv template files.
+// A .env.example (or .sample/.template/.dist) is committed documentation of the
+// variables an app expects, never real credentials, so it is deliberately
+// excluded from the dotenv secret class and from risky-access detection.
+var envTemplateSuffixes = map[string]struct{}{
+	"example": {}, "sample": {}, "template": {}, "dist": {},
+}
+
+// isDotenvSecret reports whether a base file name is a real dotenv secret file
+// (.env or a .env.<environment> variant) rather than a committed template. Only
+// the exact allowlisted template suffixes are excused; anything else (including
+// compound suffixes like .env.local.example) stays classified as a secret so the
+// allowlist can never be used to smuggle a real .env past detection.
+func isDotenvSecret(base string) bool {
+	if base == ".env" {
+		return true
+	}
+	const prefix = ".env."
+	if !strings.HasPrefix(base, prefix) {
+		return false
+	}
+	suffix := base[len(prefix):]
+	_, allowlisted := envTemplateSuffixes[suffix]
+	return !allowlisted
+}
+
 // ClassifyPath maps a raw path to a coarse class and project boundary without
 // returning or persisting the raw path. Classification is OS-independent and
 // case-insensitive: both separators are normalised and Windows drive-letter and
@@ -121,6 +148,12 @@ var certExtensions = map[string]struct{}{
 // cannot be determined it returns indeterminate rather than a fabricated answer.
 func ClassifyPath(raw string) (PathClass, PathBoundary) {
 	cleaned := strings.TrimSpace(raw)
+	// Idempotency: the sanitiser runs twice (once at ingest, once at storage as
+	// defence in depth). A value that is already a path token must survive the
+	// second pass unchanged, or its class/boundary would be corrupted.
+	if class, boundary, ok := ParsePathToken(cleaned); ok {
+		return class, boundary
+	}
 	if cleaned == "" {
 		// An empty or whitespace-only path carries no location or category
 		// signal; classifying it as project-relative would fabricate one.
@@ -147,7 +180,7 @@ func ClassifyPath(raw string) (PathClass, PathBoundary) {
 		return PathCert, boundary
 	case isCredentialsName(base) || hasSegment(segments, ".aws"):
 		return PathCredentialsFile, boundary
-	case base == ".env" || strings.HasPrefix(base, ".env."):
+	case isDotenvSecret(base):
 		return PathDotenv, boundary
 	case boundary == BoundaryProject:
 		return PathProjectRelative, boundary
@@ -160,6 +193,139 @@ func ClassifyPath(raw string) (PathClass, PathBoundary) {
 // that is safe to persist in place of a raw path.
 func PathToken(class PathClass, boundary PathBoundary) string {
 	return fmt.Sprintf("path-class:%s;boundary:%s", class, boundary)
+}
+
+// CommandAccessClass is a coarse category for a shell command, derived without
+// retaining the raw arguments (PRODUCT_MAP.md §14.5). Only the credential-access
+// category is detected here; everything else is CommandAccessNone.
+type CommandAccessClass string
+
+const (
+	CommandAccessCredential CommandAccessClass = "credential_access"
+	CommandAccessNone       CommandAccessClass = "none"
+)
+
+// commandSplit separates a raw command line into candidate tokens. It splits on
+// whitespace and the shell/interpreter metacharacters that commonly wrap a file
+// path (quotes, parentheses, redirections, pipes, separators, and the `=` and
+// `,` used by interpreter one-liners such as python -c "open('.env')"), so a
+// path embedded in a quoted argument is still surfaced for classification.
+func commandSplit(raw string) []string {
+	return strings.FieldsFunc(raw, func(r rune) bool {
+		switch r {
+		case ' ', '\t', '\n', '\r', '"', '\'', '(', ')', '[', ']', '{', '}',
+			'<', '>', '|', '&', ';', ',', '=', '`':
+			return true
+		}
+		return false
+	})
+}
+
+// ClassifyCommandAccess categorises a raw command line for credential/secret
+// file access without returning or persisting any part of the command. It reuses
+// ClassifyPath over each candidate token, so the .env.example allowlist and the
+// sensitive-path classes are honoured identically to filesystem-read detection.
+// When a secret-file token is present it returns CommandAccessCredential with the
+// matched token's boundary; otherwise CommandAccessNone. An empty command yields
+// (none, indeterminate) so absent visibility is never reported as a clean read.
+func ClassifyCommandAccess(raw string) (CommandAccessClass, PathBoundary) {
+	cleaned := strings.TrimSpace(raw)
+	// Idempotency: a value that is already a command-access token must survive the
+	// storage-time re-sanitisation pass unchanged (see ClassifyPath).
+	if class, boundary, ok := ParseCommandAccessToken(cleaned); ok {
+		return class, boundary
+	}
+	if cleaned == "" {
+		return CommandAccessNone, BoundaryIndeterminate
+	}
+	for _, token := range commandSplit(raw) {
+		class, boundary := ClassifyPath(token)
+		switch class {
+		case PathDotenv, PathSSHKey, PathCert, PathCredentialsFile:
+			return CommandAccessCredential, boundary
+		}
+	}
+	return CommandAccessNone, BoundaryIndeterminate
+}
+
+// CommandAccessToken renders a command-access class + boundary as the compact,
+// non-reversible string that is safe to persist in place of a raw command.
+func CommandAccessToken(class CommandAccessClass, boundary PathBoundary) string {
+	return fmt.Sprintf("command-access:%s;boundary:%s", class, boundary)
+}
+
+// knownPathClasses and knownBoundaries enumerate the values a genuine token can
+// carry. Parsing validates against them so a crafted attribute that merely
+// matches the token grammar (e.g. "path-class:/home/dev/app/.env;boundary:project")
+// is not mistaken for an already-sanitised token — which would let its raw
+// payload survive the idempotency fast-path across the privacy boundary.
+var knownPathClasses = map[PathClass]struct{}{
+	PathDotenv: {}, PathSSHKey: {}, PathCert: {}, PathCredentialsFile: {},
+	PathProjectRelative: {}, PathNonProject: {},
+}
+
+var knownBoundaries = map[PathBoundary]struct{}{
+	BoundaryProject: {}, BoundaryExternal: {}, BoundaryIndeterminate: {},
+}
+
+var knownCommandAccessClasses = map[CommandAccessClass]struct{}{
+	CommandAccessCredential: {}, CommandAccessNone: {},
+}
+
+// ParsePathToken decodes a PathToken back into its class and boundary. ok is
+// false for any string that is not a path-class token, so callers can scan mixed
+// attribute values without misreading unrelated strings. Both fields are
+// validated against the known enumerations, so an untrusted value that only
+// mimics the grammar falls back to re-classification rather than being trusted.
+func ParsePathToken(token string) (PathClass, PathBoundary, bool) {
+	rawClass, rawBoundary, ok := parseToken(token, "path-class:")
+	if !ok {
+		return "", "", false
+	}
+	class, boundary := PathClass(rawClass), PathBoundary(rawBoundary)
+	if _, known := knownPathClasses[class]; !known {
+		return "", "", false
+	}
+	if _, known := knownBoundaries[boundary]; !known {
+		return "", "", false
+	}
+	return class, boundary, true
+}
+
+// ParseCommandAccessToken decodes a CommandAccessToken back into its class and
+// boundary. ok is false for any string that is not a command-access token, or
+// whose class/boundary is outside the known enumerations (see ParsePathToken).
+func ParseCommandAccessToken(token string) (CommandAccessClass, PathBoundary, bool) {
+	rawClass, rawBoundary, ok := parseToken(token, "command-access:")
+	if !ok {
+		return "", "", false
+	}
+	class, boundary := CommandAccessClass(rawClass), PathBoundary(rawBoundary)
+	if _, known := knownCommandAccessClasses[class]; !known {
+		return "", "", false
+	}
+	if _, known := knownBoundaries[boundary]; !known {
+		return "", "", false
+	}
+	return class, boundary, true
+}
+
+// parseToken decodes the shared "<prefix><class>;boundary:<boundary>" grammar.
+func parseToken(token, prefix string) (class, boundary string, ok bool) {
+	if !strings.HasPrefix(token, prefix) {
+		return "", "", false
+	}
+	body := token[len(prefix):]
+	separator := strings.Index(body, ";boundary:")
+	if separator < 0 {
+		return "", "", false
+	}
+	class = body[:separator]
+	boundary = body[separator+len(";boundary:"):]
+	if class == "" || boundary == "" {
+		return "", "", false
+	}
+	return class, boundary, true
 }
 
 func classifyBoundary(normalized string, segments []string) PathBoundary {
@@ -386,13 +552,21 @@ func (s *Sanitizer) sanitizeMap(input map[string]any, parentPath string) (map[st
 			}
 			provenance = append(provenance, Provenance{Path: path, Action: ActionRemoved, Reason: removalReason(key)})
 		case ActionClassified:
-			token := PathToken(ClassifyPath(fmt.Sprint(value)))
+			token := PathToken(ClassifyPath(scalarString(value)))
 			if attributeName != "" {
 				result[key] = map[string]any{"stringValue": token}
 			} else {
 				result[key] = token
 			}
 			provenance = append(provenance, Provenance{Path: path, Action: ActionClassified, Reason: "file_path"})
+		case ActionCommandClassified:
+			token := CommandAccessToken(ClassifyCommandAccess(scalarString(value)))
+			if attributeName != "" {
+				result[key] = map[string]any{"stringValue": token}
+			} else {
+				result[key] = token
+			}
+			provenance = append(provenance, Provenance{Path: path, Action: ActionCommandClassified, Reason: "command_access"})
 		case ActionRedacted:
 			if attributeName != "" {
 				result[key] = map[string]any{"stringValue": redactedValue}
@@ -450,6 +624,19 @@ func (s *Sanitizer) hash(value any) string {
 	return "hmac-sha256:" + hex.EncodeToString(mac.Sum(nil))
 }
 
+// scalarString returns the underlying string a value carries. OTLP attribute
+// values arrive wrapped as {"stringValue": "..."}; classification must read that
+// inner string rather than the map's Go representation, or a path/command would
+// be classified from "map[stringValue:...]" and always mis-bucketed.
+func scalarString(value any) string {
+	if wrapped, ok := value.(map[string]any); ok {
+		if text, ok := wrapped["stringValue"].(string); ok {
+			return text
+		}
+	}
+	return fmt.Sprint(value)
+}
+
 func classify(key string) Action {
 	normalized := strings.NewReplacer("_", "", "-", "", " ", "", ".", "").Replace(strings.ToLower(key))
 	for _, suffix := range []string{"email", "accountid", "conversationid", "hostname"} {
@@ -458,7 +645,9 @@ func classify(key string) Action {
 		}
 	}
 	switch normalized {
-	case "command", "commandline", "commandarguments", "commandargs", "arguments":
+	case "command", "commandline":
+		return ActionCommandClassified
+	case "commandarguments", "commandargs", "arguments":
 		return ActionRedacted
 	case "prompt", "prompts", "response", "responses", "sourcecode", "output", "body", "email", "accountid", "conversationid", "hostname":
 		return ActionRemoved
