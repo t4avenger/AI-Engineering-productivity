@@ -94,33 +94,45 @@ func NormalizeLogs(data []byte, receivedAt time.Time, fingerprint func([]byte) s
 		return nil, fmt.Errorf("decode Claude OTLP logs: %w", err)
 	}
 	var events []canonical.Event
-	index := 0
 	for _, resource := range payload.ResourceLogs {
-		resourceAttrs := attributeValues(resource.Resource.Attributes)
-		if service, _ := resourceAttrs["service.name"].(string); service != claudeLogService {
-			continue
+		resourceEvents, err := normaliseResourceLogs(resource, receivedAt, fingerprint, len(events))
+		if err != nil {
+			return nil, err
 		}
-		version, _ := resourceAttrs["service.version"].(string)
-		document := fixtureDocument{Provider: provider, Tool: tool, ToolVersion: fallbackString(version, unavailable)}
-		for _, scope := range resource.ScopeLogs {
-			for _, record := range scope.LogRecords {
-				sample := sampleEventFromRecord(record, fingerprint)
-				if _, ok := sample["event_name"].(string); !ok {
-					continue
-				}
-				event, err := normaliseSampleEvent(document, receivedAt.UTC(), fingerprint, index, sample)
-				if err != nil {
-					return nil, err
-				}
-				events = append(events, event)
-				index++
-			}
-		}
+		events = append(events, resourceEvents...)
 	}
 	if len(events) == 0 {
 		return nil, ErrUnsupportedLogs
 	}
 	return normalize.CorrelateEvents(events), nil
+}
+
+// normaliseResourceLogs normalises a single resourceLogs entry, returning events
+// only when its service.name is claude-code (nil otherwise, so a mixed payload is
+// safe). indexBase is the count of events already produced, keeping event indexing
+// stable and contiguous across resources.
+func normaliseResourceLogs(resource resourceLog, receivedAt time.Time, fingerprint func([]byte) string, indexBase int) ([]canonical.Event, error) {
+	resourceAttrs := attributeValues(resource.Resource.Attributes)
+	if service, _ := resourceAttrs["service.name"].(string); service != claudeLogService {
+		return nil, nil
+	}
+	version, _ := resourceAttrs["service.version"].(string)
+	document := fixtureDocument{Provider: provider, Tool: tool, ToolVersion: fallbackString(version, unavailable)}
+	var events []canonical.Event
+	for _, scope := range resource.ScopeLogs {
+		for _, record := range scope.LogRecords {
+			sample := sampleEventFromRecord(record, fingerprint)
+			if _, ok := sample["event_name"].(string); !ok {
+				continue
+			}
+			event, err := normaliseSampleEvent(document, receivedAt.UTC(), fingerprint, indexBase+len(events), sample)
+			if err != nil {
+				return nil, err
+			}
+			events = append(events, event)
+		}
+	}
+	return events, nil
 }
 
 // sampleEventFromRecord reduces one OTLP log record to the underscore-keyed

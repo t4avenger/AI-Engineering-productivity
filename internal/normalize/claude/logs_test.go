@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
 // rawClaudeLogs mirrors the observed Claude Code OTLP/HTTP log wire shape
@@ -74,15 +76,7 @@ func TestNormalizeLogsFingerprintsServerIdentityAndDropsOperatorFields(t *testin
 	if err != nil {
 		t.Fatalf("normalise: %v", err)
 	}
-	var connection map[string]any
-	for _, event := range events {
-		if event.EventType == "mcp_server_connection" {
-			connection, _ = event.ProviderExtensions["event"].(map[string]any)
-		}
-	}
-	if connection == nil {
-		t.Fatal("mcp_server_connection event extensions missing")
-	}
+	connection := requireConnectionExtensions(t, events)
 	// Behaviour fields the MCP inventory reads survive.
 	for key, want := range map[string]any{"status": "connected", "transport_type": "stdio", "server_scope": "user"} {
 		if connection[key] != want {
@@ -107,6 +101,24 @@ func TestNormalizeLogsFingerprintsServerIdentityAndDropsOperatorFields(t *testin
 			t.Fatalf("identity leaked into canonical events: %q", prohibited)
 		}
 	}
+}
+
+// requireConnectionExtensions returns the provider_extensions.event map of the
+// single mcp_server_connection event, failing the test if it is absent.
+func requireConnectionExtensions(t *testing.T, events []canonical.Event) map[string]any {
+	t.Helper()
+	for _, event := range events {
+		if event.EventType != "mcp_server_connection" {
+			continue
+		}
+		connection, _ := event.ProviderExtensions["event"].(map[string]any)
+		if connection == nil {
+			t.Fatal("mcp_server_connection event extensions missing")
+		}
+		return connection
+	}
+	t.Fatal("no mcp_server_connection event")
+	return nil
 }
 
 func TestNormalizeLogsRejectsPayloadWithoutClaudeResources(t *testing.T) {

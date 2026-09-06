@@ -6,8 +6,10 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
@@ -67,7 +69,22 @@ func TestClaudeLogsIngestEndToEnd(t *testing.T) {
 	}
 	closeBody(t, response)
 
-	// A real Claude Code session is persisted from the ingested events.
+	sessions := requireClaudeSession(t, repository)
+	inventory := fetchMCPInventory(t, server.URL)
+	if inventory.Data.Totals.ConnectedServers != 1 {
+		t.Fatalf("connected_servers = %d, want 1: %#v", inventory.Data.Totals.ConnectedServers, inventory.Data.Totals)
+	}
+
+	// Nothing sensitive survived the round trip through the read API.
+	assertNoRawIdentifiers(t,
+		[]string{"tiq-canary-session", "tiq-canary-server", "tiq-canary@example.test", "tiq-canary-api-key"},
+		marshalJSON(t, sessions), marshalJSON(t, inventory))
+}
+
+// requireClaudeSession asserts exactly one persisted anthropic/claude-code
+// session and returns it for further inspection.
+func requireClaudeSession(t *testing.T, repository storage.Repository) []canonical.Session {
+	t.Helper()
 	sessions, err := repository.ListSessions(context.Background(), storage.SessionFilter{Limit: 10})
 	if err != nil {
 		t.Fatalf("list sessions: %v", err)
@@ -78,53 +95,46 @@ func TestClaudeLogsIngestEndToEnd(t *testing.T) {
 	if sessions[0].Provider != "anthropic" || sessions[0].Tool != "claude-code" {
 		t.Fatalf("session provider/tool = %q/%q", sessions[0].Provider, sessions[0].Tool)
 	}
+	return sessions
+}
 
-	// The MCP inventory endpoint reports the connected server from real ingest.
-	inventory, err := http.Get(server.URL + "/api/v1/insights/mcp-inventory")
+// fetchMCPInventory reads the MCP inventory through the live HTTP read API.
+func fetchMCPInventory(t *testing.T, baseURL string) mcpInventoryResponse {
+	t.Helper()
+	response, err := http.Get(baseURL + "/api/v1/insights/mcp-inventory")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeBody(t, inventory)
-	if inventory.StatusCode != http.StatusOK {
-		t.Fatalf("mcp inventory status = %d", inventory.StatusCode)
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("mcp inventory status = %d", response.StatusCode)
 	}
 	var body mcpInventoryResponse
-	if err := json.NewDecoder(inventory.Body).Decode(&body); err != nil {
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
 		t.Fatal(err)
 	}
-	if body.Data.Totals.ConnectedServers != 1 {
-		t.Fatalf("connected_servers = %d, want 1: %#v", body.Data.Totals.ConnectedServers, body.Data.Totals)
-	}
+	return body
+}
 
-	// Nothing sensitive survived the round trip through the read API.
-	sessionData, err := json.Marshal(sessions)
-	if err != nil {
-		t.Fatal(err)
-	}
-	inventoryData, err := json.Marshal(body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, prohibited := range []string{"tiq-canary-session", "tiq-canary-server", "tiq-canary@example.test", "tiq-canary-api-key"} {
-		if contains(sessionData, prohibited) || contains(inventoryData, prohibited) {
-			t.Fatalf("privacy leak %q in end-to-end read output", prohibited)
+// assertNoRawIdentifiers fails if any prohibited raw identifier appears in the
+// serialised read-API output.
+func assertNoRawIdentifiers(t *testing.T, prohibited []string, documents ...[]byte) {
+	t.Helper()
+	for _, document := range documents {
+		text := string(document)
+		for _, secret := range prohibited {
+			if strings.Contains(text, secret) {
+				t.Fatalf("privacy leak %q in end-to-end read output", secret)
+			}
 		}
 	}
 }
 
-func contains(data []byte, substring string) bool {
-	return len(substring) > 0 && json.Valid(data) && bytesContains(data, substring)
-}
-
-func bytesContains(data []byte, substring string) bool {
-	return len(data) >= len(substring) && indexOf(string(data), substring) >= 0
-}
-
-func indexOf(haystack, needle string) int {
-	for i := 0; i+len(needle) <= len(haystack); i++ {
-		if haystack[i:i+len(needle)] == needle {
-			return i
-		}
+func marshalJSON(t *testing.T, value any) []byte {
+	t.Helper()
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return -1
+	return data
 }
