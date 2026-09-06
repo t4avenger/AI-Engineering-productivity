@@ -58,13 +58,15 @@ type metricHistogram struct {
 
 type histogramDataPoint struct {
 	Attributes   []attribute `json:"attributes"`
-	Count        int         `json:"count"`
+	Count        any         `json:"count"`
 	TimeUnixNano string      `json:"timeUnixNano"`
 }
 
-// NormalizeMetrics maps Codex OTLP metrics into canonical skill events.
-// Only codex.skill.injected datapoints become events; other metrics are ignored
-// so exporters can POST a full metrics batch without inventing unrelated insight
+// NormalizeMetrics maps reviewed Codex OTLP skill metrics into canonical events.
+// codex.skill.injected datapoints with a skill name become explicit skill
+// records; codex.skill.turn.duration_seconds histogram datapoints become
+// inferred skill-detection coverage only. Other metrics are ignored so
+// exporters can POST a full metrics batch without inventing unrelated insight
 // rows. Resources whose service.name is not a Codex log/exec service are skipped.
 func NormalizeMetrics(data []byte, receivedAt time.Time, fingerprint func([]byte) string) ([]canonical.Event, error) {
 	if fingerprint == nil {
@@ -145,7 +147,7 @@ func skillTurnEvent(resource map[string]any, version string, point histogramData
 		"skill_detection": "inferred",
 		"metric": map[string]any{
 			"name":  skillTurnDurationMetric,
-			"count": point.Count,
+			"count": metricCount(point.Count),
 		},
 		"resource": normalize.UnknownFields(resource, "service.name", "service.version"),
 		"skill_turn": map[string]any{
@@ -168,14 +170,7 @@ func skillInjectedEvent(resource map[string]any, version string, point metricDat
 
 	skill := skillPayload(fields, skillName)
 	extensions := map[string]any{
-		"correlation": map[string]any{
-			"dedup_key":    eventID,
-			"ordering_key": fmt.Sprintf("%020d:%s", occurredAt.UnixNano(), eventID),
-			"task_boundary": map[string]any{
-				"confidence": "unknown",
-				"reason":     "Codex skill metrics have no reviewed task-boundary signal",
-			},
-		},
+		"correlation":     skillCorrelation(eventID, occurredAt),
 		"skill_detection": "explicit",
 		"skill":           skill,
 		"metric": map[string]any{
@@ -185,23 +180,7 @@ func skillInjectedEvent(resource map[string]any, version string, point metricDat
 		"resource": normalize.UnknownFields(resource, "service.name", "service.version"),
 	}
 
-	return canonical.Event{
-		SchemaVersion:      canonicalSchemaVersion,
-		EventID:            eventID,
-		EventType:          skillInjectedMetric,
-		OccurredAt:         occurredAt,
-		ReceivedAt:         receivedAt.UTC(),
-		Provider:           "openai",
-		Tool:               "codex",
-		SourceSchema:       sourceSchema,
-		SourceVersion:      version,
-		ActorID:            unavailable,
-		DeviceID:           unavailable,
-		SessionID:          eventID,
-		PrivacyLevel:       "operational",
-		Attributes:         map[string]any{"unavailable_fields": []string{"model", "token_usage", "cache_usage", "tool_calls", "file_operations", "command_execution", "approvals", "prompt_content", "response_content", "repository_context", "task_outcome", "provider_cost", "session_lifecycle"}},
-		ProviderExtensions: extensions,
-	}, true, nil
+	return skillEvent(eventID, skillInjectedMetric, occurredAt, receivedAt, version, extensions), true, nil
 }
 
 func skillEvent(eventID, eventType string, occurredAt, receivedAt time.Time, version string, extensions map[string]any) canonical.Event {

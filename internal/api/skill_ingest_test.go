@@ -24,7 +24,7 @@ const rawClaudeSkillOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
 
 const rawCodexSkillMetrics = `{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.version","value":{"stringValue":"0.153.4"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.skill.injected","sum":{"dataPoints":[{"attributes":[{"key":"skill","value":{"stringValue":"tiq-probe"}},{"key":"status","value":{"stringValue":"ok"}},{"key":"invoke_type","value":{"stringValue":"explicit"}}],"asInt":1,"timeUnixNano":"1788706421601372612"}]}}]}]}]}`
 
-const rawCodexSkillTurnMetrics = `{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.version","value":{"stringValue":"0.153.4"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.skill.turn.duration_seconds","histogram":{"dataPoints":[{"attributes":[{"key":"status","value":{"stringValue":"completed"}},{"key":"plugin_id","value":{"stringValue":"unattributed"}}],"count":1,"timeUnixNano":"1788709355426961808"}]}}]}]}]}`
+const rawCodexSkillTurnMetrics = `{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.version","value":{"stringValue":"0.153.4"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.skill.turn.duration_seconds","histogram":{"dataPoints":[{"attributes":[{"key":"status","value":{"stringValue":"completed"}},{"key":"plugin_id","value":{"stringValue":"unattributed"}}],"count":"1","timeUnixNano":"1788709355426961808"}]}}]}]}]}`
 
 // TestSkillUsageInsightIngestEndToEnd is the live-data DoD gate for the skill
 // usage insight: it POSTs Claude skill_activated logs and Codex skill.injected

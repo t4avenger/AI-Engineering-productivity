@@ -54,7 +54,7 @@ func TestNormalizeMetricsSkillInjectedGolden(t *testing.T) {
 }
 
 func TestNormalizeMetricsSkillTurnDurationIsInferred(t *testing.T) {
-	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.version","value":{"stringValue":"0.153.4"}},{"key":"env","value":{"stringValue":"telemetryiq-synthetic"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.skill.turn.duration_seconds","histogram":{"dataPoints":[{"attributes":[{"key":"status","value":{"stringValue":"completed"}},{"key":"plugin_id","value":{"stringValue":"unattributed"}}],"count":1,"timeUnixNano":"1788709355426961808"}]}}]}]}]}`)
+	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.version","value":{"stringValue":"0.153.4"}},{"key":"env","value":{"stringValue":"telemetryiq-synthetic"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.skill.turn.duration_seconds","histogram":{"dataPoints":[{"attributes":[{"key":"status","value":{"stringValue":"completed"}},{"key":"plugin_id","value":{"stringValue":"unattributed"}}],"count":"1","timeUnixNano":"1788709355426961808"}]}}]}]}]}`)
 	events, err := NormalizeMetrics(payload, time.Date(2026, 9, 6, 15, 42, 35, 0, time.UTC), stubCodexFingerprint)
 	if err != nil {
 		t.Fatalf("NormalizeMetrics: %v", err)
