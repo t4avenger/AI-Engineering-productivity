@@ -45,9 +45,10 @@ claims to surface retained telemetry:
    canary identity/secret values absent from the response. Follow the pattern
    in `internal/api/claude_ingest_test.go` and `internal/api/codex_ingest_test.go`.
 2. **At least one non-mocked frontend e2e** — a Playwright spec that uses the
-   daemon already started by `web/playwright.config.ts`, ingests live data, and
-   asserts the UI renders that data (or an honest unavailable cell). Do **not**
-   use `page.route().fulfill()` to mock API responses in that gate.
+   daemon already started by `web/playwright.config.ts` (HTML UI on the daemon
+   origin per ADR 0002), ingests live data, and asserts the UI renders that
+   data (or an honest unavailable cell). Do **not** use `page.route().fulfill()`
+   to mock API responses in that gate.
 3. Existing mocked e2e specs may remain for fast UI coverage; they do not
    replace the live gate above.
 

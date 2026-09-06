@@ -5,6 +5,8 @@ import (
 	"crypto/subtle"
 	"net/http"
 	"strings"
+
+	"github.com/wayne/telemetryiq/internal/ui"
 )
 
 // withManagementAuth protects local session data without imposing an
@@ -16,10 +18,9 @@ func withManagementAuth(token string, next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		header := r.Header.Get("Authorization")
-		provided := strings.TrimPrefix(header, "Bearer ")
+		provided := ui.TokenFromRequest(r)
 		actual := sha256.Sum256([]byte(provided))
-		if !strings.HasPrefix(header, "Bearer ") || subtle.ConstantTimeCompare(expected[:], actual[:]) != 1 {
+		if provided == "" || subtle.ConstantTimeCompare(expected[:], actual[:]) != 1 {
 			writeSessionError(w, http.StatusUnauthorized, "authentication_required", "local API authentication is required")
 			return
 		}

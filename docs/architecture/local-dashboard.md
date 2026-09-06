@@ -1,12 +1,21 @@
 # Local dashboard
 
-Task 010 implements a local React dashboard using Mantine Core and Hooks (ADR 0001) with Home, Sessions, Session
-Detail, Insights, Integrations, and Privacy pages. It consumes only the loopback API and
-does not send analytics or dashboard data to third parties.
+The local dashboard is served by the TelemetryIQ daemon using Go `html/template`
+and HTMX (ADR 0002). It provides Home, Sessions, Session Detail, Insights,
+Integrations, Privacy, and Costs pages over the same loopback origin as the
+JSON API and OTLP intake. It does not send analytics or dashboard data to third
+parties.
 
-The Sessions page uses the stable Task 009 read API. A session detail is loaded
-only after selection. Deletion uses authenticated `DELETE /api/v1/sessions/{id}` and requires
-an in-app confirmation before the request is sent; the repository removes the
+Browser authentication uses `POST /unlock` with the token from `make auth-token`.
+A successful unlock sets an httpOnly **Secure** session cookie. Use the
+`localhost` hostname (the daemon default) so browsers accept that cookie over
+local HTTP; bare `127.0.0.1` may reject Secure cookies. JSON management
+endpoints continue to accept `Authorization: Bearer` and also accept the
+session cookie.
+
+The Sessions page uses the stable Task 009 read API data. A session detail is
+loaded only after navigation to `/sessions/{id}`. Deletion requires an in-app
+confirmation before `POST /sessions/{id}/delete`; the repository removes the
 session and all retained events transactionally.
 
 The dashboard never converts unavailable telemetry into zero. Examples include
@@ -14,16 +23,20 @@ an unavailable model or completion time. Integration status is derived only
 from observed local sessions: with none observed it says `Awaiting telemetry`,
 rather than claiming that a provider has been detected.
 
-The Privacy page documents the enforced local-only defaults and provides a Mantine managed modal with accessible typed confirmation to delete all retained telemetry. It preserves safe configuration, the installation privacy salt, and the local API token.
+Home emphasises orchestration usage (sessions today, tools observed, insight
+highlights) and never headlines cost. Costs remain a secondary page.
 
-The Insights page reads authenticated MCP inventory summaries from retained canonical events. It renders provider-reported MCP server names when available, privacy-safe server fingerprints, explicit usage states, connected-but-unused context-waste states, and request-level token context labelled as not exact per-MCP allocation.
+The Insights page reads MCP inventory and skill usage summaries from retained
+canonical events. It renders provider-reported MCP server names when available,
+privacy-safe server fingerprints, explicit usage states, connected-but-unused
+context-waste states, and request-level token context labelled as not exact
+per-MCP allocation.
 
-The Costs page reads authenticated local calculation summaries, shows calculated estimates and cost statuses, and never represents an unknown price as zero. Session summaries retain the first observed model so the list and detail view agree with the event timeline.
-
-The dashboard asks once per browser session for the token printed by `make auth-token`; it retains the value only in session storage.
+The Costs page reads local calculation summaries, shows calculated estimates
+and cost statuses, and never represents an unknown price as zero.
 
 The Privacy page documents the enforced local-only defaults: no prompt,
 response, or source-code retention; hashed file paths; redacted command
 arguments; no sharing; and a default 30-day retention period. These values are
 not editable in the dashboard because configuration remains file-based and is
-validated by the daemon.
+validated by the daemon. Bulk deletion requires typing `DELETE ALL`.

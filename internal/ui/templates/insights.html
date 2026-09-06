@@ -1,0 +1,87 @@
+{{define "insights.html"}}
+{{template "shell-start" .}}
+{{template "nav" .}}
+<main id="main-content" class="page">
+  <h1>Insights</h1>
+  <p>Learn from retained telemetry. Missing signals are labelled explicitly.</p>
+  {{with .Content}}
+  {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+  <section>
+    <h2>MCP inventory</h2>
+    <p>Connected {{.MCP.Totals.ConnectedServers}} · Used {{.MCP.Totals.UsedServers}} · Unused {{.MCP.Totals.UnusedServers}} · Usage unavailable {{.MCP.Totals.UsageUnavailableServers}}</p>
+    <p class="muted">{{.MCP.Totals.TokenContextLabel}}</p>
+    {{if .MCP.Servers}}
+    <section class="table-wrap" aria-label="MCP servers">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Server</th>
+            <th scope="col">Tool</th>
+            <th scope="col">Usage</th>
+            <th scope="col">Context waste</th>
+            <th scope="col">Invocations</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .MCP.Servers}}
+          <tr>
+            <td>{{if .ServerName}}{{.ServerName}}{{else}}{{.ServerFingerprint}}{{end}}</td>
+            <td>{{.Tool}}</td>
+            <td>{{.UsageState}}</td>
+            <td>{{.ContextWasteState}}</td>
+            <td>{{.InvocationCount}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </section>
+    {{else}}
+    <p>No MCP inventory rows yet.</p>
+    {{end}}
+    {{if .MCP.Notes}}<ul>{{range .MCP.Notes}}<li>{{.}}</li>{{end}}</ul>{{end}}
+  </section>
+  <section>
+    <h2>Skill usage</h2>
+    <p>Observed skills {{.Skills.Totals.ObservedSkills}} · Invocations {{.Skills.Totals.Invocations}}</p>
+    {{if .Skills.Skills}}
+    <section class="table-wrap" aria-label="Skills">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Skill</th>
+            <th scope="col">Tool</th>
+            <th scope="col">Detection</th>
+            <th scope="col">Invocations</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Skills.Skills}}
+          <tr>
+            <td>{{.SkillName}}</td>
+            <td>{{.Tool}}</td>
+            <td>{{.DetectionState}}</td>
+            <td>{{.InvocationCount}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </section>
+    {{else}}
+    <p>No explicit skills observed yet.</p>
+    {{end}}
+    <h3>Detection coverage</h3>
+    {{if .Skills.Coverage}}
+    <ul>
+      {{range .Skills.Coverage}}
+      <li>{{.Provider}} / {{.Tool}}: {{.DetectionState}}</li>
+      {{end}}
+    </ul>
+    {{else}}
+    <p>Coverage unavailable.</p>
+    {{end}}
+    {{if .Skills.Notes}}<ul>{{range .Skills.Notes}}<li>{{.}}</li>{{end}}</ul>{{end}}
+  </section>
+  {{end}}
+</main>
+{{template "shell-end" .}}
+{{end}}

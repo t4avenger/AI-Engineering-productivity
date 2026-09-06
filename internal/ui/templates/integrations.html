@@ -1,0 +1,21 @@
+{{define "integrations.html"}}
+{{template "shell-start" .}}
+{{template "nav" .}}
+<main id="main-content" class="page">
+  <h1>Integrations</h1>
+  <p>Tools appear only after local session data has been observed.</p>
+  {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+  {{with .Content}}
+  {{if .Empty}}
+  <p>Awaiting telemetry</p>
+  {{else}}
+  <ul>
+    {{range .Tools}}
+    <li>{{.Tool}} ({{.Provider}})</li>
+    {{end}}
+  </ul>
+  {{end}}
+  {{end}}
+</main>
+{{template "shell-end" .}}
+{{end}}

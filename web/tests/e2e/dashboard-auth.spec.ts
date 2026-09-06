@@ -1,31 +1,20 @@
 import { expect, test } from '@playwright/test';
 
-test('connects with the local token and requires bulk-deletion confirmation', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await expect(
-    page.getByRole('heading', { name: 'Connect your dashboard' }),
-  ).toBeVisible();
-  await page.getByLabel('Local API token').fill('playwright-token');
-  const sessionList = page.waitForResponse(
-    (response) =>
-      response.url().endsWith('/api/v1/sessions?limit=100') &&
-      response.request().method() === 'GET',
-  );
-  await page.getByRole('button', { name: 'Connect securely' }).click();
-  expect((await sessionList).status()).toBe(200);
-  await page.getByRole('button', { name: 'Privacy' }).click();
+import { authToken, unlockDashboard } from './live-ingest-helpers';
+
+test('requires typed confirmation for bulk deletion', async ({ page }) => {
+  await unlockDashboard(page, authToken);
+  await page.getByRole('link', { name: 'Privacy', exact: true }).click();
   await page
-    .getByRole('button', { name: 'Delete all retained telemetry' })
+    .getByRole('link', { name: 'Delete all retained telemetry' })
     .click();
+  await expect(page.getByLabel('Type DELETE ALL to confirm')).toBeVisible();
+  await page.getByLabel('Type DELETE ALL to confirm').fill('DELETE ALL');
+  await page.getByRole('link', { name: 'Cancel' }).click();
   await expect(
-    page.getByRole('button', { name: 'Delete all permanently' }),
-  ).toBeDisabled();
-  await page.getByLabel('Confirmation').fill('DELETE ALL');
+    page.getByRole('heading', { name: 'Privacy' }),
+  ).toBeVisible();
   await expect(
-    page.getByRole('button', { name: 'Delete all permanently' }),
-  ).toBeEnabled();
-  await page.getByRole('button', { name: 'Cancel' }).click();
-  await expect(page.getByRole('dialog')).toBeHidden();
+    page.getByRole('link', { name: 'Delete all retained telemetry' }),
+  ).toBeVisible();
 });

@@ -1,0 +1,33 @@
+{{define "privacy.html"}}
+{{template "shell-start" .}}
+{{template "nav" .}}
+<main id="main-content" class="page">
+  <h1>Privacy</h1>
+  <p>These defaults are enforced by the daemon and are not editable here.</p>
+  <ul>
+    <li>Mode: local-only</li>
+    <li>Prompts, responses, and source code are not retained</li>
+    <li>File paths are hashed; command arguments are redacted</li>
+    <li>Retention: 30 days</li>
+    <li>No sharing of diagnostics or analytics</li>
+  </ul>
+  {{with .Content}}
+  {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+  <section>
+    <h2>Delete all retained telemetry</h2>
+    {{if .Confirm}}
+    <!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token -->
+  <form method="post" action="/privacy/delete-all" class="stack">
+      <label for="confirmation">Type DELETE ALL to confirm</label>
+      <input id="confirmation" name="confirmation" type="text" autocomplete="off" required>
+      <button type="submit" class="danger">Delete all permanently</button>
+      <a href="/privacy">Cancel</a>
+    </form>
+    {{else}}
+    <p><a class="button danger" href="/privacy?confirm=1">Delete all retained telemetry</a></p>
+    {{end}}
+  </section>
+  {{end}}
+</main>
+{{template "shell-end" .}}
+{{end}}

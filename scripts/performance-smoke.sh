@@ -18,7 +18,7 @@ TELEMETRYIQ_PORT="$port" "$tmpdir/telemetryiq" >"$tmpdir/daemon.log" 2>&1 &
 pid="$!"
 
 for _ in $(seq 1 40); do
-  if curl -fsS "http://127.0.0.1:$port/api/v1/health" >/dev/null 2>&1; then
+  if curl -fsS "http://localhost:$port/api/v1/health" >/dev/null 2>&1; then
     ready=1
     break
   fi
@@ -32,7 +32,7 @@ if [[ "$ready" != "1" ]]; then
 fi
 
 start_ns="$(date +%s%N)"
-curl -fsS "http://127.0.0.1:$port/api/v1/health" >/dev/null
+curl -fsS "http://localhost:$port/api/v1/health" >/dev/null
 end_ns="$(date +%s%N)"
 elapsed_ms="$(((end_ns - start_ns) / 1000000))"
 

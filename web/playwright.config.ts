@@ -8,20 +8,13 @@ export default defineConfig({
   workers: 1,
   reporter: [['list']],
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: 'http://localhost:18080',
     trace: 'on-first-retry',
   },
   webServer: [
     {
-      command: `cd .. && XDG_CONFIG_HOME=${testConfigHome} TELEMETRYIQ_AUTH_TOKEN=playwright-token TELEMETRYIQ_PORT=18080 go run ./cmd/telemetryiq`,
-      url: 'http://127.0.0.1:18080/api/v1/health',
-      reuseExistingServer: false,
-      timeout: 120_000,
-    },
-    {
-      command:
-        'VITE_API_URL=http://127.0.0.1:18080/api/v1 VITE_HEALTH_URL=http://127.0.0.1:18080/api/v1/health npm run build && npm run preview -- --port 4173',
-      url: 'http://127.0.0.1:4173',
+      command: `cd .. && XDG_CONFIG_HOME=${testConfigHome} TELEMETRYIQ_AUTH_TOKEN=playwright-token TELEMETRYIQ_HOST=localhost TELEMETRYIQ_PORT=18080 go run ./cmd/telemetryiq`,
+      url: 'http://localhost:18080/api/v1/health',
       reuseExistingServer: false,
       timeout: 120_000,
     },

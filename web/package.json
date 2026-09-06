@@ -1,5 +1,5 @@
 {
-  "name": "telemetryiq-web",
+  "name": "telemetryiq-e2e",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -7,44 +7,9 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 127.0.0.1",
-    "lint": "eslint .",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
-    "knip": "knip"
-  },
-  "dependencies": {
-    "@mantine/core": "^8.3.17",
-    "@mantine/hooks": "^8.3.17",
-    "@vitejs/plugin-react": "4.7.0",
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
-    "typescript": "5.9.3",
-    "vite": "6.4.3"
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
-    "@eslint/js": "10.0.1",
-    "@playwright/test": "1.61.1",
-    "@testing-library/jest-dom": "6.6.3",
-    "@testing-library/react": "16.1.0",
-    "@types/node": "22.10.5",
-    "@types/react": "19.0.4",
-    "@types/react-dom": "19.0.2",
-    "@vitest/coverage-v8": "^4.1.10",
-    "eslint": "^10.8.0",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.3",
-    "globals": "15.14.0",
-    "jsdom": "25.0.1",
-    "knip": "5.80.0",
-    "prettier": "3.4.2",
-    "typescript-eslint": "8.65.0",
-    "vitest": "^4.1.10"
+    "@playwright/test": "1.61.1"
   }
 }

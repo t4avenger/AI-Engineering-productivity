@@ -1,0 +1,25 @@
+{{define "timeline_rows.html"}}
+{{range .Events}}
+<article class="timeline-item">
+  <h3>{{.EventType}}</h3>
+  <p>{{.OccurredAt}} · {{.Provider}} / {{.Tool}}</p>
+  <p>Model: {{.Model}} · In: {{.InputTokens}} · Out: {{.OutputTokens}}</p>
+  {{if .UnavailableFields}}
+  <p class="muted">Unavailable: {{range $i, $f := .UnavailableFields}}{{if $i}}, {{end}}{{$f}}{{end}}</p>
+  {{end}}
+</article>
+{{else}}
+{{if not .NextCursor}}<p>No events retained for this session.</p>{{end}}
+{{end}}
+{{if .NextCursor}}
+<p>
+  <a
+    href="/sessions/{{.SessionID}}?cursor={{.NextCursor}}"
+    hx-get="/sessions/{{.SessionID}}/timeline?cursor={{.NextCursor}}"
+    hx-target="#timeline"
+    hx-swap="beforeend"
+    hx-select=".timeline-item, p:has(a[hx-get])"
+  >Load more</a>
+</p>
+{{end}}
+{{end}}

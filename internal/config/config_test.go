@@ -101,7 +101,7 @@ func TestLoadFromEnvDefaultsToLoopback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load defaults: %v", err)
 	}
-	if cfg.Addr() != "127.0.0.1:8080" {
+	if cfg.Addr() != "localhost:8080" {
 		t.Fatalf("expected loopback address, got %q", cfg.Addr())
 	}
 }

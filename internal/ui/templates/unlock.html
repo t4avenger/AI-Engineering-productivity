@@ -1,0 +1,15 @@
+{{define "unlock.html"}}
+{{template "shell-start" .}}
+<main id="main-content" class="page">
+  <h1>Unlock local dashboard</h1>
+  <p>Run <code>make auth-token</code> and paste the token below. It is stored only in an httpOnly cookie for this browser session on loopback.</p>
+  {{with .Content.Error}}<p class="error" role="alert">{{.}}</p>{{end}}
+  <!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token -->
+  <form method="post" action="/unlock" class="stack">
+    <label for="token">Local API token</label>
+    <input id="token" name="token" type="password" autocomplete="off" required>
+    <button type="submit">Unlock</button>
+  </form>
+</main>
+{{template "shell-end" .}}
+{{end}}
