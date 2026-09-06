@@ -183,7 +183,10 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), page.want) {
 			t.Fatalf("%s = %d want containing %q body=%q", page.path, rec.Code, page.want, rec.Body.String())
 		}
-		if strings.Contains(rec.Body.String(), "%!") {
+		// The %! marker only ever comes from Go template/fmt rendering, so the
+		// guard applies to templated pages, not static assets — CSS legitimately
+		// contains %! (e.g. 50%!important).
+		if !strings.HasPrefix(page.path, "/static/") && strings.Contains(rec.Body.String(), "%!") {
 			t.Fatalf("%s rendered a fmt error marker (%%!...): body=%q", page.path, rec.Body.String())
 		}
 	}
