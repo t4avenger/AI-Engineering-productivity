@@ -53,6 +53,7 @@ func newHandler(logger *slog.Logger, inspector *sanitizedInspector, repository s
 	mux.HandleFunc("GET /api/v1/insights/skill-usage", sessionAPI.skillUsage)
 	mux.HandleFunc("GET /api/v1/insights/model-performance", sessionAPI.modelPerformance)
 	mux.HandleFunc("GET /api/v1/insights/context-waste", sessionAPI.contextWaste)
+	mux.HandleFunc("GET /api/v1/insights/risky-access", sessionAPI.riskyAccess)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/costs", sessionAPI.costs)
 	mux.HandleFunc("GET /api/v1/sessions/{id}", sessionAPI.detail)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/events", sessionAPI.events)

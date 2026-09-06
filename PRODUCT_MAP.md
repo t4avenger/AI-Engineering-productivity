@@ -752,6 +752,13 @@ Evaluate against a configurable estimated-cost threshold.
 ### 14.7 Missing approval
 Record when a high-risk action is observed without a corresponding approval event, where the provider exposes sufficient evidence.
 
+### 14.8 Risky credential/secret file access
+Report when an agent reads a credential or secret file — `.env` (excluding template variants such as `.env.example`/`.env.sample`/`.env.template`/`.env.dist`), SSH keys, certificates, or credentials files — via a filesystem read or an equivalent shell command (e.g. `cat .env`).
+
+Detection runs entirely on the privacy-safe path/command-access tokens the sanitiser emits before storage (`path-class:<class>;boundary:<boundary>`, `command-access:<class>;boundary:<boundary>`); no raw path, command, or secret value is read by the detector. Findings carry only the coarse class, boundary, and confidence. Filesystem-read findings are high confidence; shell-command findings are medium (the command is categorised, not parsed for the exact target).
+
+When no filesystem-read or shell-command access is observed at all, the outcome is `indeterminate` — the policy never claims a clean result from absent visibility. Surfaced at `GET /api/v1/insights/risky-access` and rendered as a `schemas/policy.schema.json` decision (`policy_id: governance.risky_access`).
+
 Never infer a violation when the underlying telemetry is insufficient. Use `indeterminate`.
 
 ---
