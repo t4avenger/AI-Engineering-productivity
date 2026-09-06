@@ -135,10 +135,13 @@ func classifyToken(token, observedAt string) (finding *Finding, observed bool) {
 	}
 	if class, boundary, ok := privacy.ParseCommandAccessToken(token); ok {
 		if class == privacy.CommandAccessCredential {
+			// The command-access token carries only the coarse category, not the
+			// specific secret-file class, so the finding reports that category
+			// rather than assuming any single file type (e.g. dotenv).
 			finding = &Finding{
 				RuleID:       riskyAccessRuleID,
 				AccessMethod: AccessShellCommand,
-				Class:        string(privacy.PathDotenv),
+				Class:        string(class),
 				Boundary:     string(boundary),
 				Confidence:   "medium",
 				ObservedAt:   observedAt,

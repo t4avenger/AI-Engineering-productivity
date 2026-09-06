@@ -164,6 +164,42 @@ func TestClassifyPathAllowlistsEnvTemplates(t *testing.T) {
 	}
 }
 
+func TestParseTokenRejectsCraftedPayloads(t *testing.T) {
+	// A crafted attribute that only mimics the token grammar must not be trusted
+	// as an already-sanitised token, or its raw payload would survive the
+	// idempotency fast-path across the privacy boundary.
+	craftedPaths := []string{
+		"path-class:/home/dev/app/.env;boundary:project",
+		"path-class:dotenv;boundary:/etc/shadow",
+		"path-class:secret;boundary:project",
+	}
+	for _, token := range craftedPaths {
+		if _, _, ok := ParsePathToken(token); ok {
+			t.Fatalf("crafted path token %q must be rejected", token)
+		}
+		// Re-classification must strip the raw payload rather than echo it back.
+		if class, _ := ClassifyPath(token); strings.Contains(string(PathToken(class, BoundaryProject)), ".env;") {
+			t.Fatalf("crafted path token %q leaked raw payload after re-classification", token)
+		}
+	}
+	craftedCommands := []string{
+		"command-access:cat /home/dev/.env;boundary:project",
+		"command-access:credential_access;boundary:rm -rf /",
+	}
+	for _, token := range craftedCommands {
+		if _, _, ok := ParseCommandAccessToken(token); ok {
+			t.Fatalf("crafted command token %q must be rejected", token)
+		}
+	}
+	// Genuine tokens still round-trip.
+	if _, _, ok := ParsePathToken(PathToken(PathDotenv, BoundaryIndeterminate)); !ok {
+		t.Fatal("genuine path token must parse")
+	}
+	if _, _, ok := ParseCommandAccessToken(CommandAccessToken(CommandAccessCredential, BoundaryProject)); !ok {
+		t.Fatal("genuine command token must parse")
+	}
+}
+
 func TestClassifyCommandAccessDetectsCredentialReads(t *testing.T) {
 	credential := []string{
 		"cat .env",

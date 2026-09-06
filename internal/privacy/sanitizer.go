@@ -254,19 +254,60 @@ func CommandAccessToken(class CommandAccessClass, boundary PathBoundary) string 
 	return fmt.Sprintf("command-access:%s;boundary:%s", class, boundary)
 }
 
+// knownPathClasses and knownBoundaries enumerate the values a genuine token can
+// carry. Parsing validates against them so a crafted attribute that merely
+// matches the token grammar (e.g. "path-class:/home/dev/app/.env;boundary:project")
+// is not mistaken for an already-sanitised token — which would let its raw
+// payload survive the idempotency fast-path across the privacy boundary.
+var knownPathClasses = map[PathClass]struct{}{
+	PathDotenv: {}, PathSSHKey: {}, PathCert: {}, PathCredentialsFile: {},
+	PathProjectRelative: {}, PathNonProject: {},
+}
+
+var knownBoundaries = map[PathBoundary]struct{}{
+	BoundaryProject: {}, BoundaryExternal: {}, BoundaryIndeterminate: {},
+}
+
+var knownCommandAccessClasses = map[CommandAccessClass]struct{}{
+	CommandAccessCredential: {}, CommandAccessNone: {},
+}
+
 // ParsePathToken decodes a PathToken back into its class and boundary. ok is
 // false for any string that is not a path-class token, so callers can scan mixed
-// attribute values without misreading unrelated strings.
+// attribute values without misreading unrelated strings. Both fields are
+// validated against the known enumerations, so an untrusted value that only
+// mimics the grammar falls back to re-classification rather than being trusted.
 func ParsePathToken(token string) (PathClass, PathBoundary, bool) {
-	class, boundary, ok := parseToken(token, "path-class:")
-	return PathClass(class), PathBoundary(boundary), ok
+	rawClass, rawBoundary, ok := parseToken(token, "path-class:")
+	if !ok {
+		return "", "", false
+	}
+	class, boundary := PathClass(rawClass), PathBoundary(rawBoundary)
+	if _, known := knownPathClasses[class]; !known {
+		return "", "", false
+	}
+	if _, known := knownBoundaries[boundary]; !known {
+		return "", "", false
+	}
+	return class, boundary, true
 }
 
 // ParseCommandAccessToken decodes a CommandAccessToken back into its class and
-// boundary. ok is false for any string that is not a command-access token.
+// boundary. ok is false for any string that is not a command-access token, or
+// whose class/boundary is outside the known enumerations (see ParsePathToken).
 func ParseCommandAccessToken(token string) (CommandAccessClass, PathBoundary, bool) {
-	class, boundary, ok := parseToken(token, "command-access:")
-	return CommandAccessClass(class), PathBoundary(boundary), ok
+	rawClass, rawBoundary, ok := parseToken(token, "command-access:")
+	if !ok {
+		return "", "", false
+	}
+	class, boundary := CommandAccessClass(rawClass), PathBoundary(rawBoundary)
+	if _, known := knownCommandAccessClasses[class]; !known {
+		return "", "", false
+	}
+	if _, known := knownBoundaries[boundary]; !known {
+		return "", "", false
+	}
+	return class, boundary, true
 }
 
 // parseToken decodes the shared "<prefix><class>;boundary:<boundary>" grammar.
