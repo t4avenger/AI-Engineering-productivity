@@ -121,6 +121,45 @@ function claudeOTLPLogs(logRecords: Array<{ attributes: OTLPAttribute[] }>): str
   });
 }
 
+type ClaudeApiRequestOptions = {
+  timestamp: string;
+  sequence: string;
+  sessionId: string;
+  requestId?: string;
+  model: string;
+  inputTokens: string;
+  outputTokens?: string;
+  durationMs?: string;
+  cacheReadTokens?: string;
+};
+
+function claudeApiRequestAttrs(options: ClaudeApiRequestOptions): OTLPAttribute[] {
+  const attrs: OTLPAttribute[] = [
+    { key: 'event.name', value: { stringValue: 'api_request' } },
+    { key: 'event.timestamp', value: { stringValue: options.timestamp } },
+    { key: 'event.sequence', value: { intValue: options.sequence } },
+    { key: 'session.id', value: { stringValue: options.sessionId } },
+    { key: 'model', value: { stringValue: options.model } },
+    { key: 'input_tokens', value: { intValue: options.inputTokens } },
+  ];
+  if (options.requestId) {
+    attrs.push({ key: 'request_id', value: { stringValue: options.requestId } });
+  }
+  if (options.outputTokens) {
+    attrs.push({ key: 'output_tokens', value: { intValue: options.outputTokens } });
+  }
+  if (options.durationMs) {
+    attrs.push({ key: 'duration_ms', value: { intValue: options.durationMs } });
+  }
+  if (options.cacheReadTokens) {
+    attrs.push({
+      key: 'cache_read_tokens',
+      value: { intValue: options.cacheReadTokens },
+    });
+  }
+  return attrs;
+}
+
 // claudeSkillOTLPLogs is a sanitised Claude Code skill_activated OTLP log payload.
 export function claudeSkillOTLPLogs(): string {
   return claudeOTLPLogs([
@@ -189,25 +228,15 @@ export function codexSkillOTLPMetrics(): string {
 export function claudeOutcomeSuccessOTLPLogs(): string {
   return claudeOTLPLogs([
     {
-      attributes: [
-        { key: 'event.name', value: { stringValue: 'api_request' } },
-        {
-          key: 'event.timestamp',
-          value: { stringValue: '2026-09-06T18:05:00.100Z' },
-        },
-        { key: 'event.sequence', value: { intValue: '3' } },
-        {
-          key: 'session.id',
-          value: { stringValue: 'tiq-live-e2e-outcome-session' },
-        },
-        {
-          key: 'model',
-          value: { stringValue: 'claude-haiku-4-5-20251001' },
-        },
-        { key: 'input_tokens', value: { intValue: '12' } },
-        { key: 'output_tokens', value: { intValue: '4' } },
-        { key: 'duration_ms', value: { intValue: '842' } },
-      ],
+      attributes: claudeApiRequestAttrs({
+        timestamp: '2026-09-06T18:05:00.100Z',
+        sequence: '3',
+        sessionId: 'tiq-live-e2e-outcome-session',
+        model: 'claude-haiku-4-5-20251001',
+        inputTokens: '12',
+        outputTokens: '4',
+        durationMs: '842',
+      }),
     },
   ]);
 }
@@ -271,34 +300,26 @@ export function claudeContextWasteOTLPLogs(): string {
   const session = 'tiq-live-e2e-context-waste-session';
   return claudeOTLPLogs([
     {
-      attributes: [
-        { key: 'event.name', value: { stringValue: 'api_request' } },
-        {
-          key: 'event.timestamp',
-          value: { stringValue: '2026-09-06T19:00:00.000Z' },
-        },
-        { key: 'event.sequence', value: { intValue: '1' } },
-        { key: 'session.id', value: { stringValue: session } },
-        { key: 'request_id', value: { stringValue: 'synthetic-request-1' } },
-        { key: 'model', value: { stringValue: 'claude-opus-4-8' } },
-        { key: 'input_tokens', value: { intValue: '100' } },
-        { key: 'cache_read_tokens', value: { intValue: '75' } },
-      ],
+      attributes: claudeApiRequestAttrs({
+        timestamp: '2026-09-06T19:00:00.000Z',
+        sequence: '1',
+        sessionId: session,
+        requestId: 'synthetic-request-1',
+        model: 'claude-opus-4-8',
+        inputTokens: '100',
+        cacheReadTokens: '75',
+      }),
     },
     {
-      attributes: [
-        { key: 'event.name', value: { stringValue: 'api_request' } },
-        {
-          key: 'event.timestamp',
-          value: { stringValue: '2026-09-06T19:00:01.000Z' },
-        },
-        { key: 'event.sequence', value: { intValue: '2' } },
-        { key: 'session.id', value: { stringValue: session } },
-        { key: 'request_id', value: { stringValue: 'synthetic-request-2' } },
-        { key: 'model', value: { stringValue: 'claude-opus-4-8' } },
-        { key: 'input_tokens', value: { intValue: '200' } },
-        { key: 'cache_read_tokens', value: { intValue: '150' } },
-      ],
+      attributes: claudeApiRequestAttrs({
+        timestamp: '2026-09-06T19:00:01.000Z',
+        sequence: '2',
+        sessionId: session,
+        requestId: 'synthetic-request-2',
+        model: 'claude-opus-4-8',
+        inputTokens: '200',
+        cacheReadTokens: '150',
+      }),
     },
   ]);
 }
