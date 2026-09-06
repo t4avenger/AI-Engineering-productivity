@@ -17,7 +17,7 @@ BMAD UX artifacts in `docs/bmad/ux-design.md` and `docs/bmad/user-flow.md` defin
 Serve the local dashboard from the TelemetryIQ Go daemon using `html/template` and HTMX:
 
 1. HTML routes and static assets (CSS, vendored HTMX) are served same-origin with the JSON API and OTLP intake.
-2. Browser authentication uses an httpOnly session cookie set by `POST /unlock` after validating the local management token. JSON `/api/v1/*` management endpoints continue to accept `Authorization: Bearer` for tests and machine clients; they also accept the session cookie.
+2. Browser authentication uses an httpOnly **Secure** session cookie set by `POST /unlock` after validating the local management token. Reach the UI as `http://localhost` (daemon default) so browsers accept Secure cookies over local HTTP. JSON `/api/v1/*` management endpoints continue to accept `Authorization: Bearer` for tests and machine clients; they also accept the session cookie.
 3. Templates reuse domain data from existing session and insight readers; business logic is not reimplemented in the UI layer.
 4. The React/Vite/Mantine application under `web/` is removed; Playwright e2e targets the daemon origin.
 5. PRODUCT_MAP web-stack choices are updated to match this ADR.

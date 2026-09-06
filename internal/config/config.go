@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	defaultHost   = "127.0.0.1"
+	defaultHost   = "localhost"
 	defaultPort   = "8080"
 	SchemaVersion = "0.1.0"
 	ModeLocalOnly = "local-only"

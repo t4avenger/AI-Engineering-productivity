@@ -25,7 +25,7 @@ test('renders explicit skill usage for data ingested through the live daemon', a
   await ingestOTLPMetrics(codexSkillOTLPMetrics());
 
   const skillUsage = await fetch(
-    'http://127.0.0.1:18080/api/v1/insights/skill-usage',
+    'http://localhost:18080/api/v1/insights/skill-usage',
     { headers: { Authorization: `Bearer ${authToken}` } },
   );
   expect(skillUsage.status).toBe(200);

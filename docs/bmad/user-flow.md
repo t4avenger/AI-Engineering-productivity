@@ -15,7 +15,7 @@
 **User Persona:** Local AI developer
 
 **Entry Points:**
-- Open `http://127.0.0.1:8080/` (or configured loopback addr)
+- Open `http://localhost:8080/` (or configured loopback addr)
 - Deep link to `/sessions/{id}`, `/insights`, etc. (redirects to unlock if unauthenticated)
 
 **Success Criteria:** Authenticated user can complete Home → Sessions → Detail and Insights journeys; destructive deletes require confirmation.

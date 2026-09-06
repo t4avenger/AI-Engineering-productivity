@@ -20,7 +20,7 @@ resetDaemonBetweenTests();
 test('renders a session ingested through the live daemon', async ({ page }) => {
   await ingestOTLPLogs(codexOTLPLogs(liveModel));
 
-  const list = await fetch('http://127.0.0.1:18080/api/v1/sessions?limit=100', {
+  const list = await fetch('http://localhost:18080/api/v1/sessions?limit=100', {
     headers: { Authorization: `Bearer ${authToken}` },
   });
   expect(list.status).toBe(200);

@@ -25,9 +25,10 @@ Run the daemon:
 make run
 ```
 
-Open `http://127.0.0.1:8080/`, run `make auth-token`, and paste the token into
-the Unlock page. The token is stored only in an httpOnly cookie for the browser
-session on loopback. The daemon exposes HTML dashboard routes plus
+Open `http://localhost:8080/`, run `make auth-token`, and paste the token into
+the Unlock page. The token is stored only in an httpOnly Secure cookie for the
+browser session on loopback (use the `localhost` hostname so browsers accept the
+Secure cookie over local HTTP). The daemon exposes HTML dashboard routes plus
 `GET /api/v1/health`, `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}`,
 `DELETE /api/v1/sessions/{id}`, `DELETE /api/v1/sessions`, `POST /v1/logs`,
 `POST /v1/traces`, `POST /v1/metrics`, and `GET /api/v1/ingest/counters`.
@@ -107,4 +108,4 @@ sharing:
   research_sessions: explicit-only
 ```
 
-The daemon rejects unknown fields, unsupported schema versions, content capture, non-local storage, unsafe sharing, non-loopback hosts, and invalid ports with actionable startup errors. `TELEMETRYIQ_HOST` (default `127.0.0.1`) and `TELEMETRYIQ_PORT` (default `8080`) override the loopback server address.
+The daemon rejects unknown fields, unsupported schema versions, content capture, non-local storage, unsafe sharing, non-loopback hosts, and invalid ports with actionable startup errors. `TELEMETRYIQ_HOST` (default `localhost`) and `TELEMETRYIQ_PORT` (default `8080`) override the loopback server address.

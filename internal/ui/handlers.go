@@ -110,12 +110,12 @@ func (s *Server) unlockPost(w http.ResponseWriter, r *http.Request) {
 		s.render(w, tmplUnlock, layoutData{Title: "Unlock", Content: unlockData{Error: "Token rejected. Run make auth-token and try again."}})
 		return
 	}
-	setAuthCookie(w, r, token)
+	setAuthCookie(w, token)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
-	clearAuthCookie(w, r)
+	clearAuthCookie(w)
 	http.Redirect(w, r, pathUnlock, http.StatusSeeOther)
 }
 

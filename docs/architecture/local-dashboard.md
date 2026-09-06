@@ -7,9 +7,11 @@ JSON API and OTLP intake. It does not send analytics or dashboard data to third
 parties.
 
 Browser authentication uses `POST /unlock` with the token from `make auth-token`.
-A successful unlock sets an httpOnly session cookie for the browser session.
-JSON management endpoints continue to accept `Authorization: Bearer` and also
-accept the session cookie.
+A successful unlock sets an httpOnly **Secure** session cookie. Use the
+`localhost` hostname (the daemon default) so browsers accept that cookie over
+local HTTP; bare `127.0.0.1` may reject Secure cookies. JSON management
+endpoints continue to accept `Authorization: Bearer` and also accept the
+session cookie.
 
 The Sessions page uses the stable Task 009 read API data. A session detail is
 loaded only after navigation to `/sessions/{id}`. Deletion requires an in-app

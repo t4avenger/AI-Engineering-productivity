@@ -121,23 +121,22 @@ func tokenMatches(expected [32]byte, provided string) bool {
 	return subtle.ConstantTimeCompare(expected[:], actual[:]) == 1
 }
 
-func setAuthCookie(w http.ResponseWriter, r *http.Request, token string) {
-	// Local-first daemon serves HTTP on loopback by default (ADR 0002).
-	// Secure cookies are not sent on http://127.0.0.1; enable Secure under TLS.
-	// Owner: maintainers; reason: loopback HTTP MVP; expiry: 2026-12-31.
-	//nosemgrep: go.lang.security.audit.net.cookie-missing-secure.cookie-missing-secure
+func setAuthCookie(w http.ResponseWriter, token string) {
+	// Secure is required for cookie hygiene (Sonar S2092). Local HTTP unlock
+	// works when the daemon is reached as http://localhost (Chromium treats
+	// localhost as a secure context for Secure cookies). Prefer
+	// TELEMETRYIQ_HOST=localhost over bare 127.0.0.1 for the HTML UI.
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
-		Secure:   r.TLS != nil, // NOSONAR S2092 -- Secure under TLS; loopback HTTP otherwise
+		Secure:   true,
 	})
 }
 
-func clearAuthCookie(w http.ResponseWriter, r *http.Request) {
-	//nosemgrep: go.lang.security.audit.net.cookie-missing-secure.cookie-missing-secure
+func clearAuthCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
 		Value:    "",
@@ -145,7 +144,7 @@ func clearAuthCookie(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
-		Secure:   r.TLS != nil, // NOSONAR S2092 -- Secure under TLS; loopback HTTP otherwise
+		Secure:   true,
 	})
 }
 
