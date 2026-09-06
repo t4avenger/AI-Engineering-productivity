@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
 
+import {
+  authToken,
+  codexOTLPLogs,
+  ingestOTLPLogs,
+  resetDaemonBetweenTests,
+} from './live-ingest-helpers';
+
 /**
  * Live end-to-end gate for the skill usage insight: drive the real daemon
  * started by playwright.config.ts. No page.route().fulfill() mocking — ingest
@@ -9,73 +16,12 @@ import { expect, test } from '@playwright/test';
  * "unknown" detection-coverage row and a "no skill identity observed" empty
  * state — never a fabricated skill or a silent zero (QUALITY_GATES live-data DoD).
  */
-const daemonBase = 'http://127.0.0.1:18080';
-const authToken = 'playwright-token';
-
-const rawCodexOTLPLogs = JSON.stringify({
-  resourceLogs: [
-    {
-      resource: {
-        attributes: [
-          { key: 'service.name', value: { stringValue: 'codex_cli_rs' } },
-          { key: 'service.version', value: { stringValue: '0.145.0' } },
-        ],
-      },
-      scopeLogs: [
-        {
-          logRecords: [
-            {
-              attributes: [
-                {
-                  key: 'event.name',
-                  value: { stringValue: 'codex.sse_event' },
-                },
-                {
-                  key: 'model',
-                  value: { stringValue: 'tiq-live-e2e-skill-model' },
-                },
-                {
-                  key: 'input_token_count',
-                  value: { stringValue: '11' },
-                },
-                {
-                  key: 'output_token_count',
-                  value: { stringValue: '3' },
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-  ],
-});
-
-async function clearSessions(): Promise<void> {
-  const response = await fetch(`${daemonBase}/api/v1/sessions`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${authToken}` },
-  });
-  expect(response.status).toBe(204);
-}
-
-test.beforeEach(async () => {
-  await clearSessions();
-});
-
-test.afterEach(async () => {
-  await clearSessions();
-});
+resetDaemonBetweenTests();
 
 test('renders honest skill usage for data ingested through the live daemon', async ({
   page,
 }) => {
-  const ingest = await fetch(`${daemonBase}/v1/logs`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: rawCodexOTLPLogs,
-  });
-  expect(ingest.status).toBe(202);
+  await ingestOTLPLogs(codexOTLPLogs('tiq-live-e2e-skill-model'));
 
   await page.goto('/');
   await page.getByLabel('Local API token').fill(authToken);

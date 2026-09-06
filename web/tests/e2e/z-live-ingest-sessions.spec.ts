@@ -1,84 +1,23 @@
 import { expect, test } from '@playwright/test';
 
+import {
+  authToken,
+  codexOTLPLogs,
+  ingestOTLPLogs,
+  resetDaemonBetweenTests,
+} from './live-ingest-helpers';
+
 /**
  * Live end-to-end gate: drive the real daemon started by playwright.config.ts.
  * No page.route().fulfill() mocking — ingest real OTLP, assert the UI renders
  * the resulting session data (issue #49 / #51).
  */
-const daemonBase = 'http://127.0.0.1:18080';
-const authToken = 'playwright-token';
 const liveModel = 'tiq-live-e2e-codex-model';
 
-const rawCodexOTLPLogs = JSON.stringify({
-  resourceLogs: [
-    {
-      resource: {
-        attributes: [
-          {
-            key: 'service.name',
-            value: { stringValue: 'codex_cli_rs' },
-          },
-          {
-            key: 'service.version',
-            value: { stringValue: '0.145.0' },
-          },
-        ],
-      },
-      scopeLogs: [
-        {
-          logRecords: [
-            {
-              attributes: [
-                {
-                  key: 'event.name',
-                  value: { stringValue: 'codex.sse_event' },
-                },
-                {
-                  key: 'model',
-                  value: { stringValue: liveModel },
-                },
-                {
-                  key: 'input_token_count',
-                  value: { stringValue: '11' },
-                },
-                {
-                  key: 'output_token_count',
-                  value: { stringValue: '3' },
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-  ],
-});
-
-async function clearSessions(): Promise<void> {
-  const response = await fetch(`${daemonBase}/api/v1/sessions`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${authToken}` },
-  });
-  expect(response.status).toBe(204);
-}
-
-test.beforeEach(async () => {
-  // Clean slate so retries cannot pass on leftover sessions/models.
-  await clearSessions();
-});
-
-test.afterEach(async () => {
-  // Leave the shared daemon empty for any later specs / re-runs.
-  await clearSessions();
-});
+resetDaemonBetweenTests();
 
 test('renders a session ingested through the live daemon', async ({ page }) => {
-  const ingest = await fetch(`${daemonBase}/v1/logs`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: rawCodexOTLPLogs,
-  });
-  expect(ingest.status).toBe(202);
+  await ingestOTLPLogs(codexOTLPLogs(liveModel));
 
   await page.goto('/');
   await page.getByLabel('Local API token').fill(authToken);
