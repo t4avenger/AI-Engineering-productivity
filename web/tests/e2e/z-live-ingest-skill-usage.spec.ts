@@ -57,5 +57,9 @@ test('renders honest skill usage for data ingested through the live daemon', asy
     skillSection.getByRole('heading', { name: 'No skill identity observed' }),
   ).toBeVisible();
   await expect(skillSection.getByText('codex')).toBeVisible();
-  await expect(skillSection.getByText('unknown')).toBeVisible();
+  // Exact match: the "Unknown providers" metric label also contains "unknown",
+  // so assert the coverage row's detection-state value specifically.
+  await expect(
+    skillSection.getByText('unknown', { exact: true }),
+  ).toBeVisible();
 });

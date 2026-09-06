@@ -398,7 +398,9 @@ function SkillUsageSection() {
       <h2 id="skill-usage-title">Skill usage</h2>
       <p className="lede">
         Skills are reported only where the provider explicitly stamps skill
-        identity. Providers without that signal are listed as unavailable.
+        identity. Providers without that signal are listed with their honest
+        detection state: unavailable when the provider stamps no skill signal,
+        unknown when its events carry no detection metadata at all.
       </p>
       {error ? <p role="alert">{error}</p> : null}
       {!usage && !error ? <output>Loading skill usage...</output> : null}
@@ -417,6 +419,10 @@ function SkillUsageSection() {
             <Metric
               label="Unavailable providers"
               value={usage.totals.unavailable_detection}
+            />
+            <Metric
+              label="Unknown providers"
+              value={usage.totals.unknown_detection}
             />
           </dl>
           {usage.skills.length === 0 ? (

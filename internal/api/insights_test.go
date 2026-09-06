@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
@@ -62,11 +63,13 @@ func TestSkillUsageInsightAPI(t *testing.T) {
 	explicit.Provider = "anthropic"
 	explicit.EventType = "skill_invocation"
 	explicit.ProviderExtensions = map[string]any{"skill_detection": "explicit", "skill": map[string]any{"name": "pdf", "outcome": "success"}}
-	unavailable := sessionTestEvent(t, "skill-unavailable", "skill-session-2", "codex-cli", "active", "2026-01-04T09:00:01Z", "")
-	unavailable.Provider = "openai"
-	unavailable.EventType = "api_request"
-	unavailable.ProviderExtensions = map[string]any{"skill_detection": "unavailable"}
-	if err := repo.SaveEvents(context.Background(), []canonical.Event{explicit, unavailable}); err != nil {
+	// Codex stamps no skill_detection metadata today, so its honest surface state
+	// is unknown (missing metadata), never unavailable (a stamped no-skill signal).
+	unknown := sessionTestEvent(t, "skill-unknown", "skill-session-2", "codex", "active", "2026-01-04T09:00:01Z", "")
+	unknown.Provider = "openai"
+	unknown.EventType = "api_request"
+	unknown.ProviderExtensions = map[string]any{}
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{explicit, unknown}); err != nil {
 		t.Fatal(err)
 	}
 	server := httptest.NewServer(NewHandler(slog.Default(), repo))
@@ -87,8 +90,13 @@ func TestSkillUsageInsightAPI(t *testing.T) {
 	if body.Data.Totals.ObservedSkills != 1 || body.Data.Totals.Invocations != 1 {
 		t.Fatalf("skill insight totals = %#v", body.Data.Totals)
 	}
-	if body.Data.Totals.ExplicitDetection != 1 || body.Data.Totals.UnavailableDetection != 1 {
+	if body.Data.Totals.ExplicitDetection != 1 || body.Data.Totals.UnavailableDetection != 0 {
 		t.Fatalf("skill detection coverage = %#v", body.Data.Totals)
+	}
+	// The codex surface stamps no skill_detection, so it must be reported as
+	// unknown (missing metadata), never fabricated as unavailable.
+	if state := coverageStateFor(body.Data.Coverage, "openai", "codex"); state != "unknown" {
+		t.Fatalf("codex skill detection = %q, want unknown: %#v", state, body.Data.Coverage)
 	}
 	if len(body.Data.Skills) != 1 || body.Data.Skills[0].SkillName != "pdf" {
 		t.Fatalf("skill records = %#v", body.Data.Skills)
@@ -97,9 +105,20 @@ func TestSkillUsageInsightAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(serialized), `"detection_state":"unavailable"`) {
-		t.Fatalf("skill insight did not surface unavailable coverage honestly: %s", serialized)
+	if !strings.Contains(string(serialized), `"detection_state":"unknown"`) {
+		t.Fatalf("skill insight did not surface unknown coverage honestly: %s", serialized)
 	}
+}
+
+// coverageStateFor returns the detection state reported for a (provider, tool)
+// surface, or empty string when that surface is absent from coverage.
+func coverageStateFor(coverage []insights.SkillCoverage, provider, tool string) string {
+	for _, row := range coverage {
+		if row.Provider == provider && row.Tool == tool {
+			return row.DetectionState
+		}
+	}
+	return ""
 }
 
 func TestInsightsPathRequiresManagementAuth(t *testing.T) {

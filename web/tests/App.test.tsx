@@ -189,8 +189,8 @@ function mockAPI(
                   invocations: options.insightEmpty ? 0 : 3,
                   explicit_detection: options.insightEmpty ? 0 : 1,
                   inferred_detection: 0,
-                  unavailable_detection: 1,
-                  unknown_detection: 0,
+                  unavailable_detection: 0,
+                  unknown_detection: 1,
                 },
                 skills: options.insightEmpty
                   ? []
@@ -217,8 +217,8 @@ function mockAPI(
                 coverage: [
                   {
                     provider: 'openai',
-                    tool: 'codex-cli',
-                    detection_state: 'unavailable',
+                    tool: 'codex',
+                    detection_state: 'unknown',
                   },
                 ],
                 notes: [
@@ -535,13 +535,14 @@ describe('App dashboard', () => {
     );
   });
 
-  test('shows skill usage with explicit and unavailable states', async () => {
+  test('shows skill usage with explicit and unknown states', async () => {
     renderInsights();
-    // The provider with no explicit skill signal is shown, not silently dropped.
+    // A provider with no detection metadata is surfaced as unknown, not silently
+    // dropped and not conflated with a stamped "unavailable" no-skill signal.
     await expectInsightContent(
       'Skill usage',
       ['Observed skills', 'failed: 1, success: 1'],
-      ['pdf', 'unavailable'],
+      ['pdf', 'unknown'],
     );
   });
 
