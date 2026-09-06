@@ -194,7 +194,11 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) sessionTimelinePartial(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, pathSessionsPrefix)
-	id := strings.TrimSuffix(path, "/timeline")
+	id, ok := safePathID(strings.TrimSuffix(path, "/timeline"))
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
 	rows, next, err := s.loadTimeline(r, id, r.URL.Query().Get("cursor"))
 	if err != nil {
 		http.Error(w, "unable to load timeline", http.StatusInternalServerError)
@@ -313,16 +317,18 @@ func (s *Server) costsPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var amount int64
+	var hasKnownAmount bool
 	for _, record := range records {
 		if data.Currency == "" {
 			data.Currency = record.Currency
 		}
 		data.Statuses[record.Status]++
 		if record.AmountMicrousd != nil {
+			hasKnownAmount = true
 			amount += *record.AmountMicrousd
 		}
 	}
-	if amount != 0 {
+	if hasKnownAmount {
 		data.Amount = &amount
 	}
 	s.render(w, tmplCosts, layoutData{Title: "Costs", Nav: "costs", Health: s.healthLabel(), Content: data})

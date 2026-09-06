@@ -254,3 +254,39 @@ func TestUnavailableNotZeroOnCosts(t *testing.T) {
 		t.Fatalf("unknown cost must not render as zero: %q", body)
 	}
 }
+
+func TestKnownZeroCostRendersZero(t *testing.T) {
+	zero := int64(0)
+	repo := &fullStub{costs: []cost.Record{{
+		Currency:       "EUR",
+		Status:         "calculated",
+		AmountMicrousd: &zero,
+	}}}
+	server, err := ui.New("test-token", repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	rec := getAuthed(t, handler, cookie, "/costs")
+	body := rec.Body.String()
+	if !strings.Contains(body, "Calculated amount (EUR): 0.000000") {
+		t.Fatalf("known zero should render with currency: %q", body)
+	}
+}
+
+func TestTimelinePartialRejectsInvalidSessionID(t *testing.T) {
+	server, err := ui.New("test-token", &fullStub{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	req := httptest.NewRequest(http.MethodGet, "/sessions/../evil/timeline", nil)
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("invalid timeline id status = %d", rec.Code)
+	}
+}

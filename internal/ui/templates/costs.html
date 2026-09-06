@@ -7,7 +7,7 @@
   {{with .Content}}
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
   <p>Currency: {{if .Currency}}{{.Currency}}{{else}}unavailable{{end}}</p>
-  <p>Calculated amount (USD): {{microusd .Amount}}</p>
+  <p>Calculated amount ({{if .Currency}}{{.Currency}}{{else}}unavailable{{end}}): {{microusd .Amount}}</p>
   {{if .Statuses}}
   <h2>Statuses</h2>
   <ul>
