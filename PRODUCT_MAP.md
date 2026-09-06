@@ -911,6 +911,11 @@ claim and its enforcement cannot drift apart silently.
 - new governance events
 - high-confidence insights
 
+Home must not surface cost estimates, totals, labels, links, or calls to action.
+It is reserved for behaviour, efficiency, governance, integration health, and
+privacy status. Cost remains a secondary optional estimate on the Costs page and
+must never gate ingestion or the primary local workflow.
+
 ### 17.2 Sessions
 Filter by:
 - date
@@ -952,12 +957,18 @@ field may imply provider parity that is not backed by the capability matrix.
 - evidence limits for unobserved contract sources (abandon/PR/revert)
 
 ### 17.4 Costs
-- cost by day
-- cost by tool
-- cost by model
-- cost by session outcome
-- failed-work cost
+- secondary optional estimates by day
+- secondary optional estimates by tool
+- secondary optional estimates by model
+- secondary optional estimates by session outcome
+- failed-work estimate, labelled secondary
 - unknown-cost records
+
+Costs must show calculation version, currency, catalog version, and status
+coverage. Unknown, missing, or partial coverage is labelled with the relevant
+status and never rendered as `$0`; a displayed zero is valid only when the
+calculation produced an explicit zero amount. Costs must not allocate spend to
+MCP servers, skills, or other operations without observed provider evidence.
 
 ### 17.5 Governance
 - policy events

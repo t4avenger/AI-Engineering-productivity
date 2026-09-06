@@ -119,7 +119,7 @@ See [user-flow.md](user-flow.md) for full paths. Primary flows:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ TelemetryIQ Local          Daemon: Healthy              │
-│ Home Sessions Insights Integrations Privacy Costs       │
+│ Home Sessions Insights Integrations Privacy             │
 ├─────────────────────────────────────────────────────────┤
 │ Orchestration overview                                  │
 │ Privacy mode: local-only · Retention: 30 days           │

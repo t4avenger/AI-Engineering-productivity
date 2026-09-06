@@ -24,7 +24,8 @@ from observed local sessions: with none observed it says `Awaiting telemetry`,
 rather than claiming that a provider has been detected.
 
 Home emphasises orchestration usage (sessions today, tools observed, insight
-highlights) and never headlines cost. Costs remain a secondary page.
+highlights) and does not surface cost labels or links. Costs remain a secondary
+page available at `/costs`, outside the primary navigation.
 
 The Insights page reads MCP inventory and skill usage summaries from retained
 canonical events. It renders provider-reported MCP server names when available,
