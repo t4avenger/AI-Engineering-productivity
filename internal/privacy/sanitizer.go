@@ -121,6 +121,11 @@ var certExtensions = map[string]struct{}{
 // cannot be determined it returns indeterminate rather than a fabricated answer.
 func ClassifyPath(raw string) (PathClass, PathBoundary) {
 	cleaned := strings.TrimSpace(raw)
+	if cleaned == "" {
+		// An empty or whitespace-only path carries no location or category
+		// signal; classifying it as project-relative would fabricate one.
+		return PathNonProject, BoundaryIndeterminate
+	}
 	normalized := strings.ToLower(strings.ReplaceAll(cleaned, "\\", "/"))
 	segments := make([]string, 0)
 	for _, segment := range strings.Split(normalized, "/") {
@@ -158,18 +163,23 @@ func PathToken(class PathClass, boundary PathBoundary) string {
 }
 
 func classifyBoundary(normalized string, segments []string) PathBoundary {
+	// A relative path is syntactically project-relative regardless of the
+	// segments it passes through: an in-repo path like internal/.ssh/id_rsa is
+	// still inside the project, so the home-config heuristic must not apply.
+	if !strings.HasPrefix(normalized, "~") && !isAbsolutePath(normalized) {
+		return BoundaryProject
+	}
+	// Absolute or home-anchored: project membership is unknown. A home-directory
+	// config segment marks it external; otherwise it stays indeterminate.
+	if strings.HasPrefix(normalized, "~") {
+		return BoundaryExternal
+	}
 	for _, segment := range segments {
 		if _, ok := homeConfigSegments[segment]; ok {
 			return BoundaryExternal
 		}
 	}
-	if strings.HasPrefix(normalized, "~") {
-		return BoundaryExternal
-	}
-	if isAbsolutePath(normalized) {
-		return BoundaryIndeterminate
-	}
-	return BoundaryProject
+	return BoundaryIndeterminate
 }
 
 // isAbsolutePath recognises POSIX, UNC, and Windows drive-letter absolute paths

@@ -108,6 +108,9 @@ func TestClassifiedPathsAreNotDictionaryReversible(t *testing.T) {
 		"/etc/ssl/server.pem":     "path-class:cert;boundary:indeterminate",
 		`C:\Users\me\.ssh\id_rsa`: "path-class:ssh_key;boundary:external",
 		"internal/app/handler.go": "path-class:project_relative;boundary:project",
+		// A home-config-like segment inside a relative path is still in-repo:
+		// the boundary stays project, not external.
+		"internal/.ssh/id_rsa": "path-class:ssh_key;boundary:project",
 	}
 	for raw, want := range cases {
 		result := sanitizer.Sanitize(map[string]any{"file_path": raw})
@@ -131,6 +134,15 @@ func TestClassifiedPathsAreNotDictionaryReversible(t *testing.T) {
 	if sanitizer.Sanitize(map[string]any{"file_path": ".env"}).Value["file_path"] !=
 		sanitizer.Sanitize(map[string]any{"file_path": ".env.production"}).Value["file_path"] {
 		t.Fatal("distinct dotenv paths must share one class token")
+	}
+
+	// An empty or whitespace-only path must not fabricate a project-relative
+	// signal; it carries no location or category information.
+	for _, blank := range []string{"", "   ", "\t"} {
+		got, _ := sanitizer.Sanitize(map[string]any{"file_path": blank}).Value["file_path"].(string)
+		if got != "path-class:non_project;boundary:indeterminate" {
+			t.Fatalf("blank path %q: got %q want non_project/indeterminate", blank, got)
+		}
 	}
 }
 
