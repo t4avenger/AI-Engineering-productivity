@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/wayne/telemetryiq/internal/normalize"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
@@ -93,7 +94,34 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 			attributes[key] = value
 		}
 	}
-	return canonical.Event{SchemaVersion: canonicalSchemaVersion, EventID: id, EventType: stringValue(fields["event.name"], "codex.log.received"), OccurredAt: receivedAt.UTC(), ReceivedAt: receivedAt.UTC(), Provider: "openai", Tool: "codex", SourceSchema: sourceSchema, SourceVersion: stringValue(resource["service.version"], unavailable), ActorID: unavailable, DeviceID: unavailable, SessionID: id, PrivacyLevel: "operational", Attributes: attributes, ProviderExtensions: map[string]any{"resource_attributes": resource, "log_attributes": fields, "severity": record.SeverityText}}, nil
+	extensions := map[string]any{"resource_attributes": resource, "log_attributes": codexLogAttributes(fields), "severity": record.SeverityText}
+	if mcpCall, ok := codexMCPCall(fields, fingerprint); ok {
+		attributes["category"] = string(canonical.OperationCategoryMCPCall)
+		extensions["mcp_call"] = mcpCall
+	}
+	return canonical.Event{SchemaVersion: canonicalSchemaVersion, EventID: id, EventType: stringValue(fields["event.name"], "codex.log.received"), OccurredAt: receivedAt.UTC(), ReceivedAt: receivedAt.UTC(), Provider: "openai", Tool: "codex", SourceSchema: sourceSchema, SourceVersion: stringValue(resource["service.version"], unavailable), ActorID: unavailable, DeviceID: unavailable, SessionID: id, PrivacyLevel: "operational", Attributes: attributes, ProviderExtensions: extensions}, nil
+}
+
+func codexLogAttributes(fields map[string]any) map[string]any {
+	return normalize.UnknownFields(fields, "mcp_server")
+}
+
+func codexMCPCall(fields map[string]any, fingerprint func([]byte) string) (map[string]any, bool) {
+	server, ok := normalize.ObservedString(fields["mcp_server"])
+	if !ok {
+		return nil, false
+	}
+	call := map[string]any{
+		"server_fingerprint": "codex:" + fingerprint([]byte(server)),
+		"server_name":        server,
+		"identity_state":     "fingerprinted",
+	}
+	for _, key := range []string{"mcp_server_origin", "tool_name", "tool_namespace", "call_id", "duration_ms", "success", "output_truncated", "tool_result_seq", "decision"} {
+		if value, ok := fields[key]; ok {
+			call[key] = value
+		}
+	}
+	return call, true
 }
 
 type attribute struct {

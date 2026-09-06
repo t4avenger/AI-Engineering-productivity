@@ -33,23 +33,26 @@ type MCPTotals struct {
 }
 
 type MCPServer struct {
-	ServerFingerprint         string `json:"server_fingerprint"`
-	IdentityState             string `json:"identity_state"`
-	Provider                  string `json:"provider"`
-	Tool                      string `json:"tool"`
-	SessionID                 string `json:"session_id"`
-	ConnectionStatus          string `json:"connection_status"`
-	ConnectionScope           string `json:"connection_scope"`
-	TransportType             string `json:"transport_type"`
-	IsPlugin                  *bool  `json:"is_plugin"`
-	Used                      bool   `json:"used"`
-	UsageState                string `json:"usage_state"`
-	ContextWasteState         string `json:"context_waste_state"`
-	RequestInputTokens        *int64 `json:"request_input_tokens"`
-	RequestOutputTokens       *int64 `json:"request_output_tokens"`
-	RequestCachedInputTokens  *int64 `json:"request_cached_input_tokens"`
-	RequestCacheCreatedTokens *int64 `json:"request_cache_created_tokens"`
-	TokenContextLabel         string `json:"token_context_label"`
+	ServerFingerprint         string   `json:"server_fingerprint"`
+	ServerName                string   `json:"server_name"`
+	IdentityState             string   `json:"identity_state"`
+	Provider                  string   `json:"provider"`
+	Tool                      string   `json:"tool"`
+	SessionID                 string   `json:"session_id"`
+	ConnectionStatus          string   `json:"connection_status"`
+	ConnectionScope           string   `json:"connection_scope"`
+	TransportType             string   `json:"transport_type"`
+	IsPlugin                  *bool    `json:"is_plugin"`
+	InvocationCount           int      `json:"invocation_count"`
+	ToolNames                 []string `json:"tool_names"`
+	Used                      bool     `json:"used"`
+	UsageState                string   `json:"usage_state"`
+	ContextWasteState         string   `json:"context_waste_state"`
+	RequestInputTokens        *int64   `json:"request_input_tokens"`
+	RequestOutputTokens       *int64   `json:"request_output_tokens"`
+	RequestCachedInputTokens  *int64   `json:"request_cached_input_tokens"`
+	RequestCacheCreatedTokens *int64   `json:"request_cache_created_tokens"`
+	TokenContextLabel         string   `json:"token_context_label"`
 }
 
 type tokenContext struct {
@@ -59,20 +62,49 @@ type tokenContext struct {
 	cacheCreated *int64
 }
 
-// MCPInventoryFromEvents reports observed MCP connections and explicit MCP use
-// without persisting or exposing raw server names. If no reviewed invocation
-// signal is present, usage remains unavailable rather than inferred.
+type mcpUsage struct {
+	count       int
+	serverNames map[string]struct{}
+	toolNames   map[string]struct{}
+}
+
+type mcpUse struct {
+	fingerprint string
+	serverName  string
+	toolName    string
+}
+
+// MCPInventoryFromEvents reports provider-reported MCP server names when
+// available, privacy-safe fingerprints for correlation, observed connection
+// metadata, and explicit MCP use. If no reviewed invocation signal is present,
+// usage remains unavailable rather than inferred.
 func MCPInventoryFromEvents(events []canonical.Event) MCPInventory {
 	servers := map[string]*MCPServer{}
-	used := map[string]struct{}{}
+	used := map[string]mcpUsage{}
 	tokensBySession := map[string]tokenContext{}
 
 	for _, event := range events {
 		if context, ok := requestTokenContext(event); ok {
 			tokensBySession[event.SessionID] = mergeTokenContext(tokensBySession[event.SessionID], context)
 		}
-		if fingerprint, ok := mcpUseFingerprint(event); ok {
-			used[fingerprint] = struct{}{}
+		if use, ok := mcpUseEvent(event); ok {
+			used[use.fingerprint] = mergeMCPUsage(used[use.fingerprint], use)
+			if _, exists := servers[use.fingerprint]; !exists {
+				servers[use.fingerprint] = &MCPServer{
+					ServerFingerprint: use.fingerprint,
+					ServerName:        use.serverName,
+					IdentityState:     "fingerprinted",
+					Provider:          event.Provider,
+					Tool:              event.Tool,
+					SessionID:         event.SessionID,
+					ConnectionStatus:  "unavailable",
+					ConnectionScope:   "unknown",
+					TransportType:     "unknown",
+					ToolNames:         []string{},
+					UsageState:        "unavailable",
+					ContextWasteState: "usage_unavailable",
+				}
+			}
 		}
 		if server, ok := mcpConnection(event); ok {
 			servers[server.ServerFingerprint] = &server
@@ -98,9 +130,15 @@ func MCPInventoryFromEvents(events []canonical.Event) MCPInventory {
 	return result
 }
 
-func annotatedServer(server *MCPServer, used map[string]struct{}, tokensBySession map[string]tokenContext) MCPServer {
-	if _, ok := used[server.ServerFingerprint]; ok {
+func annotatedServer(server *MCPServer, used map[string]mcpUsage, tokensBySession map[string]tokenContext) MCPServer {
+	server.ToolNames = []string{}
+	if usage, ok := used[server.ServerFingerprint]; ok {
 		server.Used = true
+		server.InvocationCount = usage.count
+		if server.ServerName == "" {
+			server.ServerName = firstSortedValue(usage.serverNames)
+		}
+		server.ToolNames = sortedSet(usage.toolNames)
 		server.UsageState = "observed"
 		server.ContextWasteState = "used"
 	} else if server.IdentityState == "fingerprinted" {
@@ -153,6 +191,7 @@ func mcpConnection(event canonical.Event) (MCPServer, bool) {
 	fingerprint, identityState := serverFingerprint(event, rawEvent)
 	return MCPServer{
 		ServerFingerprint: fingerprint,
+		ServerName:        stringValue(rawEvent, "server_name", ""),
 		IdentityState:     identityState,
 		Provider:          event.Provider,
 		Tool:              event.Tool,
@@ -161,22 +200,61 @@ func mcpConnection(event canonical.Event) (MCPServer, bool) {
 		ConnectionScope:   stringValue(rawEvent, "server_scope", "unknown"),
 		TransportType:     stringValue(rawEvent, "transport_type", "unknown"),
 		IsPlugin:          boolPointer(rawEvent["is_plugin"]),
+		ToolNames:         []string{},
 		UsageState:        "unavailable",
 		ContextWasteState: "usage_unavailable",
 	}, true
 }
 
-func mcpUseFingerprint(event canonical.Event) (string, bool) {
+func mcpUseEvent(event canonical.Event) (mcpUse, bool) {
 	if event.EventType != "mcp_call" && event.EventType != "mcp.call" && event.Attributes["category"] != string(canonical.OperationCategoryMCPCall) {
-		return "", false
+		return mcpUse{}, false
 	}
 	if fingerprint, ok := hashedValue(event.ProviderExtensions); ok {
-		return fingerprint, true
+		return mcpUse{fingerprint: fingerprint}, true
 	}
 	if rawCall, ok := event.ProviderExtensions["mcp_call"].(map[string]any); ok {
-		return hashedValue(rawCall)
+		fingerprint, ok := hashedValue(rawCall)
+		if !ok {
+			return mcpUse{}, false
+		}
+		return mcpUse{fingerprint: fingerprint, serverName: stringValue(rawCall, "server_name", ""), toolName: stringValue(rawCall, "tool_name", "")}, true
 	}
-	return "", false
+	return mcpUse{}, false
+}
+
+func mergeMCPUsage(current mcpUsage, use mcpUse) mcpUsage {
+	if current.serverNames == nil {
+		current.serverNames = map[string]struct{}{}
+	}
+	if current.toolNames == nil {
+		current.toolNames = map[string]struct{}{}
+	}
+	current.count++
+	if strings.TrimSpace(use.serverName) != "" {
+		current.serverNames[use.serverName] = struct{}{}
+	}
+	if strings.TrimSpace(use.toolName) != "" {
+		current.toolNames[use.toolName] = struct{}{}
+	}
+	return current
+}
+
+func sortedSet(values map[string]struct{}) []string {
+	result := make([]string, 0, len(values))
+	for value := range values {
+		result = append(result, value)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func firstSortedValue(values map[string]struct{}) string {
+	sorted := sortedSet(values)
+	if len(sorted) == 0 {
+		return ""
+	}
+	return sorted[0]
 }
 
 func serverFingerprint(event canonical.Event, rawEvent map[string]any) (string, string) {

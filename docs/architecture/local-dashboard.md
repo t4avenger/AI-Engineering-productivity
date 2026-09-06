@@ -16,7 +16,7 @@ rather than claiming that a provider has been detected.
 
 The Privacy page documents the enforced local-only defaults and provides a Mantine managed modal with accessible typed confirmation to delete all retained telemetry. It preserves safe configuration, the installation privacy salt, and the local API token.
 
-The Insights page reads authenticated MCP inventory summaries from retained canonical events. It renders privacy-safe server fingerprints, explicit usage states, connected-but-unused context-waste states, and request-level token context labelled as not exact per-MCP allocation.
+The Insights page reads authenticated MCP inventory summaries from retained canonical events. It renders provider-reported MCP server names when available, privacy-safe server fingerprints, explicit usage states, connected-but-unused context-waste states, and request-level token context labelled as not exact per-MCP allocation.
 
 The Costs page reads authenticated local calculation summaries, shows calculated estimates and cost statuses, and never represents an unknown price as zero. Session summaries retain the first observed model so the list and detail view agree with the event timeline.
 

@@ -74,10 +74,13 @@ func TestClaudeLogsIngestEndToEnd(t *testing.T) {
 	if inventory.Data.Totals.ConnectedServers != 1 {
 		t.Fatalf("connected_servers = %d, want 1: %#v", inventory.Data.Totals.ConnectedServers, inventory.Data.Totals)
 	}
+	if len(inventory.Data.Servers) != 1 || inventory.Data.Servers[0].ServerName != "tiq-canary-server" {
+		t.Fatalf("server name missing from MCP inventory: %#v", inventory.Data.Servers)
+	}
 
-	// Nothing sensitive survived the round trip through the read API.
+	// Sensitive identifiers still do not survive the round trip through the read API.
 	assertNoRawIdentifiers(t,
-		[]string{"tiq-canary-session", "tiq-canary-server", "tiq-canary@example.test", "tiq-canary-api-key"},
+		[]string{"tiq-canary-session", "tiq-canary@example.test", "tiq-canary-api-key"},
 		marshalJSON(t, sessions), marshalJSON(t, inventory))
 }
 

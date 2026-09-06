@@ -84,7 +84,7 @@ function mockAPI(
                 schema_version: '0.1.0',
                 totals: {
                   connected_servers: 0,
-                  used_servers: 0,
+                  used_servers: 1,
                   unused_servers: 0,
                   usage_unavailable_servers: 0,
                   request_input_tokens: null,
@@ -108,8 +108,8 @@ function mockAPI(
               data: {
                 schema_version: '0.1.0',
                 totals: {
-                  connected_servers: 1,
-                  used_servers: 0,
+                  connected_servers: 2,
+                  used_servers: 1,
                   unused_servers: 1,
                   usage_unavailable_servers: 0,
                   request_input_tokens: 10,
@@ -122,6 +122,7 @@ function mockAPI(
                 servers: [
                   {
                     server_fingerprint: 'mcp:hmac:filesystem',
+                    server_name: 'filesystem',
                     identity_state: 'fingerprinted',
                     provider: 'anthropic',
                     tool: 'claude-code',
@@ -130,6 +131,31 @@ function mockAPI(
                     connection_scope: 'user',
                     transport_type: 'stdio',
                     is_plugin: false,
+                    invocation_count: 2,
+                    tool_names: ['read_file', 'list_directory'],
+                    used: true,
+                    usage_state: 'observed',
+                    context_waste_state: 'used',
+                    request_input_tokens: 10,
+                    request_output_tokens: 5,
+                    request_cached_input_tokens: null,
+                    request_cache_created_tokens: null,
+                    token_context_label:
+                      'request-level context only; not exact per-MCP allocation',
+                  },
+                  {
+                    server_fingerprint: 'mcp:hmac:git',
+                    server_name: 'git',
+                    identity_state: 'fingerprinted',
+                    provider: 'anthropic',
+                    tool: 'claude-code',
+                    session_id: 'session-1',
+                    connection_status: 'connected',
+                    connection_scope: 'project',
+                    transport_type: 'stdio',
+                    is_plugin: true,
+                    invocation_count: 0,
+                    tool_names: [],
                     used: false,
                     usage_state: 'not_observed',
                     context_waste_state: 'connected_but_unused',
@@ -409,7 +435,11 @@ describe('App dashboard', () => {
       await screen.findByRole('heading', { name: 'MCP inventory' }),
     ).toBeInTheDocument();
     expect(screen.getByText('Connected MCPs')).toBeInTheDocument();
-    expect(screen.getByText('connected_but_unused')).toBeInTheDocument();
+    expect(screen.getAllByText('filesystem').length).toBeGreaterThan(0);
+    expect(screen.getByText('used')).toBeInTheDocument();
+    expect(screen.getAllByText('2').length).toBeGreaterThan(0);
+    expect(screen.getByText('read_file, list_directory')).toBeInTheDocument();
+    expect(screen.getAllByText('unavailable').length).toBeGreaterThan(0);
     expect(
       screen.getAllByText(/not exact per-MCP allocation/).length,
     ).toBeGreaterThan(0);

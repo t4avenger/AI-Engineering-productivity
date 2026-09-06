@@ -15,3 +15,7 @@ Observed with Codex CLI 0.145.0 in an isolated synthetic session on 2026-07-27.
 | Trace/span correlation | unsupported | observed log records had empty trace/span IDs. |
 
 No capability not listed here is inferred from this run.
+
+## Implementation note
+
+The Codex log adapter contains defensive handling for newer `codex.tool_result` metadata observed locally on 2026-09-06: when a sanitized log record contains a non-empty `mcp_server`, it stores `provider_extensions.mcp_call.server_name`, a privacy-safe `server_fingerprint`, and safe invocation metadata while excluding the raw server name from generic log attributes. This remains implementation support, not a matrix capability claim, until a reviewed committed fixture is added.
