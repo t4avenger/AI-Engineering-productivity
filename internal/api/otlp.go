@@ -55,8 +55,7 @@ func (i *otlpHTTPIngest) tracesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (i *otlpHTTPIngest) metricsHandler(w http.ResponseWriter, r *http.Request) {
-	// Explicit route so operators get an honest 501 instead of an ambiguous 404.
-	i.rejectUnsupportedSignal(w, r, "metrics")
+	i.receive(w, r, "resourceMetrics")
 }
 
 func (i *otlpHTTPIngest) logsHandler(w http.ResponseWriter, r *http.Request) {
@@ -113,16 +112,25 @@ func (i *otlpHTTPIngest) receive(w http.ResponseWriter, r *http.Request, resourc
 	if i.inspector != nil {
 		i.inspector.capture(payload)
 	}
-	if resourceField == "resourceLogs" {
-		if err := i.persistLogs(r, payload); err != nil {
-			status, code, message := ingestPersistenceError(err)
-			i.reject(w, status, code, message)
-			return
-		}
+	if err := i.persistSignal(r, resourceField, payload); err != nil {
+		status, code, message := ingestPersistenceError(err)
+		i.reject(w, status, code, message)
+		return
 	}
 	// Raw payloads are never persisted or logged; only canonical sanitised events are stored.
 	i.accepted.Add(1)
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func (i *otlpHTTPIngest) persistSignal(request *http.Request, resourceField string, payload map[string]json.RawMessage) error {
+	switch resourceField {
+	case "resourceLogs":
+		return i.persistLogs(request, payload)
+	case "resourceMetrics":
+		return i.persistMetrics(request, payload)
+	default:
+		return nil
+	}
 }
 
 func (i *otlpHTTPIngest) sanitizedPayload(payload map[string]json.RawMessage) ([]byte, error) {
@@ -172,6 +180,33 @@ func (i *otlpHTTPIngest) persistLogs(request *http.Request, payload map[string]j
 	}
 	events = append(events, claudeEvents...)
 
+	if len(events) == 0 {
+		return nil
+	}
+	if err := i.repository.SaveEvents(request.Context(), events); err != nil {
+		return fmt.Errorf("persist: %w", err)
+	}
+	return nil
+}
+
+// persistMetrics sanitises an OTLP metrics payload and persists only reviewed
+// Codex skill-injection datapoints as canonical events. Non-skill metrics are
+// accepted at the HTTP layer (so exporters do not retry) but produce no events.
+func (i *otlpHTTPIngest) persistMetrics(request *http.Request, payload map[string]json.RawMessage) error {
+	if i.repository == nil || i.sanitizer == nil {
+		return nil
+	}
+	safePayload, err := i.sanitizedPayload(payload)
+	if err != nil {
+		return err
+	}
+	fingerprint := func(value []byte) string { return i.sanitizer.Fingerprint(value) }
+	receivedAt := time.Now().UTC()
+
+	events, err := codex.NormalizeMetrics(safePayload, receivedAt, fingerprint)
+	if err != nil && !errors.Is(err, codex.ErrUnsupportedMetrics) {
+		return fmt.Errorf("normalise: %w", err)
+	}
 	if len(events) == 0 {
 		return nil
 	}

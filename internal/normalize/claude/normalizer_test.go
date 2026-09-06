@@ -34,7 +34,7 @@ func TestNormalizeEventsGolden(t *testing.T) {
 	assertMatchesGolden(t, "claude-code-2.1.251-otlp-events.events.json", first)
 }
 
-func TestNormalizeEventsFingerprintsSessionAndPreservesUnavailableStates(t *testing.T) {
+func TestNormalizeEventsFingerprintsSessionAndOmitsFabricatedSkillUnavailable(t *testing.T) {
 	events, err := NormalizeEvents(readFixture(t, "claude-code-2.1.251-otlp-events.json"), stubFingerprint)
 	if err != nil {
 		t.Fatalf("normalise: %v", err)
@@ -46,11 +46,11 @@ func TestNormalizeEventsFingerprintsSessionAndPreservesUnavailableStates(t *test
 		if event.SessionID != "claude-code:fixture" {
 			t.Fatalf("session id = %q, want fingerprint", event.SessionID)
 		}
-		if event.ProviderExtensions["skill_detection"] != "unavailable" {
-			t.Fatalf("skill_detection = %v, want unavailable", event.ProviderExtensions["skill_detection"])
+		if _, stamped := event.ProviderExtensions["skill_detection"]; stamped {
+			t.Fatalf("non-skill events must not stamp skill_detection, got %v", event.ProviderExtensions["skill_detection"])
 		}
 		unavailableFields, ok := event.Attributes["unavailable_fields"].([]string)
-		if !ok || !containsField(unavailableFields, "skill_invocations") || !containsField(unavailableFields, "tool_calls") {
+		if !ok || containsField(unavailableFields, "skill_invocations") || !containsField(unavailableFields, "tool_calls") {
 			t.Fatalf("unavailable_fields = %v", event.Attributes["unavailable_fields"])
 		}
 		preserved := event.ProviderExtensions["event"].(map[string]any)
@@ -66,6 +66,34 @@ func TestNormalizeEventsFingerprintsSessionAndPreservesUnavailableStates(t *test
 	if !containsField(connectionUnavailable, "model") || !containsField(connectionUnavailable, "token_usage") {
 		t.Fatalf("connection event should mark model/token unavailable, got %v", connectionUnavailable)
 	}
+}
+
+func TestNormalizeEventsSkillActivatedIsExplicit(t *testing.T) {
+	events, err := NormalizeEvents(readFixture(t, "claude-code-2.1.263-skill-activated.json"), stubFingerprint)
+	if err != nil {
+		t.Fatalf("normalise: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("event count = %d, want 1", len(events))
+	}
+	event := events[0]
+	if event.EventType != "skill_activated" {
+		t.Fatalf("event_type = %q", event.EventType)
+	}
+	if event.ProviderExtensions["skill_detection"] != "explicit" {
+		t.Fatalf("skill_detection = %v, want explicit", event.ProviderExtensions["skill_detection"])
+	}
+	skill, ok := event.ProviderExtensions["skill"].(map[string]any)
+	if !ok || skill["name"] != "tiq-probe" {
+		t.Fatalf("skill payload = %#v", event.ProviderExtensions["skill"])
+	}
+	if skill["invocation_trigger"] != "user-slash" || skill["source"] != "projectSettings" {
+		t.Fatalf("skill extras = %#v", skill)
+	}
+	if updateGolden() {
+		writeGolden(t, "claude-code-2.1.263-skill-activated.events.json", events)
+	}
+	assertMatchesGolden(t, "claude-code-2.1.263-skill-activated.events.json", events)
 }
 
 func TestNormalizeEventsCapabilityProbeYieldsNoEvents(t *testing.T) {

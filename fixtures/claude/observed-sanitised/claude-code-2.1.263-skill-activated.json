@@ -1,0 +1,37 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.263",
+  "captured_at": "2026-09-06T14:50:01Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "source_type": "otlp_http_json_logs",
+    "capture": {
+      "workspace": "isolated_tmp",
+      "content_logging": "OTEL_LOG_TOOL_DETAILS=1",
+      "telemetry_endpoint": "loopback_dump_receiver",
+      "skill_invoked": "tiq-probe",
+      "accepted_payloads_after_capture": 1
+    },
+    "observations": [
+      {
+        "name": "skill_invocations",
+        "state": "supported",
+        "evidence": "skill_activated event included skill.name, invocation_trigger, and skill.source"
+      }
+    ],
+    "sample_events": [
+      {
+        "event_name": "skill_activated",
+        "session_id": "synthetic-session-id",
+        "event_timestamp": "2026-09-06T14:50:00.962Z",
+        "event_sequence": 9,
+        "skill.name": "tiq-probe",
+        "invocation_trigger": "user-slash",
+        "skill.source": "projectSettings"
+      }
+    ]
+  }
+}

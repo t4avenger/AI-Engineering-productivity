@@ -34,7 +34,8 @@ func TestSkillUsageFromEventsAggregatesExplicitSkills(t *testing.T) {
 }
 
 func TestSkillUsageMarksUnavailableProviderInsteadOfEmptyZero(t *testing.T) {
-	// Claude Code stamps skill_detection=unavailable on every event today.
+	// A provider may stamp skill_detection=unavailable when fixtures prove the
+	// surface cannot carry skill identity; that is distinct from missing metadata.
 	usage := SkillUsageFromEvents([]canonical.Event{
 		testSkillEvent("a", map[string]any{"skill_detection": "unavailable"}, nil),
 		testSkillEvent("b", map[string]any{"skill_detection": "unavailable"}, nil),

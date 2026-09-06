@@ -19,9 +19,34 @@ The checked-in fixture is deliberately synthetic. It documents the wrapper forma
 
 ## Bounded live receiver test
 
-The local receiver accepts Codex OTLP logs at `http://127.0.0.1:8080/v1/logs`. Use `test-harness/codex-otel-config.toml` only in an isolated temporary Codex home with a synthetic repository. It keeps prompt logging disabled and selects the JSON protocol required by the current receiver.
+The local receiver accepts Codex OTLP logs at `http://127.0.0.1:8080/v1/logs`
+and skill-relevant OTLP metrics at `http://127.0.0.1:8080/v1/metrics`. Use
+`test-harness/codex-otel-config.toml` only in an isolated temporary Codex home
+with a synthetic repository. It keeps prompt logging disabled and selects the
+JSON protocol required by the current receiver.
 
-Start the receiver, copy the template to the temporary home as `config.toml`, then run one synthetic Codex session with that home. Confirm the accepted ingest counter increases. Stop Codex to flush its asynchronous exporter, delete the temporary home, and sanitise any locally captured observation before attempting to create an `observed-sanitised` fixture. Never use a normal working repository or normal Codex configuration for this test.
+Start the receiver, copy the template to the temporary home as `config.toml`,
+then run one synthetic Codex session with that home. Confirm the accepted ingest
+counter increases. Stop Codex to flush its asynchronous exporter, delete the
+temporary home, and sanitise any locally captured observation before attempting
+to create an `observed-sanitised` fixture. Never use a normal working repository
+or normal Codex configuration for this test.
+
+## Skill injection capture
+
+To raise Skill invocations above `unknown`, add a synthetic skill under the
+isolated `CODEX_HOME/skills/` tree, enable both `exporter` (logs) and
+`metrics_exporter` (metrics) in the harness config, then run a synthetic
+`codex exec` turn that injects the skill (for example `$tiq-probe`).
+
+The reviewed skill signal is the OTLP metric `codex.skill.injected` with
+datapoint attributes `skill`, `status`, and `invoke_type`. Companion logs from
+the same 0.153.4 capture did not carry skill identity on tool events; do not
+infer skills from `tool_name`.
+
+Committed evidence:
+
+- `fixtures/codex/observed-sanitised/codex-0.153.4-skill-injected-metrics.json`
 
 ## Review checklist
 

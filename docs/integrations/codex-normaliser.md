@@ -85,6 +85,18 @@ resource and log attributes plus the severity are preserved verbatim under
 `provider_extensions`. `fixtures/codex/expected/codex-0.145.0-logs.records.json`
 is the golden output for the checked-in observed-sanitised input.
 
+## Skill injection metrics
+
+`NormalizeMetrics` maps OTLP `resourceMetrics` from Codex (`codex_cli_rs` /
+`codex_exec`) and emits canonical events only for `codex.skill.injected`
+datapoints. Each datapoint with a non-empty `skill` attribute becomes an event
+with `provider_extensions.skill_detection = "explicit"` and
+`provider_extensions.skill.{name,outcome,invoke_type}`. Other metrics are ignored
+after HTTP accept so exporters can flush without inventing insight rows.
+
+Golden: `fixtures/codex/expected/codex-0.153.4-skill-injected-metrics.events.json`
+for `fixtures/codex/observed-sanitised/codex-0.153.4-skill-injected-metrics.json`.
+
 The static-analysis gate enforces cyclomatic complexity of 15 or lower for
 each Go function. The normaliser separates fixture, resource, scope, and span
 handling so that nesting does not conceal excessive decision complexity.

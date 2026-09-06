@@ -28,20 +28,22 @@ The daemon binds to `127.0.0.1:8080` by default. After starting it once, run `ma
 
 ## OTLP/HTTP ingest
 
-`POST /v1/logs` is the supported live ingest path. It accepts one JSON OTLP
-payload with a non-empty `resourceLogs` array, requires `application/json`, and
-is limited to 1 MiB. Accepted payloads return `202 Accepted`. Validation
-failures return JSON errors with a stable `error.code`
-(`malformed_payload`, `invalid_payload`, `unsupported_media_type`,
+`POST /v1/logs` is the supported live ingest path for provider log events. It
+accepts one JSON OTLP payload with a non-empty `resourceLogs` array, requires
+`application/json`, and is limited to 1 MiB. Accepted payloads return
+`202 Accepted`. Validation failures return JSON errors with a stable
+`error.code` (`malformed_payload`, `invalid_payload`, `unsupported_media_type`,
 `payload_too_large`).
 
-`POST /v1/traces` and `POST /v1/metrics` are registered deliberately and return
-`501 Not Implemented` with `error.code` `not_implemented`. They never return
-`202` for a payload that will be dropped. Observed first-class providers export
-behaviour signals as OTLP logs; use `/v1/logs`.
+`POST /v1/metrics` accepts OTLP JSON `resourceMetrics` the same way. Only
+reviewed Codex `codex.skill.injected` datapoints are persisted as canonical
+skill events; other metrics are accepted so exporters can flush, but are not
+turned into insight rows. `POST /v1/traces` remains `501 Not Implemented` with
+`error.code` `not_implemented` so exporters are never told a dropped payload
+was accepted.
 
 Raw OTLP payloads are never logged or persisted. The supported, observed Codex
-and Claude Code OTLP log shapes are normalised and sanitised before canonical
+and Claude Code OTLP shapes are normalised and sanitised before canonical
 events are saved locally.
 
 ## Codex fixture normalisation

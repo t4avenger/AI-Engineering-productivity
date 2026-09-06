@@ -1,0 +1,116 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:skill:fixture-1524",
+    "event_type": "codex.skill.injected",
+    "occurred_at": "2026-09-06T14:53:41.601372612Z",
+    "received_at": "2026-09-06T14:53:41Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.153.4",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:skill:fixture-1524",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "tool_calls",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:skill:fixture-1524",
+        "ordering_key": "01788706421601372612:codex:skill:fixture-1524",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex skill metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "count": 1,
+        "name": "codex.skill.injected"
+      },
+      "resource": {
+        "env": "telemetryiq-synthetic"
+      },
+      "skill": {
+        "invoke_type": "implicit",
+        "name": "tiq-probe",
+        "outcome": "success"
+      },
+      "skill_detection": "explicit"
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:skill:fixture-79f4",
+    "event_type": "codex.skill.injected",
+    "occurred_at": "2026-09-06T14:53:41.601372612Z",
+    "received_at": "2026-09-06T14:53:41Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.153.4",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:skill:fixture-79f4",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "tool_calls",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:skill:fixture-79f4",
+        "ordering_key": "01788706421601372612:codex:skill:fixture-79f4",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex skill metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "count": 1,
+        "name": "codex.skill.injected"
+      },
+      "resource": {
+        "env": "telemetryiq-synthetic"
+      },
+      "skill": {
+        "invoke_type": "explicit",
+        "name": "tiq-probe",
+        "outcome": "success"
+      },
+      "skill_detection": "explicit"
+    }
+  }
+]

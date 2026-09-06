@@ -32,7 +32,10 @@ The daemon opens the existing local SQLite repository at the platform
 configuration directory and reuses its installation-specific privacy salt.
 The API never reads raw intake payloads. Session endpoints require a bearer token; the auth-token CLI command deliberately prints the protected local token for dashboard setup. Health and OTLP intake remain unauthenticated, and the daemon remains loopback-only by default.
 
-Live OTLP persistence is limited to `POST /v1/logs`. `POST /v1/traces` and
-`POST /v1/metrics` exist as honest refusal endpoints (`501`,
+Live OTLP persistence accepts `POST /v1/logs` (provider log events) and a
+narrow `POST /v1/metrics` path that persists only reviewed Codex
+`codex.skill.injected` datapoints as canonical skill events. Other metrics are
+accepted with HTTP 202 so exporters flush, but are not turned into insight rows.
+`POST /v1/traces` remains an honest refusal endpoint (`501`,
 `error.code=not_implemented`) so exporters are never told a dropped payload was
 accepted.

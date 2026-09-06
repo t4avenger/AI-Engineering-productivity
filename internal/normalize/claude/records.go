@@ -124,7 +124,6 @@ func recordExtensions(raw map[string]any, requestID string, started time.Time, s
 				"reason":     "Claude Code event telemetry has no reviewed task-boundary signal",
 			},
 		},
-		"skill_detection": unavailable,
 		"timestamps": map[string]any{
 			"completed_at": "observed",
 			"started_at":   startedProvenance,
