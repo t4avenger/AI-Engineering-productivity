@@ -36,6 +36,7 @@ function mockAPI(
     costFails?: boolean;
     insightFails?: boolean;
     insightEmpty?: boolean;
+    skillFails?: boolean;
   } = {},
 ) {
   vi.stubGlobal(
@@ -175,6 +176,8 @@ function mockAPI(
             { status: 200 },
           ),
         );
+      if (url.endsWith('/insights/skill-usage') && options.skillFails)
+        return Promise.reject(new Error('Skill service offline'));
       if (url.endsWith('/insights/skill-usage'))
         return Promise.resolve(
           new Response(
@@ -182,8 +185,8 @@ function mockAPI(
               data: {
                 schema_version: '0.1.0',
                 totals: {
-                  observed_skills: options.insightEmpty ? 0 : 1,
-                  invocations: options.insightEmpty ? 0 : 2,
+                  observed_skills: options.insightEmpty ? 0 : 2,
+                  invocations: options.insightEmpty ? 0 : 3,
                   explicit_detection: options.insightEmpty ? 0 : 1,
                   inferred_detection: 0,
                   unavailable_detection: 1,
@@ -200,6 +203,15 @@ function mockAPI(
                         invocation_count: 2,
                         outcomes: { success: 1, failed: 1 },
                         outcome_state: 'observed',
+                      },
+                      {
+                        skill_name: 'diagram',
+                        provider: 'anthropic',
+                        tool: 'claude-code',
+                        detection_state: 'explicit',
+                        invocation_count: 1,
+                        outcomes: {},
+                        outcome_state: 'unavailable',
                       },
                     ],
                 coverage: [
@@ -252,6 +264,18 @@ function mockAPI(
       return Promise.reject(new Error(`Unexpected request: ${url}`));
     }),
   );
+}
+
+// renderInsights mounts the app with a mocked API and opens the Insights page,
+// the shared setup for every insight test.
+function renderInsights(options: Parameters<typeof mockAPI>[1] = {}) {
+  mockAPI([session], options);
+  render(
+    <MantineProvider env="test">
+      <App />
+    </MantineProvider>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
 }
 
 describe('App dashboard', () => {
@@ -466,13 +490,7 @@ describe('App dashboard', () => {
   });
 
   test('shows MCP inventory with explicit context labels', async () => {
-    mockAPI();
-    render(
-      <MantineProvider env="test">
-        <App />
-      </MantineProvider>,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+    renderInsights();
     expect(
       await screen.findByRole('heading', { name: 'MCP inventory' }),
     ).toBeInTheDocument();
@@ -488,13 +506,7 @@ describe('App dashboard', () => {
   });
 
   test('shows an empty MCP inventory', async () => {
-    mockAPI([session], { insightEmpty: true });
-    render(
-      <MantineProvider env="test">
-        <App />
-      </MantineProvider>,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+    renderInsights({ insightEmpty: true });
     expect(
       await screen.findByRole('heading', {
         name: 'No MCP connections observed',
@@ -503,26 +515,14 @@ describe('App dashboard', () => {
   });
 
   test('shows an MCP inventory loading failure', async () => {
-    mockAPI([session], { insightFails: true });
-    render(
-      <MantineProvider env="test">
-        <App />
-      </MantineProvider>,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+    renderInsights({ insightFails: true });
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Insight service offline',
     );
   });
 
   test('shows skill usage with explicit and unavailable states', async () => {
-    mockAPI();
-    render(
-      <MantineProvider env="test">
-        <App />
-      </MantineProvider>,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+    renderInsights();
     expect(
       await screen.findByRole('heading', { name: 'Skill usage' }),
     ).toBeInTheDocument();
@@ -534,17 +534,18 @@ describe('App dashboard', () => {
   });
 
   test('shows an empty skill usage state honestly', async () => {
-    mockAPI([session], { insightEmpty: true });
-    render(
-      <MantineProvider env="test">
-        <App />
-      </MantineProvider>,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+    renderInsights({ insightEmpty: true });
     expect(
       await screen.findByRole('heading', {
         name: 'No skill identity observed',
       }),
+    ).toBeInTheDocument();
+  });
+
+  test('shows a skill usage loading failure', async () => {
+    renderInsights({ skillFails: true });
+    expect(
+      await screen.findByText('Skill service offline'),
     ).toBeInTheDocument();
   });
 

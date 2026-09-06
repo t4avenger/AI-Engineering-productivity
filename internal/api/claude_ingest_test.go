@@ -51,23 +51,8 @@ const rawClaudeOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
 // full path — ingest, sanitise, normalise, persist, serve — actually surfaces
 // real Claude behaviour data, not that a fixture round-trips in isolation.
 func TestClaudeLogsIngestEndToEnd(t *testing.T) {
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	repository, err := sqlite.Open(":memory:", sanitizer)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = repository.Close() })
-	server := httptest.NewServer(NewPersistentHandler(slog.Default(), sanitizer, repository))
-	t.Cleanup(server.Close)
-
-	response := postOTLPToPath(t, server.URL, "/v1/logs", []byte(rawClaudeOTLPLogs), "application/json")
-	if response.StatusCode != http.StatusAccepted {
-		t.Fatalf("ingest status = %d", response.StatusCode)
-	}
-	closeBody(t, response)
+	server, repository := newPersistentTestServer(t)
+	ingestClaudeOTLP(t, server)
 
 	sessions := requireClaudeSession(t, repository)
 	inventory := fetchMCPInventory(t, server.URL)
@@ -82,6 +67,35 @@ func TestClaudeLogsIngestEndToEnd(t *testing.T) {
 	assertNoRawIdentifiers(t,
 		[]string{"tiq-canary-session", "tiq-canary@example.test", "tiq-canary-api-key"},
 		marshalJSON(t, sessions), marshalJSON(t, inventory))
+}
+
+// newPersistentTestServer starts a live persistent daemon backed by an in-memory
+// sqlite repository and a fresh sanitizer, returning both for ingest→read gates.
+func newPersistentTestServer(t *testing.T) (*httptest.Server, storage.Repository) {
+	t.Helper()
+	sanitizer, err := privacy.New(make([]byte, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository, err := sqlite.Open(":memory:", sanitizer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = repository.Close() })
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), sanitizer, repository))
+	t.Cleanup(server.Close)
+	return server, repository
+}
+
+// ingestClaudeOTLP POSTs the raw Claude OTLP log payload to the live /v1/logs
+// receiver and asserts it was accepted.
+func ingestClaudeOTLP(t *testing.T, server *httptest.Server) {
+	t.Helper()
+	response := postOTLPToPath(t, server.URL, "/v1/logs", []byte(rawClaudeOTLPLogs), "application/json")
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("ingest status = %d", response.StatusCode)
+	}
+	closeBody(t, response)
 }
 
 // requireClaudeSession asserts exactly one persisted anthropic/claude-code
@@ -104,15 +118,22 @@ func requireClaudeSession(t *testing.T, repository storage.Repository) []canonic
 // fetchMCPInventory reads the MCP inventory through the live HTTP read API.
 func fetchMCPInventory(t *testing.T, baseURL string) mcpInventoryResponse {
 	t.Helper()
-	response, err := http.Get(baseURL + "/api/v1/insights/mcp-inventory")
+	return getInsightJSON[mcpInventoryResponse](t, baseURL+"/api/v1/insights/mcp-inventory")
+}
+
+// getInsightJSON reads an insight endpoint through the live HTTP read API and
+// decodes its JSON response into T.
+func getInsightJSON[T any](t *testing.T, url string) T {
+	t.Helper()
+	response, err := http.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
-		t.Fatalf("mcp inventory status = %d", response.StatusCode)
+		t.Fatalf("insight status = %d for %s", response.StatusCode, url)
 	}
-	var body mcpInventoryResponse
+	var body T
 	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
 		t.Fatal(err)
 	}
