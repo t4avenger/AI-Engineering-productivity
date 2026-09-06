@@ -17,8 +17,12 @@ import (
 // adapter persists).
 var ErrUnsupportedMetrics = errors.New("unsupported Codex metrics payload")
 
-const skillInjectedMetric = "codex.skill.injected"
-const skillTurnDurationMetric = "codex.skill.turn.duration_seconds"
+const (
+	skillInjectedMetric     = "codex.skill.injected"
+	skillTurnDurationMetric = "codex.skill.turn.duration_seconds"
+	serviceNameAttribute    = "service.name"
+	serviceVersionAttribute = "service.version"
+)
 
 type metricsPayload struct {
 	ResourceMetrics []resourceMetric `json:"resourceMetrics"`
@@ -92,10 +96,10 @@ func NormalizeMetrics(data []byte, receivedAt time.Time, fingerprint func([]byte
 
 func skillEventsFromResource(resource resourceMetric, receivedAt time.Time, fingerprint func([]byte) string) ([]canonical.Event, error) {
 	resourceAttrs := attributes(resource.Resource.Attributes)
-	if !isCodexLogService(resourceAttrs["service.name"]) {
+	if !isCodexLogService(resourceAttrs[serviceNameAttribute]) {
 		return nil, nil
 	}
-	version := stringValue(resourceAttrs["service.version"], unavailable)
+	version := stringValue(resourceAttrs[serviceVersionAttribute], unavailable)
 	var events []canonical.Event
 	for _, scope := range resource.ScopeMetrics {
 		for _, item := range scope.Metrics {
@@ -149,7 +153,7 @@ func skillTurnEvent(resource map[string]any, version string, point histogramData
 			"name":  skillTurnDurationMetric,
 			"count": metricCount(point.Count),
 		},
-		"resource": normalize.UnknownFields(resource, "service.name", "service.version"),
+		"resource": normalize.UnknownFields(resource, serviceNameAttribute, serviceVersionAttribute),
 		"skill_turn": map[string]any{
 			"outcome":   mapSkillStatus(stringValue(fields["status"], "")),
 			"plugin_id": stringValue(fields["plugin_id"], unavailable),
@@ -177,7 +181,7 @@ func skillInjectedEvent(resource map[string]any, version string, point metricDat
 			"name":  skillInjectedMetric,
 			"count": metricCount(point.AsInt),
 		},
-		"resource": normalize.UnknownFields(resource, "service.name", "service.version"),
+		"resource": normalize.UnknownFields(resource, serviceNameAttribute, serviceVersionAttribute),
 	}
 
 	return skillEvent(eventID, skillInjectedMetric, occurredAt, receivedAt, version, extensions), true, nil
