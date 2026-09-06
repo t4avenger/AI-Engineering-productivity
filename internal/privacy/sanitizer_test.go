@@ -3,6 +3,7 @@ package privacy
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -38,13 +39,16 @@ func TestSanitizeRemovesSensitiveContentBeforeStorageBoundary(t *testing.T) {
 	if got := result.Value["command_arguments"]; got != "[REDACTED]" {
 		t.Fatalf("expected command arguments redacted, got %#v", got)
 	}
-	if got, ok := result.Value["file_path"].(string); !ok || !strings.HasPrefix(got, "hmac-sha256:") {
-		t.Fatalf("expected hashed file path, got %#v", got)
+	if got, ok := result.Value["file_path"].(string); !ok || got != "path-class:non_project;boundary:indeterminate" {
+		t.Fatalf("expected classified file path token, got %#v", got)
+	}
+	if strings.Contains(fmt.Sprint(result.Value["file_path"]), "hmac-sha256:") {
+		t.Fatalf("classified file path must not carry a reversible hash, got %#v", result.Value["file_path"])
 	}
 	if _, found := result.Value["prompt"]; found {
 		t.Fatal("prompt must be removed")
 	}
-	if !hasProvenance(result.Provenance, "file_path", ActionHashed) || !hasProvenance(result.Provenance, "provider_extensions.api_key", ActionRemoved) {
+	if !hasProvenance(result.Provenance, "file_path", ActionClassified) || !hasProvenance(result.Provenance, "provider_extensions.api_key", ActionRemoved) {
 		t.Fatalf("expected transformation provenance, got %#v", result.Provenance)
 	}
 }
@@ -91,15 +95,109 @@ func TestSanitizeRemovesSensitiveOTLPAttributeValues(t *testing.T) {
 	}
 }
 
-func TestHashIsStablePerInstallationAndDifferentAcrossInstallations(t *testing.T) {
+func TestClassifiedPathsAreNotDictionaryReversible(t *testing.T) {
+	sanitizer := testSanitizer(t, 1)
+	// A leaked local key must not let an attacker recover which secret file was
+	// touched from the persisted output. Every entry below is a well-known secret
+	// path an attacker would hold in a dictionary.
+	cases := map[string]string{
+		".env":                    "path-class:dotenv;boundary:project",
+		".env.production":         "path-class:dotenv;boundary:project",
+		"~/.ssh/id_rsa":           "path-class:ssh_key;boundary:external",
+		"~/.aws/credentials":      "path-class:credentials_file;boundary:external",
+		"/etc/ssl/server.pem":     "path-class:cert;boundary:indeterminate",
+		`C:\Users\me\.ssh\id_rsa`: "path-class:ssh_key;boundary:external",
+		"internal/app/handler.go": "path-class:project_relative;boundary:project",
+	}
+	for raw, want := range cases {
+		result := sanitizer.Sanitize(map[string]any{"file_path": raw})
+		got, _ := result.Value["file_path"].(string)
+		if got != want {
+			t.Fatalf("classify %q: got %q want %q", raw, got, want)
+		}
+		persisted, err := json.Marshal(result)
+		if err != nil {
+			t.Fatalf("marshal %q: %v", raw, err)
+		}
+		if strings.Contains(string(persisted), raw) {
+			t.Fatalf("raw path %q reached storage boundary", raw)
+		}
+		if strings.Contains(string(persisted), "hmac-sha256:") {
+			t.Fatalf("classified path %q must not carry a reversible fingerprint", raw)
+		}
+	}
+	// Two distinct dotenv files collapse to one token: the specific file cannot
+	// be recovered even by an attacker who knows the class.
+	if sanitizer.Sanitize(map[string]any{"file_path": ".env"}).Value["file_path"] !=
+		sanitizer.Sanitize(map[string]any{"file_path": ".env.production"}).Value["file_path"] {
+		t.Fatal("distinct dotenv paths must share one class token")
+	}
+}
+
+func TestFingerprintScopedIsDomainSeparatedStableAndInstallationSpecific(t *testing.T) {
 	first := testSanitizer(t, 1)
 	second := testSanitizer(t, 2)
-	input := map[string]any{"file_path": "/private/project/main.go"}
-	if first.Sanitize(input).Value["file_path"] != first.Sanitize(input).Value["file_path"] {
-		t.Fatal("expected stable hash within one installation")
+	const value = "session-correlation-key"
+
+	sessionScoped := first.FingerprintScoped("session", value)
+	if sessionScoped != first.FingerprintScoped("session", value) {
+		t.Fatal("expected scoped fingerprint stable within one installation")
 	}
-	if first.Sanitize(input).Value["file_path"] == second.Sanitize(input).Value["file_path"] {
-		t.Fatal("expected different hashes across installations")
+	if sessionScoped == first.FingerprintScoped("event", value) {
+		t.Fatal("expected different fingerprints across scopes")
+	}
+	if sessionScoped == second.FingerprintScoped("session", value) {
+		t.Fatal("expected different scoped fingerprints across installations")
+	}
+	if !strings.HasPrefix(sessionScoped, "hmac-sha256:") {
+		t.Fatal("expected hmac-prefixed scoped fingerprint")
+	}
+}
+
+func TestRotateSaltChangesFingerprints(t *testing.T) {
+	dir := t.TempDir()
+	original, err := LoadOrCreateSalt(dir)
+	if err != nil {
+		t.Fatalf("create salt: %v", err)
+	}
+	before, err := New(original)
+	if err != nil {
+		t.Fatalf("build sanitizer: %v", err)
+	}
+
+	rotated, err := RotateSalt(dir)
+	if err != nil {
+		t.Fatalf("rotate salt: %v", err)
+	}
+	if string(rotated) == string(original) {
+		t.Fatal("rotation must produce a new key")
+	}
+	reloaded, err := LoadOrCreateSalt(dir)
+	if err != nil {
+		t.Fatalf("reload salt: %v", err)
+	}
+	if string(reloaded) != string(rotated) {
+		t.Fatal("rotated salt must be the one persisted")
+	}
+	after, err := New(rotated)
+	if err != nil {
+		t.Fatalf("build rotated sanitizer: %v", err)
+	}
+
+	const value = "session-correlation-key"
+	if before.Fingerprint(value) == after.Fingerprint(value) {
+		t.Fatal("rotation must change fingerprints for the same value")
+	}
+	if before.FingerprintScoped("session", value) == after.FingerprintScoped("session", value) {
+		t.Fatal("rotation must change scoped fingerprints for the same value")
+	}
+
+	info, err := os.Stat(filepath.Join(dir, saltFileName))
+	if err != nil {
+		t.Fatalf("stat rotated salt: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Fatalf("expected rotated salt permissions 0600, got %o", got)
 	}
 }
 
