@@ -75,6 +75,10 @@ When the web application changes, also run functional browser and accessibility 
 make test-e2e
 ```
 
+When adding or changing a provider adapter or insight that surfaces retained
+telemetry, satisfy the live-data DoD in `QUALITY_GATES.md` (daemon
+ingest→read gate plus at least one non-mocked Playwright e2e).
+
 When concurrency or shared state changes, run:
 
 ```bash

@@ -1020,6 +1020,12 @@ Use Playwright against a packaged or production-like local application. Cover:
 
 E2E tests must verify user-observable behaviour, not internal implementation details.
 
+At least one Playwright journey must exercise the **live daemon** end-to-end
+(ingest via the real OTLP receiver, then render through the real read API)
+without mocking API responses. Fixture-boundary adapter tests and mocked UI
+specs alone are not a sufficient DoD for adapters or insights; see
+`QUALITY_GATES.md` (live-data DoD) and issues #49 / #51.
+
 #### Exploratory and usability testing
 Before each alpha checkpoint, execute a written exploratory charter covering:
 - installation and setup friction
