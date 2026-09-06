@@ -124,8 +124,13 @@ func ContextWasteFromEvents(events []canonical.Event, thresholds ContextWasteThr
 
 	sort.Slice(result.Sessions, func(i, j int) bool {
 		left, right := result.Sessions[i], result.Sessions[j]
-		return fmt.Sprintf("%s\x00%s\x00%s", left.Provider, left.Tool, left.SessionID) <
-			fmt.Sprintf("%s\x00%s\x00%s", right.Provider, right.Tool, right.SessionID)
+		if left.Provider != right.Provider {
+			return left.Provider < right.Provider
+		}
+		if left.Tool != right.Tool {
+			return left.Tool < right.Tool
+		}
+		return left.SessionID < right.SessionID
 	})
 	result.Totals = contextWasteTotals(result.Sessions)
 	return result

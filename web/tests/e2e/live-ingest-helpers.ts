@@ -98,8 +98,14 @@ export async function ingestOTLPMetrics(body: string): Promise<void> {
   expect(ingest.status).toBe(202);
 }
 
-// claudeSkillOTLPLogs is a sanitised Claude Code skill_activated OTLP log payload.
-export function claudeSkillOTLPLogs(): string {
+type OTLPAttributeValue =
+  | { stringValue: string }
+  | { intValue: string }
+  | { boolValue: boolean };
+
+type OTLPAttribute = { key: string; value: OTLPAttributeValue };
+
+function claudeOTLPLogs(logRecords: Array<{ attributes: OTLPAttribute[] }>): string {
   return JSON.stringify({
     resourceLogs: [
       {
@@ -109,41 +115,33 @@ export function claudeSkillOTLPLogs(): string {
             { key: 'service.version', value: { stringValue: '2.1.263' } },
           ],
         },
-        scopeLogs: [
-          {
-            logRecords: [
-              {
-                attributes: [
-                  {
-                    key: 'event.name',
-                    value: { stringValue: 'skill_activated' },
-                  },
-                  {
-                    key: 'event.timestamp',
-                    value: { stringValue: '2026-09-06T14:50:00.962Z' },
-                  },
-                  { key: 'event.sequence', value: { intValue: '9' } },
-                  {
-                    key: 'session.id',
-                    value: { stringValue: 'tiq-live-e2e-skill-session' },
-                  },
-                  { key: 'skill.name', value: { stringValue: 'tiq-probe' } },
-                  {
-                    key: 'invocation_trigger',
-                    value: { stringValue: 'user-slash' },
-                  },
-                  {
-                    key: 'skill.source',
-                    value: { stringValue: 'projectSettings' },
-                  },
-                ],
-              },
-            ],
-          },
-        ],
+        scopeLogs: [{ logRecords }],
       },
     ],
   });
+}
+
+// claudeSkillOTLPLogs is a sanitised Claude Code skill_activated OTLP log payload.
+export function claudeSkillOTLPLogs(): string {
+  return claudeOTLPLogs([
+    {
+      attributes: [
+        { key: 'event.name', value: { stringValue: 'skill_activated' } },
+        {
+          key: 'event.timestamp',
+          value: { stringValue: '2026-09-06T14:50:00.962Z' },
+        },
+        { key: 'event.sequence', value: { intValue: '9' } },
+        {
+          key: 'session.id',
+          value: { stringValue: 'tiq-live-e2e-skill-session' },
+        },
+        { key: 'skill.name', value: { stringValue: 'tiq-probe' } },
+        { key: 'invocation_trigger', value: { stringValue: 'user-slash' } },
+        { key: 'skill.source', value: { stringValue: 'projectSettings' } },
+      ],
+    },
+  ]);
 }
 
 // codexSkillOTLPMetrics is a sanitised Codex skill.injected OTLP metrics payload.
@@ -189,45 +187,29 @@ export function codexSkillOTLPMetrics(): string {
 
 /** Claude api_request provider-completion success contract for scorecard e2e. */
 export function claudeOutcomeSuccessOTLPLogs(): string {
-  return JSON.stringify({
-    resourceLogs: [
-      {
-        resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'claude-code' } },
-            { key: 'service.version', value: { stringValue: '2.1.263' } },
-          ],
+  return claudeOTLPLogs([
+    {
+      attributes: [
+        { key: 'event.name', value: { stringValue: 'api_request' } },
+        {
+          key: 'event.timestamp',
+          value: { stringValue: '2026-09-06T18:05:00.100Z' },
         },
-        scopeLogs: [
-          {
-            logRecords: [
-              {
-                attributes: [
-                  { key: 'event.name', value: { stringValue: 'api_request' } },
-                  {
-                    key: 'event.timestamp',
-                    value: { stringValue: '2026-09-06T18:05:00.100Z' },
-                  },
-                  { key: 'event.sequence', value: { intValue: '3' } },
-                  {
-                    key: 'session.id',
-                    value: { stringValue: 'tiq-live-e2e-outcome-session' },
-                  },
-                  {
-                    key: 'model',
-                    value: { stringValue: 'claude-haiku-4-5-20251001' },
-                  },
-                  { key: 'input_tokens', value: { intValue: '12' } },
-                  { key: 'output_tokens', value: { intValue: '4' } },
-                  { key: 'duration_ms', value: { intValue: '842' } },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  });
+        { key: 'event.sequence', value: { intValue: '3' } },
+        {
+          key: 'session.id',
+          value: { stringValue: 'tiq-live-e2e-outcome-session' },
+        },
+        {
+          key: 'model',
+          value: { stringValue: 'claude-haiku-4-5-20251001' },
+        },
+        { key: 'input_tokens', value: { intValue: '12' } },
+        { key: 'output_tokens', value: { intValue: '4' } },
+        { key: 'duration_ms', value: { intValue: '842' } },
+      ],
+    },
+  ]);
 }
 
 /** Codex tool_result + api_request outcome contracts for scorecard e2e. */
@@ -286,64 +268,37 @@ export function codexOutcomeOTLPLogs(): string {
 
 /** Claude api_request logs carrying cache-read tokens for the context-waste insight. */
 export function claudeContextWasteOTLPLogs(): string {
-  return JSON.stringify({
-    resourceLogs: [
-      {
-        resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'claude-code' } },
-            { key: 'service.version', value: { stringValue: '2.1.263' } },
-          ],
+  const session = 'tiq-live-e2e-context-waste-session';
+  return claudeOTLPLogs([
+    {
+      attributes: [
+        { key: 'event.name', value: { stringValue: 'api_request' } },
+        {
+          key: 'event.timestamp',
+          value: { stringValue: '2026-09-06T19:00:00.000Z' },
         },
-        scopeLogs: [
-          {
-            logRecords: [
-              {
-                attributes: [
-                  { key: 'event.name', value: { stringValue: 'api_request' } },
-                  {
-                    key: 'event.timestamp',
-                    value: { stringValue: '2026-09-06T19:00:00.000Z' },
-                  },
-                  { key: 'event.sequence', value: { intValue: '1' } },
-                  {
-                    key: 'session.id',
-                    value: { stringValue: 'tiq-live-e2e-context-waste-session' },
-                  },
-                  {
-                    key: 'request_id',
-                    value: { stringValue: 'synthetic-request-1' },
-                  },
-                  { key: 'model', value: { stringValue: 'claude-opus-4-8' } },
-                  { key: 'input_tokens', value: { intValue: '100' } },
-                  { key: 'cache_read_tokens', value: { intValue: '75' } },
-                ],
-              },
-              {
-                attributes: [
-                  { key: 'event.name', value: { stringValue: 'api_request' } },
-                  {
-                    key: 'event.timestamp',
-                    value: { stringValue: '2026-09-06T19:00:01.000Z' },
-                  },
-                  { key: 'event.sequence', value: { intValue: '2' } },
-                  {
-                    key: 'session.id',
-                    value: { stringValue: 'tiq-live-e2e-context-waste-session' },
-                  },
-                  {
-                    key: 'request_id',
-                    value: { stringValue: 'synthetic-request-2' },
-                  },
-                  { key: 'model', value: { stringValue: 'claude-opus-4-8' } },
-                  { key: 'input_tokens', value: { intValue: '200' } },
-                  { key: 'cache_read_tokens', value: { intValue: '150' } },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  });
+        { key: 'event.sequence', value: { intValue: '1' } },
+        { key: 'session.id', value: { stringValue: session } },
+        { key: 'request_id', value: { stringValue: 'synthetic-request-1' } },
+        { key: 'model', value: { stringValue: 'claude-opus-4-8' } },
+        { key: 'input_tokens', value: { intValue: '100' } },
+        { key: 'cache_read_tokens', value: { intValue: '75' } },
+      ],
+    },
+    {
+      attributes: [
+        { key: 'event.name', value: { stringValue: 'api_request' } },
+        {
+          key: 'event.timestamp',
+          value: { stringValue: '2026-09-06T19:00:01.000Z' },
+        },
+        { key: 'event.sequence', value: { intValue: '2' } },
+        { key: 'session.id', value: { stringValue: session } },
+        { key: 'request_id', value: { stringValue: 'synthetic-request-2' } },
+        { key: 'model', value: { stringValue: 'claude-opus-4-8' } },
+        { key: 'input_tokens', value: { intValue: '200' } },
+        { key: 'cache_read_tokens', value: { intValue: '150' } },
+      ],
+    },
+  ]);
 }
