@@ -24,16 +24,25 @@ make run-daemon
 make run-web
 ```
 
-The daemon binds to `127.0.0.1:8080` by default. After starting it once, run `make auth-token` and paste the result into the dashboard once per browser session; the token is never logged or retained by the browser after that session. The daemon exposes `GET /api/v1/health`, `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}`, `DELETE /api/v1/sessions/{id}`, `DELETE /api/v1/sessions`, `POST /v1/traces`, `POST /v1/logs`, and `GET /api/v1/ingest/counters`.
+The daemon binds to `127.0.0.1:8080` by default. After starting it once, run `make auth-token` and paste the result into the dashboard once per browser session; the token is never logged or retained by the browser after that session. The daemon exposes `GET /api/v1/health`, `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}`, `DELETE /api/v1/sessions/{id}`, `DELETE /api/v1/sessions`, `POST /v1/logs`, `POST /v1/traces`, `POST /v1/metrics`, and `GET /api/v1/ingest/counters`.
 
-## OTLP/HTTP ingest proof
+## OTLP/HTTP ingest
 
-`POST /v1/traces` and `POST /v1/logs` accept one JSON OTLP payload with a non-empty `resourceSpans` or `resourceLogs` array. Requests must use `application/json` and are limited to 1 MiB. Each endpoint returns `202 Accepted` for accepted payloads and JSON errors with a stable `error.code` for malformed, invalid, unsupported-media-type, or oversized requests.
+`POST /v1/logs` is the supported live ingest path. It accepts one JSON OTLP
+payload with a non-empty `resourceLogs` array, requires `application/json`, and
+is limited to 1 MiB. Accepted payloads return `202 Accepted`. Validation
+failures return JSON errors with a stable `error.code`
+(`malformed_payload`, `invalid_payload`, `unsupported_media_type`,
+`payload_too_large`).
+
+`POST /v1/traces` and `POST /v1/metrics` are registered deliberately and return
+`501 Not Implemented` with `error.code` `not_implemented`. They never return
+`202` for a payload that will be dropped. Observed first-class providers export
+behaviour signals as OTLP logs; use `/v1/logs`.
 
 Raw OTLP payloads are never logged or persisted. The supported, observed Codex
-OTLP log shape is normalised and sanitised before its canonical event is saved
-locally. Other accepted OTLP payloads remain receive-only until an adapter has
-reviewed evidence.
+and Claude Code OTLP log shapes are normalised and sanitised before canonical
+events are saved locally.
 
 ## Codex fixture normalisation
 
