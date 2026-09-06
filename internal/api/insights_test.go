@@ -56,8 +56,56 @@ func TestMCPInventoryInsightAPI(t *testing.T) {
 	}
 }
 
+func TestSkillUsageInsightAPI(t *testing.T) {
+	repo := sessionTestRepository(t)
+	explicit := sessionTestEvent(t, "skill-explicit", "skill-session", "claude-code", "active", "2026-01-04T09:00:00Z", "")
+	explicit.Provider = "anthropic"
+	explicit.EventType = "skill_invocation"
+	explicit.ProviderExtensions = map[string]any{"skill_detection": "explicit", "skill": map[string]any{"name": "pdf", "outcome": "success"}}
+	unavailable := sessionTestEvent(t, "skill-unavailable", "skill-session-2", "codex-cli", "active", "2026-01-04T09:00:01Z", "")
+	unavailable.Provider = "openai"
+	unavailable.EventType = "api_request"
+	unavailable.ProviderExtensions = map[string]any{"skill_detection": "unavailable"}
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{explicit, unavailable}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(NewHandler(slog.Default(), repo))
+	t.Cleanup(server.Close)
+
+	response, err := http.Get(server.URL + "/api/v1/insights/skill-usage")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("skill insight status = %d", response.StatusCode)
+	}
+	var body skillUsageResponse
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Data.Totals.ObservedSkills != 1 || body.Data.Totals.Invocations != 1 {
+		t.Fatalf("skill insight totals = %#v", body.Data.Totals)
+	}
+	if body.Data.Totals.ExplicitDetection != 1 || body.Data.Totals.UnavailableDetection != 1 {
+		t.Fatalf("skill detection coverage = %#v", body.Data.Totals)
+	}
+	if len(body.Data.Skills) != 1 || body.Data.Skills[0].SkillName != "pdf" {
+		t.Fatalf("skill records = %#v", body.Data.Skills)
+	}
+	serialized, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(serialized), `"detection_state":"unavailable"`) {
+		t.Fatalf("skill insight did not surface unavailable coverage honestly: %s", serialized)
+	}
+}
+
 func TestInsightsPathRequiresManagementAuth(t *testing.T) {
-	if !isManagementPath("/api/v1/insights/mcp-inventory") {
-		t.Fatal("MCP insight endpoint must require local API authentication")
+	for _, path := range []string{"/api/v1/insights/mcp-inventory", "/api/v1/insights/skill-usage"} {
+		if !isManagementPath(path) {
+			t.Fatalf("insight endpoint %q must require local API authentication", path)
+		}
 	}
 }

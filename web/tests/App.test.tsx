@@ -175,6 +175,48 @@ function mockAPI(
             { status: 200 },
           ),
         );
+      if (url.endsWith('/insights/skill-usage'))
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                schema_version: '0.1.0',
+                totals: {
+                  observed_skills: options.insightEmpty ? 0 : 1,
+                  invocations: options.insightEmpty ? 0 : 2,
+                  explicit_detection: options.insightEmpty ? 0 : 1,
+                  inferred_detection: 0,
+                  unavailable_detection: 1,
+                  unknown_detection: 0,
+                },
+                skills: options.insightEmpty
+                  ? []
+                  : [
+                      {
+                        skill_name: 'pdf',
+                        provider: 'anthropic',
+                        tool: 'claude-code',
+                        detection_state: 'explicit',
+                        invocation_count: 2,
+                        outcomes: { success: 1, failed: 1 },
+                        outcome_state: 'observed',
+                      },
+                    ],
+                coverage: [
+                  {
+                    provider: 'openai',
+                    tool: 'codex-cli',
+                    detection_state: 'unavailable',
+                  },
+                ],
+                notes: [
+                  'Skill identity is reported only where the provider explicitly stamps it; inferred and unavailable states are shown, never guessed.',
+                ],
+              },
+            }),
+            { status: 200 },
+          ),
+        );
       if (url.includes('/sessions?'))
         return Promise.resolve(
           new Response(
@@ -471,6 +513,39 @@ describe('App dashboard', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Insight service offline',
     );
+  });
+
+  test('shows skill usage with explicit and unavailable states', async () => {
+    mockAPI();
+    render(
+      <MantineProvider env="test">
+        <App />
+      </MantineProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Skill usage' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Observed skills')).toBeInTheDocument();
+    expect(screen.getAllByText('pdf').length).toBeGreaterThan(0);
+    expect(screen.getByText('failed: 1, success: 1')).toBeInTheDocument();
+    // The provider with no explicit skill signal is shown, not silently dropped.
+    expect(screen.getAllByText('unavailable').length).toBeGreaterThan(0);
+  });
+
+  test('shows an empty skill usage state honestly', async () => {
+    mockAPI([session], { insightEmpty: true });
+    render(
+      <MantineProvider env="test">
+        <App />
+      </MantineProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+    expect(
+      await screen.findByRole('heading', {
+        name: 'No skill identity observed',
+      }),
+    ).toBeInTheDocument();
   });
 
   test('shows a cost loading failure', async () => {

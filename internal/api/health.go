@@ -50,6 +50,7 @@ func newHandler(logger *slog.Logger, inspector *sanitizedInspector, repository s
 	mux.HandleFunc("GET /api/v1/sessions", sessionAPI.list)
 	mux.HandleFunc("GET /api/v1/costs/summary", sessionAPI.costSummary)
 	mux.HandleFunc("GET /api/v1/insights/mcp-inventory", sessionAPI.mcpInventory)
+	mux.HandleFunc("GET /api/v1/insights/skill-usage", sessionAPI.skillUsage)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/costs", sessionAPI.costs)
 	mux.HandleFunc("GET /api/v1/sessions/{id}", sessionAPI.detail)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/events", sessionAPI.events)

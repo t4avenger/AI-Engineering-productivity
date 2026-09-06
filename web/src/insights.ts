@@ -58,3 +58,52 @@ export async function fetchMCPInventory(): Promise<MCPInventoryInsight> {
   }
   return response.data;
 }
+
+export interface SkillRecordInsight {
+  skill_name: string;
+  provider: string;
+  tool: string;
+  detection_state: string;
+  invocation_count: number;
+  outcomes: Record<string, number>;
+  outcome_state: string;
+}
+
+export interface SkillCoverageInsight {
+  provider: string;
+  tool: string;
+  detection_state: string;
+}
+
+export interface SkillUsageInsight {
+  schema_version: string;
+  totals: {
+    observed_skills: number;
+    invocations: number;
+    explicit_detection: number;
+    inferred_detection: number;
+    unavailable_detection: number;
+    unknown_detection: number;
+  };
+  skills: SkillRecordInsight[];
+  coverage: SkillCoverageInsight[];
+  notes: string[];
+}
+
+function isSkillUsage(value: unknown): value is SkillUsageInsight {
+  if (!isRecord(value)) return false;
+  if (!Array.isArray(value.skills) || !Array.isArray(value.coverage)) {
+    return false;
+  }
+  return isRecord(value.totals);
+}
+
+export async function fetchSkillUsage(): Promise<SkillUsageInsight> {
+  const response = await request<{ data?: unknown }>(
+    apiRequestURL(['insights', 'skill-usage']),
+  );
+  if (!isSkillUsage(response.data)) {
+    throw new TypeError('Skill usage response was malformed');
+  }
+  return response.data;
+}
