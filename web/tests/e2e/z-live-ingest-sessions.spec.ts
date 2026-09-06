@@ -54,12 +54,22 @@ const rawCodexOTLPLogs = JSON.stringify({
   ],
 });
 
-test.afterEach(async () => {
-  // Leave the shared daemon empty for any later specs / re-runs.
-  await fetch(`${daemonBase}/api/v1/sessions`, {
+async function clearSessions(): Promise<void> {
+  const response = await fetch(`${daemonBase}/api/v1/sessions`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${authToken}` },
   });
+  expect(response.status).toBe(204);
+}
+
+test.beforeEach(async () => {
+  // Clean slate so retries cannot pass on leftover sessions/models.
+  await clearSessions();
+});
+
+test.afterEach(async () => {
+  // Leave the shared daemon empty for any later specs / re-runs.
+  await clearSessions();
 });
 
 test('renders a session ingested through the live daemon', async ({ page }) => {
