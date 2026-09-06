@@ -1,0 +1,40 @@
+{{define "sessions.html"}}
+{{template "shell-start" .}}
+{{template "nav" .}}
+<main id="main-content" class="page">
+  <h1>Sessions</h1>
+  <p>Newest first. Open a row for evidence.</p>
+  {{with .Content}}
+  {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+  {{if .Sessions}}
+  <div class="table-wrap" role="region" aria-label="Session list">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Tool</th>
+          <th scope="col">Provider</th>
+          <th scope="col">State</th>
+          <th scope="col">Started</th>
+          <th scope="col">Session</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Sessions}}
+        <tr>
+          <td>{{.Tool}}</td>
+          <td>{{.Provider}}</td>
+          <td>{{.State}}</td>
+          <td>{{formatTime .StartedAt}}</td>
+          <td><a href="/sessions/{{.SessionID}}">{{.SessionID}}</a></td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p>No retained sessions yet.</p>
+  {{end}}
+  {{end}}
+</main>
+{{template "shell-end" .}}
+{{end}}

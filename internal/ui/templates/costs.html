@@ -1,0 +1,24 @@
+{{define "costs.html"}}
+{{template "shell-start" .}}
+{{template "nav" .}}
+<main id="main-content" class="page">
+  <h1>Costs</h1>
+  <p>Secondary estimates only. Unknown prices are never shown as zero.</p>
+  {{with .Content}}
+  {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+  <p>Currency: {{if .Currency}}{{.Currency}}{{else}}unavailable{{end}}</p>
+  <p>Calculated amount (USD): {{microusd .Amount}}</p>
+  {{if .Statuses}}
+  <h2>Statuses</h2>
+  <ul>
+    {{range $status, $count := .Statuses}}
+    <li>{{$status}}: {{$count}}</li>
+    {{end}}
+  </ul>
+  {{else}}
+  <p>No cost records yet.</p>
+  {{end}}
+  {{end}}
+</main>
+{{template "shell-end" .}}
+{{end}}

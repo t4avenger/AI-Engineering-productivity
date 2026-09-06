@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted — 2026-08-09
+Superseded — 2026-09-06 by [ADR 0002](0002-go-htmx-local-dashboard.md)
+
+Accepted — 2026-08-09 (historical)
 
 ## Context
 

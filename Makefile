@@ -13,15 +13,12 @@ hooks-install:
 
 format:
 	gofmt -w cmd internal
-	npm run format --prefix $(WEB_DIR)
 
 format-check:
 	test -z "$$(gofmt -l cmd internal)"
-	npm run format:check --prefix $(WEB_DIR)
 
 lint:
 	go vet $(GO_PACKAGES)
-	npm run lint --prefix $(WEB_DIR)
 
 static-analysis:
 	bash scripts/static-analysis.sh
@@ -32,7 +29,7 @@ test-unit:
 	go test $(GO_PACKAGES)
 
 test-component:
-	npm run test:coverage --prefix $(WEB_DIR)
+	go test ./internal/ui
 
 test-integration:
 	go test ./internal/api
@@ -62,7 +59,6 @@ security-scan:
 
 build:
 	go build ./cmd/telemetryiq
-	npm run build --prefix $(WEB_DIR)
 
 precommit: format-check lint static-analysis test-unit test-component
 
@@ -79,7 +75,7 @@ auth-token:
 	go run ./cmd/telemetryiq auth-token
 
 run-web:
-	npm run dev --prefix $(WEB_DIR)
+	@echo "Dashboard is served by the daemon (ADR 0002). Use: make run"
 
 run:
-	@echo "Run 'make run-daemon' and 'make run-web' in separate terminals."
+	go run ./cmd/telemetryiq

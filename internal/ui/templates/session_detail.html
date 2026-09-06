@@ -1,0 +1,46 @@
+{{define "session_detail.html"}}
+{{template "shell-start" .}}
+{{template "nav" .}}
+<main id="main-content" class="page">
+  <p><a href="/sessions">← Sessions</a></p>
+  {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+  {{with .Content}}
+  <h1>Session {{.Session.SessionID}}</h1>
+  <p>{{.Session.Tool}} · {{.Session.Provider}} · {{.Session.State}}</p>
+  <section>
+    <h2>Availability</h2>
+    {{if .Availability}}
+    <ul>
+      {{range $field, $state := .Availability}}
+      <li><span class="avail">{{$field}}</span>: {{avail $state}}</li>
+      {{end}}
+    </ul>
+    {{else}}
+    <p>No availability map on this session.</p>
+    {{end}}
+  </section>
+  <section>
+    <h2>Timeline</h2>
+    {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+    <div id="timeline">
+      {{template "timeline_rows.html" .}}
+    </div>
+  </section>
+  <section>
+    <h2>Delete</h2>
+    {{if .Confirm}}
+    <!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token -->
+  <form method="post" action="/sessions/{{.Session.SessionID}}/delete" class="stack">
+      <p role="alert">This permanently deletes the session and its retained events.</p>
+      <input type="hidden" name="confirm" value="1">
+      <button type="submit" class="danger">Confirm delete</button>
+      <a href="/sessions/{{.Session.SessionID}}">Cancel</a>
+    </form>
+    {{else}}
+    <p><a class="button danger" href="/sessions/{{.Session.SessionID}}?confirm=1">Delete this session</a></p>
+    {{end}}
+  </section>
+  {{end}}
+</main>
+{{template "shell-end" .}}
+{{end}}

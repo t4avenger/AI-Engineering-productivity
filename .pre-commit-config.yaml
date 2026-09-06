@@ -22,13 +22,3 @@ repos:
         entry: gofmt -w
         language: system
         types: [go]
-      - id: web-format-check
-        name: web format check
-        entry: npm run format:check --prefix web
-        language: system
-        pass_filenames: false
-      - id: web-lint
-        name: web lint
-        entry: npm run lint --prefix web
-        language: system
-        pass_filenames: false

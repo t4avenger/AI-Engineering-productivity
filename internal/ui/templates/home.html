@@ -1,0 +1,40 @@
+{{define "home.html"}}
+{{template "shell-start" .}}
+{{template "nav" .}}
+<main id="main-content" class="page">
+  <h1>Orchestration overview</h1>
+  <p class="eyebrow">Privacy mode: local-only · Retention: 30 days</p>
+  {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+  {{with .Content}}
+  {{if .Empty}}
+  <p>No retained sessions yet. Point a supported tool’s OTLP exporter at this daemon to begin auditing usage.</p>
+  {{else}}
+  <section>
+    <h2>Sessions today</h2>
+    <p>Successful {{.Successful}} · Failed {{.Failed}} · Abandoned {{.Abandoned}} · Other {{.Other}}</p>
+  </section>
+  <section>
+    <h2>Tools observed</h2>
+    {{if .Tools}}
+    <ul>{{range .Tools}}<li>{{.}}</li>{{end}}</ul>
+    {{else}}
+    <p>Awaiting telemetry</p>
+    {{end}}
+  </section>
+  <section>
+    <h2>Insight highlights</h2>
+    {{if .InsightErr}}
+    <p>{{.InsightErr}}</p>
+    {{else}}
+    <ul>
+      <li>MCP: {{.MCPUnused}} unused connected servers — <a href="/insights">Insights</a></li>
+      <li>Skills: {{.SkillCount}} observed — <a href="/insights">Insights</a></li>
+    </ul>
+    {{end}}
+  </section>
+  {{end}}
+  <p class="muted">Cost estimates are not shown on Home. See <a href="/costs">Costs</a> for secondary pricing.</p>
+  {{end}}
+</main>
+{{template "shell-end" .}}
+{{end}}

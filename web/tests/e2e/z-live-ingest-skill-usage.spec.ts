@@ -7,6 +7,7 @@ import {
   ingestOTLPLogs,
   ingestOTLPMetrics,
   resetDaemonBetweenTests,
+  unlockDashboard,
 } from './live-ingest-helpers';
 
 /**
@@ -23,18 +24,12 @@ test('renders explicit skill usage for data ingested through the live daemon', a
   await ingestOTLPLogs(claudeSkillOTLPLogs());
   await ingestOTLPMetrics(codexSkillOTLPMetrics());
 
-  await page.goto('/');
-  await page.getByLabel('Local API token').fill(authToken);
-  const skillUsage = page.waitForResponse(
-    (response) =>
-      response.url().endsWith('/api/v1/insights/skill-usage') &&
-      response.request().method() === 'GET' &&
-      response.status() === 200,
+  const skillUsage = await fetch(
+    'http://127.0.0.1:18080/api/v1/insights/skill-usage',
+    { headers: { Authorization: `Bearer ${authToken}` } },
   );
-  await page.getByRole('button', { name: 'Connect securely' }).click();
-  await page.getByRole('button', { name: 'Insights' }).click();
-
-  const body = (await (await skillUsage).json()) as {
+  expect(skillUsage.status).toBe(200);
+  const body = (await skillUsage.json()) as {
     data: {
       skills: Array<{ skill_name: string }>;
       coverage: Array<{ tool: string; detection_state: string }>;
@@ -57,16 +52,11 @@ test('renders explicit skill usage for data ingested through the live daemon', a
     ),
   ).toBe(true);
 
-  const skillSection = page.locator(
-    'section[aria-labelledby="skill-usage-title"]',
-  );
-  await expect(
-    skillSection.getByRole('heading', { name: 'Skill usage' }),
-  ).toBeVisible();
-  await expect(skillSection.getByText('tiq-probe').first()).toBeVisible();
-  await expect(skillSection.getByText('claude-code').first()).toBeVisible();
-  await expect(skillSection.getByText('codex').first()).toBeVisible();
-  await expect(
-    skillSection.getByText('explicit', { exact: true }).first(),
-  ).toBeVisible();
+  await unlockDashboard(page, authToken);
+  await page.getByLabel('Primary navigation').getByRole('link', { name: 'Insights' }).click();
+  await expect(page.getByRole('heading', { name: 'Skill usage' })).toBeVisible();
+  await expect(page.getByText('tiq-probe').first()).toBeVisible();
+  await expect(page.getByText('claude-code').first()).toBeVisible();
+  await expect(page.getByText('codex').first()).toBeVisible();
+  await expect(page.getByText('explicit', { exact: true }).first()).toBeVisible();
 });

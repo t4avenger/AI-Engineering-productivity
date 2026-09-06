@@ -1,0 +1,35 @@
+{{define "shell-start"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}} · TelemetryIQ</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <div class="app-shell">
+    <header class="app-header">
+      <p class="brand">TelemetryIQ <span>Local developer edition</span></p>
+      {{if .Health}}<p class="health healthy" aria-live="polite">Daemon: {{.Health}}</p>{{end}}
+    </header>
+{{end}}
+
+{{define "nav"}}
+    <nav aria-label="Primary navigation" class="navigation">
+      <a class="nav-link{{if eq .Nav "home"}} active{{end}}" href="/" {{if eq .Nav "home"}}aria-current="page"{{end}}>Home</a>
+      <a class="nav-link{{if eq .Nav "sessions"}} active{{end}}" href="/sessions" {{if eq .Nav "sessions"}}aria-current="page"{{end}}>Sessions</a>
+      <a class="nav-link{{if eq .Nav "insights"}} active{{end}}" href="/insights" {{if eq .Nav "insights"}}aria-current="page"{{end}}>Insights</a>
+      <a class="nav-link{{if eq .Nav "integrations"}} active{{end}}" href="/integrations" {{if eq .Nav "integrations"}}aria-current="page"{{end}}>Integrations</a>
+      <a class="nav-link{{if eq .Nav "privacy"}} active{{end}}" href="/privacy" {{if eq .Nav "privacy"}}aria-current="page"{{end}}>Privacy</a>
+      <a class="nav-link{{if eq .Nav "costs"}} active{{end}}" href="/costs" {{if eq .Nav "costs"}}aria-current="page"{{end}}>Costs</a>
+    </nav>
+{{end}}
+
+{{define "shell-end"}}
+  </div>
+</body>
+</html>
+{{end}}

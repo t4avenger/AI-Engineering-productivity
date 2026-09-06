@@ -6,18 +6,27 @@ import (
 
 	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
+	"github.com/wayne/telemetryiq/internal/ui"
 )
 
 // NewAuthenticatedPersistentHandler enables persistent ingestion and protects
-// management endpoints with a local bearer token.
+// management endpoints with a local bearer token or dashboard cookie.
 func NewAuthenticatedPersistentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer, repository storage.Repository, token string) http.Handler {
-	return withManagementAuth(token, withBulkDelete(repository, newHandler(logger, nil, repository, sanitizer, repository)))
+	return wrapUI(token, repository, withManagementAuth(token, withBulkDelete(repository, newHandler(logger, nil, repository, sanitizer, repository))))
 }
 
 // NewAuthenticatedPersistentDevelopmentHandler retains the development-only
 // sanitized inspector while protecting management endpoints.
 func NewAuthenticatedPersistentDevelopmentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer, repository storage.Repository, token string) http.Handler {
-	return withManagementAuth(token, withBulkDelete(repository, newHandler(logger, newSanitizedInspector(sanitizer), repository, sanitizer, repository)))
+	return wrapUI(token, repository, withManagementAuth(token, withBulkDelete(repository, newHandler(logger, newSanitizedInspector(sanitizer), repository, sanitizer, repository))))
+}
+
+func wrapUI(token string, repository storage.Repository, next http.Handler) http.Handler {
+	dashboard, err := ui.New(token, repository)
+	if err != nil {
+		panic("ui templates: " + err.Error())
+	}
+	return dashboard.Wrap(next)
 }
 
 func withBulkDelete(repository storage.Repository, next http.Handler) http.Handler {

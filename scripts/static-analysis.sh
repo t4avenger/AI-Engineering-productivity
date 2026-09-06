@@ -27,6 +27,3 @@ if command -v govulncheck >/dev/null 2>&1; then
 else
   echo "govulncheck: not installed; install golang.org/x/vuln/cmd/govulncheck@v1.1.4"
 fi
-
-npm run typecheck --prefix web
-npm run knip --prefix web

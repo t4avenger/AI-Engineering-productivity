@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 /**
  * Shared plumbing for the live-ingest e2e gates: both the sessions and the
@@ -8,6 +8,18 @@ import { expect, test } from '@playwright/test';
  */
 const daemonBase = 'http://127.0.0.1:18080';
 export const authToken = 'playwright-token';
+
+export async function unlockDashboard(
+  page: Page,
+  token: string = authToken,
+): Promise<void> {
+  await page.goto('/');
+  await page.getByLabel('Local API token').fill(token);
+  await page.getByRole('button', { name: 'Unlock' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Orchestration overview' }),
+  ).toBeVisible();
+}
 
 // codexOTLPLogs builds a raw codex_cli_rs OTLP/HTTP log payload carrying a
 // single sse_event that reports the given model, in the observed wire shape.

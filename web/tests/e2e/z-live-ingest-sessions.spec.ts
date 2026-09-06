@@ -5,6 +5,7 @@ import {
   codexOTLPLogs,
   ingestOTLPLogs,
   resetDaemonBetweenTests,
+  unlockDashboard,
 } from './live-ingest-helpers';
 
 /**
@@ -19,16 +20,11 @@ resetDaemonBetweenTests();
 test('renders a session ingested through the live daemon', async ({ page }) => {
   await ingestOTLPLogs(codexOTLPLogs(liveModel));
 
-  await page.goto('/');
-  await page.getByLabel('Local API token').fill(authToken);
-  const sessionList = page.waitForResponse(
-    (response) =>
-      response.url().endsWith('/api/v1/sessions?limit=100') &&
-      response.request().method() === 'GET' &&
-      response.status() === 200,
-  );
-  await page.getByRole('button', { name: 'Connect securely' }).click();
-  const listBody = (await (await sessionList).json()) as {
+  const list = await fetch('http://127.0.0.1:18080/api/v1/sessions?limit=100', {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+  expect(list.status).toBe(200);
+  const listBody = (await list.json()) as {
     data: Array<{ tool: string; attributes?: { model?: string } }>;
   };
   expect(listBody.data.some((session) => session.tool === 'codex')).toBe(true);
@@ -36,10 +32,10 @@ test('renders a session ingested through the live daemon', async ({ page }) => {
     listBody.data.some((session) => session.attributes?.model === liveModel),
   ).toBe(true);
 
-  await page.getByRole('button', { name: 'Sessions' }).click();
-  await expect(page.getByRole('button', { name: /codex/i })).toBeVisible();
-  await expect(page.getByText(liveModel)).toBeVisible();
+  await unlockDashboard(page, authToken);
+  await page.getByRole('link', { name: 'Sessions', exact: true }).click();
+  await expect(page.getByRole('cell', { name: 'codex' }).first()).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: 'No sessions yet' }),
+    page.getByRole('heading', { name: 'No retained sessions yet.' }),
   ).toHaveCount(0);
 });

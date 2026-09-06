@@ -272,12 +272,12 @@ Codex may change an implementation choice when justified in an architecture deci
 - REST API for dashboard
 
 ### Web application
-- TypeScript
-- React
-- Vite
-- Mantine Core and Hooks for accessible dashboard primitives (ADR 0001)
+- Go `html/template` served by the local daemon (ADR 0002)
+- HTMX for progressive enhancement (partial updates, forms)
+- Vendored static CSS and HTMX (no CDN required)
 - Localhost-only by default
 - No third-party analytics in local mode
+- JSON `/api/v1` retained for tests and machine clients
 
 ### Storage
 - SQLite for configuration and initial local event storage
@@ -287,8 +287,8 @@ Codex may change an implementation choice when justified in an architecture deci
 
 ### Testing and quality engineering
 - Go unit, component, integration, contract, race, fuzz, and benchmark tests
-- TypeScript unit and component tests
-- Playwright functional end-to-end tests
+- Go UI handler and template tests for the local dashboard
+- Playwright functional end-to-end tests against the daemon origin
 - Golden fixtures and adapter conformance tests for provider telemetry
 - Schema compatibility and database migration tests
 - Privacy leakage and diagnostics sanitisation tests
@@ -1439,7 +1439,7 @@ Allow a developer to understand collected sessions.
 
 ### Deliverables
 - Local authenticated API
-- React dashboard
+- Go HTML/HTMX dashboard (ADR 0002)
 - Home page
 - Session list
 - Session detail timeline

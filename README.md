@@ -2,13 +2,15 @@
 
 Local-first AI engineering intelligence and governance.
 
-Task 010 provides a privacy-safe local dashboard over the authenticated SQLite-backed session API. Supported Codex OTLP logs are normalised, sanitised, and persisted locally.
+The local dashboard is served by the Go daemon (ADR 0002) using HTML templates
+and HTMX over the authenticated SQLite-backed session store. Supported Codex
+OTLP logs are normalised, sanitised, and persisted locally.
 
 ## Requirements
 
 - Go 1.26.6 or newer
-- Node.js 24.0.0 or newer
-- npm 10.x or newer
+- Node.js 24.0.0 or newer (Playwright e2e only)
+- npm 10.x or newer (Playwright e2e only)
 
 ## Local setup
 
@@ -17,14 +19,18 @@ make bootstrap
 make hooks-install
 ```
 
-Run the daemon and web app in separate terminals:
+Run the daemon:
 
 ```bash
-make run-daemon
-make run-web
+make run
 ```
 
-The daemon binds to `127.0.0.1:8080` by default. After starting it once, run `make auth-token` and paste the result into the dashboard once per browser session; the token is never logged or retained by the browser after that session. The daemon exposes `GET /api/v1/health`, `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}`, `DELETE /api/v1/sessions/{id}`, `DELETE /api/v1/sessions`, `POST /v1/logs`, `POST /v1/traces`, `POST /v1/metrics`, and `GET /api/v1/ingest/counters`.
+Open `http://127.0.0.1:8080/`, run `make auth-token`, and paste the token into
+the Unlock page. The token is stored only in an httpOnly cookie for the browser
+session on loopback. The daemon exposes HTML dashboard routes plus
+`GET /api/v1/health`, `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}`,
+`DELETE /api/v1/sessions/{id}`, `DELETE /api/v1/sessions`, `POST /v1/logs`,
+`POST /v1/traces`, `POST /v1/metrics`, and `GET /api/v1/ingest/counters`.
 
 ## OTLP/HTTP ingest
 
@@ -64,7 +70,11 @@ the privacy sanitizer before SQLite persistence.
 
 ## Local dashboard
 
-The Mantine-based dashboard provides Home, Sessions, Session Detail, Integrations, and Privacy pages. It labels missing data as unavailable, lists an integration only after local session data has been observed, and presents the enforced local-only privacy defaults. The token-entry flow retains the value only for the browser session; the Privacy page uses a typed confirmation before bulk deletion. Configure `VITE_API_URL` when the session API has a non-default origin; `VITE_HEALTH_URL` configures the health endpoint.
+The Go/HTMX dashboard provides Home, Sessions, Session Detail, Insights,
+Integrations, Privacy, and Costs pages on the daemon origin. Home emphasises
+orchestration usage (not cost). Missing data is labelled unavailable,
+integrations appear only after local session data has been observed, and the
+Privacy page uses a typed confirmation before bulk deletion.
 
 ## Privacy pipeline
 
@@ -97,19 +107,4 @@ sharing:
   research_sessions: explicit-only
 ```
 
-The daemon rejects unknown fields, unsupported schema versions, content capture, non-local storage, unsafe sharing, non-loopback hosts, and invalid ports with actionable startup errors. `TELEMETRYIQ_HOST` (default `127.0.0.1`) and `TELEMETRYIQ_PORT` (default `8080`) override the loopback server address; `VITE_HEALTH_URL` configures the web health endpoint.
-
-## Verification
-
-- `make format` / `make format-check`
-- `make lint`
-- `make static-analysis`
-- `make test-unit`, `make test-component`, `make test-e2e`, `make test-race`
-- `make coverage`, `make security-scan`, `make build`
-- `make verify` and `make verify-push`
-
-Contract and fuzz checks report not applicable until their corresponding product capabilities are implemented.
-
-## Current scope
-
-Cost insights, analytics, and third-party telemetry remain out of scope. Management API authentication is local-token based and preserves loopback defaults.
+The daemon rejects unknown fields, unsupported schema versions, content capture, non-local storage, unsafe sharing, non-loopback hosts, and invalid ports with actionable startup errors. `TELEMETRYIQ_HOST` (default `127.0.0.1`) and `TELEMETRYIQ_PORT` (default `8080`) override the loopback server address.

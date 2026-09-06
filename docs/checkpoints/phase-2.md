@@ -4,47 +4,38 @@
 
 The reconciliation adds a chronological authenticated safe-event timeline and per-event sanitisation provenance view. Provider extensions and raw intake are never returned by these endpoints.
 
-The local dashboard now provides Home, Sessions, Session Detail, Integrations,
-and Privacy pages. It reads only from the loopback API, labels unavailable
-telemetry explicitly, derives integration status only from observed sessions,
-and requires confirmation before permanently deleting a session and its events.
+The local dashboard is served by the Go daemon with HTML templates and HTMX
+(ADR 0002). It provides Home, Sessions, Session Detail, Insights, Integrations,
+Privacy, and Costs pages on the same loopback origin as the JSON API. Home
+emphasises orchestration usage (not cost). Unavailable telemetry is labelled
+explicitly; integrations appear only from observed sessions; deletion requires
+confirmation.
 
 ## Verification evidence
 
-- Phase 2 timeline reconciliation: `make verify-push` passed on 2026-08-11, including format, lint, static analysis, unit, component, integration, contract, race, fuzz-smoke, performance-smoke, E2E, coverage, security scan, and build.
+- Go/HTMX dashboard rewrite on branch `feature/go-htmx-dashboard` (2026-09-06):
+  format-check, lint, static-analysis, unit, component, integration, contract,
+  race, e2e (5 Chromium specs against daemon origin), coverage (≥80%), build
+  passed. Security-scan: gitleaks/osv/semgrep/trivy with documented nosemgrep
+  for loopback HTTP auth cookies (Secure follows TLS; expiry 2026-12-31).
 
-Original dashboard evidence completed on 2026-07-28. Phase 2 reconciliation completed on 2026-08-09: `make verify-push` passed, including format, lint, static analysis, unit, component, integration, contract, race, fuzz-smoke, performance-smoke, browser E2E, coverage, security scan, and build.
-
-- `make format-check` — passed.
-- `make lint` — passed (`go vet`, ESLint).
-- `make static-analysis` — passed (0 static-analysis issues; no reachable Go
-  vulnerabilities reported).
-- `make test-unit` — passed.
-- `make test-component` — passed: 9 tests; 96.70% statements, 87.62%
-  branches, 94.87% functions, and 97.72% lines (all above 80% thresholds).
-- `make test-integration` and `make test-contract` — passed.
-- `make test-e2e` — passed: Chromium dashboard journey.
-- `make test-race` — passed.
-- `make test-fuzz-smoke` — passed for configuration, privacy, and Codex
-  normalisation targets.
-- `make test-performance-smoke` — passed; health endpoint latency 8 ms.
-- `make coverage` — passed; API coverage 85.1%.
-- `make security-scan` — passed: no gitleaks findings; static dependency scan
-  found no reachable vulnerabilities.
-- `make build` — passed.
+Historical evidence: Phase 2 timeline reconciliation `make verify-push` passed
+on 2026-08-11 (React/Mantine era, superseded by ADR 0002).
 
 ## Accessibility and privacy summary
 
 The dashboard uses semantic landmarks, labelled navigation, heading hierarchy,
-visible focus styles, a skip link, status/error live roles, and an accessible
-confirmation dialog. Browser coverage exercises the empty session and Privacy
-journey. The UI neither persists nor exposes prompts, responses, source code,
-or raw command arguments; its Privacy page communicates the enforced defaults.
+visible focus styles, a skip link, and `role="alert"` for errors. Bulk delete
+requires typing `DELETE ALL`. The UI neither persists nor exposes prompts,
+responses, source code, or raw command arguments; Privacy documents enforced
+defaults.
 
 ## Known defects and risks
 
-No blocking defects are known. The local management API now requires a generated bearer token, and the dashboard supports authenticated individual and bulk retained-telemetry deletion.
+No blocking defects are known. Management JSON endpoints accept Bearer tokens;
+the HTML UI uses an httpOnly session cookie after unlock.
 
 ## Decision
 
-**GO** for Phase 2 acceptance after the current verification commands in this repository pass. The next task may begin the cost engine and explainable-insights scope.
+**GO** for Phase 2 acceptance with the Go/HTMX dashboard. Next smallest tasks
+can continue behaviour/efficiency insights and provider adapters without a SPA.

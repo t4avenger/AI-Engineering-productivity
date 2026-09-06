@@ -1,21 +1,25 @@
 import { expect, test } from '@playwright/test';
 
-test('renders the local dashboard journey', async ({ page }) => {
+import { authToken, unlockDashboard } from './live-ingest-helpers';
+
+test('unlocks and walks the local dashboard journey', async ({ page }) => {
   await page.goto('/');
-  await page.getByLabel('Local API token').fill('playwright-token');
-  await page.getByRole('button', { name: 'Connect securely' }).click();
   await expect(
-    page.getByRole('heading', { name: 'Your local AI activity' }),
+    page.getByRole('heading', { name: 'Unlock local dashboard' }),
   ).toBeVisible();
-  await expect(page.getByText('Daemon healthy')).toBeVisible();
-  await page.getByRole('button', { name: 'Sessions' }).click();
+  await unlockDashboard(page, authToken);
+  await expect(
+    page.getByRole('heading', { name: 'Orchestration overview' }),
+  ).toBeVisible();
+  await expect(page.getByText('Daemon: Healthy')).toBeVisible();
+  await page.getByRole('link', { name: 'Sessions', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: 'Sessions', exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole('heading', { name: 'No sessions yet' }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Privacy' }).click();
+  await expect(page.getByText('No retained sessions yet.')).toBeVisible();
+  await page.getByRole('link', { name: 'Privacy', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Privacy' })).toBeVisible();
-  await expect(page.getByText('Prompts and responses')).toBeVisible();
+  await expect(
+    page.getByText('Prompts, responses, and source code are not retained'),
+  ).toBeVisible();
 });

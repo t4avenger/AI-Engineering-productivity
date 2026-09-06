@@ -83,11 +83,8 @@ func healthHandler(logger *slog.Logger) http.HandlerFunc {
 
 func withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		origin := r.Header.Get("Origin")
-		if origin == "http://127.0.0.1:5173" || origin == "http://127.0.0.1:4173" {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Add("Vary", "Origin")
-		}
+		// Same-origin HTML UI (ADR 0002). Allow simple local tooling preflights
+		// without advertising third-party dashboard origins.
 		w.Header().Set("Access-Control-Allow-Methods", "DELETE, GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 		if r.Method == http.MethodOptions {
