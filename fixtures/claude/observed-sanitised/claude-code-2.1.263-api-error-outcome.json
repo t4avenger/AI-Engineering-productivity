@@ -1,0 +1,38 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.263",
+  "captured_at": "2026-09-06T17:57:57Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "source_type": "otlp_http_json_logs",
+    "capture": {
+      "workspace": "isolated_tmp",
+      "telemetry_endpoint": "loopback_dump_receiver",
+      "outcome_signal": "api_error",
+      "note": "Claude Code rate-limit failure observed as api_error with model and status_code"
+    },
+    "observations": [
+      {
+        "name": "task_outcome",
+        "state": "partial",
+        "evidence": "api_error carries model, status_code, error, duration_ms \u2014 provider completion failure contract"
+      }
+    ],
+    "sample_events": [
+      {
+        "event_name": "api_error",
+        "session_id": "synthetic-session-id",
+        "event_timestamp": "2026-09-06T17:57:57.860Z",
+        "event_sequence": 1,
+        "model": "claude-opus-4-8",
+        "status_code": 429,
+        "error": "rate_limit",
+        "duration_ms": 62462,
+        "attempt": 1
+      }
+    ]
+  }
+}

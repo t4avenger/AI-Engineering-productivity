@@ -20,11 +20,11 @@
         "model",
         "token_usage",
         "cache_usage",
+        "task_outcome",
         "tool_calls",
         "mcp_calls",
         "file_operations",
         "reasoning_tokens",
-        "task_outcome",
         "repository_context",
         "prompt_content",
         "response_content",
@@ -72,7 +72,6 @@
         "mcp_calls",
         "file_operations",
         "reasoning_tokens",
-        "task_outcome",
         "repository_context",
         "prompt_content",
         "response_content",
@@ -98,6 +97,15 @@
         "model": "claude-opus-4-8",
         "output_tokens": 4,
         "query_source": "sdk"
+      },
+      "outcome_contract": {
+        "confidence": "observed",
+        "duration_ms": 3077,
+        "input_tokens": 2,
+        "model": "claude-opus-4-8",
+        "output_tokens": 4,
+        "source": "provider_completion",
+        "status": "success"
       },
       "request_fingerprint": "claude-code:fixture"
     }

@@ -99,7 +99,7 @@ func codexAdapter() adapter {
 			inputOutputTokens: statePartial,
 			cachedTokens:      stateUnknown,
 			reasoningTokens:   stateUnknown,
-			taskOutcome:       stateUnknown,
+			taskOutcome:       statePartial,
 			promptResponse:    stateUnsupported,
 		},
 		events: func(data []byte, fingerprint func([]byte) string) ([]canonical.Event, error) {
@@ -122,7 +122,7 @@ func claudeAdapter() adapter {
 			inputOutputTokens: stateSupported,
 			cachedTokens:      stateSupported,
 			reasoningTokens:   stateUnknown,
-			taskOutcome:       stateUnknown,
+			taskOutcome:       statePartial,
 			promptResponse:    stateUnsupported,
 		},
 		events:   claude.NormalizeEvents,

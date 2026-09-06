@@ -43,8 +43,11 @@ func TestExtractModelInteractionsIsHonestAboutUnknowns(t *testing.T) {
 	if record.ReasoningTokens != nil {
 		t.Fatalf("reasoning tokens must stay nil (unknown), got %v", *record.ReasoningTokens)
 	}
-	if record.Result != "unknown" {
-		t.Fatalf("result = %q, want unknown", record.Result)
+	if record.Result != "success" {
+		t.Fatalf("result = %q, want success from api_request outcome contract", record.Result)
+	}
+	if _, ok := record.ProviderExtensions["outcome_contract"].(map[string]any); !ok {
+		t.Fatalf("outcome_contract missing: %#v", record.ProviderExtensions)
 	}
 	if record.CachedInputTokens == nil || *record.CachedInputTokens != 0 {
 		t.Fatalf("cached input tokens = %v, want observed 0 (cache_read_tokens)", record.CachedInputTokens)

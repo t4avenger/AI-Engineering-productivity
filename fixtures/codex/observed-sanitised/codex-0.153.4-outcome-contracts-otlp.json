@@ -1,0 +1,257 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "openai",
+  "tool": "codex",
+  "tool_version": "0.153.4",
+  "captured_at": "2026-09-06T18:02:43Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "resourceLogs": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.153.4"
+              }
+            },
+            {
+              "key": "env",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        },
+        "scopeLogs": [
+          {
+            "logRecords": [
+              {
+                "attributes": [
+                  {
+                    "key": "event.name",
+                    "value": {
+                      "stringValue": "codex.api_request"
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "gpt-6-astra"
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  },
+                  {
+                    "key": "http.status_code",
+                    "value": {
+                      "stringValue": "200"
+                    }
+                  },
+                  {
+                    "key": "attempt",
+                    "value": {
+                      "stringValue": "0"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "stringValue": "435"
+                    }
+                  }
+                ],
+                "severityText": "INFO",
+                "timeUnixNano": "1788717763629000000",
+                "observedTimeUnixNano": "1788717763629000000"
+              },
+              {
+                "attributes": [
+                  {
+                    "key": "event.name",
+                    "value": {
+                      "stringValue": "codex.api_request"
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "gpt-6-astra"
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": false
+                    }
+                  },
+                  {
+                    "key": "http.status_code",
+                    "value": {
+                      "stringValue": "401"
+                    }
+                  },
+                  {
+                    "key": "attempt",
+                    "value": {
+                      "stringValue": "2"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "stringValue": "268"
+                    }
+                  },
+                  {
+                    "key": "error_code",
+                    "value": {
+                      "stringValue": "http_401"
+                    }
+                  }
+                ],
+                "severityText": "INFO",
+                "timeUnixNano": "1788717763629000000",
+                "observedTimeUnixNano": "1788717763629000000"
+              },
+              {
+                "attributes": [
+                  {
+                    "key": "event.name",
+                    "value": {
+                      "stringValue": "codex.tool_result"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "exec_command"
+                    }
+                  },
+                  {
+                    "key": "tool_namespace",
+                    "value": {
+                      "stringValue": "functions"
+                    }
+                  },
+                  {
+                    "key": "call_id",
+                    "value": {
+                      "stringValue": "synthetic-call-success"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "stringValue": "92"
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "stringValue": "true"
+                    }
+                  },
+                  {
+                    "key": "output_truncated",
+                    "value": {
+                      "boolValue": false
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "gpt-6-astra"
+                    }
+                  },
+                  {
+                    "key": "tool_result_seq",
+                    "value": {
+                      "stringValue": "1"
+                    }
+                  }
+                ],
+                "severityText": "INFO",
+                "timeUnixNano": "1788717763629000000",
+                "observedTimeUnixNano": "1788717763629000000"
+              },
+              {
+                "attributes": [
+                  {
+                    "key": "event.name",
+                    "value": {
+                      "stringValue": "codex.tool_result"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "apply_patch"
+                    }
+                  },
+                  {
+                    "key": "tool_namespace",
+                    "value": {
+                      "stringValue": "functions"
+                    }
+                  },
+                  {
+                    "key": "call_id",
+                    "value": {
+                      "stringValue": "synthetic-call-failed"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "stringValue": "87"
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "stringValue": "false"
+                    }
+                  },
+                  {
+                    "key": "output_truncated",
+                    "value": {
+                      "boolValue": false
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "gpt-6-astra"
+                    }
+                  },
+                  {
+                    "key": "tool_result_seq",
+                    "value": {
+                      "stringValue": "3"
+                    }
+                  }
+                ],
+                "severityText": "INFO",
+                "timeUnixNano": "1788717763629000000",
+                "observedTimeUnixNano": "1788717763629000000"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

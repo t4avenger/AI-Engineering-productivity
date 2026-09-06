@@ -33,6 +33,7 @@ const (
 	sourceTypeCapabilityProbe = "local_cli_capability_probe"
 
 	eventAPIRequest     = "api_request"
+	eventAPIError       = "api_error"
 	eventSkillActivated = "skill_activated"
 )
 
@@ -96,6 +97,7 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, finger
 		extensions["request_fingerprint"] = "claude-code:" + fingerprint([]byte(*requestID))
 	}
 	attachSkillDetection(extensions, raw, name)
+	attachOutcomeContract(extensions, raw, name)
 	return canonical.Event{
 		SchemaVersion: canonicalSchemaVersion, EventID: eventID, EventType: name,
 		OccurredAt: occurredAt, ReceivedAt: capturedAt, Provider: provider, Tool: tool,
@@ -130,6 +132,55 @@ func attachSkillDetection(extensions map[string]any, raw map[string]any, eventNa
 	if len(skill) > 0 {
 		extensions["skill"] = skill
 	}
+}
+
+// attachOutcomeContract stamps a provider-completion outcome contract for
+// reviewed Claude signals: api_request → success, api_error → failed. Broader
+// task contracts (PR/revert/abandon) remain unobserved and are not fabricated.
+func attachOutcomeContract(extensions map[string]any, raw map[string]any, eventName string) {
+	var status string
+	switch eventName {
+	case eventAPIRequest:
+		status = "success"
+	case eventAPIError:
+		status = "failed"
+	default:
+		return
+	}
+	contract := map[string]any{
+		"source":     "provider_completion",
+		"status":     status,
+		"confidence": "observed",
+	}
+	if model := firstString(raw, "model"); model != "" {
+		contract["model"] = model
+	}
+	if duration := normalize.OptionalTokenCount(raw["duration_ms"]); duration != nil {
+		contract["duration_ms"] = *duration
+	}
+	if input := normalize.OptionalTokenCount(raw["input_tokens"]); input != nil {
+		contract["input_tokens"] = *input
+	}
+	if output := normalize.OptionalTokenCount(raw["output_tokens"]); output != nil {
+		contract["output_tokens"] = *output
+	}
+	if code := outcomeErrorCode(raw); code != "" {
+		contract["error_code"] = code
+	}
+	if attempt := normalize.OptionalTokenCount(raw["attempt"]); attempt != nil && *attempt > 0 {
+		contract["retry_attempt"] = *attempt
+	}
+	extensions["outcome_contract"] = contract
+}
+
+func outcomeErrorCode(raw map[string]any) string {
+	if code := firstString(raw, "error", "error_code"); code != "" {
+		return code
+	}
+	if status := normalize.OptionalTokenCount(raw["status_code"]); status != nil {
+		return "http_" + strconv.FormatInt(*status, 10)
+	}
+	return ""
 }
 
 func skillName(raw map[string]any) string {
@@ -174,11 +225,14 @@ func promotedEventFields(eventName string) []string {
 // skill_activated via skill_detection — it is never listed as unavailable on
 // other events just because those events are not skill events.
 func unavailableFields(eventName string) []string {
-	common := []string{"tool_calls", "mcp_calls", "file_operations", "reasoning_tokens", "task_outcome", "repository_context", "prompt_content", "response_content", "provider_cost", "trace_span_correlation"}
-	if eventName == eventAPIRequest {
+	common := []string{"tool_calls", "mcp_calls", "file_operations", "reasoning_tokens", "repository_context", "prompt_content", "response_content", "provider_cost", "trace_span_correlation"}
+	switch eventName {
+	case eventAPIRequest, eventAPIError:
+		// Provider-completion outcome contracts are stamped for these events.
 		return common
+	default:
+		return append([]string{"model", "token_usage", "cache_usage", "task_outcome"}, common...)
 	}
-	return append([]string{"model", "token_usage", "cache_usage"}, common...)
 }
 
 func eventCorrelation(eventID string, occurredAt time.Time) map[string]any {

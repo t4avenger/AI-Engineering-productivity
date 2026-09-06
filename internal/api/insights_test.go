@@ -122,9 +122,51 @@ func coverageStateFor(coverage []insights.SkillCoverage, provider, tool string) 
 }
 
 func TestInsightsPathRequiresManagementAuth(t *testing.T) {
-	for _, path := range []string{"/api/v1/insights/mcp-inventory", "/api/v1/insights/skill-usage"} {
+	for _, path := range []string{"/api/v1/insights/mcp-inventory", "/api/v1/insights/skill-usage", "/api/v1/insights/model-performance"} {
 		if !isManagementPath(path) {
 			t.Fatalf("insight endpoint %q must require local API authentication", path)
 		}
+	}
+}
+
+func TestModelPerformanceInsightAPI(t *testing.T) {
+	repo := sessionTestRepository(t)
+	success := sessionTestEvent(t, "mp-success", "mp-session", "claude-code", "active", "2026-01-04T09:00:00Z", "")
+	success.Provider = "anthropic"
+	success.EventType = "api_request"
+	success.ProviderExtensions = map[string]any{"outcome_contract": map[string]any{
+		"source": "provider_completion", "status": "success", "confidence": "observed",
+		"model": "claude-haiku-4-5", "duration_ms": int64(100), "input_tokens": int64(4), "output_tokens": int64(2),
+	}}
+	failed := sessionTestEvent(t, "mp-failed", "mp-session", "claude-code", "active", "2026-01-04T09:00:01Z", "")
+	failed.Provider = "anthropic"
+	failed.EventType = "api_error"
+	failed.ProviderExtensions = map[string]any{"outcome_contract": map[string]any{
+		"source": "provider_completion", "status": "failed", "confidence": "observed",
+		"model": "claude-opus-4-8", "duration_ms": int64(50), "error_code": "rate_limit",
+	}}
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{success, failed}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(NewHandler(slog.Default(), repo))
+	t.Cleanup(server.Close)
+
+	response, err := http.Get(server.URL + "/api/v1/insights/model-performance")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("model performance status = %d", response.StatusCode)
+	}
+	var body modelPerformanceResponse
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Data.Models) != 2 {
+		t.Fatalf("expected 2 models, got %#v", body.Data.Models)
+	}
+	if body.Data.RankingAvailable {
+		t.Fatal("ranking must be suppressed below min sample size")
 	}
 }

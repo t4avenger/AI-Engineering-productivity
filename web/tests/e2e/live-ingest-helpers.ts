@@ -186,3 +186,100 @@ export function codexSkillOTLPMetrics(): string {
     ],
   });
 }
+
+/** Claude api_request provider-completion success contract for scorecard e2e. */
+export function claudeOutcomeSuccessOTLPLogs(): string {
+  return JSON.stringify({
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'claude-code' } },
+            { key: 'service.version', value: { stringValue: '2.1.263' } },
+          ],
+        },
+        scopeLogs: [
+          {
+            logRecords: [
+              {
+                attributes: [
+                  { key: 'event.name', value: { stringValue: 'api_request' } },
+                  {
+                    key: 'event.timestamp',
+                    value: { stringValue: '2026-09-06T18:05:00.100Z' },
+                  },
+                  { key: 'event.sequence', value: { intValue: '3' } },
+                  {
+                    key: 'session.id',
+                    value: { stringValue: 'tiq-live-e2e-outcome-session' },
+                  },
+                  {
+                    key: 'model',
+                    value: { stringValue: 'claude-haiku-4-5-20251001' },
+                  },
+                  { key: 'input_tokens', value: { intValue: '12' } },
+                  { key: 'output_tokens', value: { intValue: '4' } },
+                  { key: 'duration_ms', value: { intValue: '842' } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
+
+/** Codex tool_result + api_request outcome contracts for scorecard e2e. */
+export function codexOutcomeOTLPLogs(): string {
+  return JSON.stringify({
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'codex_exec' } },
+            { key: 'service.version', value: { stringValue: '0.153.4' } },
+          ],
+        },
+        scopeLogs: [
+          {
+            logRecords: [
+              {
+                attributes: [
+                  {
+                    key: 'event.name',
+                    value: { stringValue: 'codex.tool_result' },
+                  },
+                  { key: 'tool_name', value: { stringValue: 'exec_command' } },
+                  { key: 'success', value: { stringValue: 'true' } },
+                  { key: 'model', value: { stringValue: 'gpt-6-astra' } },
+                  { key: 'duration_ms', value: { stringValue: '92' } },
+                  { key: 'call_id', value: { stringValue: 'synthetic-call' } },
+                ],
+                severityText: 'INFO',
+              },
+              {
+                attributes: [
+                  {
+                    key: 'event.name',
+                    value: { stringValue: 'codex.api_request' },
+                  },
+                  { key: 'success', value: { boolValue: false } },
+                  { key: 'model', value: { stringValue: 'gpt-6-astra' } },
+                  { key: 'attempt', value: { stringValue: '2' } },
+                  { key: 'duration_ms', value: { stringValue: '268' } },
+                  {
+                    key: 'http.status_code',
+                    value: { stringValue: '401' },
+                  },
+                  { key: 'error_code', value: { stringValue: 'http_401' } },
+                ],
+                severityText: 'INFO',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}

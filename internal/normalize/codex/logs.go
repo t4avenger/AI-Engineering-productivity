@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/normalize"
@@ -88,18 +89,106 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 	}
 	id := "codex-log:" + fingerprint(recordData)
 	fields := attributes(record.Attributes)
-	attributes := map[string]any{"unavailable_fields": []string{"session_lifecycle", "cache_usage", "reasoning_tokens", "tool_calls", "file_operations", "command_execution", "approvals", "prompt_content", "response_content", "repository_context", "task_outcome", "provider_cost"}}
+	attributes := map[string]any{"unavailable_fields": []string{"session_lifecycle", "cache_usage", "reasoning_tokens", "tool_calls", "file_operations", "command_execution", "approvals", "prompt_content", "response_content", "repository_context", "provider_cost"}}
 	for _, key := range []string{"model", "input_token_count", "output_token_count"} {
 		if value, ok := fields[key]; ok {
 			attributes[key] = value
 		}
+	}
+	eventName := stringValue(fields["event.name"], "codex.log.received")
+	if !hasCodexOutcomeContract(eventName) {
+		attributes["unavailable_fields"] = append(attributes["unavailable_fields"].([]string), "task_outcome")
 	}
 	extensions := map[string]any{"resource_attributes": resource, "log_attributes": codexLogAttributes(fields), "severity": record.SeverityText}
 	if mcpCall, ok := codexMCPCall(fields, fingerprint); ok {
 		attributes["category"] = string(canonical.OperationCategoryMCPCall)
 		extensions["mcp_call"] = mcpCall
 	}
-	return canonical.Event{SchemaVersion: canonicalSchemaVersion, EventID: id, EventType: stringValue(fields["event.name"], "codex.log.received"), OccurredAt: receivedAt.UTC(), ReceivedAt: receivedAt.UTC(), Provider: "openai", Tool: "codex", SourceSchema: sourceSchema, SourceVersion: stringValue(resource["service.version"], unavailable), ActorID: unavailable, DeviceID: unavailable, SessionID: id, PrivacyLevel: "operational", Attributes: attributes, ProviderExtensions: extensions}, nil
+	attachCodexOutcomeContract(extensions, fields, eventName)
+	return canonical.Event{SchemaVersion: canonicalSchemaVersion, EventID: id, EventType: eventName, OccurredAt: receivedAt.UTC(), ReceivedAt: receivedAt.UTC(), Provider: "openai", Tool: "codex", SourceSchema: sourceSchema, SourceVersion: stringValue(resource["service.version"], unavailable), ActorID: unavailable, DeviceID: unavailable, SessionID: id, PrivacyLevel: "operational", Attributes: attributes, ProviderExtensions: extensions}, nil
+}
+
+func hasCodexOutcomeContract(eventName string) bool {
+	return eventName == "codex.tool_result" || eventName == "codex.api_request"
+}
+
+func attachCodexOutcomeContract(extensions map[string]any, fields map[string]any, eventName string) {
+	var source, status string
+	switch eventName {
+	case "codex.tool_result":
+		source = "tool_result"
+		status = codexSuccessStatus(fields["success"])
+	case "codex.api_request":
+		source = "provider_completion"
+		status = codexSuccessStatus(fields["success"])
+	default:
+		return
+	}
+	if status == "" {
+		return
+	}
+	contract := map[string]any{
+		"source":     source,
+		"status":     status,
+		"confidence": "observed",
+	}
+	if model, ok := normalize.ObservedString(fields["model"]); ok {
+		contract["model"] = model
+	}
+	if duration := normalize.OptionalTokenCount(fields["duration_ms"]); duration != nil {
+		contract["duration_ms"] = *duration
+	}
+	if input := normalize.OptionalTokenCount(fields["input_token_count"]); input != nil {
+		contract["input_tokens"] = *input
+	}
+	if output := normalize.OptionalTokenCount(fields["output_token_count"]); output != nil {
+		contract["output_tokens"] = *output
+	}
+	if code := codexErrorCode(fields, status); code != "" {
+		contract["error_code"] = code
+	}
+	if attempt := normalize.OptionalTokenCount(fields["attempt"]); attempt != nil && *attempt > 0 {
+		contract["retry_attempt"] = *attempt
+	}
+	extensions["outcome_contract"] = contract
+}
+
+func codexSuccessStatus(value any) string {
+	switch typed := value.(type) {
+	case bool:
+		if typed {
+			return "success"
+		}
+		return "failed"
+	case string:
+		switch strings.ToLower(strings.TrimSpace(typed)) {
+		case "true", "ok", "success":
+			return "success"
+		case "false", "error", "failed", "failure":
+			return "failed"
+		}
+	}
+	return ""
+}
+
+func codexErrorCode(fields map[string]any, status string) string {
+	if status != "failed" {
+		return ""
+	}
+	for _, key := range []string{"error_code", "error.message", "error"} {
+		if text, ok := normalize.ObservedString(fields[key]); ok {
+			return text
+		}
+	}
+	for _, key := range []string{"http.status_code", "http.response.status_code"} {
+		if text, ok := normalize.ObservedString(fields[key]); ok && text != "" {
+			return "http_" + text
+		}
+		if number := normalize.OptionalTokenCount(fields[key]); number != nil {
+			return fmt.Sprintf("http_%d", *number)
+		}
+	}
+	return ""
 }
 
 func codexLogAttributes(fields map[string]any) map[string]any {

@@ -1,0 +1,52 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "cursor",
+  "tool": "cursor-agent",
+  "tool_version": "2026.09.02-c22c1a3",
+  "captured_at": "2026-09-06T18:00:30Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "source_type": "local_cli_stream_json",
+    "capture": {
+      "workspace": "isolated_tmp",
+      "mode": "ask",
+      "model_flag": "gpt-5.2",
+      "note": "model appears on system init event; result subtype success is provider completion"
+    },
+    "observations": [
+      {
+        "name": "task_outcome",
+        "state": "partial",
+        "evidence": "stream-json result.subtype success + is_error false; model on system init"
+      },
+      {
+        "name": "model_identity",
+        "state": "partial",
+        "evidence": "system init model field GPT-5.2 Medium observed when --model gpt-5.2"
+      }
+    ],
+    "init": {
+      "type": "system",
+      "subtype": "init",
+      "model": "GPT-5.2 Medium",
+      "session_id": "synthetic-session-id"
+    },
+    "result": {
+      "type": "result",
+      "subtype": "success",
+      "is_error": false,
+      "duration_ms": 5386,
+      "duration_api_ms": 5386,
+      "result_summary": "synthetic_ok",
+      "session_id": "synthetic-session-id",
+      "request_id": "synthetic-request-id",
+      "usage": {
+        "inputTokens": 8402,
+        "outputTokens": 19,
+        "cacheReadTokens": 5504,
+        "cacheWriteTokens": 0
+      }
+    }
+  }
+}

@@ -13,7 +13,7 @@
     "output_tokens": 4,
     "cached_input_tokens": 0,
     "reasoning_tokens": null,
-    "result": "unknown",
+    "result": "success",
     "error_code": null,
     "provenance": "observed",
     "provider_extensions": {
@@ -29,6 +29,15 @@
         "cache_creation_tokens": 6258,
         "effort": "high",
         "query_source": "sdk"
+      },
+      "outcome_contract": {
+        "confidence": "observed",
+        "duration_ms": 3077,
+        "input_tokens": 2,
+        "model": "claude-opus-4-8",
+        "output_tokens": 4,
+        "source": "provider_completion",
+        "status": "success"
       },
       "timestamps": {
         "completed_at": "observed",
