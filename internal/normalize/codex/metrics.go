@@ -18,6 +18,7 @@ import (
 var ErrUnsupportedMetrics = errors.New("unsupported Codex metrics payload")
 
 const skillInjectedMetric = "codex.skill.injected"
+const skillTurnDurationMetric = "codex.skill.turn.duration_seconds"
 
 type metricsPayload struct {
 	ResourceMetrics []resourceMetric `json:"resourceMetrics"`
@@ -35,8 +36,9 @@ type scopeMetric struct {
 }
 
 type otlpMetric struct {
-	Name string     `json:"name"`
-	Sum  *metricSum `json:"sum"`
+	Name      string           `json:"name"`
+	Sum       *metricSum       `json:"sum"`
+	Histogram *metricHistogram `json:"histogram"`
 }
 
 type metricSum struct {
@@ -48,6 +50,16 @@ type metricDataPoint struct {
 	AsInt             any         `json:"asInt"`
 	TimeUnixNano      string      `json:"timeUnixNano"`
 	StartTimeUnixNano string      `json:"startTimeUnixNano"`
+}
+
+type metricHistogram struct {
+	DataPoints []histogramDataPoint `json:"dataPoints"`
+}
+
+type histogramDataPoint struct {
+	Attributes   []attribute `json:"attributes"`
+	Count        int         `json:"count"`
+	TimeUnixNano string      `json:"timeUnixNano"`
 }
 
 // NormalizeMetrics maps Codex OTLP metrics into canonical skill events.
@@ -96,6 +108,9 @@ func skillEventsFromResource(resource resourceMetric, receivedAt time.Time, fing
 }
 
 func skillEventsFromMetric(resourceAttrs map[string]any, version string, item otlpMetric, receivedAt time.Time, fingerprint func([]byte) string) ([]canonical.Event, error) {
+	if item.Name == skillTurnDurationMetric && item.Histogram != nil {
+		return skillTurnEventsFromHistogram(resourceAttrs, version, item.Histogram, receivedAt, fingerprint), nil
+	}
 	if item.Name != skillInjectedMetric || item.Sum == nil {
 		return nil, nil
 	}
@@ -110,6 +125,35 @@ func skillEventsFromMetric(resourceAttrs map[string]any, version string, item ot
 		}
 	}
 	return events, nil
+}
+
+func skillTurnEventsFromHistogram(resourceAttrs map[string]any, version string, histogram *metricHistogram, receivedAt time.Time, fingerprint func([]byte) string) []canonical.Event {
+	events := make([]canonical.Event, 0, len(histogram.DataPoints))
+	for index, point := range histogram.DataPoints {
+		events = append(events, skillTurnEvent(resourceAttrs, version, point, index, receivedAt, fingerprint))
+	}
+	return events
+}
+
+func skillTurnEvent(resource map[string]any, version string, point histogramDataPoint, index int, receivedAt time.Time, fingerprint func([]byte) string) canonical.Event {
+	fields := attributes(point.Attributes)
+	occurredAt := metricTime(point.TimeUnixNano, receivedAt)
+	identity := fmt.Sprintf("%s|%s|%s|%d", skillTurnDurationMetric, stringValue(fields["status"], ""), point.TimeUnixNano, index)
+	eventID := "codex:skill-turn:" + fingerprint([]byte(identity))
+	extensions := map[string]any{
+		"correlation":     skillCorrelation(eventID, occurredAt),
+		"skill_detection": "inferred",
+		"metric": map[string]any{
+			"name":  skillTurnDurationMetric,
+			"count": point.Count,
+		},
+		"resource": normalize.UnknownFields(resource, "service.name", "service.version"),
+		"skill_turn": map[string]any{
+			"outcome":   mapSkillStatus(stringValue(fields["status"], "")),
+			"plugin_id": stringValue(fields["plugin_id"], unavailable),
+		},
+	}
+	return skillEvent(eventID, skillTurnDurationMetric, occurredAt, receivedAt, version, extensions)
 }
 
 func skillInjectedEvent(resource map[string]any, version string, point metricDataPoint, index int, receivedAt time.Time, fingerprint func([]byte) string) (canonical.Event, bool, error) {
@@ -158,6 +202,37 @@ func skillInjectedEvent(resource map[string]any, version string, point metricDat
 		Attributes:         map[string]any{"unavailable_fields": []string{"model", "token_usage", "cache_usage", "tool_calls", "file_operations", "command_execution", "approvals", "prompt_content", "response_content", "repository_context", "task_outcome", "provider_cost", "session_lifecycle"}},
 		ProviderExtensions: extensions,
 	}, true, nil
+}
+
+func skillEvent(eventID, eventType string, occurredAt, receivedAt time.Time, version string, extensions map[string]any) canonical.Event {
+	return canonical.Event{
+		SchemaVersion:      canonicalSchemaVersion,
+		EventID:            eventID,
+		EventType:          eventType,
+		OccurredAt:         occurredAt,
+		ReceivedAt:         receivedAt.UTC(),
+		Provider:           "openai",
+		Tool:               "codex",
+		SourceSchema:       sourceSchema,
+		SourceVersion:      version,
+		ActorID:            unavailable,
+		DeviceID:           unavailable,
+		SessionID:          eventID,
+		PrivacyLevel:       "operational",
+		Attributes:         map[string]any{"unavailable_fields": []string{"model", "token_usage", "cache_usage", "tool_calls", "file_operations", "command_execution", "approvals", "prompt_content", "response_content", "repository_context", "task_outcome", "provider_cost", "session_lifecycle"}},
+		ProviderExtensions: extensions,
+	}
+}
+
+func skillCorrelation(eventID string, occurredAt time.Time) map[string]any {
+	return map[string]any{
+		"dedup_key":    eventID,
+		"ordering_key": fmt.Sprintf("%020d:%s", occurredAt.UnixNano(), eventID),
+		"task_boundary": map[string]any{
+			"confidence": "unknown",
+			"reason":     "Codex skill metrics have no reviewed task-boundary signal",
+		},
+	}
 }
 
 func skillPayload(fields map[string]any, skillName string) map[string]any {

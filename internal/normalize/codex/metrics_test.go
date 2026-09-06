@@ -53,6 +53,27 @@ func TestNormalizeMetricsSkillInjectedGolden(t *testing.T) {
 	assertCodexGolden(t, "codex-0.153.4-skill-injected-metrics.events.json", first)
 }
 
+func TestNormalizeMetricsSkillTurnDurationIsInferred(t *testing.T) {
+	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.version","value":{"stringValue":"0.153.4"}},{"key":"env","value":{"stringValue":"telemetryiq-synthetic"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.skill.turn.duration_seconds","histogram":{"dataPoints":[{"attributes":[{"key":"status","value":{"stringValue":"completed"}},{"key":"plugin_id","value":{"stringValue":"unattributed"}}],"count":1,"timeUnixNano":"1788709355426961808"}]}}]}]}]}`)
+	events, err := NormalizeMetrics(payload, time.Date(2026, 9, 6, 15, 42, 35, 0, time.UTC), stubCodexFingerprint)
+	if err != nil {
+		t.Fatalf("NormalizeMetrics: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("event count = %d, want 1", len(events))
+	}
+	event := events[0]
+	if event.EventType != skillTurnDurationMetric {
+		t.Fatalf("event type = %q", event.EventType)
+	}
+	if event.ProviderExtensions["skill_detection"] != "inferred" {
+		t.Fatalf("skill_detection = %v", event.ProviderExtensions["skill_detection"])
+	}
+	if _, ok := event.ProviderExtensions["skill"]; ok {
+		t.Fatalf("inferred skill turn must not fabricate a named skill: %#v", event.ProviderExtensions["skill"])
+	}
+}
+
 func TestNormalizeMetricsRejectsNonCodexService(t *testing.T) {
 	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"other"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.skill.injected","sum":{"dataPoints":[{"attributes":[{"key":"skill","value":{"stringValue":"x"}}],"asInt":1}]}}]}]}]}`)
 	_, err := NormalizeMetrics(payload, time.Now().UTC(), stubCodexFingerprint)

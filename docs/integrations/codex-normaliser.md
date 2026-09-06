@@ -88,11 +88,15 @@ is the golden output for the checked-in observed-sanitised input.
 ## Skill injection metrics
 
 `NormalizeMetrics` maps OTLP `resourceMetrics` from Codex (`codex_cli_rs` /
-`codex_exec`) and emits canonical events only for `codex.skill.injected`
-datapoints. Each datapoint with a non-empty `skill` attribute becomes an event
-with `provider_extensions.skill_detection = "explicit"` and
-`provider_extensions.skill.{name,outcome,invoke_type}`. Other metrics are ignored
-after HTTP accept so exporters can flush without inventing insight rows.
+`codex_exec`) for two reviewed skill surfaces. `codex.skill.injected` datapoints
+with a non-empty `skill` attribute become explicit named skill events with
+`provider_extensions.skill_detection = "explicit"` and
+`provider_extensions.skill.{name,outcome,invoke_type}`. A live Codex CLI 0.153.4
+trigger-style `bmad:brainstorm` probe emitted `codex.skill.turn.duration_seconds` as a histogram
+with `status` and `plugin_id=unattributed`, but no skill name; those datapoints
+become inferred coverage events with `provider_extensions.skill_detection =
+"inferred"` and no `provider_extensions.skill` record. Other metrics are
+ignored after HTTP accept so exporters can flush without inventing insight rows.
 
 Golden: `fixtures/codex/expected/codex-0.153.4-skill-injected-metrics.events.json`
 for `fixtures/codex/observed-sanitised/codex-0.153.4-skill-injected-metrics.json`.

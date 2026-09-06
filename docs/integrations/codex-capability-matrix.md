@@ -13,7 +13,7 @@ Observed with Codex CLI 0.145.0 in an isolated synthetic session on 2026-07-27.
 | Prompt/response content | unsupported | not enabled; log body is removed before inspection. |
 | Account, email, hostname | unsupported | observed as sensitive attributes and removed before output. |
 | Trace/span correlation | unsupported | observed log records had empty trace/span IDs. |
-| Skill invocations | supported | `codex.skill.injected` metric with `skill`, `status`, `invoke_type` in `fixtures/codex/observed-sanitised/codex-0.153.4-skill-injected-metrics.json` (CLI 0.153.4); mapped by `codex.NormalizeMetrics`. Companion logs from the same run did not carry skill identity on tool events. |
+| Skill invocations | version-dependent | `codex.skill.injected` metric with `skill`, `status`, `invoke_type` in `fixtures/codex/observed-sanitised/codex-0.153.4-skill-injected-metrics.json` (CLI 0.153.4) maps to explicit named skill usage. A live trigger-style `bmad:brainstorm` probe on 2026-09-06 emitted `codex.skill.turn.duration_seconds` with `status` and `plugin_id=unattributed`, but no skill name; this maps only to inferred skill-detection coverage. Companion logs do not carry skill identity on tool events. |
 
 No capability not listed here is inferred from this run.
 
