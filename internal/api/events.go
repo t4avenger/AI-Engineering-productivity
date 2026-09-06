@@ -190,16 +190,18 @@ func (a sessionAPI) costSummary(w http.ResponseWriter, r *http.Request) {
 	}
 	summary := costSummary{Statuses: map[string]int{}}
 	var amount int64
+	hasAmount := false
 	for _, record := range records {
 		if summary.Currency == "" {
 			summary.Currency = record.Currency
 		}
 		summary.Statuses[record.Status]++
 		if record.AmountMicrousd != nil {
+			hasAmount = true
 			amount += *record.AmountMicrousd
 		}
 	}
-	if amount != 0 {
+	if hasAmount {
 		summary.CalculatedAmountMicrousd = &amount
 	}
 	writeSessionJSON(w, http.StatusOK, costSummaryResponse{Data: summary})

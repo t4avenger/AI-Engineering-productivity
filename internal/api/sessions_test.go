@@ -17,6 +17,14 @@ import (
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
 )
 
+type costReaderStub struct {
+	records []cost.Record
+}
+
+func (s costReaderStub) ListCostRecords(context.Context, string) ([]cost.Record, error) {
+	return s.records, nil
+}
+
 func TestSessionAPIContract(t *testing.T) {
 	repo := sessionTestRepository(t)
 	server := httptest.NewServer(NewHandler(slog.Default(), repo))
@@ -115,6 +123,57 @@ func TestCostAPIProvidesSummaryAndSessionProvenance(t *testing.T) {
 		if response.StatusCode != http.StatusOK {
 			t.Fatalf("%s status = %d", path, response.StatusCode)
 		}
+	}
+}
+
+func TestCostAPISummaryLabelsUnknownWithoutSynthesisingZero(t *testing.T) {
+	api := sessionAPI{costReader: costReaderStub{records: []cost.Record{
+		{Status: "unknown_price", Currency: "USD"},
+		{Status: "missing_usage", Currency: "USD"},
+	}}}
+	response := httptest.NewRecorder()
+	api.costSummary(response, httptest.NewRequest(http.MethodGet, "/api/v1/costs/summary", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("summary status = %d", response.Code)
+	}
+	var body costSummaryResponse
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Data.CalculatedAmountMicrousd != nil {
+		t.Fatalf("unknown cost synthesized amount = %d", *body.Data.CalculatedAmountMicrousd)
+	}
+	if got := body.Data.Statuses["unknown_price"]; got != 1 {
+		t.Fatalf("unknown_price status count = %d, statuses=%#v", got, body.Data.Statuses)
+	}
+	if got := body.Data.Statuses["missing_usage"]; got != 1 {
+		t.Fatalf("missing_usage status count = %d, statuses=%#v", got, body.Data.Statuses)
+	}
+}
+
+func TestCostAPISummaryPreservesKnownZeroAmount(t *testing.T) {
+	zero := int64(0)
+	api := sessionAPI{costReader: costReaderStub{records: []cost.Record{{
+		Status:         "calculated",
+		Currency:       "USD",
+		AmountMicrousd: &zero,
+	}}}}
+	response := httptest.NewRecorder()
+	api.costSummary(response, httptest.NewRequest(http.MethodGet, "/api/v1/costs/summary", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("summary status = %d", response.Code)
+	}
+	var body costSummaryResponse
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Data.CalculatedAmountMicrousd == nil || *body.Data.CalculatedAmountMicrousd != 0 {
+		t.Fatalf("known zero amount = %#v", body.Data.CalculatedAmountMicrousd)
+	}
+	if got := body.Data.Statuses["calculated"]; got != 1 {
+		t.Fatalf("calculated status count = %d, statuses=%#v", got, body.Data.Statuses)
 	}
 }
 

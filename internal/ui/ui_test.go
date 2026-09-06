@@ -267,8 +267,8 @@ func TestUnlockAndHome(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(body, "Orchestration overview") || !strings.Contains(body, "codex") {
 		t.Fatalf("home = %d %q", rec.Code, body)
 	}
-	if strings.Contains(strings.ToLower(body), "calculated amount") {
-		t.Fatal("home must not headline costs")
+	if strings.Contains(strings.ToLower(body), "cost") {
+		t.Fatal("home must not surface costs")
 	}
 }
 
