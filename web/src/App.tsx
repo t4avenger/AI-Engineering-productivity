@@ -14,6 +14,7 @@ import {
 import { useEffect, useState } from 'react';
 
 import { fetchHealth, type HealthResponse } from './health';
+import { fetchMCPInventory, type MCPInventoryInsight } from './insights';
 import {
   deleteAllSessions,
   deleteSession,
@@ -29,7 +30,13 @@ import {
   SessionAPIError,
 } from './sessions';
 
-type Page = 'home' | 'sessions' | 'costs' | 'integrations' | 'privacy';
+type Page =
+  | 'home'
+  | 'sessions'
+  | 'insights'
+  | 'costs'
+  | 'integrations'
+  | 'privacy';
 type HealthState =
   | { status: 'loading' }
   | { status: 'healthy'; data: HealthResponse }
@@ -149,7 +156,14 @@ export function App() {
       </header>
       <nav aria-label="Primary navigation" className="navigation">
         {(
-          ['home', 'sessions', 'costs', 'integrations', 'privacy'] as const
+          [
+            'home',
+            'sessions',
+            'insights',
+            'costs',
+            'integrations',
+            'privacy',
+          ] as const
         ).map((item) => (
           <button
             aria-current={!selectedID && page === item ? 'page' : undefined}
@@ -187,6 +201,7 @@ function PageContent({
 }>) {
   if (page === 'sessions')
     return <SessionsPage sessions={sessions} onSelect={onSelectSession} />;
+  if (page === 'insights') return <InsightsPage />;
   if (page === 'costs') return <CostsPage />;
   if (page === 'integrations')
     return <IntegrationsPage sessions={sessions.data} />;
@@ -229,6 +244,97 @@ function HomePage({
         Cost and governance data are not available yet. They will be clearly
         labelled when implemented.
       </p>
+    </section>
+  );
+}
+
+function InsightsPage() {
+  const [inventory, setInventory] = useState<MCPInventoryInsight | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    fetchMCPInventory()
+      .then(setInventory)
+      .catch((reason: unknown) => {
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : 'Unable to load MCP inventory',
+        );
+      });
+  }, []);
+  return (
+    <section aria-labelledby="insights-title" className="page">
+      <p className="eyebrow">Behaviour insight</p>
+      <h1 id="insights-title">MCP inventory</h1>
+      <p className="lede">
+        Connected MCP servers are shown with privacy-safe fingerprints and usage
+        certainty labels.
+      </p>
+      {error ? <p role="alert">{error}</p> : null}
+      {!inventory && !error ? <output>Loading MCP inventory...</output> : null}
+      {inventory ? (
+        <>
+          <dl className="metrics">
+            <Metric
+              label="Connected MCPs"
+              value={inventory.totals.connected_servers}
+            />
+            <Metric label="Used" value={inventory.totals.used_servers} />
+            <Metric label="Unused" value={inventory.totals.unused_servers} />
+            <Metric
+              label="Usage unavailable"
+              value={inventory.totals.usage_unavailable_servers}
+            />
+          </dl>
+          {inventory.servers.length === 0 ? (
+            <div className="empty">
+              <h2>No MCP connections observed</h2>
+              <p>
+                TelemetryIQ has not retained a reviewed MCP connection event.
+              </p>
+            </div>
+          ) : (
+            <ul className="cards">
+              {inventory.servers.map((server) => (
+                <li key={server.server_fingerprint}>
+                  <h2>{server.tool}</h2>
+                  <dl className="details">
+                    <Detail
+                      label="Server"
+                      value={shortFingerprint(server.server_fingerprint)}
+                    />
+                    <Detail label="Identity" value={server.identity_state} />
+                    <Detail
+                      label="Connection"
+                      value={server.connection_status}
+                    />
+                    <Detail label="Usage" value={server.usage_state} />
+                    <Detail
+                      label="Context waste"
+                      value={server.context_waste_state}
+                    />
+                    <Detail
+                      label="Input tokens"
+                      value={optionalNumber(server.request_input_tokens)}
+                    />
+                    <Detail
+                      label="Output tokens"
+                      value={optionalNumber(server.request_output_tokens)}
+                    />
+                  </dl>
+                  <p>{server.token_context_label}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <section className="panel">
+            <h2>Evidence limits</h2>
+            {inventory.notes.map((note) => (
+              <p key={note}>{note}</p>
+            ))}
+          </section>
+        </>
+      ) : null}
     </section>
   );
 }
@@ -921,6 +1027,14 @@ function numberAttribute(
   const value = session.attributes[key];
   return typeof value === 'number' || typeof value === 'string' ? value : null;
 }
+function optionalNumber(value: number | null): string | number {
+  return value === null ? 'Unavailable' : value;
+}
+
+function shortFingerprint(value: string): string {
+  return value.length <= 24 ? value : value.slice(0, 24) + '...';
+}
+
 function formatCost(amount: number | null, currency: string): string {
   if (amount === null) return 'Unknown price';
   return new Intl.NumberFormat(undefined, {

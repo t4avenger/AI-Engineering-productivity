@@ -74,7 +74,7 @@ function authHeaders(init?: RequestInit): Headers {
   return headers;
 }
 
-function apiRequestURL(
+export function apiRequestURL(
   segments: readonly string[],
   parameters?: URLSearchParams,
 ): URL {
@@ -85,7 +85,7 @@ function apiRequestURL(
   return url;
 }
 
-async function request<T>(url: URL, init?: RequestInit): Promise<T> {
+export async function request<T>(url: URL, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
     headers: authHeaders(init),
