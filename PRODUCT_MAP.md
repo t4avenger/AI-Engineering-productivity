@@ -575,6 +575,8 @@ sharing:
 - Redact every raw provider payload recursively before normalisation, persistent storage, diagnostics, or logs.
 - Redact again before persistent storage as a defense-in-depth boundary.
 - Redact before diagnostics.
+- Never persist a raw file path. Persist a coarse, non-reversible path class (`dotenv`, `ssh_key`, `cert`, `credentials_file`, `project_relative`, `non_project`) plus a syntactic project boundary (`project`, `external`, `indeterminate`). The class is intentionally-retained governance signal (category of access), never the identity of the file. A bare keyed hash is rejected here: the universe of interesting secret paths is a tiny dictionary a leaked local key could match.
+- Where a stable identifier must be persisted, use a rotatable, scoped keyed HMAC (`FingerprintScoped`) — domain-separated per scope, and re-keyable via `RotateSalt` so fingerprints are unlinkable across installations and across rotations. Rotation is forward-only; complete local deletion severs pre-existing identifiers.
 - Provide field-level provenance showing why a field was retained.
 - Support complete local deletion.
 - Use synthetic secrets in tests.

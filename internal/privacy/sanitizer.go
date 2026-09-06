@@ -25,10 +25,11 @@ const (
 type Action string
 
 const (
-	ActionRetained Action = "retained"
-	ActionRemoved  Action = "removed"
-	ActionHashed   Action = "hashed"
-	ActionRedacted Action = "redacted"
+	ActionRetained   Action = "retained"
+	ActionRemoved    Action = "removed"
+	ActionHashed     Action = "hashed"
+	ActionRedacted   Action = "redacted"
+	ActionClassified Action = "classified"
 )
 
 // Provenance provides the reason a field was retained or transformed without
@@ -52,7 +53,184 @@ type Sanitizer struct {
 
 // Fingerprint returns an installation-specific, non-reversible identifier for
 // transient telemetry. It is safe to persist, unlike the input value.
+//
+// Fingerprint is the unscoped identifier used for cross-record correlation
+// (e.g. deriving a stable event/session id). New persisted identifiers that
+// must not be linkable across contexts should prefer FingerprintScoped so a
+// value in one scope cannot be matched against the same value in another.
 func (s *Sanitizer) Fingerprint(value any) string { return s.hash(value) }
+
+// FingerprintScoped returns a non-reversible identifier that is domain-separated
+// by scope: the same value under different scopes produces unrelated
+// fingerprints, so a leaked fingerprint in one context cannot be matched against
+// the same value in another. Fingerprints remain stable within an installation
+// and differ across installations and across key rotations (see RotateSalt).
+func (s *Sanitizer) FingerprintScoped(scope string, value any) string {
+	subkey := hmac.New(sha256.New, s.salt)
+	_, _ = fmt.Fprintf(subkey, "privacy-hmac-v1|scope|%s", scope)
+	mac := hmac.New(sha256.New, subkey.Sum(nil))
+	_, _ = fmt.Fprint(mac, value)
+	return "hmac-sha256:" + hex.EncodeToString(mac.Sum(nil))
+}
+
+// PathClass is a coarse, non-reversible classification of a file path. It
+// records the sensitive category or project location a path belongs to without
+// persisting the raw path, which — for the small universe of interesting secret
+// paths — a bare keyed hash would leave dictionary-recoverable if the local key
+// ever leaked.
+type PathClass string
+
+const (
+	PathDotenv          PathClass = "dotenv"
+	PathSSHKey          PathClass = "ssh_key"
+	PathCert            PathClass = "cert"
+	PathCredentialsFile PathClass = "credentials_file"
+	PathProjectRelative PathClass = "project_relative"
+	PathNonProject      PathClass = "non_project"
+)
+
+// PathBoundary records where a path sits relative to the observed project. It is
+// derived syntactically (no symlink resolution), so project means
+// "syntactically project-relative", not a filesystem-verified location.
+type PathBoundary string
+
+const (
+	BoundaryProject       PathBoundary = "project"
+	BoundaryExternal      PathBoundary = "external"
+	BoundaryIndeterminate PathBoundary = "indeterminate"
+)
+
+// homeConfigSegments name home-directory locations that hold credentials or
+// keys; a path passing through one is treated as external to the project.
+var homeConfigSegments = map[string]struct{}{
+	".ssh": {}, ".aws": {}, ".gnupg": {}, ".config": {}, ".kube": {}, ".docker": {}, "gcloud": {},
+}
+
+// certExtensions name certificate/key-material file extensions. ".key" is
+// deliberately excluded: it collides with too many non-secret files
+// (localization keys, license keys, keyboard maps) to classify reliably.
+var certExtensions = map[string]struct{}{
+	".pem": {}, ".crt": {}, ".cer": {}, ".der": {}, ".p12": {}, ".pfx": {},
+}
+
+// ClassifyPath maps a raw path to a coarse class and project boundary without
+// returning or persisting the raw path. Classification is OS-independent and
+// case-insensitive: both separators are normalised and Windows drive-letter and
+// tilde-prefixed paths are recognised. The sensitive category dominates location
+// (a .env inside or outside the project is still dotenv). When the location
+// cannot be determined it returns indeterminate rather than a fabricated answer.
+func ClassifyPath(raw string) (PathClass, PathBoundary) {
+	cleaned := strings.TrimSpace(raw)
+	if cleaned == "" {
+		// An empty or whitespace-only path carries no location or category
+		// signal; classifying it as project-relative would fabricate one.
+		return PathNonProject, BoundaryIndeterminate
+	}
+	normalized := strings.ToLower(strings.ReplaceAll(cleaned, "\\", "/"))
+	segments := make([]string, 0)
+	for _, segment := range strings.Split(normalized, "/") {
+		if segment != "" {
+			segments = append(segments, segment)
+		}
+	}
+	base := ""
+	if len(segments) > 0 {
+		base = segments[len(segments)-1]
+	}
+
+	boundary := classifyBoundary(normalized, segments)
+
+	switch {
+	case hasSegment(segments, ".ssh") || isSSHKeyName(base):
+		return PathSSHKey, boundary
+	case hasCertExtension(base):
+		return PathCert, boundary
+	case isCredentialsName(base) || hasSegment(segments, ".aws"):
+		return PathCredentialsFile, boundary
+	case base == ".env" || strings.HasPrefix(base, ".env."):
+		return PathDotenv, boundary
+	case boundary == BoundaryProject:
+		return PathProjectRelative, boundary
+	default:
+		return PathNonProject, boundary
+	}
+}
+
+// PathToken renders a class + boundary as the compact, non-reversible string
+// that is safe to persist in place of a raw path.
+func PathToken(class PathClass, boundary PathBoundary) string {
+	return fmt.Sprintf("path-class:%s;boundary:%s", class, boundary)
+}
+
+func classifyBoundary(normalized string, segments []string) PathBoundary {
+	// A relative path is syntactically project-relative regardless of the
+	// segments it passes through: an in-repo path like internal/.ssh/id_rsa is
+	// still inside the project, so the home-config heuristic must not apply.
+	if !strings.HasPrefix(normalized, "~") && !isAbsolutePath(normalized) {
+		return BoundaryProject
+	}
+	// Absolute or home-anchored: project membership is unknown. A home-directory
+	// config segment marks it external; otherwise it stays indeterminate.
+	if strings.HasPrefix(normalized, "~") {
+		return BoundaryExternal
+	}
+	for _, segment := range segments {
+		if _, ok := homeConfigSegments[segment]; ok {
+			return BoundaryExternal
+		}
+	}
+	return BoundaryIndeterminate
+}
+
+// isAbsolutePath recognises POSIX, UNC, and Windows drive-letter absolute paths
+// regardless of the host OS (input is already lowercased and slash-normalised).
+func isAbsolutePath(normalized string) bool {
+	if strings.HasPrefix(normalized, "/") {
+		return true
+	}
+	if len(normalized) >= 2 && normalized[1] == ':' && normalized[0] >= 'a' && normalized[0] <= 'z' {
+		return true
+	}
+	return false
+}
+
+func isSSHKeyName(base string) bool {
+	for _, name := range []string{"id_rsa", "id_dsa", "id_ecdsa", "id_ed25519"} {
+		if base == name || strings.HasPrefix(base, name+".") {
+			return true
+		}
+	}
+	return base == "known_hosts" || base == "authorized_keys"
+}
+
+func isCredentialsName(base string) bool {
+	if strings.Contains(base, "credential") {
+		return true
+	}
+	switch base {
+	case ".netrc", "_netrc", ".pgpass", ".npmrc", ".pypirc":
+		return true
+	}
+	return false
+}
+
+func hasCertExtension(base string) bool {
+	dot := strings.LastIndex(base, ".")
+	if dot < 0 {
+		return false
+	}
+	_, ok := certExtensions[base[dot:]]
+	return ok
+}
+
+func hasSegment(segments []string, target string) bool {
+	for _, segment := range segments {
+		if segment == target {
+			return true
+		}
+	}
+	return false
+}
 
 // New creates a Sanitizer from an installation-specific secret salt.
 func New(salt []byte) (*Sanitizer, error) {
@@ -110,6 +288,60 @@ func LoadOrCreateSalt(dataDir string) ([]byte, error) {
 	return append([]byte(nil), salt...), nil
 }
 
+// RotateSalt replaces the installation salt with a freshly generated key and
+// returns it. Every fingerprint produced from the new salt is unrelated to those
+// produced before rotation, so a leaked fingerprint cannot be matched against
+// values collected after the key is rotated. Rotation is forward-only: it does
+// not re-key identifiers already persisted — remove local data (the salt itself
+// is enough) to sever their linkage. The write is atomic (temp file, fsync,
+// rename, directory fsync) so a crash cannot leave a truncated key.
+func RotateSalt(dataDir string) ([]byte, error) {
+	if dataDir == "" {
+		return nil, errors.New("privacy salt data directory is required")
+	}
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+		return nil, fmt.Errorf("create privacy data directory: %w", err)
+	}
+	if err := os.Chmod(dataDir, 0o700); err != nil {
+		return nil, fmt.Errorf("secure privacy data directory: %w", err)
+	}
+
+	salt := make([]byte, saltSize)
+	if _, err := rand.Read(salt); err != nil {
+		return nil, fmt.Errorf("generate privacy salt: %w", err)
+	}
+
+	temp, err := os.CreateTemp(dataDir, saltFileName+".rotate-*")
+	if err != nil {
+		return nil, fmt.Errorf("create privacy salt temp file: %w", err)
+	}
+	tempPath := temp.Name()
+	defer func() { _ = os.Remove(tempPath) }()
+	if err := temp.Chmod(0o600); err != nil {
+		_ = temp.Close()
+		return nil, fmt.Errorf("secure privacy salt temp file: %w", err)
+	}
+	if _, err := temp.Write(salt); err != nil {
+		_ = temp.Close()
+		return nil, fmt.Errorf("write privacy salt: %w", err)
+	}
+	if err := temp.Sync(); err != nil {
+		_ = temp.Close()
+		return nil, fmt.Errorf("sync privacy salt: %w", err)
+	}
+	if err := temp.Close(); err != nil {
+		return nil, fmt.Errorf("close privacy salt temp file: %w", err)
+	}
+	if err := os.Rename(tempPath, filepath.Join(dataDir, saltFileName)); err != nil {
+		return nil, fmt.Errorf("replace privacy salt: %w", err)
+	}
+	if dir, err := os.Open(dataDir); err == nil {
+		_ = dir.Sync()
+		_ = dir.Close()
+	}
+	return append([]byte(nil), salt...), nil
+}
+
 func validateSalt(salt []byte) ([]byte, error) {
 	if len(salt) != saltSize {
 		return nil, fmt.Errorf("privacy salt must be %d bytes", saltSize)
@@ -153,13 +385,14 @@ func (s *Sanitizer) sanitizeMap(input map[string]any, parentPath string) (map[st
 				continue
 			}
 			provenance = append(provenance, Provenance{Path: path, Action: ActionRemoved, Reason: removalReason(key)})
-		case ActionHashed:
+		case ActionClassified:
+			token := PathToken(ClassifyPath(fmt.Sprint(value)))
 			if attributeName != "" {
-				result[key] = map[string]any{"stringValue": s.hash(value)}
+				result[key] = map[string]any{"stringValue": token}
 			} else {
-				result[key] = s.hash(value)
+				result[key] = token
 			}
-			provenance = append(provenance, Provenance{Path: path, Action: ActionHashed, Reason: "file_path"})
+			provenance = append(provenance, Provenance{Path: path, Action: ActionClassified, Reason: "file_path"})
 		case ActionRedacted:
 			if attributeName != "" {
 				result[key] = map[string]any{"stringValue": redactedValue}
@@ -230,7 +463,7 @@ func classify(key string) Action {
 	case "prompt", "prompts", "response", "responses", "sourcecode", "output", "body", "email", "accountid", "conversationid", "hostname":
 		return ActionRemoved
 	case "filepath", "filepaths", "filename", "filenames":
-		return ActionHashed
+		return ActionClassified
 	case "password", "token", "accesstoken", "apikey", "authorization", "secret":
 		return ActionRemoved
 	default:
