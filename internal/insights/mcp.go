@@ -81,6 +81,7 @@ func MCPInventoryFromEvents(events []canonical.Event) MCPInventory {
 
 	result := MCPInventory{
 		SchemaVersion: MCPSchemaVersion,
+		Servers:       []MCPServer{},
 		Notes: []string{
 			"Request token context is session/request-level only and is not an exact per-MCP allocation.",
 			"MCP usage is marked observed only when an explicit invocation signal carries the same privacy-safe fingerprint.",

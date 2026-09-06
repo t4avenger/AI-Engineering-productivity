@@ -70,6 +70,19 @@ func TestMCPInventoryDoesNotExposeRawServerIdentity(t *testing.T) {
 	}
 }
 
+func TestMCPInventoryEmptyServersEncodeAsArray(t *testing.T) {
+	payload, err := json.Marshal(MCPInventoryFromEvents(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(payload), `"servers":null`) {
+		t.Fatalf("empty servers must encode as an array: %s", payload)
+	}
+	if !strings.Contains(string(payload), `"servers":[]`) {
+		t.Fatalf("empty servers array missing: %s", payload)
+	}
+}
+
 func testMCPEvent(id, eventType string, attributes, extensions map[string]any) canonical.Event {
 	at := time.Date(2026, 1, 2, 9, 0, 0, 0, time.UTC)
 	return canonical.Event{
