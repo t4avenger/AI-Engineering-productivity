@@ -2,6 +2,7 @@ import { apiRequestURL, request } from './sessions';
 
 export interface MCPServerInsight {
   server_fingerprint: string;
+  server_name: string;
   identity_state: string;
   provider: string;
   tool: string;
@@ -10,6 +11,8 @@ export interface MCPServerInsight {
   connection_scope: string;
   transport_type: string;
   is_plugin: boolean | null;
+  invocation_count: number;
+  tool_names: string[];
   used: boolean;
   usage_state: string;
   context_waste_state: string;

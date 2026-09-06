@@ -267,8 +267,8 @@ function InsightsPage() {
       <p className="eyebrow">Behaviour insight</p>
       <h1 id="insights-title">MCP inventory</h1>
       <p className="lede">
-        Connected MCP servers are shown with privacy-safe fingerprints and usage
-        certainty labels.
+        Connected MCP servers are shown with provider-reported names,
+        privacy-safe fingerprints, and usage certainty labels.
       </p>
       {error ? <p role="alert">{error}</p> : null}
       {!inventory && !error ? <output>Loading MCP inventory...</output> : null}
@@ -297,10 +297,14 @@ function InsightsPage() {
             <ul className="cards">
               {inventory.servers.map((server) => (
                 <li key={server.server_fingerprint}>
-                  <h2>{server.tool}</h2>
+                  <h2>{server.server_name || server.tool}</h2>
                   <dl className="details">
                     <Detail
                       label="Server"
+                      value={server.server_name || 'unavailable'}
+                    />
+                    <Detail
+                      label="Fingerprint"
                       value={shortFingerprint(server.server_fingerprint)}
                     />
                     <Detail label="Identity" value={server.identity_state} />
@@ -309,6 +313,23 @@ function InsightsPage() {
                       value={server.connection_status}
                     />
                     <Detail label="Usage" value={server.usage_state} />
+                    <Detail
+                      label="Invocations"
+                      value={
+                        server.usage_state === 'observed'
+                          ? server.invocation_count
+                          : 'unavailable'
+                      }
+                    />
+                    <Detail
+                      label="Tools"
+                      value={
+                        server.usage_state === 'observed' &&
+                        server.tool_names.length > 0
+                          ? server.tool_names.join(', ')
+                          : 'unavailable'
+                      }
+                    />
                     <Detail
                       label="Context waste"
                       value={server.context_waste_state}

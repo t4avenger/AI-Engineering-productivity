@@ -27,7 +27,7 @@ const rawClaudeLogs = `{"resourceLogs":[
        {"key":"transport_type","value":{"stringValue":"stdio"}},
        {"key":"server_scope","value":{"stringValue":"user"}},
        {"key":"is_plugin","value":{"boolValue":false}},
-       {"key":"server_name","value":{"stringValue":"synthetic-secret-server"}},
+       {"key":"server_name","value":{"stringValue":"synthetic-filesystem-server"}},
        {"key":"user.id","value":{"stringValue":"synthetic-user-hash"}},
        {"key":"organization.id","value":{"stringValue":"synthetic-org"}},
        {"key":"prompt.id","value":{"stringValue":"synthetic-prompt"}}]},
@@ -86,7 +86,10 @@ func TestNormalizeLogsFingerprintsServerIdentityAndDropsOperatorFields(t *testin
 	if plugin, ok := connection["is_plugin"].(bool); !ok || plugin {
 		t.Fatalf("is_plugin = %#v, want false bool", connection["is_plugin"])
 	}
-	// Raw server identity is reduced to a fingerprint, never retained verbatim.
+	// Provider-reported MCP server name is retained for inventory display, and a fingerprint remains available for correlation.
+	if connection["server_name"] != "synthetic-filesystem-server" {
+		t.Fatalf("server_name = %#v", connection["server_name"])
+	}
 	if fp, ok := connection["server_fingerprint"].(string); !ok || !strings.HasPrefix(fp, "claude-code:") {
 		t.Fatalf("server_fingerprint = %#v, want claude-code:* fingerprint", connection["server_fingerprint"])
 	}
@@ -96,7 +99,7 @@ func TestNormalizeLogsFingerprintsServerIdentityAndDropsOperatorFields(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, prohibited := range []string{"synthetic-secret-server", "synthetic-user-hash", "synthetic-org", "synthetic-prompt", "synthetic-session-uuid"} {
+	for _, prohibited := range []string{"synthetic-user-hash", "synthetic-org", "synthetic-prompt", "synthetic-session-uuid"} {
 		if strings.Contains(string(serialized), prohibited) {
 			t.Fatalf("identity leaked into canonical events: %q", prohibited)
 		}

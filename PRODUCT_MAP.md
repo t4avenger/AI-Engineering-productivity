@@ -613,10 +613,10 @@ All insights must be deterministic and explainable. Per section 0, the headline 
 the behaviour/efficiency/performance ones below (13.7–13.10); cost-only insights are secondary.
 
 ### 13.7 MCP inventory & context-cost insight
-Show how many MCP servers are connected from reviewed telemetry, whether explicit invocation evidence shows use, and request-level token context for sessions where MCP telemetry is present. Flag "connected but unused" only when a privacy-safe server fingerprint is observed and no matching invocation is observed; otherwise show usage as unavailable. Per-MCP token *allocation* is never presented as exact — request token context is labelled as session/request-level only.
+Show how many MCP servers are connected from reviewed telemetry, whether explicit invocation evidence shows use, and request-level token context for sessions where MCP telemetry is present. Flag "connected but unused" only when a server fingerprint is observed and no matching invocation is observed; otherwise show usage as unavailable. Per-MCP token *allocation* is never presented as exact — request token context is labelled as session/request-level only.
 
 Evidence:
-- connected MCP servers (privacy-safe fingerprint when observed, generated connection fingerprint when identity is unavailable)
+- connected MCP servers (provider-reported server name when available, plus a privacy-safe fingerprint for correlation; generated connection fingerprint when identity is unavailable)
 - explicit invocation evidence where present
 - request-level tokens where MCP telemetry is present
 - usage state (`observed | not_observed | unavailable`) and context-waste state

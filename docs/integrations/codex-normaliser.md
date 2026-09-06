@@ -34,13 +34,23 @@ fixture, and a review of any newly evidenced capabilities.
 
 Codex CLI 0.145.0 was observed exporting OTLP JSON logs with `service.name`
 `codex_cli_rs` (interactive TUI) and `codex_exec` (the non-interactive `codex
-exec` subcommand); the log adapter accepts both. The log adapter retains only
-reviewed operational attributes (`event.name`, `model`, `input_token_count`,
-and `output_token_count`) plus sanitised provider extensions. Since the
-observed logs lack trace correlation and a safe retained session identifier,
-each retained log forms an explicitly `unknown` lifecycle session identified by
-an installation-specific HMAC fingerprint. Account, hostname, email,
-conversation ID, raw command arguments, tool output, and body fields are
+exec` subcommand); the log adapter accepts both. The log adapter retains reviewed operational attributes (`event.name`,
+`model`, `input_token_count`, and `output_token_count`) plus sanitised provider
+extensions. Local Codex 0.153.4 metadata also shows tool telemetry such as
+`codex.tool_decision`, `codex.tool_result`, `codex.sandbox_outcome`,
+`tool_name`, `tool_namespace`, `call_id`, `duration_ms`, `success`,
+`mcp_server`, and `mcp_server_origin`. When a `codex.tool_result` carries a
+non-empty `mcp_server`, the event normaliser stores an explicit MCP-use signal
+under `provider_extensions.mcp_call` with the provider-reported `server_name`,
+an installation-specific `server_fingerprint`, and safe invocation metadata;
+the raw server name is excluded from generic log attributes to avoid duplicate
+evidence but is retained in the MCP-specific record for display. Empty `mcp_server`
+means the provider did not report that tool result as an MCP server call, so it
+remains an internal Codex/tool invocation rather than MCP inventory evidence.
+Since the observed logs lack trace correlation and a safe retained session
+identifier, each retained log forms an explicitly `unknown` lifecycle session
+identified by an installation-specific HMAC fingerprint. Account, hostname,
+email, conversation ID, raw command arguments, tool output, and body fields are
 removed by the privacy pipeline before storage.
 
 ## Model-interaction records
@@ -58,8 +68,9 @@ Codex log shape into stable-primitive `canonical.ModelInteraction` records
   from the OTLP `stringValue`/`intValue`. Absent or unparseable counts stay
   `nil` (serialised as `null`), never a fabricated `0`, so a genuine absence is
   distinguishable from a real zero.
-- **Cached and reasoning tokens, tool calls, task outcome** (`unknown`) are left
-  `nil`/`"unknown"`; no `Operation` records are fabricated from Codex logs.
+- **Cached and reasoning tokens, task outcome** (`unknown` for typed model records) are left
+  `nil`/`"unknown"`; no typed model field is fabricated from provider-extension evidence.
+- **MCP-backed tool results** (`partial` for events) are represented only when Codex reports a non-empty `mcp_server`; the provider-reported server name and fingerprint are retained under `provider_extensions.mcp_call` with safe invocation fields.
 - **Session/request identity** derives from the installation HMAC fingerprint,
   because `conversation.id` is stripped by the privacy pipeline.
 - **Correlation evidence** records the dedup key, ordering key, and explicit

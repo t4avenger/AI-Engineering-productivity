@@ -152,6 +152,7 @@ func sampleEventFromRecord(record logRecord, fingerprint func([]byte) string) ma
 		if isServerIdentityKey(attribute.Key) {
 			if text, ok := value.(string); ok && strings.TrimSpace(text) != "" {
 				sample["server_fingerprint"] = "claude-code:" + fingerprint([]byte(text))
+				sample["server_name"] = strings.TrimSpace(text)
 			}
 			continue
 		}
