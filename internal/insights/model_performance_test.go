@@ -8,11 +8,11 @@ import (
 
 func TestModelPerformanceFromEventsAggregatesOutcomeContracts(t *testing.T) {
 	events := []canonical.Event{
-		outcomeEvent("anthropic", "claude-code", "claude-haiku-4-5", "provider_completion", "success", 842, 16, 0, ""),
-		outcomeEvent("anthropic", "claude-code", "claude-opus-4-8", "provider_completion", "failed", 62462, 0, 1, "rate_limit"),
-		outcomeEvent("openai", "codex", "gpt-6-astra", "tool_result", "success", 92, 0, 0, ""),
-		outcomeEvent("openai", "codex", "gpt-6-astra", "tool_result", "failed", 87, 0, 0, ""),
-		outcomeEvent("openai", "codex", "gpt-6-astra", "provider_completion", "failed", 268, 0, 2, "http_401"),
+		outcomeEvent(outcomeSpec{provider: "anthropic", tool: "claude-code", model: "claude-haiku-4-5", source: "provider_completion", status: "success", durationMs: 842, tokens: 16}),
+		outcomeEvent(outcomeSpec{provider: "anthropic", tool: "claude-code", model: "claude-opus-4-8", source: "provider_completion", status: "failed", durationMs: 62462, retryAttempt: 1, errorCode: "rate_limit"}),
+		outcomeEvent(outcomeSpec{provider: "openai", tool: "codex", model: "gpt-6-astra", source: "tool_result", status: "success", durationMs: 92}),
+		outcomeEvent(outcomeSpec{provider: "openai", tool: "codex", model: "gpt-6-astra", source: "tool_result", status: "failed", durationMs: 87}),
+		outcomeEvent(outcomeSpec{provider: "openai", tool: "codex", model: "gpt-6-astra", source: "provider_completion", status: "failed", durationMs: 268, retryAttempt: 2, errorCode: "http_401"}),
 	}
 	// Session lifecycle must not contribute.
 	events = append(events, canonical.Event{
@@ -42,8 +42,8 @@ func TestModelPerformanceFromEventsAggregatesOutcomeContracts(t *testing.T) {
 func TestModelPerformanceRankingGuardRequiresMinSampleSize(t *testing.T) {
 	events := make([]canonical.Event, 0, MinRankingSampleSize*2)
 	for i := 0; i < MinRankingSampleSize; i++ {
-		events = append(events, outcomeEvent("openai", "codex", "model-a", "provider_completion", "success", 100, 10, 0, ""))
-		events = append(events, outcomeEvent("openai", "codex", "model-b", "provider_completion", "failed", 200, 10, 0, "err"))
+		events = append(events, outcomeEvent(outcomeSpec{provider: "openai", tool: "codex", model: "model-a", source: "provider_completion", status: "success", durationMs: 100, tokens: 10}))
+		events = append(events, outcomeEvent(outcomeSpec{provider: "openai", tool: "codex", model: "model-b", source: "provider_completion", status: "failed", durationMs: 200, tokens: 10, errorCode: "err"}))
 	}
 	got := ModelPerformanceFromEvents(events)
 	if !got.RankingAvailable {
@@ -71,28 +71,40 @@ func TestModelPerformanceIgnoresSessionStateWithoutContract(t *testing.T) {
 	}
 }
 
-func outcomeEvent(provider, tool, model, source, status string, durationMs, tokens, retryAttempt int64, errorCode string) canonical.Event {
+type outcomeSpec struct {
+	provider     string
+	tool         string
+	model        string
+	source       string
+	status       string
+	durationMs   int64
+	tokens       int64
+	retryAttempt int64
+	errorCode    string
+}
+
+func outcomeEvent(spec outcomeSpec) canonical.Event {
 	contract := map[string]any{
-		"source":     source,
-		"status":     status,
+		"source":     spec.source,
+		"status":     spec.status,
 		"confidence": "observed",
-		"model":      model,
+		"model":      spec.model,
 	}
-	if durationMs > 0 {
-		contract["duration_ms"] = durationMs
+	if spec.durationMs > 0 {
+		contract["duration_ms"] = spec.durationMs
 	}
-	if tokens > 0 {
-		contract["input_tokens"] = tokens / 2
-		contract["output_tokens"] = tokens - tokens/2
+	if spec.tokens > 0 {
+		contract["input_tokens"] = spec.tokens / 2
+		contract["output_tokens"] = spec.tokens - spec.tokens/2
 	}
-	if retryAttempt > 0 {
-		contract["retry_attempt"] = retryAttempt
+	if spec.retryAttempt > 0 {
+		contract["retry_attempt"] = spec.retryAttempt
 	}
-	if errorCode != "" {
-		contract["error_code"] = errorCode
+	if spec.errorCode != "" {
+		contract["error_code"] = spec.errorCode
 	}
 	return canonical.Event{
-		Provider: provider, Tool: tool, EventType: source,
+		Provider: spec.provider, Tool: spec.tool, EventType: spec.source,
 		ProviderExtensions: map[string]any{"outcome_contract": contract},
 	}
 }

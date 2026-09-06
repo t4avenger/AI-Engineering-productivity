@@ -1,7 +1,6 @@
 package api
 
 import (
-	"net/http"
 	"testing"
 )
 
@@ -85,5 +84,4 @@ func TestModelPerformanceInsightIngestEndToEnd(t *testing.T) {
 	assertNoRawIdentifiers(t,
 		[]string{"tiq-canary-outcome-session", "tiq-canary@example.test"},
 		marshalJSON(t, scorecard))
-	_ = http.StatusOK
 }
