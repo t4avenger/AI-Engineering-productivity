@@ -21,11 +21,12 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	server := httptest.NewServer(NewHandler(slog.Default()))
 	t.Cleanup(server.Close)
 
-	accepted := postOTLP(t, server.URL, []byte(`{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","name":"synthetic"}]}]}]}`))
-	if accepted.StatusCode != http.StatusAccepted {
-		t.Fatalf("expected supported payload status 202, got %d", accepted.StatusCode)
-	}
-	closeBody(t, accepted)
+	// Traces and metrics must fail honestly — never 202-then-drop (issue #50).
+	traces := postOTLP(t, server.URL, []byte(`{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","name":"synthetic"}]}]}]}`))
+	assertIngestError(t, traces, http.StatusNotImplemented, "not_implemented")
+
+	metrics := postOTLPToPath(t, server.URL, "/v1/metrics", []byte(`{"resourceMetrics":[{"scopeMetrics":[{"metrics":[{"name":"synthetic"}]}]}]}`), "application/json")
+	assertIngestError(t, metrics, http.StatusNotImplemented, "not_implemented")
 
 	logs := postOTLPToPath(t, server.URL, "/v1/logs", []byte(`{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"stringValue":"synthetic"}}]}]}]}`), "application/json")
 	if logs.StatusCode != http.StatusAccepted {
@@ -33,16 +34,16 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	}
 	closeBody(t, logs)
 
-	malformed := postOTLP(t, server.URL, []byte(`{"resourceSpans":`))
+	malformed := postOTLPToPath(t, server.URL, "/v1/logs", []byte(`{"resourceLogs":`), "application/json")
 	assertIngestError(t, malformed, http.StatusBadRequest, "malformed_payload")
 
-	invalid := postOTLP(t, server.URL, []byte(`{"resourceSpans":[]}`))
+	invalid := postOTLPToPath(t, server.URL, "/v1/logs", []byte(`{"resourceLogs":[]}`), "application/json")
 	assertIngestError(t, invalid, http.StatusBadRequest, "invalid_payload")
 
-	oversized := postOTLP(t, server.URL, bytes.Repeat([]byte("x"), int(maxOTLPPayloadBytes)+1))
+	oversized := postOTLPToPath(t, server.URL, "/v1/logs", bytes.Repeat([]byte("x"), int(maxOTLPPayloadBytes)+1), "application/json")
 	assertIngestError(t, oversized, http.StatusRequestEntityTooLarge, "payload_too_large")
 
-	unsupportedMediaType := postOTLPWithContentType(t, server.URL, []byte(`{"resourceSpans":[{}]}`), "application/x-protobuf")
+	unsupportedMediaType := postOTLPToPath(t, server.URL, "/v1/logs", []byte(`{"resourceLogs":[{}]}`), "application/x-protobuf")
 	assertIngestError(t, unsupportedMediaType, http.StatusUnsupportedMediaType, "unsupported_media_type")
 
 	resp, err := http.Get(server.URL + "/api/v1/ingest/counters")
@@ -54,8 +55,19 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&counters); err != nil {
 		t.Fatalf("decode counters: %v", err)
 	}
-	if counters.AcceptedPayloads != 2 || counters.RejectedPayloads != 4 {
+	// 1 accepted log + 2 unsupported signals + 4 validation rejects
+	if counters.AcceptedPayloads != 1 || counters.RejectedPayloads != 6 {
 		t.Fatalf("unexpected counters: %+v", counters)
+	}
+}
+
+func TestOTLPTracesAndMetricsNeverSilentlyAccepted(t *testing.T) {
+	server := httptest.NewServer(NewHandler(slog.Default()))
+	t.Cleanup(server.Close)
+
+	for _, path := range []string{"/v1/traces", "/v1/metrics"} {
+		resp := postOTLPToPath(t, server.URL, path, []byte(`{"ignored":true}`), "application/json")
+		assertIngestError(t, resp, http.StatusNotImplemented, "not_implemented")
 	}
 }
 

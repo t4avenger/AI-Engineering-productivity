@@ -49,11 +49,33 @@ func newOTLPHTTPIngest(inspector *sanitizedInspector, sanitizer *privacy.Sanitiz
 }
 
 func (i *otlpHTTPIngest) tracesHandler(w http.ResponseWriter, r *http.Request) {
-	i.receive(w, r, "resourceSpans")
+	// Observed first-class providers export behaviour signals as OTLP logs.
+	// Accepting traces with 202 while dropping them misleads exporters (issue #50).
+	i.rejectUnsupportedSignal(w, r, "traces")
+}
+
+func (i *otlpHTTPIngest) metricsHandler(w http.ResponseWriter, r *http.Request) {
+	// Explicit route so operators get an honest 501 instead of an ambiguous 404.
+	i.rejectUnsupportedSignal(w, r, "metrics")
 }
 
 func (i *otlpHTTPIngest) logsHandler(w http.ResponseWriter, r *http.Request) {
 	i.receive(w, r, "resourceLogs")
+}
+
+// rejectUnsupportedSignal refuses OTLP signal paths that are not persisted in
+// the MVP. The body is drained within the size limit so clients can reuse the
+// connection; the payload is never inspected, normalised, or stored.
+func (i *otlpHTTPIngest) rejectUnsupportedSignal(w http.ResponseWriter, r *http.Request, signal string) {
+	if r.Body != nil {
+		_, _ = io.Copy(io.Discard, http.MaxBytesReader(w, r.Body, maxOTLPPayloadBytes+1))
+	}
+	i.reject(
+		w,
+		http.StatusNotImplemented,
+		"not_implemented",
+		fmt.Sprintf("OTLP %s are not persisted; export logs to POST /v1/logs", signal),
+	)
 }
 
 func (i *otlpHTTPIngest) receive(w http.ResponseWriter, r *http.Request, resourceField string) {

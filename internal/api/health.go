@@ -56,6 +56,7 @@ func newHandler(logger *slog.Logger, inspector *sanitizedInspector, repository s
 	mux.HandleFunc("GET /api/v1/events/{id}/provenance", sessionAPI.provenance)
 	mux.HandleFunc("DELETE /api/v1/sessions/{id}", sessionAPI.delete)
 	mux.HandleFunc("POST /v1/traces", ingest.tracesHandler)
+	mux.HandleFunc("POST /v1/metrics", ingest.metricsHandler)
 	mux.HandleFunc("POST /v1/logs", ingest.logsHandler)
 	mux.HandleFunc("GET /api/v1/ingest/counters", ingest.countersHandler)
 	if inspector != nil {
