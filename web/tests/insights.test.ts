@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { fetchMCPInventory } from '../src/insights';
+import { fetchMCPInventory, fetchSkillUsage } from '../src/insights';
 
 describe('insights API client', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -58,6 +58,58 @@ describe('insights API client', () => {
     await expect(fetchMCPInventory()).resolves.toMatchObject({
       schema_version: '0.1.0',
       servers: [],
+    });
+  });
+
+  test('rejects malformed skill usage responses', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(new Response(JSON.stringify({ data: null }))),
+      ),
+    );
+    await expect(fetchSkillUsage()).rejects.toThrow(
+      'Skill usage response was malformed',
+    );
+  });
+
+  test('reads a valid skill usage response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                schema_version: '0.1.0',
+                totals: {
+                  observed_skills: 0,
+                  invocations: 0,
+                  explicit_detection: 0,
+                  inferred_detection: 0,
+                  unavailable_detection: 1,
+                  unknown_detection: 0,
+                },
+                skills: [],
+                coverage: [
+                  {
+                    provider: 'anthropic',
+                    tool: 'claude-code',
+                    detection_state: 'unavailable',
+                  },
+                ],
+                notes: [],
+              },
+            }),
+          ),
+        ),
+      ),
+    );
+
+    await expect(fetchSkillUsage()).resolves.toMatchObject({
+      schema_version: '0.1.0',
+      skills: [],
+      coverage: [{ detection_state: 'unavailable' }],
     });
   });
 });

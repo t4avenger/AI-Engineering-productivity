@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
@@ -56,8 +57,74 @@ func TestMCPInventoryInsightAPI(t *testing.T) {
 	}
 }
 
+func TestSkillUsageInsightAPI(t *testing.T) {
+	repo := sessionTestRepository(t)
+	explicit := sessionTestEvent(t, "skill-explicit", "skill-session", "claude-code", "active", "2026-01-04T09:00:00Z", "")
+	explicit.Provider = "anthropic"
+	explicit.EventType = "skill_invocation"
+	explicit.ProviderExtensions = map[string]any{"skill_detection": "explicit", "skill": map[string]any{"name": "pdf", "outcome": "success"}}
+	// Codex stamps no skill_detection metadata today, so its honest surface state
+	// is unknown (missing metadata), never unavailable (a stamped no-skill signal).
+	unknown := sessionTestEvent(t, "skill-unknown", "skill-session-2", "codex", "active", "2026-01-04T09:00:01Z", "")
+	unknown.Provider = "openai"
+	unknown.EventType = "api_request"
+	unknown.ProviderExtensions = map[string]any{}
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{explicit, unknown}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(NewHandler(slog.Default(), repo))
+	t.Cleanup(server.Close)
+
+	response, err := http.Get(server.URL + "/api/v1/insights/skill-usage")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("skill insight status = %d", response.StatusCode)
+	}
+	var body skillUsageResponse
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Data.Totals.ObservedSkills != 1 || body.Data.Totals.Invocations != 1 {
+		t.Fatalf("skill insight totals = %#v", body.Data.Totals)
+	}
+	if body.Data.Totals.ExplicitDetection != 1 || body.Data.Totals.UnavailableDetection != 0 {
+		t.Fatalf("skill detection coverage = %#v", body.Data.Totals)
+	}
+	// The codex surface stamps no skill_detection, so it must be reported as
+	// unknown (missing metadata), never fabricated as unavailable.
+	if state := coverageStateFor(body.Data.Coverage, "openai", "codex"); state != "unknown" {
+		t.Fatalf("codex skill detection = %q, want unknown: %#v", state, body.Data.Coverage)
+	}
+	if len(body.Data.Skills) != 1 || body.Data.Skills[0].SkillName != "pdf" {
+		t.Fatalf("skill records = %#v", body.Data.Skills)
+	}
+	serialized, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(serialized), `"detection_state":"unknown"`) {
+		t.Fatalf("skill insight did not surface unknown coverage honestly: %s", serialized)
+	}
+}
+
+// coverageStateFor returns the detection state reported for a (provider, tool)
+// surface, or empty string when that surface is absent from coverage.
+func coverageStateFor(coverage []insights.SkillCoverage, provider, tool string) string {
+	for _, row := range coverage {
+		if row.Provider == provider && row.Tool == tool {
+			return row.DetectionState
+		}
+	}
+	return ""
+}
+
 func TestInsightsPathRequiresManagementAuth(t *testing.T) {
-	if !isManagementPath("/api/v1/insights/mcp-inventory") {
-		t.Fatal("MCP insight endpoint must require local API authentication")
+	for _, path := range []string{"/api/v1/insights/mcp-inventory", "/api/v1/insights/skill-usage"} {
+		if !isManagementPath(path) {
+			t.Fatalf("insight endpoint %q must require local API authentication", path)
+		}
 	}
 }

@@ -622,8 +622,21 @@ Evidence:
 - usage state (`observed | not_observed | unavailable`) and context-waste state
 
 ### 13.8 Skill usage insight
-Show which skills were invoked, frequency, and outcome — only where the provider exposes skill
-identity. Skill detection is marked `explicit | inferred | unavailable`.
+Show which skills were invoked, how often, and their outcome — only where the provider explicitly
+stamps skill identity. Skill records are emitted solely from provider-stamped `explicit` identity;
+they are never inferred from tool names or other proxies. Every `(provider, tool)` surface is
+reported in a detection-coverage list so a provider that does not expose skill identity is shown
+with its honest state rather than a silent zero. Skill outcome is counted only from the skill's own
+reported outcome, never borrowed from session- or task-level outcomes.
+
+Skill detection is marked per surface as `explicit | inferred | unavailable | unknown`, where
+`unavailable` is a provider that explicitly stamps no skill signal (e.g. Claude Code today) and
+`unknown` is a surface whose events carry no detection metadata at all.
+
+Evidence:
+- observed skills with per-skill invocation count (provider-stamped explicit identity only)
+- per-skill outcome breakdown with an `observed | unavailable` outcome state
+- detection coverage (`explicit | inferred | unavailable | unknown`) for every provider/tool surface
 
 ### 13.9 Model-performance scorecard
 Per model, report raw metrics with sample size: success/failed/abandoned, retry rate, error
@@ -906,6 +919,10 @@ field may imply provider parity that is not backed by the capability matrix.
 - connected, used, unused, and usage-unavailable MCP states
 - request-level token context labelled as not exact per-MCP allocation
 - evidence limits for unavailable provider signals
+- Skill usage
+- observed skills with invocation count and per-skill outcome breakdown (explicit identity only)
+- detection coverage per provider/tool (`explicit | inferred | unavailable | unknown`)
+- providers without skill identity shown as unavailable, never as a silent zero
 
 ### 17.4 Costs
 - cost by day

@@ -36,6 +36,7 @@ function mockAPI(
     costFails?: boolean;
     insightFails?: boolean;
     insightEmpty?: boolean;
+    skillFails?: boolean;
   } = {},
 ) {
   vi.stubGlobal(
@@ -175,6 +176,59 @@ function mockAPI(
             { status: 200 },
           ),
         );
+      if (url.endsWith('/insights/skill-usage') && options.skillFails)
+        return Promise.reject(new Error('Skill service offline'));
+      if (url.endsWith('/insights/skill-usage'))
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                schema_version: '0.1.0',
+                totals: {
+                  observed_skills: options.insightEmpty ? 0 : 2,
+                  invocations: options.insightEmpty ? 0 : 3,
+                  explicit_detection: options.insightEmpty ? 0 : 1,
+                  inferred_detection: 0,
+                  unavailable_detection: 0,
+                  unknown_detection: 1,
+                },
+                skills: options.insightEmpty
+                  ? []
+                  : [
+                      {
+                        skill_name: 'pdf',
+                        provider: 'anthropic',
+                        tool: 'claude-code',
+                        detection_state: 'explicit',
+                        invocation_count: 2,
+                        outcomes: { success: 1, failed: 1 },
+                        outcome_state: 'observed',
+                      },
+                      {
+                        skill_name: 'diagram',
+                        provider: 'anthropic',
+                        tool: 'claude-code',
+                        detection_state: 'explicit',
+                        invocation_count: 1,
+                        outcomes: {},
+                        outcome_state: 'unavailable',
+                      },
+                    ],
+                coverage: [
+                  {
+                    provider: 'openai',
+                    tool: 'codex',
+                    detection_state: 'unknown',
+                  },
+                ],
+                notes: [
+                  'Skill identity is reported only where the provider explicitly stamps it; inferred and unavailable states are shown, never guessed.',
+                ],
+              },
+            }),
+            { status: 200 },
+          ),
+        );
       if (url.includes('/sessions?'))
         return Promise.resolve(
           new Response(
@@ -210,6 +264,36 @@ function mockAPI(
       return Promise.reject(new Error(`Unexpected request: ${url}`));
     }),
   );
+}
+
+// renderInsights mounts the app with a mocked API and opens the Insights page,
+// the shared setup for every insight test.
+function renderInsights(options: Parameters<typeof mockAPI>[1] = {}) {
+  mockAPI([session], options);
+  render(
+    <MantineProvider env="test">
+      <App />
+    </MantineProvider>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+}
+
+// expectInsightContent asserts an insight section renders its heading, its
+// exact single-occurrence labels, and its labels that appear at least once.
+async function expectInsightContent(
+  heading: string,
+  exactTexts: string[],
+  someTexts: string[],
+) {
+  expect(
+    await screen.findByRole('heading', { name: heading }),
+  ).toBeInTheDocument();
+  for (const text of exactTexts) {
+    expect(screen.getByText(text)).toBeInTheDocument();
+  }
+  for (const text of someTexts) {
+    expect(screen.getAllByText(text).length).toBeGreaterThan(0);
+  }
 }
 
 describe('App dashboard', () => {
@@ -424,35 +508,19 @@ describe('App dashboard', () => {
   });
 
   test('shows MCP inventory with explicit context labels', async () => {
-    mockAPI();
-    render(
-      <MantineProvider env="test">
-        <App />
-      </MantineProvider>,
+    renderInsights();
+    await expectInsightContent(
+      'MCP inventory',
+      ['Connected MCPs', 'used', 'read_file, list_directory'],
+      ['filesystem', '2', 'unavailable'],
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
-    expect(
-      await screen.findByRole('heading', { name: 'MCP inventory' }),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Connected MCPs')).toBeInTheDocument();
-    expect(screen.getAllByText('filesystem').length).toBeGreaterThan(0);
-    expect(screen.getByText('used')).toBeInTheDocument();
-    expect(screen.getAllByText('2').length).toBeGreaterThan(0);
-    expect(screen.getByText('read_file, list_directory')).toBeInTheDocument();
-    expect(screen.getAllByText('unavailable').length).toBeGreaterThan(0);
     expect(
       screen.getAllByText(/not exact per-MCP allocation/).length,
     ).toBeGreaterThan(0);
   });
 
   test('shows an empty MCP inventory', async () => {
-    mockAPI([session], { insightEmpty: true });
-    render(
-      <MantineProvider env="test">
-        <App />
-      </MantineProvider>,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+    renderInsights({ insightEmpty: true });
     expect(
       await screen.findByRole('heading', {
         name: 'No MCP connections observed',
@@ -461,16 +529,37 @@ describe('App dashboard', () => {
   });
 
   test('shows an MCP inventory loading failure', async () => {
-    mockAPI([session], { insightFails: true });
-    render(
-      <MantineProvider env="test">
-        <App />
-      </MantineProvider>,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+    renderInsights({ insightFails: true });
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Insight service offline',
     );
+  });
+
+  test('shows skill usage with explicit and unknown states', async () => {
+    renderInsights();
+    // A provider with no detection metadata is surfaced as unknown, not silently
+    // dropped and not conflated with a stamped "unavailable" no-skill signal.
+    await expectInsightContent(
+      'Skill usage',
+      ['Observed skills', 'failed: 1, success: 1'],
+      ['pdf', 'unknown'],
+    );
+  });
+
+  test('shows an empty skill usage state honestly', async () => {
+    renderInsights({ insightEmpty: true });
+    expect(
+      await screen.findByRole('heading', {
+        name: 'No skill identity observed',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  test('shows a skill usage loading failure', async () => {
+    renderInsights({ skillFails: true });
+    expect(
+      await screen.findByText('Skill service offline'),
+    ).toBeInTheDocument();
   });
 
   test('shows a cost loading failure', async () => {

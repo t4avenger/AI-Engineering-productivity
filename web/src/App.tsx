@@ -14,7 +14,12 @@ import {
 import { useEffect, useState } from 'react';
 
 import { fetchHealth, type HealthResponse } from './health';
-import { fetchMCPInventory, type MCPInventoryInsight } from './insights';
+import {
+  fetchMCPInventory,
+  fetchSkillUsage,
+  type MCPInventoryInsight,
+  type SkillUsageInsight,
+} from './insights';
 import {
   deleteAllSessions,
   deleteSession,
@@ -249,6 +254,21 @@ function HomePage({
 }
 
 function InsightsPage() {
+  return (
+    <section aria-labelledby="insights-title" className="page">
+      <p className="eyebrow">Behaviour insight</p>
+      <h1 id="insights-title">Behaviour insights</h1>
+      <p className="lede">
+        Deterministic, explainable findings from reviewed telemetry. Signals a
+        provider does not expose are shown as unavailable, never as zero.
+      </p>
+      <MCPInventorySection />
+      <SkillUsageSection />
+    </section>
+  );
+}
+
+function MCPInventorySection() {
   const [inventory, setInventory] = useState<MCPInventoryInsight | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -263,9 +283,8 @@ function InsightsPage() {
       });
   }, []);
   return (
-    <section aria-labelledby="insights-title" className="page">
-      <p className="eyebrow">Behaviour insight</p>
-      <h1 id="insights-title">MCP inventory</h1>
+    <section aria-labelledby="mcp-inventory-title" className="panel">
+      <h2 id="mcp-inventory-title">MCP inventory</h2>
       <p className="lede">
         Connected MCP servers are shown with provider-reported names,
         privacy-safe fingerprints, and usage certainty labels.
@@ -358,6 +377,129 @@ function InsightsPage() {
       ) : null}
     </section>
   );
+}
+
+function SkillUsageSection() {
+  const [usage, setUsage] = useState<SkillUsageInsight | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    fetchSkillUsage()
+      .then(setUsage)
+      .catch((reason: unknown) => {
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : 'Unable to load skill usage',
+        );
+      });
+  }, []);
+  return (
+    <section aria-labelledby="skill-usage-title" className="panel">
+      <h2 id="skill-usage-title">Skill usage</h2>
+      <p className="lede">
+        Skills are reported only where the provider explicitly stamps skill
+        identity. Providers without that signal are listed with their honest
+        detection state: unavailable when the provider stamps no skill signal,
+        unknown when its events carry no detection metadata at all.
+      </p>
+      {error ? <p role="alert">{error}</p> : null}
+      {!usage && !error ? <output>Loading skill usage...</output> : null}
+      {usage ? (
+        <>
+          <dl className="metrics">
+            <Metric
+              label="Observed skills"
+              value={usage.totals.observed_skills}
+            />
+            <Metric label="Invocations" value={usage.totals.invocations} />
+            <Metric
+              label="Explicit providers"
+              value={usage.totals.explicit_detection}
+            />
+            <Metric
+              label="Unavailable providers"
+              value={usage.totals.unavailable_detection}
+            />
+            <Metric
+              label="Unknown providers"
+              value={usage.totals.unknown_detection}
+            />
+          </dl>
+          {usage.skills.length === 0 ? (
+            <div className="empty">
+              <h3>No skill identity observed</h3>
+              <p>
+                No provider in retained telemetry has explicitly stamped a skill
+                invocation. See coverage below for each provider&apos;s honest
+                detection state.
+              </p>
+            </div>
+          ) : (
+            <ul className="cards">
+              {usage.skills.map((skill) => (
+                <li key={`${skill.provider}:${skill.tool}:${skill.skill_name}`}>
+                  <h3>{skill.skill_name}</h3>
+                  <dl className="details">
+                    <Detail label="Provider" value={skill.provider} />
+                    <Detail label="Tool" value={skill.tool} />
+                    <Detail label="Detection" value={skill.detection_state} />
+                    <Detail
+                      label="Invocations"
+                      value={skill.invocation_count}
+                    />
+                    <Detail
+                      label="Outcomes"
+                      value={
+                        skill.outcome_state === 'observed'
+                          ? formatOutcomes(skill.outcomes)
+                          : 'unavailable'
+                      }
+                    />
+                  </dl>
+                </li>
+              ))}
+            </ul>
+          )}
+          <section className="panel">
+            <h3>Detection coverage</h3>
+            {usage.coverage.length === 0 ? (
+              <p>No provider telemetry retained.</p>
+            ) : (
+              <ul className="cards">
+                {usage.coverage.map((row) => (
+                  <li key={`${row.provider}:${row.tool}`}>
+                    <dl className="details">
+                      <Detail label="Provider" value={row.provider} />
+                      <Detail label="Tool" value={row.tool} />
+                      <Detail
+                        label="Skill detection"
+                        value={row.detection_state}
+                      />
+                    </dl>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <section className="panel">
+            <h3>Evidence limits</h3>
+            {usage.notes.map((note) => (
+              <p key={note}>{note}</p>
+            ))}
+          </section>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+function formatOutcomes(outcomes: Record<string, number>): string {
+  const entries = Object.entries(outcomes);
+  if (entries.length === 0) return 'unavailable';
+  return entries
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([outcome, count]) => `${outcome}: ${String(count)}`)
+    .join(', ');
 }
 
 function CostsPage() {

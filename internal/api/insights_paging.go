@@ -7,7 +7,10 @@ import (
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
-func (a sessionAPI) mcpInventoryEvents(r *http.Request) ([]canonical.Event, error) {
+// insightEvents loads every retained canonical event across all sessions so an
+// insight can be derived over the full corpus. It is shared by insights that
+// need session-wide event data (MCP inventory, skill usage).
+func (a sessionAPI) insightEvents(r *http.Request) ([]canonical.Event, error) {
 	events := []canonical.Event{}
 	var sessionCursor *storage.SessionCursor
 	for {
@@ -23,7 +26,7 @@ func (a sessionAPI) mcpInventoryEvents(r *http.Request) ([]canonical.Event, erro
 			sessionCursor = &storage.SessionCursor{StartedAt: last.StartedAt, SessionID: last.SessionID}
 		}
 		for _, session := range page {
-			sessionEvents, err := a.mcpInventorySessionEvents(r, session.SessionID)
+			sessionEvents, err := a.insightSessionEvents(r, session.SessionID)
 			if err != nil {
 				return nil, err
 			}
@@ -35,7 +38,7 @@ func (a sessionAPI) mcpInventoryEvents(r *http.Request) ([]canonical.Event, erro
 	}
 }
 
-func (a sessionAPI) mcpInventorySessionEvents(r *http.Request, sessionID string) ([]canonical.Event, error) {
+func (a sessionAPI) insightSessionEvents(r *http.Request, sessionID string) ([]canonical.Event, error) {
 	events := []canonical.Event{}
 	var eventCursor *storage.EventCursor
 	for {
