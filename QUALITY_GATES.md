@@ -30,6 +30,29 @@ make verify-push        # broader pre-push checks
 
 Task 001 may introduce a subset where later commands clearly report “not applicable yet”; by the relevant phase, each command must perform real checks.
 
+## Live-data DoD for adapters and insights
+
+Fixture-only adapter tests and mocked Playwright journeys are necessary but not
+sufficient. A fully broken ingest or read path can still look green if DoD
+stops at those boundaries (see issues #49 / #51).
+
+For every **new or changed provider adapter** and every **new insight** that
+claims to surface retained telemetry:
+
+1. **Daemon live ingest→read gate** — POST a real captured (or synthetic
+   wire-shaped) payload to the running receiver (`POST /v1/logs` today) and
+   assert the HTTP read API serves the expected session/insight fields, with
+   canary identity/secret values absent from the response. Follow the pattern
+   in `internal/api/claude_ingest_test.go` and `internal/api/codex_ingest_test.go`.
+2. **At least one non-mocked frontend e2e** — a Playwright spec that uses the
+   daemon already started by `web/playwright.config.ts`, ingests live data, and
+   asserts the UI renders that data (or an honest unavailable cell). Do **not**
+   use `page.route().fulfill()` to mock API responses in that gate.
+3. Existing mocked e2e specs may remain for fast UI coverage; they do not
+   replace the live gate above.
+
+`make test-integration` and `make test-e2e` must exercise these gates in CI.
+
 ## Pull-request gate
 
 A change may merge only when:
@@ -38,6 +61,7 @@ A change may merge only when:
 - branch is up to date under the repository merge policy
 - acceptance criteria are mapped in the PR description
 - tests accompany behavioural changes
+- live-data DoD items above are satisfied when the change touches adapters or insights
 - no critical or high privacy/security finding is open
 - coverage gates pass
 - generated schemas and documentation are current
