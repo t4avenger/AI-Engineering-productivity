@@ -278,6 +278,24 @@ function renderInsights(options: Parameters<typeof mockAPI>[1] = {}) {
   fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
 }
 
+// expectInsightContent asserts an insight section renders its heading, its
+// exact single-occurrence labels, and its labels that appear at least once.
+async function expectInsightContent(
+  heading: string,
+  exactTexts: string[],
+  someTexts: string[],
+) {
+  expect(
+    await screen.findByRole('heading', { name: heading }),
+  ).toBeInTheDocument();
+  for (const text of exactTexts) {
+    expect(screen.getByText(text)).toBeInTheDocument();
+  }
+  for (const text of someTexts) {
+    expect(screen.getAllByText(text).length).toBeGreaterThan(0);
+  }
+}
+
 describe('App dashboard', () => {
   beforeEach(() => {
     sessionStorage.setItem('telemetryiq-auth-token', 'test-token');
@@ -491,15 +509,11 @@ describe('App dashboard', () => {
 
   test('shows MCP inventory with explicit context labels', async () => {
     renderInsights();
-    expect(
-      await screen.findByRole('heading', { name: 'MCP inventory' }),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Connected MCPs')).toBeInTheDocument();
-    expect(screen.getAllByText('filesystem').length).toBeGreaterThan(0);
-    expect(screen.getByText('used')).toBeInTheDocument();
-    expect(screen.getAllByText('2').length).toBeGreaterThan(0);
-    expect(screen.getByText('read_file, list_directory')).toBeInTheDocument();
-    expect(screen.getAllByText('unavailable').length).toBeGreaterThan(0);
+    await expectInsightContent(
+      'MCP inventory',
+      ['Connected MCPs', 'used', 'read_file, list_directory'],
+      ['filesystem', '2', 'unavailable'],
+    );
     expect(
       screen.getAllByText(/not exact per-MCP allocation/).length,
     ).toBeGreaterThan(0);
@@ -523,14 +537,12 @@ describe('App dashboard', () => {
 
   test('shows skill usage with explicit and unavailable states', async () => {
     renderInsights();
-    expect(
-      await screen.findByRole('heading', { name: 'Skill usage' }),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Observed skills')).toBeInTheDocument();
-    expect(screen.getAllByText('pdf').length).toBeGreaterThan(0);
-    expect(screen.getByText('failed: 1, success: 1')).toBeInTheDocument();
     // The provider with no explicit skill signal is shown, not silently dropped.
-    expect(screen.getAllByText('unavailable').length).toBeGreaterThan(0);
+    await expectInsightContent(
+      'Skill usage',
+      ['Observed skills', 'failed: 1, success: 1'],
+      ['pdf', 'unavailable'],
+    );
   });
 
   test('shows an empty skill usage state honestly', async () => {
