@@ -613,16 +613,13 @@ All insights must be deterministic and explainable. Per section 0, the headline 
 the behaviour/efficiency/performance ones below (13.7–13.10); cost-only insights are secondary.
 
 ### 13.7 MCP inventory & context-cost insight
-Show how many MCP servers are connected, which were actually used, and the request-level
-tokens for requests where an MCP was used. Flag "connected but unused" MCP servers as context
-waste. Per-MCP token *allocation* is shown only as an explicitly labelled heuristic — a single
-MCP call has no defensible standalone token cost.
+Show how many MCP servers are connected from reviewed telemetry, whether explicit invocation evidence shows use, and request-level token context for sessions where MCP telemetry is present. Flag "connected but unused" only when a privacy-safe server fingerprint is observed and no matching invocation is observed; otherwise show usage as unavailable. Per-MCP token *allocation* is never presented as exact — request token context is labelled as session/request-level only.
 
 Evidence:
-- connected MCP servers (identity hashed)
-- used vs unused
-- request-level tokens where MCP present
-- confidence marker (`observed | inferred | unknown`)
+- connected MCP servers (privacy-safe fingerprint when observed, generated connection fingerprint when identity is unavailable)
+- explicit invocation evidence where present
+- request-level tokens where MCP telemetry is present
+- usage state (`observed | not_observed | unavailable`) and context-waste state
 
 ### 13.8 Skill usage insight
 Show which skills were invoked, frequency, and outcome — only where the provider exposes skill
@@ -873,7 +870,6 @@ claim and its enforcement cannot drift apart silently.
 ### 17.1 Home
 - sessions today
 - active integration status
-- estimated cost
 - successful, failed, and abandoned sessions
 - current privacy mode
 - new governance events
@@ -905,7 +901,13 @@ semantics for Codex and Claude Code: `observed`, `partial`, `unavailable`,
 `unavailable`/`unknown` cell rather than a blank value or zero, and no dashboard
 field may imply provider parity that is not backed by the capability matrix.
 
-### 17.3 Costs
+### 17.3 Insights
+- MCP inventory
+- connected, used, unused, and usage-unavailable MCP states
+- request-level token context labelled as not exact per-MCP allocation
+- evidence limits for unavailable provider signals
+
+### 17.4 Costs
 - cost by day
 - cost by tool
 - cost by model
@@ -913,7 +915,7 @@ field may imply provider parity that is not backed by the capability matrix.
 - failed-work cost
 - unknown-cost records
 
-### 17.4 Governance
+### 17.5 Governance
 - policy events
 - severity
 - status
@@ -921,7 +923,7 @@ field may imply provider parity that is not backed by the capability matrix.
 - remediation
 - indeterminate checks
 
-### 17.5 Privacy
+### 17.6 Privacy
 - current telemetry level
 - retained field categories
 - excluded categories

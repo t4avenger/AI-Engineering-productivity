@@ -34,6 +34,8 @@ function mockAPI(
     deleteFails?: boolean;
     healthFails?: boolean;
     costFails?: boolean;
+    insightFails?: boolean;
+    insightEmpty?: boolean;
   } = {},
 ) {
   vi.stubGlobal(
@@ -67,6 +69,81 @@ function mockAPI(
                 currency: 'USD',
                 calculated_amount_microusd: 1250000,
                 statuses: { calculated: 1, unknown_price: 2 },
+              },
+            }),
+            { status: 200 },
+          ),
+        );
+      if (url.endsWith('/insights/mcp-inventory') && options.insightFails)
+        return Promise.reject(new Error('Insight service offline'));
+      if (url.endsWith('/insights/mcp-inventory') && options.insightEmpty)
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                schema_version: '0.1.0',
+                totals: {
+                  connected_servers: 0,
+                  used_servers: 0,
+                  unused_servers: 0,
+                  usage_unavailable_servers: 0,
+                  request_input_tokens: null,
+                  request_output_tokens: null,
+                  request_cached_input_tokens: null,
+                  request_cache_created_tokens: null,
+                  token_context_label:
+                    'request-level context only; not exact per-MCP allocation',
+                },
+                servers: [],
+                notes: [],
+              },
+            }),
+            { status: 200 },
+          ),
+        );
+      if (url.endsWith('/insights/mcp-inventory'))
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                schema_version: '0.1.0',
+                totals: {
+                  connected_servers: 1,
+                  used_servers: 0,
+                  unused_servers: 1,
+                  usage_unavailable_servers: 0,
+                  request_input_tokens: 10,
+                  request_output_tokens: 5,
+                  request_cached_input_tokens: null,
+                  request_cache_created_tokens: null,
+                  token_context_label:
+                    'request-level context only; not exact per-MCP allocation',
+                },
+                servers: [
+                  {
+                    server_fingerprint: 'mcp:hmac:filesystem',
+                    identity_state: 'fingerprinted',
+                    provider: 'anthropic',
+                    tool: 'claude-code',
+                    session_id: 'session-1',
+                    connection_status: 'connected',
+                    connection_scope: 'user',
+                    transport_type: 'stdio',
+                    is_plugin: false,
+                    used: false,
+                    usage_state: 'not_observed',
+                    context_waste_state: 'connected_but_unused',
+                    request_input_tokens: 10,
+                    request_output_tokens: 5,
+                    request_cached_input_tokens: null,
+                    request_cache_created_tokens: null,
+                    token_context_label:
+                      'request-level context only; not exact per-MCP allocation',
+                  },
+                ],
+                notes: [
+                  'Request token context is session/request-level only and is not an exact per-MCP allocation.',
+                ],
               },
             }),
             { status: 200 },
@@ -318,6 +395,52 @@ describe('App dashboard', () => {
       screen.getByText('Unknown prices are not shown as zero.'),
     ).toBeInTheDocument();
     expect(screen.getByText('unknown_price')).toBeInTheDocument();
+  });
+
+  test('shows MCP inventory with explicit context labels', async () => {
+    mockAPI();
+    render(
+      <MantineProvider env="test">
+        <App />
+      </MantineProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+    expect(
+      await screen.findByRole('heading', { name: 'MCP inventory' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Connected MCPs')).toBeInTheDocument();
+    expect(screen.getByText('connected_but_unused')).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/not exact per-MCP allocation/).length,
+    ).toBeGreaterThan(0);
+  });
+
+  test('shows an empty MCP inventory', async () => {
+    mockAPI([session], { insightEmpty: true });
+    render(
+      <MantineProvider env="test">
+        <App />
+      </MantineProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+    expect(
+      await screen.findByRole('heading', {
+        name: 'No MCP connections observed',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  test('shows an MCP inventory loading failure', async () => {
+    mockAPI([session], { insightFails: true });
+    render(
+      <MantineProvider env="test">
+        <App />
+      </MantineProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Insight service offline',
+    );
   });
 
   test('shows a cost loading failure', async () => {

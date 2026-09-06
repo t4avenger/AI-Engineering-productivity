@@ -5,7 +5,7 @@ The Phase 2 local management API provides authenticated session endpoints:
 - `GET /api/v1/sessions`
 - `GET /api/v1/sessions/{id}`
 - `DELETE /api/v1/sessions/{id}`
-- `GET /api/v1/costs/summary`, `GET /api/v1/sessions/{id}/costs`, `DELETE /api/v1/sessions`
+- `GET /api/v1/costs/summary`, `GET /api/v1/sessions/{id}/costs`, `GET /api/v1/insights/mcp-inventory`, `DELETE /api/v1/sessions`
 
 Responses use stable JSON envelopes: list responses contain `data` and
 `pagination`; detail responses contain `data`; errors contain `error.code` and
@@ -25,6 +25,8 @@ shared cross-tool fields rendered by the dashboard: `provider`, `tool`,
 `token_usage`. Values are `observed`, `partial`, `unavailable`, `unsupported`,
 or `unknown`. The UI must render non-observed states as labelled cells, never
 as blanks or numeric zeroes.
+
+The MCP inventory insight response contains `data.totals`, `data.servers`, and `data.notes`. Server identities are privacy-safe fingerprints only. Usage is `observed` only with explicit matching invocation evidence; otherwise it is `not_observed` or `unavailable`. Token context is request-level and labelled as not exact per-MCP allocation.
 
 The daemon opens the existing local SQLite repository at the platform
 configuration directory and reuses its installation-specific privacy salt.
