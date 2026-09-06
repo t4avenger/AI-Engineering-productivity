@@ -74,6 +74,15 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 			}
 			return t.UTC().Format(time.RFC3339)
 		},
+		// deref unwraps a *float64 so printf receives the value, not the pointer
+		// (printing the pointer with %f yields %!f(*float64=0x...)). Callers guard
+		// nil via {{with}}/{{if}}; the zero fallback is only defensive.
+		"deref": func(v *float64) float64 {
+			if v == nil {
+				return 0
+			}
+			return *v
+		},
 		"microusd": formatMicroUSD,
 	}).ParseFS(embedded, "templates/*.html")
 	if err != nil {

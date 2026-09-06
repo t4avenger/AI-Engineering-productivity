@@ -109,9 +109,9 @@
             <td>{{.Success}}</td>
             <td>{{.Failed}}</td>
             <td>{{.Abandoned}}</td>
-            <td>{{if eq .RetryRateState "observed"}}{{with .RetryRate}}{{printf "%.2f" .}}{{end}}{{else}}{{.RetryRateState}}{{end}}</td>
-            <td>{{with .LatencyP50Ms}}{{printf "%.0f" .}}{{else}}unavailable{{end}}</td>
-            <td>{{with .LatencyP95Ms}}{{printf "%.0f" .}}{{else}}unavailable{{end}}</td>
+            <td>{{if eq .RetryRateState "observed"}}{{with .RetryRate}}{{printf "%.2f" (deref .)}}{{end}}{{else}}{{.RetryRateState}}{{end}}</td>
+            <td>{{with .LatencyP50Ms}}{{printf "%.0f" (deref .)}}{{else}}unavailable{{end}}</td>
+            <td>{{with .LatencyP95Ms}}{{printf "%.0f" (deref .)}}{{else}}unavailable{{end}}</td>
           </tr>
           {{end}}
         </tbody>

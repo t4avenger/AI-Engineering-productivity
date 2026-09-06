@@ -122,6 +122,25 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 					"output_token_count": "3",
 					"unavailable_fields": []string{"latency"},
 				},
+			}, {
+				// Outcome-contract event with an observed latency so the model
+				// performance scorecard renders a non-nil *float64 latency,
+				// guarding the pointer-deref template bug (regression for the
+				// %!f(*float64=0x...) render).
+				EventID:    "e2",
+				EventType:  "operation",
+				OccurredAt: now,
+				ReceivedAt: now,
+				Provider:   "openai",
+				Tool:       "codex",
+				ProviderExtensions: map[string]any{
+					"outcome_contract": map[string]any{
+						"model":       "gpt-test",
+						"status":      "success",
+						"duration_ms": 1234.0,
+						"source":      "test",
+					},
+				},
 			}},
 		},
 		costs: []cost.Record{{
@@ -151,6 +170,7 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 		{"/insights", "MCP inventory"},
 		{"/insights", "Skill usage"},
 		{"/insights", "Model performance"},
+		{"/insights", "1234"},
 		{"/insights", "Context waste"},
 		{"/integrations", "codex"},
 		{"/privacy", "local-only"},
@@ -162,6 +182,9 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 		rec := getAuthed(t, handler, cookie, page.path)
 		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), page.want) {
 			t.Fatalf("%s = %d want containing %q body=%q", page.path, rec.Code, page.want, rec.Body.String())
+		}
+		if strings.Contains(rec.Body.String(), "%!") {
+			t.Fatalf("%s rendered a fmt error marker (%%!...): body=%q", page.path, rec.Body.String())
 		}
 	}
 
