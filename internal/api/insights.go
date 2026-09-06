@@ -27,6 +27,10 @@ type modelPerformanceResponse struct {
 	Data insights.ModelPerformance `json:"data"`
 }
 
+type contextWasteResponse struct {
+	Data insights.ContextWaste `json:"data"`
+}
+
 func (a sessionAPI) mcpInventory(w http.ResponseWriter, r *http.Request) {
 	events, ok := a.loadInsightEvents(w, r)
 	if !ok {
@@ -49,6 +53,14 @@ func (a sessionAPI) modelPerformance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSessionJSON(w, http.StatusOK, modelPerformanceResponse{Data: insights.ModelPerformanceFromEvents(events)})
+}
+
+func (a sessionAPI) contextWaste(w http.ResponseWriter, r *http.Request) {
+	events, ok := a.loadInsightEvents(w, r)
+	if !ok {
+		return
+	}
+	writeSessionJSON(w, http.StatusOK, contextWasteResponse{Data: insights.ContextWasteFromEvents(events, a.thresholds.ContextWaste)})
 }
 
 // loadInsightEvents returns retained events for an insight handler, or writes

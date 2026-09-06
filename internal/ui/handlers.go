@@ -68,6 +68,7 @@ type insightsData struct {
 	MCP              insights.MCPInventory
 	Skills           insights.SkillUsage
 	ModelPerformance insights.ModelPerformance
+	ContextWaste     insights.ContextWaste
 	Error            string
 }
 
@@ -246,6 +247,7 @@ func (s *Server) insightsPage(w http.ResponseWriter, r *http.Request) {
 		data.MCP = insights.MCPInventoryFromEvents(events)
 		data.Skills = insights.SkillUsageFromEvents(events)
 		data.ModelPerformance = insights.ModelPerformanceFromEvents(events)
+		data.ContextWaste = insights.ContextWasteFromEvents(events, s.contextWasteThresholds)
 	}
 	s.render(w, tmplInsights, layoutData{Title: "Insights", Nav: "insights", Health: s.healthLabel(), Content: data})
 }

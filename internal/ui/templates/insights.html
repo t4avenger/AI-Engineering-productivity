@@ -126,6 +126,40 @@
     {{end}}
     {{if .ModelPerformance.Notes}}<ul>{{range .ModelPerformance.Notes}}<li>{{.}}</li>{{end}}</ul>{{end}}
   </section>
+  <section>
+    <h2>Context waste</h2>
+    <p>Triggered {{.ContextWaste.Totals.TriggeredSessions}} / {{.ContextWaste.Totals.Sessions}} sessions · Cached ratio observed {{.ContextWaste.Totals.CachedRatioObserved}} · Input growth observed {{.ContextWaste.Totals.InputTokenGrowthObserved}}</p>
+    <p class="muted">Thresholds: cached-context ratio ≥ {{printf "%.2f" .ContextWaste.Thresholds.CachedContextRatioThreshold}} · input-token growth ≥ {{printf "%.2f" .ContextWaste.Thresholds.InputTokenGrowthThreshold}}</p>
+    {{if .ContextWaste.Sessions}}
+    <section class="table-wrap" aria-label="Context waste sessions">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Tool</th>
+            <th scope="col">Session</th>
+            <th scope="col">Cached ratio</th>
+            <th scope="col">Input growth</th>
+            <th scope="col">Triggered</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .ContextWaste.Sessions}}
+          <tr>
+            <td>{{.Tool}}</td>
+            <td>{{.SessionID}}</td>
+            <td>{{if eq .CachedContextRatioState "observed"}}{{with .CachedContextRatio}}{{printf "%.2f" .}}{{end}}{{else}}{{.CachedContextRatioState}}{{end}}</td>
+            <td>{{if eq .InputTokenGrowthState "observed"}}{{with .InputTokenGrowth}}{{printf "%.2f" .}}{{end}}{{else}}{{.InputTokenGrowthState}}{{end}}</td>
+            <td>{{if .Triggered}}yes{{else}}no{{end}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </section>
+    {{else}}
+    <p>No context-waste rows yet.</p>
+    {{end}}
+    {{if .ContextWaste.Notes}}<ul>{{range .ContextWaste.Notes}}<li>{{.}}</li>{{end}}</ul>{{end}}
+  </section>
   {{end}}
 </main>
 {{template "shell-end" .}}

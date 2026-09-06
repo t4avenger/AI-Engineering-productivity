@@ -11,26 +11,26 @@ import (
 
 // NewAuthenticatedPersistentHandler enables persistent ingestion and protects
 // management endpoints with a local bearer token or dashboard cookie.
-func NewAuthenticatedPersistentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer, repository storage.Repository, token string) http.Handler {
-	return wrapUI(token, repository, withManagementAuth(token, withBulkDelete(repository, newHandler(logger, nil, repository, sanitizer, repository))))
+func NewAuthenticatedPersistentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer, repository storage.Repository, token string, thresholds InsightThresholds) http.Handler {
+	return wrapUI(token, repository, thresholds, withManagementAuth(token, withBulkDelete(repository, thresholds, newHandler(logger, nil, repository, sanitizer, repository, thresholds))))
 }
 
 // NewAuthenticatedPersistentDevelopmentHandler retains the development-only
 // sanitized inspector while protecting management endpoints.
-func NewAuthenticatedPersistentDevelopmentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer, repository storage.Repository, token string) http.Handler {
-	return wrapUI(token, repository, withManagementAuth(token, withBulkDelete(repository, newHandler(logger, newSanitizedInspector(sanitizer), repository, sanitizer, repository))))
+func NewAuthenticatedPersistentDevelopmentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer, repository storage.Repository, token string, thresholds InsightThresholds) http.Handler {
+	return wrapUI(token, repository, thresholds, withManagementAuth(token, withBulkDelete(repository, thresholds, newHandler(logger, newSanitizedInspector(sanitizer), repository, sanitizer, repository, thresholds))))
 }
 
-func wrapUI(token string, repository storage.Repository, next http.Handler) http.Handler {
-	dashboard, err := ui.New(token, repository)
+func wrapUI(token string, repository storage.Repository, thresholds InsightThresholds, next http.Handler) http.Handler {
+	dashboard, err := ui.New(token, repository, thresholds.ContextWaste)
 	if err != nil {
 		panic("ui templates: " + err.Error())
 	}
 	return dashboard.Wrap(next)
 }
 
-func withBulkDelete(repository storage.Repository, next http.Handler) http.Handler {
-	api := newSessionAPI(repository)
+func withBulkDelete(repository storage.Repository, thresholds InsightThresholds, next http.Handler) http.Handler {
+	api := newSessionAPI(repository, thresholds)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete && r.URL.Path == "/api/v1/sessions" {
 			api.deleteAll(w, r)

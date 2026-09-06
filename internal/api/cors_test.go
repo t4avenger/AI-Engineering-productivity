@@ -15,7 +15,7 @@ func TestAuthenticatedManagementAPIPermitsOPTIONSPreflight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler := NewAuthenticatedPersistentHandler(slog.Default(), sanitizer, repository, "test-token")
+	handler := NewAuthenticatedPersistentHandler(slog.Default(), sanitizer, repository, "test-token", DefaultInsightThresholds())
 	request := httptest.NewRequest(http.MethodOptions, "/api/v1/sessions", nil)
 	request.Header.Set("Access-Control-Request-Method", http.MethodGet)
 	request.Header.Set("Access-Control-Request-Headers", "authorization")

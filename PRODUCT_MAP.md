@@ -679,13 +679,13 @@ Evidence:
 - estimated failed-attempt cost
 
 ### 13.2 Excessive-context insight
-Trigger when input-token growth or repeated cached context exceeds a configurable threshold.
+Superseded by **13.10 Context-waste insight**. Retained only as a legacy label for
+the same behaviour/efficiency signal.
 
 Evidence:
 - token trend
 - cached-token ratio
 - threshold
-- estimated avoidable cost range
 
 ### 13.3 Premium-model mismatch
 Do not claim a cheaper model would definitely succeed.

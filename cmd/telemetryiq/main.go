@@ -15,6 +15,7 @@ import (
 	"github.com/wayne/telemetryiq/internal/auth"
 	"github.com/wayne/telemetryiq/internal/config"
 	"github.com/wayne/telemetryiq/internal/cost"
+	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
 )
@@ -63,9 +64,16 @@ func main() {
 	}
 	defer func() { _ = repository.Close() }()
 
-	handler := api.NewAuthenticatedPersistentHandler(logger, sanitizer, repository, token)
+	thresholds := api.InsightThresholds{
+		ContextWaste: insights.ContextWasteThresholds{
+			CachedContextRatioThreshold: cfg.Insights.ContextWaste.CachedContextRatioThreshold,
+			InputTokenGrowthThreshold:   cfg.Insights.ContextWaste.InputTokenGrowthThreshold,
+		},
+	}
+
+	handler := api.NewAuthenticatedPersistentHandler(logger, sanitizer, repository, token, thresholds)
 	if os.Getenv("TELEMETRYIQ_DEVELOPMENT_INSPECTOR") == "1" {
-		handler = api.NewAuthenticatedPersistentDevelopmentHandler(logger, sanitizer, repository, token)
+		handler = api.NewAuthenticatedPersistentDevelopmentHandler(logger, sanitizer, repository, token, thresholds)
 	}
 	server := &http.Server{
 		Addr:              cfg.Addr(),

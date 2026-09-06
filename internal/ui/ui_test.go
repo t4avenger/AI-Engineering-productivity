@@ -9,11 +9,17 @@ import (
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/cost"
+	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 	"github.com/wayne/telemetryiq/internal/ui"
 )
+
+var defaultContextWasteThresholds = insights.ContextWasteThresholds{
+	CachedContextRatioThreshold: 0.75,
+	InputTokenGrowthThreshold:   2.0,
+}
 
 type fullStub struct {
 	sessions []canonical.Session
@@ -127,7 +133,7 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 			}(),
 		}},
 	}
-	server, err := ui.New("test-token", repo)
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,6 +151,7 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 		{"/insights", "MCP inventory"},
 		{"/insights", "Skill usage"},
 		{"/insights", "Model performance"},
+		{"/insights", "Context waste"},
 		{"/integrations", "codex"},
 		{"/privacy", "local-only"},
 		{"/privacy?confirm=1", "Type DELETE ALL"},
@@ -203,7 +210,7 @@ func TestUnlockAndHome(t *testing.T) {
 		State:     "completed",
 		StartedAt: time.Now().UTC(),
 	}}}
-	server, err := ui.New("test-token", repo)
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +247,7 @@ func TestUnlockAndHome(t *testing.T) {
 }
 
 func TestUnavailableNotZeroOnCosts(t *testing.T) {
-	server, err := ui.New("test-token", &fullStub{})
+	server, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +270,7 @@ func TestKnownZeroCostRendersZero(t *testing.T) {
 		Status:         "calculated",
 		AmountMicrousd: &zero,
 	}}}
-	server, err := ui.New("test-token", repo)
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,7 +284,7 @@ func TestKnownZeroCostRendersZero(t *testing.T) {
 }
 
 func TestTimelinePartialRejectsInvalidSessionID(t *testing.T) {
-	server, err := ui.New("test-token", &fullStub{})
+	server, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -122,7 +122,7 @@ func coverageStateFor(coverage []insights.SkillCoverage, provider, tool string) 
 }
 
 func TestInsightsPathRequiresManagementAuth(t *testing.T) {
-	for _, path := range []string{"/api/v1/insights/mcp-inventory", "/api/v1/insights/skill-usage", "/api/v1/insights/model-performance"} {
+	for _, path := range []string{"/api/v1/insights/mcp-inventory", "/api/v1/insights/skill-usage", "/api/v1/insights/model-performance", "/api/v1/insights/context-waste"} {
 		if !isManagementPath(path) {
 			t.Fatalf("insight endpoint %q must require local API authentication", path)
 		}
@@ -168,5 +168,37 @@ func TestModelPerformanceInsightAPI(t *testing.T) {
 	}
 	if body.Data.RankingAvailable {
 		t.Fatal("ranking must be suppressed below min sample size")
+	}
+}
+
+func TestContextWasteInsightAPI(t *testing.T) {
+	repo := sessionTestRepository(t)
+	request := sessionTestEvent(t, "cw-request", "cw-session", "claude-code", "active", "2026-01-04T09:00:00Z", "")
+	request.Provider = "anthropic"
+	request.EventType = "api_request"
+	request.ProviderExtensions = map[string]any{"event": map[string]any{"input_tokens": 100, "cache_read_tokens": 75}}
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{request}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(NewHandler(slog.Default(), repo))
+	t.Cleanup(server.Close)
+
+	response, err := http.Get(server.URL + "/api/v1/insights/context-waste")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("context-waste status = %d", response.StatusCode)
+	}
+	var body contextWasteResponse
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Data.Sessions) != 1 {
+		t.Fatalf("expected 1 context-waste session, got %#v", body.Data.Sessions)
+	}
+	if !body.Data.Sessions[0].Triggered {
+		t.Fatalf("expected triggered session, got %#v", body.Data.Sessions[0])
 	}
 }

@@ -5,7 +5,7 @@ The Phase 2 local management API provides authenticated session endpoints:
 - `GET /api/v1/sessions`
 - `GET /api/v1/sessions/{id}`
 - `DELETE /api/v1/sessions/{id}`
-- `GET /api/v1/costs/summary`, `GET /api/v1/sessions/{id}/costs`, `GET /api/v1/insights/mcp-inventory`, `DELETE /api/v1/sessions`
+- `GET /api/v1/costs/summary`, `GET /api/v1/sessions/{id}/costs`, `GET /api/v1/insights/mcp-inventory`, `GET /api/v1/insights/skill-usage`, `GET /api/v1/insights/model-performance`, `GET /api/v1/insights/context-waste`, `DELETE /api/v1/sessions`
 
 Responses use stable JSON envelopes: list responses contain `data` and
 `pagination`; detail responses contain `data`; errors contain `error.code` and

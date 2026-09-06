@@ -283,3 +283,67 @@ export function codexOutcomeOTLPLogs(): string {
     ],
   });
 }
+
+/** Claude api_request logs carrying cache-read tokens for the context-waste insight. */
+export function claudeContextWasteOTLPLogs(): string {
+  return JSON.stringify({
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'claude-code' } },
+            { key: 'service.version', value: { stringValue: '2.1.263' } },
+          ],
+        },
+        scopeLogs: [
+          {
+            logRecords: [
+              {
+                attributes: [
+                  { key: 'event.name', value: { stringValue: 'api_request' } },
+                  {
+                    key: 'event.timestamp',
+                    value: { stringValue: '2026-09-06T19:00:00.000Z' },
+                  },
+                  { key: 'event.sequence', value: { intValue: '1' } },
+                  {
+                    key: 'session.id',
+                    value: { stringValue: 'tiq-live-e2e-context-waste-session' },
+                  },
+                  {
+                    key: 'request_id',
+                    value: { stringValue: 'synthetic-request-1' },
+                  },
+                  { key: 'model', value: { stringValue: 'claude-opus-4-8' } },
+                  { key: 'input_tokens', value: { intValue: '100' } },
+                  { key: 'cache_read_tokens', value: { intValue: '75' } },
+                ],
+              },
+              {
+                attributes: [
+                  { key: 'event.name', value: { stringValue: 'api_request' } },
+                  {
+                    key: 'event.timestamp',
+                    value: { stringValue: '2026-09-06T19:00:01.000Z' },
+                  },
+                  { key: 'event.sequence', value: { intValue: '2' } },
+                  {
+                    key: 'session.id',
+                    value: { stringValue: 'tiq-live-e2e-context-waste-session' },
+                  },
+                  {
+                    key: 'request_id',
+                    value: { stringValue: 'synthetic-request-2' },
+                  },
+                  { key: 'model', value: { stringValue: 'claude-opus-4-8' } },
+                  { key: 'input_tokens', value: { intValue: '200' } },
+                  { key: 'cache_read_tokens', value: { intValue: '150' } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
