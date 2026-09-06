@@ -27,6 +27,7 @@ type Config struct {
 	Storage       Storage    `yaml:"storage"`
 	Sharing       Sharing    `yaml:"sharing"`
 	Pricing       Pricing    `yaml:"pricing"`
+	Insights      Insights   `yaml:"insights"`
 	Host          string     `yaml:"-"`
 	Port          string     `yaml:"-"`
 }
@@ -58,13 +59,33 @@ type Pricing struct {
 	OverridePath string `yaml:"override_path"`
 }
 
+type Insights struct {
+	ContextWaste ContextWaste `yaml:"context_waste"`
+}
+
+// ContextWaste configures the §13.10 context-waste insight thresholds.
+// Values are compared with >= and must remain in safe, meaningful ranges.
+type ContextWaste struct {
+	// CachedContextRatioThreshold triggers when cached_input/input >= threshold.
+	// Must be within [0,1].
+	CachedContextRatioThreshold float64 `yaml:"cached_context_ratio_threshold"`
+	// InputTokenGrowthThreshold triggers when max_input/first_input >= threshold.
+	// Must be >= 1.
+	InputTokenGrowthThreshold float64 `yaml:"input_token_growth_threshold"`
+}
+
 // Default returns the safe local-only configuration specified in PRODUCT_MAP.md.
 func Default() Config {
 	return Config{SchemaVersion: SchemaVersion, Mode: ModeLocalOnly,
 		Collection: Collection{Level: "operational", FilePaths: "hash", CommandArguments: "redact", ToolCalls: true, ModelUsage: true},
 		Storage:    Storage{Destination: "local", RetentionDays: 30},
 		Sharing:    Sharing{ResearchSessions: "explicit-only"},
-		Pricing:    Pricing{}, Host: defaultHost, Port: defaultPort}
+		Pricing:    Pricing{},
+		Insights: Insights{ContextWaste: ContextWaste{
+			CachedContextRatioThreshold: 0.75,
+			InputTokenGrowthThreshold:   2.0,
+		}},
+		Host: defaultHost, Port: defaultPort}
 }
 
 // FromEnv remains for backwards compatibility with Task 001 callers.
@@ -112,12 +133,35 @@ func LoadFromEnv() (Config, error) {
 
 // Validate preserves local-only privacy invariants and supported meanings.
 func (c Config) Validate() error {
+	if err := c.validateVersionAndMode(); err != nil {
+		return err
+	}
+	if err := c.validateCollection(); err != nil {
+		return err
+	}
+	if err := c.validateStorage(); err != nil {
+		return err
+	}
+	if err := c.validateSharing(); err != nil {
+		return err
+	}
+	if err := c.validateInsights(); err != nil {
+		return err
+	}
+	return c.validatePricing()
+}
+
+func (c Config) validateVersionAndMode() error {
 	if c.SchemaVersion != SchemaVersion {
 		return fmt.Errorf("schema_version must be %q, got %q", SchemaVersion, c.SchemaVersion)
 	}
 	if c.Mode != ModeLocalOnly {
 		return fmt.Errorf("mode must be %q, got %q", ModeLocalOnly, c.Mode)
 	}
+	return nil
+}
+
+func (c Config) validateCollection() error {
 	if c.Collection.Level != "aggregate" && c.Collection.Level != "operational" {
 		return fmt.Errorf("collection.level must be \"aggregate\" or \"operational\", got %q", c.Collection.Level)
 	}
@@ -136,12 +180,20 @@ func (c Config) Validate() error {
 	if c.Collection.CommandArguments != "redact" {
 		return fmt.Errorf("collection.command_arguments must be \"redact\", got %q", c.Collection.CommandArguments)
 	}
+	return nil
+}
+
+func (c Config) validateStorage() error {
 	if c.Storage.Destination != "local" {
 		return fmt.Errorf("storage.destination must be \"local\", got %q", c.Storage.Destination)
 	}
 	if c.Storage.RetentionDays < 1 {
 		return fmt.Errorf("storage.retention_days must be at least 1, got %d", c.Storage.RetentionDays)
 	}
+	return nil
+}
+
+func (c Config) validateSharing() error {
 	if c.Sharing.Diagnostics {
 		return errors.New("sharing.diagnostics must be false by default")
 	}
@@ -151,7 +203,17 @@ func (c Config) Validate() error {
 	if c.Sharing.ResearchSessions != "explicit-only" {
 		return fmt.Errorf("sharing.research_sessions must be \"explicit-only\", got %q", c.Sharing.ResearchSessions)
 	}
-	return c.validatePricing()
+	return nil
+}
+
+func (c Config) validateInsights() error {
+	if c.Insights.ContextWaste.CachedContextRatioThreshold < 0 || c.Insights.ContextWaste.CachedContextRatioThreshold > 1 {
+		return fmt.Errorf("insights.context_waste.cached_context_ratio_threshold must be within [0,1], got %v", c.Insights.ContextWaste.CachedContextRatioThreshold)
+	}
+	if c.Insights.ContextWaste.InputTokenGrowthThreshold < 1 {
+		return fmt.Errorf("insights.context_waste.input_token_growth_threshold must be >= 1, got %v", c.Insights.ContextWaste.InputTokenGrowthThreshold)
+	}
+	return nil
 }
 
 func (c Config) validatePricing() error {

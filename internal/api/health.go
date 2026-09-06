@@ -17,22 +17,22 @@ type HealthResponse struct {
 }
 
 func NewHandler(logger *slog.Logger, sessions ...storage.SessionReader) http.Handler {
-	return newHandler(logger, nil, nil, nil, sessionReader(sessions))
+	return newHandler(logger, nil, nil, nil, sessionReader(sessions), DefaultInsightThresholds())
 }
 
 func NewDevelopmentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer, sessions ...storage.SessionReader) http.Handler {
-	return newHandler(logger, newSanitizedInspector(sanitizer), nil, sanitizer, sessionReader(sessions))
+	return newHandler(logger, newSanitizedInspector(sanitizer), nil, sanitizer, sessionReader(sessions), DefaultInsightThresholds())
 }
 
 // NewPersistentHandler enables the supported live Codex OTLP log path.
 func NewPersistentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer, repository storage.Repository) http.Handler {
-	return newHandler(logger, nil, repository, sanitizer, repository)
+	return newHandler(logger, nil, repository, sanitizer, repository, DefaultInsightThresholds())
 }
 
 // NewPersistentDevelopmentHandler retains the development-only sanitized
 // inspector while enabling the supported persistent Codex log path.
 func NewPersistentDevelopmentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer, repository storage.Repository) http.Handler {
-	return newHandler(logger, newSanitizedInspector(sanitizer), repository, sanitizer, repository)
+	return newHandler(logger, newSanitizedInspector(sanitizer), repository, sanitizer, repository, DefaultInsightThresholds())
 }
 
 func sessionReader(readers []storage.SessionReader) storage.SessionReader {
@@ -42,16 +42,17 @@ func sessionReader(readers []storage.SessionReader) storage.SessionReader {
 	return readers[0]
 }
 
-func newHandler(logger *slog.Logger, inspector *sanitizedInspector, repository storage.Repository, sanitizer *privacy.Sanitizer, sessions storage.SessionReader) http.Handler {
+func newHandler(logger *slog.Logger, inspector *sanitizedInspector, repository storage.Repository, sanitizer *privacy.Sanitizer, sessions storage.SessionReader, thresholds InsightThresholds) http.Handler {
 	ingest := newOTLPHTTPIngest(inspector, sanitizer, repository)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", healthHandler(logger))
-	sessionAPI := newSessionAPI(sessions)
+	sessionAPI := newSessionAPI(sessions, thresholds)
 	mux.HandleFunc("GET /api/v1/sessions", sessionAPI.list)
 	mux.HandleFunc("GET /api/v1/costs/summary", sessionAPI.costSummary)
 	mux.HandleFunc("GET /api/v1/insights/mcp-inventory", sessionAPI.mcpInventory)
 	mux.HandleFunc("GET /api/v1/insights/skill-usage", sessionAPI.skillUsage)
 	mux.HandleFunc("GET /api/v1/insights/model-performance", sessionAPI.modelPerformance)
+	mux.HandleFunc("GET /api/v1/insights/context-waste", sessionAPI.contextWaste)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/costs", sessionAPI.costs)
 	mux.HandleFunc("GET /api/v1/sessions/{id}", sessionAPI.detail)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/events", sessionAPI.events)

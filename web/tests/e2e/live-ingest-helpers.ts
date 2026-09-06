@@ -98,8 +98,14 @@ export async function ingestOTLPMetrics(body: string): Promise<void> {
   expect(ingest.status).toBe(202);
 }
 
-// claudeSkillOTLPLogs is a sanitised Claude Code skill_activated OTLP log payload.
-export function claudeSkillOTLPLogs(): string {
+type OTLPAttributeValue =
+  | { stringValue: string }
+  | { intValue: string }
+  | { boolValue: boolean };
+
+type OTLPAttribute = { key: string; value: OTLPAttributeValue };
+
+function claudeOTLPLogs(logRecords: Array<{ attributes: OTLPAttribute[] }>): string {
   return JSON.stringify({
     resourceLogs: [
       {
@@ -109,41 +115,72 @@ export function claudeSkillOTLPLogs(): string {
             { key: 'service.version', value: { stringValue: '2.1.263' } },
           ],
         },
-        scopeLogs: [
-          {
-            logRecords: [
-              {
-                attributes: [
-                  {
-                    key: 'event.name',
-                    value: { stringValue: 'skill_activated' },
-                  },
-                  {
-                    key: 'event.timestamp',
-                    value: { stringValue: '2026-09-06T14:50:00.962Z' },
-                  },
-                  { key: 'event.sequence', value: { intValue: '9' } },
-                  {
-                    key: 'session.id',
-                    value: { stringValue: 'tiq-live-e2e-skill-session' },
-                  },
-                  { key: 'skill.name', value: { stringValue: 'tiq-probe' } },
-                  {
-                    key: 'invocation_trigger',
-                    value: { stringValue: 'user-slash' },
-                  },
-                  {
-                    key: 'skill.source',
-                    value: { stringValue: 'projectSettings' },
-                  },
-                ],
-              },
-            ],
-          },
-        ],
+        scopeLogs: [{ logRecords }],
       },
     ],
   });
+}
+
+type ClaudeApiRequestOptions = {
+  timestamp: string;
+  sequence: string;
+  sessionId: string;
+  requestId?: string;
+  model: string;
+  inputTokens: string;
+  outputTokens?: string;
+  durationMs?: string;
+  cacheReadTokens?: string;
+};
+
+function claudeApiRequestAttrs(options: ClaudeApiRequestOptions): OTLPAttribute[] {
+  const attrs: OTLPAttribute[] = [
+    { key: 'event.name', value: { stringValue: 'api_request' } },
+    { key: 'event.timestamp', value: { stringValue: options.timestamp } },
+    { key: 'event.sequence', value: { intValue: options.sequence } },
+    { key: 'session.id', value: { stringValue: options.sessionId } },
+    { key: 'model', value: { stringValue: options.model } },
+    { key: 'input_tokens', value: { intValue: options.inputTokens } },
+  ];
+  if (options.requestId) {
+    attrs.push({ key: 'request_id', value: { stringValue: options.requestId } });
+  }
+  if (options.outputTokens) {
+    attrs.push({ key: 'output_tokens', value: { intValue: options.outputTokens } });
+  }
+  if (options.durationMs) {
+    attrs.push({ key: 'duration_ms', value: { intValue: options.durationMs } });
+  }
+  if (options.cacheReadTokens) {
+    attrs.push({
+      key: 'cache_read_tokens',
+      value: { intValue: options.cacheReadTokens },
+    });
+  }
+  return attrs;
+}
+
+// claudeSkillOTLPLogs is a sanitised Claude Code skill_activated OTLP log payload.
+export function claudeSkillOTLPLogs(): string {
+  return claudeOTLPLogs([
+    {
+      attributes: [
+        { key: 'event.name', value: { stringValue: 'skill_activated' } },
+        {
+          key: 'event.timestamp',
+          value: { stringValue: '2026-09-06T14:50:00.962Z' },
+        },
+        { key: 'event.sequence', value: { intValue: '9' } },
+        {
+          key: 'session.id',
+          value: { stringValue: 'tiq-live-e2e-skill-session' },
+        },
+        { key: 'skill.name', value: { stringValue: 'tiq-probe' } },
+        { key: 'invocation_trigger', value: { stringValue: 'user-slash' } },
+        { key: 'skill.source', value: { stringValue: 'projectSettings' } },
+      ],
+    },
+  ]);
 }
 
 // codexSkillOTLPMetrics is a sanitised Codex skill.injected OTLP metrics payload.
@@ -189,45 +226,19 @@ export function codexSkillOTLPMetrics(): string {
 
 /** Claude api_request provider-completion success contract for scorecard e2e. */
 export function claudeOutcomeSuccessOTLPLogs(): string {
-  return JSON.stringify({
-    resourceLogs: [
-      {
-        resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'claude-code' } },
-            { key: 'service.version', value: { stringValue: '2.1.263' } },
-          ],
-        },
-        scopeLogs: [
-          {
-            logRecords: [
-              {
-                attributes: [
-                  { key: 'event.name', value: { stringValue: 'api_request' } },
-                  {
-                    key: 'event.timestamp',
-                    value: { stringValue: '2026-09-06T18:05:00.100Z' },
-                  },
-                  { key: 'event.sequence', value: { intValue: '3' } },
-                  {
-                    key: 'session.id',
-                    value: { stringValue: 'tiq-live-e2e-outcome-session' },
-                  },
-                  {
-                    key: 'model',
-                    value: { stringValue: 'claude-haiku-4-5-20251001' },
-                  },
-                  { key: 'input_tokens', value: { intValue: '12' } },
-                  { key: 'output_tokens', value: { intValue: '4' } },
-                  { key: 'duration_ms', value: { intValue: '842' } },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  });
+  return claudeOTLPLogs([
+    {
+      attributes: claudeApiRequestAttrs({
+        timestamp: '2026-09-06T18:05:00.100Z',
+        sequence: '3',
+        sessionId: 'tiq-live-e2e-outcome-session',
+        model: 'claude-haiku-4-5-20251001',
+        inputTokens: '12',
+        outputTokens: '4',
+        durationMs: '842',
+      }),
+    },
+  ]);
 }
 
 /** Codex tool_result + api_request outcome contracts for scorecard e2e. */
@@ -282,4 +293,33 @@ export function codexOutcomeOTLPLogs(): string {
       },
     ],
   });
+}
+
+/** Claude api_request logs carrying cache-read tokens for the context-waste insight. */
+export function claudeContextWasteOTLPLogs(): string {
+  const session = 'tiq-live-e2e-context-waste-session';
+  return claudeOTLPLogs([
+    {
+      attributes: claudeApiRequestAttrs({
+        timestamp: '2026-09-06T19:00:00.000Z',
+        sequence: '1',
+        sessionId: session,
+        requestId: 'synthetic-request-1',
+        model: 'claude-opus-4-8',
+        inputTokens: '100',
+        cacheReadTokens: '75',
+      }),
+    },
+    {
+      attributes: claudeApiRequestAttrs({
+        timestamp: '2026-09-06T19:00:01.000Z',
+        sequence: '2',
+        sessionId: session,
+        requestId: 'synthetic-request-2',
+        model: 'claude-opus-4-8',
+        inputTokens: '200',
+        cacheReadTokens: '150',
+      }),
+    },
+  ]);
 }

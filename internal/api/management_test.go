@@ -17,7 +17,7 @@ func TestAuthenticatedManagementAPIRequiresTokenAndDeletesAll(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	server := httptest.NewServer(NewAuthenticatedPersistentHandler(slog.Default(), sanitizer, repository, "test-token"))
+	server := httptest.NewServer(NewAuthenticatedPersistentHandler(slog.Default(), sanitizer, repository, "test-token", DefaultInsightThresholds()))
 	t.Cleanup(server.Close)
 
 	unauthenticated, err := http.Get(server.URL + "/api/v1/sessions")

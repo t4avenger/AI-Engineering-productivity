@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
@@ -46,18 +47,19 @@ var embedded embed.FS
 
 // Server serves the local HTMX dashboard.
 type Server struct {
-	token     string
-	expected  [32]byte
-	sessions  storage.SessionReader
-	deleter   storage.SessionDeleter
-	events    storage.EventReader
-	costs     storage.CostReader
-	templates *template.Template
-	static    http.Handler
+	token                  string
+	expected               [32]byte
+	sessions               storage.SessionReader
+	deleter                storage.SessionDeleter
+	events                 storage.EventReader
+	costs                  storage.CostReader
+	contextWasteThresholds insights.ContextWasteThresholds
+	templates              *template.Template
+	static                 http.Handler
 }
 
 // New builds a dashboard server. sessions may be a full Repository.
-func New(token string, sessions storage.SessionReader) (*Server, error) {
+func New(token string, sessions storage.SessionReader, contextWasteThresholds insights.ContextWasteThresholds) (*Server, error) {
 	tmpl, err := template.New("").Funcs(template.FuncMap{
 		"avail": availabilityLabel,
 		"formatTime": func(t time.Time) string {
@@ -85,14 +87,15 @@ func New(token string, sessions storage.SessionReader) (*Server, error) {
 	events, _ := sessions.(storage.EventReader)
 	costs, _ := sessions.(storage.CostReader)
 	return &Server{
-		token:     token,
-		expected:  sha256.Sum256([]byte(token)),
-		sessions:  sessions,
-		deleter:   deleter,
-		events:    events,
-		costs:     costs,
-		templates: tmpl,
-		static:    http.FileServer(http.FS(staticRoot)),
+		token:                  token,
+		expected:               sha256.Sum256([]byte(token)),
+		sessions:               sessions,
+		deleter:                deleter,
+		events:                 events,
+		costs:                  costs,
+		contextWasteThresholds: contextWasteThresholds,
+		templates:              tmpl,
+		static:                 http.FileServer(http.FS(staticRoot)),
 	}, nil
 }
 

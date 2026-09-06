@@ -81,6 +81,8 @@ func TestValidateRejectsUnsafeOrUnsupportedSettings(t *testing.T) {
 		{"diagnostics", func(c *Config) { c.Sharing.Diagnostics = true }, "sharing.diagnostics"},
 		{"analytics", func(c *Config) { c.Sharing.AnonymousAnalytics = true }, "sharing.anonymous_analytics"},
 		{"research", func(c *Config) { c.Sharing.ResearchSessions = "always" }, "sharing.research_sessions"},
+		{"context waste cached ratio threshold", func(c *Config) { c.Insights.ContextWaste.CachedContextRatioThreshold = 1.1 }, "insights.context_waste.cached_context_ratio_threshold"},
+		{"context waste input growth threshold", func(c *Config) { c.Insights.ContextWaste.InputTokenGrowthThreshold = 0.9 }, "insights.context_waste.input_token_growth_threshold"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
