@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/wayne/telemetryiq/internal/normalize/canonical"
+	"github.com/wayne/telemetryiq/internal/normalize/claude"
 	"github.com/wayne/telemetryiq/internal/normalize/codex"
 	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
@@ -90,7 +92,7 @@ func (i *otlpHTTPIngest) receive(w http.ResponseWriter, r *http.Request, resourc
 		i.inspector.capture(payload)
 	}
 	if resourceField == "resourceLogs" {
-		if err := i.persistCodexLogs(r, payload); err != nil {
+		if err := i.persistLogs(r, payload); err != nil {
 			status, code, message := ingestPersistenceError(err)
 			i.reject(w, status, code, message)
 			return
@@ -118,7 +120,13 @@ func (i *otlpHTTPIngest) sanitizedPayload(payload map[string]json.RawMessage) ([
 	return safe, nil
 }
 
-func (i *otlpHTTPIngest) persistCodexLogs(request *http.Request, payload map[string]json.RawMessage) error {
+// persistLogs sanitises an OTLP log payload once, then routes it through every
+// per-tool log adapter. Each adapter normalises only the resources whose
+// service.name it recognises (Codex: codex_cli_rs/codex_exec; Claude Code:
+// claude-code) and returns ErrUnsupportedLogs for a payload with none of its
+// own, so a payload from an unknown tool — or one mixing tools — is handled
+// safely rather than misattributed. Only canonical, sanitised events are stored.
+func (i *otlpHTTPIngest) persistLogs(request *http.Request, payload map[string]json.RawMessage) error {
 	if i.repository == nil || i.sanitizer == nil {
 		return nil
 	}
@@ -126,13 +134,22 @@ func (i *otlpHTTPIngest) persistCodexLogs(request *http.Request, payload map[str
 	if err != nil {
 		return err
 	}
-	events, err := codex.NormalizeLogs(safePayload, time.Now().UTC(), func(value []byte) string { return i.sanitizer.Fingerprint(value) })
-	if errors.Is(err, codex.ErrUnsupportedLogs) {
-		return nil
-	}
-	if err != nil {
+	fingerprint := func(value []byte) string { return i.sanitizer.Fingerprint(value) }
+	receivedAt := time.Now().UTC()
+
+	var events []canonical.Event
+	codexEvents, err := codex.NormalizeLogs(safePayload, receivedAt, fingerprint)
+	if err != nil && !errors.Is(err, codex.ErrUnsupportedLogs) {
 		return fmt.Errorf("normalise: %w", err)
 	}
+	events = append(events, codexEvents...)
+
+	claudeEvents, err := claude.NormalizeLogs(safePayload, receivedAt, fingerprint)
+	if err != nil && !errors.Is(err, claude.ErrUnsupportedLogs) {
+		return fmt.Errorf("normalise: %w", err)
+	}
+	events = append(events, claudeEvents...)
+
 	if len(events) == 0 {
 		return nil
 	}
