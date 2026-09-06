@@ -7,7 +7,7 @@
   {{with .Content}}
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
   {{if .Sessions}}
-  <div class="table-wrap" role="region" aria-label="Session list">
+  <section class="table-wrap" aria-label="Session list">
     <table>
       <thead>
         <tr>
@@ -30,7 +30,7 @@
         {{end}}
       </tbody>
     </table>
-  </div>
+  </section>
   {{else}}
   <p>No retained sessions yet.</p>
   {{end}}

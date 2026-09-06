@@ -50,7 +50,7 @@ func TestHealthEndpointHandlesOPTIONSPreflight(t *testing.T) {
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d", rec.Code)
 	}
-	if got := rec.Header().Get("Access-Control-Allow-Methods"); got == "" {
+	if rec.Header().Get("Access-Control-Allow-Methods") == "" {
 		t.Fatal("expected allow methods header")
 	}
 }

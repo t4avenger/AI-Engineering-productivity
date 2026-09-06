@@ -97,17 +97,17 @@ func (s *Server) unlockGet(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	s.render(w, "unlock.html", layoutData{Title: "Unlock", Nav: "", Content: unlockData{}})
+	s.render(w, tmplUnlock, layoutData{Title: "Unlock", Nav: "", Content: unlockData{}})
 }
 
 func (s *Server) unlockPost(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		s.render(w, "unlock.html", layoutData{Title: "Unlock", Content: unlockData{Error: "Unable to read form."}})
+		s.render(w, tmplUnlock, layoutData{Title: "Unlock", Content: unlockData{Error: "Unable to read form."}})
 		return
 	}
 	token := strings.TrimSpace(r.FormValue("token"))
 	if !tokenMatches(s.expected, token) {
-		s.render(w, "unlock.html", layoutData{Title: "Unlock", Content: unlockData{Error: "Token rejected. Run make auth-token and try again."}})
+		s.render(w, tmplUnlock, layoutData{Title: "Unlock", Content: unlockData{Error: "Token rejected. Run make auth-token and try again."}})
 		return
 	}
 	setAuthCookie(w, r, token)
@@ -116,14 +116,14 @@ func (s *Server) unlockPost(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	clearAuthCookie(w, r)
-	http.Redirect(w, r, "/unlock", http.StatusSeeOther)
+	http.Redirect(w, r, pathUnlock, http.StatusSeeOther)
 }
 
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	data := homeData{}
 	sessions, err := s.listAllSessions(r)
 	if err != nil {
-		s.render(w, "home.html", layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(), Error: "Unable to load sessions.", Content: data})
+		s.render(w, tmplHome, layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(), Error: "Unable to load sessions.", Content: data})
 		return
 	}
 	data.Empty = len(sessions) == 0
@@ -157,7 +157,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		data.MCPUnused = mcp.Totals.UnusedServers
 		data.SkillCount = skills.Totals.ObservedSkills
 	}
-	s.render(w, "home.html", layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(), Content: data})
+	s.render(w, tmplHome, layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(), Content: data})
 }
 
 func (s *Server) sessionsList(w http.ResponseWriter, r *http.Request) {
@@ -166,18 +166,18 @@ func (s *Server) sessionsList(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		data.Error = "Unable to load sessions."
 	}
-	s.render(w, "sessions.html", layoutData{Title: "Sessions", Nav: "sessions", Health: s.healthLabel(), Content: data})
+	s.render(w, tmplSessions, layoutData{Title: "Sessions", Nav: "sessions", Health: s.healthLabel(), Content: data})
 }
 
 func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
-	id, ok := safePathID(strings.TrimPrefix(r.URL.Path, "/sessions/"))
+	id, ok := safePathID(strings.TrimPrefix(r.URL.Path, pathSessionsPrefix))
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
 	session, found, err := s.sessions.Session(r.Context(), id)
 	if err != nil {
-		s.render(w, "session_detail.html", layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(), Error: "Unable to load session.", Content: sessionDetailData{}})
+		s.render(w, tmplSessionDetail, layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(), Error: "Unable to load session.", Content: sessionDetailData{}})
 		return
 	}
 	if !found {
@@ -189,11 +189,11 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		data.Error = "Unable to load timeline."
 	}
-	s.render(w, "session_detail.html", layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(), Content: data})
+	s.render(w, tmplSessionDetail, layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(), Content: data})
 }
 
 func (s *Server) sessionTimelinePartial(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/sessions/")
+	path := strings.TrimPrefix(r.URL.Path, pathSessionsPrefix)
 	id := strings.TrimSuffix(path, "/timeline")
 	rows, next, err := s.loadTimeline(r, id, r.URL.Query().Get("cursor"))
 	if err != nil {
@@ -201,7 +201,7 @@ func (s *Server) sessionTimelinePartial(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = s.templates.ExecuteTemplate(w, "timeline_rows.html", struct {
+	_ = s.templates.ExecuteTemplate(w, tmplTimelineRows, struct {
 		SessionID  string
 		Events     []timelineRow
 		NextCursor string
@@ -209,7 +209,7 @@ func (s *Server) sessionTimelinePartial(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) sessionDelete(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/sessions/")
+	path := strings.TrimPrefix(r.URL.Path, pathSessionsPrefix)
 	id, ok := safePathID(strings.TrimSuffix(path, "/delete"))
 	if !ok {
 		http.NotFound(w, r)
@@ -222,14 +222,14 @@ func (s *Server) sessionDelete(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil || r.FormValue("confirm") != "1" {
 		// Confirm flow uses query on the detail page; avoid open redirects by
 		// bouncing to the sessions list when confirmation is missing.
-		http.Redirect(w, r, "/sessions", http.StatusSeeOther)
+		http.Redirect(w, r, pathSessions, http.StatusSeeOther)
 		return
 	}
 	if err := s.deleter.DeleteSession(r.Context(), id); err != nil {
 		http.Error(w, "unable to delete session", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/sessions", http.StatusSeeOther)
+	http.Redirect(w, r, pathSessions, http.StatusSeeOther)
 }
 
 func (s *Server) insightsPage(w http.ResponseWriter, r *http.Request) {
@@ -241,14 +241,14 @@ func (s *Server) insightsPage(w http.ResponseWriter, r *http.Request) {
 		data.MCP = insights.MCPInventoryFromEvents(events)
 		data.Skills = insights.SkillUsageFromEvents(events)
 	}
-	s.render(w, "insights.html", layoutData{Title: "Insights", Nav: "insights", Health: s.healthLabel(), Content: data})
+	s.render(w, tmplInsights, layoutData{Title: "Insights", Nav: "insights", Health: s.healthLabel(), Content: data})
 }
 
 func (s *Server) integrationsPage(w http.ResponseWriter, r *http.Request) {
 	sessions, err := s.listAllSessions(r)
 	data := integrationsData{}
 	if err != nil {
-		s.render(w, "integrations.html", layoutData{Title: "Integrations", Nav: "integrations", Health: s.healthLabel(), Error: "Unable to load integrations.", Content: data})
+		s.render(w, tmplIntegrations, layoutData{Title: "Integrations", Nav: "integrations", Health: s.healthLabel(), Error: "Unable to load integrations.", Content: data})
 		return
 	}
 	seen := map[string]integrationRow{}
@@ -260,7 +260,7 @@ func (s *Server) integrationsPage(w http.ResponseWriter, r *http.Request) {
 		data.Tools = append(data.Tools, row)
 	}
 	data.Empty = len(data.Tools) == 0
-	s.render(w, "integrations.html", layoutData{Title: "Integrations", Nav: "integrations", Health: s.healthLabel(), Content: data})
+	s.render(w, tmplIntegrations, layoutData{Title: "Integrations", Nav: "integrations", Health: s.healthLabel(), Content: data})
 }
 
 func (s *Server) privacyPage(w http.ResponseWriter, r *http.Request) {
@@ -271,7 +271,7 @@ func (s *Server) privacyPage(w http.ResponseWriter, r *http.Request) {
 	case "form":
 		errMsg = "Unable to read form."
 	}
-	s.render(w, "privacy.html", layoutData{
+	s.render(w, tmplPrivacy, layoutData{
 		Title:   "Privacy",
 		Nav:     "privacy",
 		Health:  s.healthLabel(),
@@ -296,20 +296,20 @@ func (s *Server) privacyDeleteAll(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unable to delete sessions", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/sessions", http.StatusSeeOther)
+	http.Redirect(w, r, pathSessions, http.StatusSeeOther)
 }
 
 func (s *Server) costsPage(w http.ResponseWriter, r *http.Request) {
 	data := costsData{Statuses: map[string]int{}}
 	if s.costs == nil {
 		data.Error = "Cost storage is unavailable."
-		s.render(w, "costs.html", layoutData{Title: "Costs", Nav: "costs", Health: s.healthLabel(), Content: data})
+		s.render(w, tmplCosts, layoutData{Title: "Costs", Nav: "costs", Health: s.healthLabel(), Content: data})
 		return
 	}
 	records, err := s.costs.ListCostRecords(r.Context(), "")
 	if err != nil {
 		data.Error = "Unable to load costs."
-		s.render(w, "costs.html", layoutData{Title: "Costs", Nav: "costs", Health: s.healthLabel(), Content: data})
+		s.render(w, tmplCosts, layoutData{Title: "Costs", Nav: "costs", Health: s.healthLabel(), Content: data})
 		return
 	}
 	var amount int64
@@ -325,7 +325,7 @@ func (s *Server) costsPage(w http.ResponseWriter, r *http.Request) {
 	if amount != 0 {
 		data.Amount = &amount
 	}
-	s.render(w, "costs.html", layoutData{Title: "Costs", Nav: "costs", Health: s.healthLabel(), Content: data})
+	s.render(w, tmplCosts, layoutData{Title: "Costs", Nav: "costs", Health: s.healthLabel(), Content: data})
 }
 
 func (s *Server) render(w http.ResponseWriter, page string, data layoutData) {

@@ -17,6 +17,28 @@ import (
 const (
 	cookieName       = "telemetryiq_auth"
 	bulkDeletePhrase = "DELETE ALL"
+
+	pathUnlock         = "/unlock"
+	pathLogout         = "/logout"
+	pathHome           = "/"
+	pathSessions       = "/sessions"
+	pathSessionsPrefix = "/sessions/"
+	pathInsights       = "/insights"
+	pathIntegrations   = "/integrations"
+	pathPrivacy        = "/privacy"
+	pathPrivacyDelete  = "/privacy/delete-all"
+	pathCosts          = "/costs"
+	pathStaticPrefix   = "/static/"
+
+	tmplUnlock        = "unlock.html"
+	tmplHome          = "home.html"
+	tmplSessions      = "sessions.html"
+	tmplSessionDetail = "session_detail.html"
+	tmplTimelineRows  = "timeline_rows.html"
+	tmplInsights      = "insights.html"
+	tmplIntegrations  = "integrations.html"
+	tmplPrivacy       = "privacy.html"
+	tmplCosts         = "costs.html"
 )
 
 //go:embed templates/*.html static/*
@@ -100,10 +122,9 @@ func tokenMatches(expected [32]byte, provided string) bool {
 }
 
 func setAuthCookie(w http.ResponseWriter, r *http.Request, token string) {
-	// Local-first daemon serves HTTP on loopback by default (ADR 0002). A
-	// constant Secure cookie would not be stored/sent on http://127.0.0.1.
-	// Secure follows request TLS when present. Suppression owner: maintainers;
-	// reason: loopback HTTP MVP; expiry: 2026-12-31.
+	// Local-first daemon serves HTTP on loopback by default (ADR 0002).
+	// Secure cookies are not sent on http://127.0.0.1; enable Secure under TLS.
+	// Owner: maintainers; reason: loopback HTTP MVP; expiry: 2026-12-31.
 	//nosemgrep: go.lang.security.audit.net.cookie-missing-secure.cookie-missing-secure
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
@@ -111,7 +132,7 @@ func setAuthCookie(w http.ResponseWriter, r *http.Request, token string) {
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
-		Secure:   r.TLS != nil,
+		Secure:   r.TLS != nil, // NOSONAR S2092 -- Secure under TLS; loopback HTTP otherwise
 	})
 }
 
@@ -124,7 +145,7 @@ func clearAuthCookie(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
-		Secure:   r.TLS != nil,
+		Secure:   r.TLS != nil, // NOSONAR S2092 -- Secure under TLS; loopback HTTP otherwise
 	})
 }
 

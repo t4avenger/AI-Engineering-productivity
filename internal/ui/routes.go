@@ -8,8 +8,8 @@ import (
 // Wrap routes dashboard paths to the UI and forwards everything else to next.
 func (s *Server) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/static/") {
-			http.StripPrefix("/static/", s.static).ServeHTTP(w, r)
+		if strings.HasPrefix(r.URL.Path, pathStaticPrefix) {
+			http.StripPrefix(pathStaticPrefix, s.static).ServeHTTP(w, r)
 			return
 		}
 		if s.serve(w, r) {
@@ -27,7 +27,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	if !s.authenticated(r) {
-		http.Redirect(w, r, "/unlock", http.StatusSeeOther)
+		http.Redirect(w, r, pathUnlock, http.StatusSeeOther)
 		return true
 	}
 	s.serveProtected(w, r)
@@ -36,13 +36,13 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) bool {
 
 func (s *Server) servePublic(w http.ResponseWriter, r *http.Request) bool {
 	switch {
-	case r.URL.Path == "/unlock" && r.Method == http.MethodGet:
+	case r.URL.Path == pathUnlock && r.Method == http.MethodGet:
 		s.unlockGet(w, r)
 		return true
-	case r.URL.Path == "/unlock" && r.Method == http.MethodPost:
+	case r.URL.Path == pathUnlock && r.Method == http.MethodPost:
 		s.unlockPost(w, r)
 		return true
-	case r.URL.Path == "/logout" && r.Method == http.MethodPost:
+	case r.URL.Path == pathLogout && r.Method == http.MethodPost:
 		s.logout(w, r)
 		return true
 	default:
@@ -66,16 +66,16 @@ func (s *Server) serveProtected(w http.ResponseWriter, r *http.Request) {
 }
 
 var protectedRoutes = []route{
-	{match: exact(http.MethodGet, "/"), handle: (*Server).home},
-	{match: exact(http.MethodGet, "/sessions"), handle: (*Server).sessionsList},
-	{match: prefixSuffix(http.MethodPost, "/sessions/", "/delete"), handle: (*Server).sessionDelete},
-	{match: prefixSuffix(http.MethodGet, "/sessions/", "/timeline"), handle: (*Server).sessionTimelinePartial},
-	{match: prefix(http.MethodGet, "/sessions/"), handle: (*Server).sessionDetail},
-	{match: exact(http.MethodGet, "/insights"), handle: (*Server).insightsPage},
-	{match: exact(http.MethodGet, "/integrations"), handle: (*Server).integrationsPage},
-	{match: exact(http.MethodGet, "/privacy"), handle: (*Server).privacyPage},
-	{match: exact(http.MethodPost, "/privacy/delete-all"), handle: (*Server).privacyDeleteAll},
-	{match: exact(http.MethodGet, "/costs"), handle: (*Server).costsPage},
+	{match: exact(http.MethodGet, pathHome), handle: (*Server).home},
+	{match: exact(http.MethodGet, pathSessions), handle: (*Server).sessionsList},
+	{match: prefixSuffix(http.MethodPost, pathSessionsPrefix, "/delete"), handle: (*Server).sessionDelete},
+	{match: prefixSuffix(http.MethodGet, pathSessionsPrefix, "/timeline"), handle: (*Server).sessionTimelinePartial},
+	{match: prefix(http.MethodGet, pathSessionsPrefix), handle: (*Server).sessionDetail},
+	{match: exact(http.MethodGet, pathInsights), handle: (*Server).insightsPage},
+	{match: exact(http.MethodGet, pathIntegrations), handle: (*Server).integrationsPage},
+	{match: exact(http.MethodGet, pathPrivacy), handle: (*Server).privacyPage},
+	{match: exact(http.MethodPost, pathPrivacyDelete), handle: (*Server).privacyDeleteAll},
+	{match: exact(http.MethodGet, pathCosts), handle: (*Server).costsPage},
 }
 
 func exact(method, path string) func(string, string) bool {
@@ -96,8 +96,8 @@ func prefixSuffix(method, prefixPath, suffix string) func(string, string) bool {
 
 func (s *Server) isDashboardPath(path string) bool {
 	switch path {
-	case "/", "/sessions", "/insights", "/integrations", "/privacy", "/privacy/delete-all", "/costs":
+	case pathHome, pathSessions, pathInsights, pathIntegrations, pathPrivacy, pathPrivacyDelete, pathCosts:
 		return true
 	}
-	return strings.HasPrefix(path, "/sessions/")
+	return strings.HasPrefix(path, pathSessionsPrefix)
 }

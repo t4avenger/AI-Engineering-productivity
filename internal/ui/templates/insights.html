@@ -11,7 +11,7 @@
     <p>Connected {{.MCP.Totals.ConnectedServers}} · Used {{.MCP.Totals.UsedServers}} · Unused {{.MCP.Totals.UnusedServers}} · Usage unavailable {{.MCP.Totals.UsageUnavailableServers}}</p>
     <p class="muted">{{.MCP.Totals.TokenContextLabel}}</p>
     {{if .MCP.Servers}}
-    <div class="table-wrap" role="region" aria-label="MCP servers">
+    <section class="table-wrap" aria-label="MCP servers">
       <table>
         <thead>
           <tr>
@@ -34,7 +34,7 @@
           {{end}}
         </tbody>
       </table>
-    </div>
+    </section>
     {{else}}
     <p>No MCP inventory rows yet.</p>
     {{end}}
@@ -44,7 +44,7 @@
     <h2>Skill usage</h2>
     <p>Observed skills {{.Skills.Totals.ObservedSkills}} · Invocations {{.Skills.Totals.Invocations}}</p>
     {{if .Skills.Skills}}
-    <div class="table-wrap" role="region" aria-label="Skills">
+    <section class="table-wrap" aria-label="Skills">
       <table>
         <thead>
           <tr>
@@ -65,7 +65,7 @@
           {{end}}
         </tbody>
       </table>
-    </div>
+    </section>
     {{else}}
     <p>No explicit skills observed yet.</p>
     {{end}}
