@@ -1,0 +1,87 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.263",
+  "captured_at": "2026-09-06T14:50:01Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "resourceLogs": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "claude-code"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "2.1.263"
+              }
+            }
+          ]
+        },
+        "scopeLogs": [
+          {
+            "scope": {
+              "name": "com.anthropic.claude_code.events",
+              "version": "2.1.263"
+            },
+            "logRecords": [
+              {
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "synthetic-session-id"
+                    }
+                  },
+                  {
+                    "key": "event.name",
+                    "value": {
+                      "stringValue": "skill_activated"
+                    }
+                  },
+                  {
+                    "key": "event.timestamp",
+                    "value": {
+                      "stringValue": "2026-09-06T14:50:00.962Z"
+                    }
+                  },
+                  {
+                    "key": "event.sequence",
+                    "value": {
+                      "intValue": 9
+                    }
+                  },
+                  {
+                    "key": "skill.name",
+                    "value": {
+                      "stringValue": "tiq-probe"
+                    }
+                  },
+                  {
+                    "key": "invocation_trigger",
+                    "value": {
+                      "stringValue": "user-slash"
+                    }
+                  },
+                  {
+                    "key": "skill.source",
+                    "value": {
+                      "stringValue": "projectSettings"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

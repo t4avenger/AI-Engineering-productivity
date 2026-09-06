@@ -630,8 +630,9 @@ with its honest state rather than a silent zero. Skill outcome is counted only f
 reported outcome, never borrowed from session- or task-level outcomes.
 
 Skill detection is marked per surface as `explicit | inferred | unavailable | unknown`, where
-`unavailable` is a provider that explicitly stamps no skill signal (e.g. Claude Code today) and
-`unknown` is a surface whose events carry no detection metadata at all.
+`unavailable` means reviewed fixtures prove the supported telemetry surface cannot carry skill
+identity, and `unknown` means events carry no detection metadata yet (including when a skill-using
+capture has not been committed). Do not stamp `unavailable` merely because capture is hard.
 
 Evidence:
 - observed skills with per-skill invocation count (provider-stamped explicit identity only)
@@ -1629,7 +1630,8 @@ either capability.
 - No candidate field is retained without observed fixture evidence and a
   documented privacy transformation.
 - Skill usage is represented only when the provider exposes it; absent evidence
-  remains unavailable.
+  remains **unknown** until fixtures decide supported, unsupported, or
+  unavailable.
 - Service-degradation claims define their baseline, window, threshold, and
   confidence; high context alone is never treated as degradation.
 - The plan includes deterministic fixtures and acceptance tests for each

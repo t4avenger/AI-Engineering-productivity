@@ -30,7 +30,6 @@
         "effort": "high",
         "query_source": "sdk"
       },
-      "skill_detection": "unavailable",
       "timestamps": {
         "completed_at": "observed",
         "started_at": "derived_from_duration"

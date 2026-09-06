@@ -21,12 +21,17 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	server := httptest.NewServer(NewHandler(slog.Default()))
 	t.Cleanup(server.Close)
 
-	// Traces and metrics must fail honestly — never 202-then-drop (issue #50).
+	// Traces must fail honestly — never 202-then-drop (issue #50).
 	traces := postOTLP(t, server.URL, []byte(`{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","name":"synthetic"}]}]}]}`))
 	assertIngestError(t, traces, http.StatusNotImplemented, "not_implemented")
 
+	// Metrics without Codex skill datapoints are accepted (so exporters flush)
+	// but produce no persisted events.
 	metrics := postOTLPToPath(t, server.URL, "/v1/metrics", []byte(`{"resourceMetrics":[{"scopeMetrics":[{"metrics":[{"name":"synthetic"}]}]}]}`), "application/json")
-	assertIngestError(t, metrics, http.StatusNotImplemented, "not_implemented")
+	if metrics.StatusCode != http.StatusAccepted {
+		t.Fatalf("expected OTLP metrics status 202, got %d", metrics.StatusCode)
+	}
+	closeBody(t, metrics)
 
 	logs := postOTLPToPath(t, server.URL, "/v1/logs", []byte(`{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"stringValue":"synthetic"}}]}]}]}`), "application/json")
 	if logs.StatusCode != http.StatusAccepted {
@@ -55,20 +60,24 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&counters); err != nil {
 		t.Fatalf("decode counters: %v", err)
 	}
-	// 1 accepted log + 2 unsupported signals + 4 validation rejects
-	if counters.AcceptedPayloads != 1 || counters.RejectedPayloads != 6 {
+	// 1 accepted log + 1 accepted metrics + 1 unsupported traces + 4 validation rejects
+	if counters.AcceptedPayloads != 2 || counters.RejectedPayloads != 5 {
 		t.Fatalf("unexpected counters: %+v", counters)
 	}
 }
 
-func TestOTLPTracesAndMetricsNeverSilentlyAccepted(t *testing.T) {
+func TestOTLPTracesStillRefusedMetricsAccepted(t *testing.T) {
 	server := httptest.NewServer(NewHandler(slog.Default()))
 	t.Cleanup(server.Close)
 
-	for _, path := range []string{"/v1/traces", "/v1/metrics"} {
-		resp := postOTLPToPath(t, server.URL, path, []byte(`{"ignored":true}`), "application/json")
-		assertIngestError(t, resp, http.StatusNotImplemented, "not_implemented")
+	traces := postOTLPToPath(t, server.URL, "/v1/traces", []byte(`{"ignored":true}`), "application/json")
+	assertIngestError(t, traces, http.StatusNotImplemented, "not_implemented")
+
+	metrics := postOTLPToPath(t, server.URL, "/v1/metrics", []byte(`{"resourceMetrics":[{"scopeMetrics":[{"metrics":[{"name":"synthetic"}]}]}]}`), "application/json")
+	if metrics.StatusCode != http.StatusAccepted {
+		t.Fatalf("expected metrics status 202, got %d", metrics.StatusCode)
 	}
+	closeBody(t, metrics)
 }
 
 func TestCodexLogsPersistAsSanitizedCanonicalSession(t *testing.T) {

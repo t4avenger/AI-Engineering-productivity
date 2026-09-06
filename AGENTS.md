@@ -52,6 +52,7 @@ Any proposed change that weakens these invariants must be rejected unless the pr
 - Add raw sanitised fixtures and expected canonical fixtures.
 - Add deterministic golden tests.
 - Treat provider documentation as guidance; verify against observed fixtures.
+- Do not mark a capability `unavailable` / `unsupported`, or stamp `skill_detection: unavailable`, merely because capture or parsing is hard. `unknown` means not yet proven from committed fixtures; `unavailable` means reviewed fixtures prove the supported telemetry surface cannot carry the signal. Harder sources (skill-using sessions, session JSONL, OTLP metrics) must be captured or explicitly scheduled — not skipped by downgrading the cell.
 
 ## Required verification
 

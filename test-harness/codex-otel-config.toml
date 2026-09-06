@@ -4,3 +4,4 @@
 environment = "telemetryiq-synthetic"
 log_user_prompt = false
 exporter = { otlp-http = { endpoint = "http://127.0.0.1:8080/v1/logs", protocol = "json" } }
+metrics_exporter = { otlp-http = { endpoint = "http://127.0.0.1:8080/v1/metrics", protocol = "json" } }

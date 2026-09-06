@@ -32,7 +32,8 @@ const (
 	sourceTypeOTLPEvents      = "otlp_http_json_logs"
 	sourceTypeCapabilityProbe = "local_cli_capability_probe"
 
-	eventAPIRequest = "api_request"
+	eventAPIRequest     = "api_request"
+	eventSkillActivated = "skill_activated"
 )
 
 // NormalizeEvents maps the reviewed Claude Code OTLP event fixture into
@@ -88,13 +89,13 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, finger
 	eventID := sessionFingerprint + ":" + sequenceKey(raw, index)
 
 	extensions := map[string]any{
-		"correlation":     eventCorrelation(eventID, occurredAt),
-		"skill_detection": unavailable,
-		"event":           normalize.UnknownFields(raw, "event_name", "event_timestamp", "event_sequence", "session_id", "request_id"),
+		"correlation": eventCorrelation(eventID, occurredAt),
+		"event":       normalize.UnknownFields(raw, promotedEventFields(name)...),
 	}
 	if requestID := normalize.OptionalString(raw, "request_id"); requestID != nil {
 		extensions["request_fingerprint"] = "claude-code:" + fingerprint([]byte(*requestID))
 	}
+	attachSkillDetection(extensions, raw, name)
 	return canonical.Event{
 		SchemaVersion: canonicalSchemaVersion, EventID: eventID, EventType: name,
 		OccurredAt: occurredAt, ReceivedAt: capturedAt, Provider: provider, Tool: tool,
@@ -105,13 +106,75 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, finger
 	}, nil
 }
 
+// attachSkillDetection stamps explicit skill identity on skill_activated events.
+// Other events omit skill_detection so the insight reports unknown rather than a
+// fabricated unavailable state for a surface we have not proven cannot carry skills.
+func attachSkillDetection(extensions map[string]any, raw map[string]any, eventName string) {
+	if eventName != eventSkillActivated {
+		return
+	}
+	extensions["skill_detection"] = "explicit"
+	skill := map[string]any{}
+	if name := skillName(raw); name != "" {
+		skill["name"] = name
+	}
+	if outcome := skillOutcome(raw); outcome != "" {
+		skill["outcome"] = outcome
+	}
+	if trigger := normalize.OptionalString(raw, "invocation_trigger"); trigger != nil {
+		skill["invocation_trigger"] = *trigger
+	}
+	if source := firstString(raw, "skill.source", "skill_source"); source != "" {
+		skill["source"] = source
+	}
+	if len(skill) > 0 {
+		extensions["skill"] = skill
+	}
+}
+
+func skillName(raw map[string]any) string {
+	return firstString(raw, "skill.name", "skill_name")
+}
+
+func skillOutcome(raw map[string]any) string {
+	if status := firstString(raw, "skill.status", "skill_status"); status != "" {
+		switch status {
+		case "success", "ok":
+			return "success"
+		case "error", "failed", "failure":
+			return "failed"
+		default:
+			return status
+		}
+	}
+	return ""
+}
+
+func firstString(raw map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if value := normalize.OptionalString(raw, key); value != nil && *value != "" {
+			return *value
+		}
+	}
+	return ""
+}
+
+func promotedEventFields(eventName string) []string {
+	fields := []string{"event_name", "event_timestamp", "event_sequence", "session_id", "request_id"}
+	if eventName == eventSkillActivated {
+		return append(fields, "skill.name", "skill_name", "skill.status", "skill_status", "invocation_trigger", "skill.source", "skill_source")
+	}
+	return fields
+}
+
 // unavailableFields lists the behaviour signals a Claude Code event does not
 // carry, so an absent signal is explicit rather than silently missing. The
-// api_request event carries model and token identity; the connection event
-// carries neither. Neither event proves an executed tool call, an MCP call
-// invocation, a skill invocation, a file operation, or a task outcome.
+// api_request event carries model and token identity; the connection and
+// skill_activated events carry neither. Skill identity is reported only on
+// skill_activated via skill_detection — it is never listed as unavailable on
+// other events just because those events are not skill events.
 func unavailableFields(eventName string) []string {
-	common := []string{"tool_calls", "mcp_calls", "skill_invocations", "file_operations", "reasoning_tokens", "task_outcome", "repository_context", "prompt_content", "response_content", "provider_cost", "trace_span_correlation"}
+	common := []string{"tool_calls", "mcp_calls", "file_operations", "reasoning_tokens", "task_outcome", "repository_context", "prompt_content", "response_content", "provider_cost", "trace_span_correlation"}
 	if eventName == eventAPIRequest {
 		return common
 	}

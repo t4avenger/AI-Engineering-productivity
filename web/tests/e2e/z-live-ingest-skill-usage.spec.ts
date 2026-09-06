@@ -2,26 +2,26 @@ import { expect, test } from '@playwright/test';
 
 import {
   authToken,
-  codexOTLPLogs,
+  claudeSkillOTLPLogs,
+  codexSkillOTLPMetrics,
   ingestOTLPLogs,
+  ingestOTLPMetrics,
   resetDaemonBetweenTests,
 } from './live-ingest-helpers';
 
 /**
  * Live end-to-end gate for the skill usage insight: drive the real daemon
  * started by playwright.config.ts. No page.route().fulfill() mocking — ingest
- * real OTLP, then assert the Insights UI renders the honest skill-usage state.
- *
- * Codex does not stamp explicit skill identity, so the honest result is an
- * "unknown" detection-coverage row and a "no skill identity observed" empty
- * state — never a fabricated skill or a silent zero (QUALITY_GATES live-data DoD).
+ * real OTLP skill signals, then assert the Insights UI renders explicit skill
+ * usage (QUALITY_GATES live-data DoD).
  */
 resetDaemonBetweenTests();
 
-test('renders honest skill usage for data ingested through the live daemon', async ({
+test('renders explicit skill usage for data ingested through the live daemon', async ({
   page,
 }) => {
-  await ingestOTLPLogs(codexOTLPLogs('tiq-live-e2e-skill-model'));
+  await ingestOTLPLogs(claudeSkillOTLPLogs());
+  await ingestOTLPMetrics(codexSkillOTLPMetrics());
 
   await page.goto('/');
   await page.getByLabel('Local API token').fill(authToken);
@@ -36,14 +36,24 @@ test('renders honest skill usage for data ingested through the live daemon', asy
 
   const body = (await (await skillUsage).json()) as {
     data: {
-      skills: unknown[];
+      skills: Array<{ skill_name: string }>;
       coverage: Array<{ tool: string; detection_state: string }>;
+      totals: { observed_skills: number; explicit_detection: number };
     };
   };
-  expect(body.data.skills).toHaveLength(0);
+  expect(body.data.totals.observed_skills).toBeGreaterThanOrEqual(2);
+  expect(body.data.totals.explicit_detection).toBeGreaterThanOrEqual(2);
+  expect(body.data.skills.some((row) => row.skill_name === 'tiq-probe')).toBe(
+    true,
+  );
   expect(
     body.data.coverage.some(
-      (row) => row.tool === 'codex' && row.detection_state === 'unknown',
+      (row) => row.tool === 'claude-code' && row.detection_state === 'explicit',
+    ),
+  ).toBe(true);
+  expect(
+    body.data.coverage.some(
+      (row) => row.tool === 'codex' && row.detection_state === 'explicit',
     ),
   ).toBe(true);
 
@@ -53,13 +63,10 @@ test('renders honest skill usage for data ingested through the live daemon', asy
   await expect(
     skillSection.getByRole('heading', { name: 'Skill usage' }),
   ).toBeVisible();
+  await expect(skillSection.getByText('tiq-probe').first()).toBeVisible();
+  await expect(skillSection.getByText('claude-code').first()).toBeVisible();
+  await expect(skillSection.getByText('codex').first()).toBeVisible();
   await expect(
-    skillSection.getByRole('heading', { name: 'No skill identity observed' }),
-  ).toBeVisible();
-  await expect(skillSection.getByText('codex')).toBeVisible();
-  // Exact match: the "Unknown providers" metric label also contains "unknown",
-  // so assert the coverage row's detection-state value specifically.
-  await expect(
-    skillSection.getByText('unknown', { exact: true }),
+    skillSection.getByText('explicit', { exact: true }).first(),
   ).toBeVisible();
 });

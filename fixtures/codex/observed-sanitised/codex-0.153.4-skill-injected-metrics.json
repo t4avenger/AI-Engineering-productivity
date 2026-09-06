@@ -1,0 +1,141 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "openai",
+  "tool": "codex",
+  "tool_version": "0.153.4",
+  "captured_at": "2026-09-06T14:53:41Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "resourceMetrics": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.153.4"
+              }
+            },
+            {
+              "key": "env",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        },
+        "scopeMetrics": [
+          {
+            "scope": {
+              "name": "codex"
+            },
+            "metrics": [
+              {
+                "name": "codex.skill.injected",
+                "sum": {
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        {
+                          "key": "app.version",
+                          "value": {
+                            "stringValue": "0.153.4"
+                          }
+                        },
+                        {
+                          "key": "invoke_type",
+                          "value": {
+                            "stringValue": "implicit"
+                          }
+                        },
+                        {
+                          "key": "originator",
+                          "value": {
+                            "stringValue": "codex_exec"
+                          }
+                        },
+                        {
+                          "key": "session_source",
+                          "value": {
+                            "stringValue": "exec"
+                          }
+                        },
+                        {
+                          "key": "skill",
+                          "value": {
+                            "stringValue": "tiq-probe"
+                          }
+                        },
+                        {
+                          "key": "status",
+                          "value": {
+                            "stringValue": "ok"
+                          }
+                        }
+                      ],
+                      "startTimeUnixNano": "1788706408772193927",
+                      "timeUnixNano": "1788706421601372612",
+                      "asInt": 1
+                    },
+                    {
+                      "attributes": [
+                        {
+                          "key": "app.version",
+                          "value": {
+                            "stringValue": "0.153.4"
+                          }
+                        },
+                        {
+                          "key": "invoke_type",
+                          "value": {
+                            "stringValue": "explicit"
+                          }
+                        },
+                        {
+                          "key": "originator",
+                          "value": {
+                            "stringValue": "codex_exec"
+                          }
+                        },
+                        {
+                          "key": "session_source",
+                          "value": {
+                            "stringValue": "exec"
+                          }
+                        },
+                        {
+                          "key": "skill",
+                          "value": {
+                            "stringValue": "tiq-probe"
+                          }
+                        },
+                        {
+                          "key": "status",
+                          "value": {
+                            "stringValue": "ok"
+                          }
+                        }
+                      ],
+                      "startTimeUnixNano": "1788706408772193927",
+                      "timeUnixNano": "1788706421601372612",
+                      "asInt": 1
+                    }
+                  ],
+                  "aggregationTemporality": 1,
+                  "isMonotonic": true
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,53 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:fixture:9",
+    "event_type": "skill_activated",
+    "occurred_at": "2026-09-06T14:50:00.962Z",
+    "received_at": "2026-09-06T14:50:01Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.263",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:fixture",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "reasoning_tokens",
+        "task_outcome",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:fixture:9",
+        "ordering_key": "01788706200962000000:claude-code:fixture:9",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "event": {},
+      "skill": {
+        "invocation_trigger": "user-slash",
+        "name": "tiq-probe",
+        "source": "projectSettings"
+      },
+      "skill_detection": "explicit"
+    }
+  }
+]

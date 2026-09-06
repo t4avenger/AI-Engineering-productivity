@@ -22,7 +22,6 @@
         "cache_usage",
         "tool_calls",
         "mcp_calls",
-        "skill_invocations",
         "file_operations",
         "reasoning_tokens",
         "task_outcome",
@@ -48,8 +47,7 @@
         "server_scope": "user",
         "status": "connected",
         "transport_type": "stdio"
-      },
-      "skill_detection": "unavailable"
+      }
     }
   },
   {
@@ -72,7 +70,6 @@
       "unavailable_fields": [
         "tool_calls",
         "mcp_calls",
-        "skill_invocations",
         "file_operations",
         "reasoning_tokens",
         "task_outcome",
@@ -102,8 +99,7 @@
         "output_tokens": 4,
         "query_source": "sdk"
       },
-      "request_fingerprint": "claude-code:fixture",
-      "skill_detection": "unavailable"
+      "request_fingerprint": "claude-code:fixture"
     }
   }
 ]

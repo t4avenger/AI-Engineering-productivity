@@ -26,8 +26,12 @@ Every signal the event does not carry is listed in `attributes.unavailable_field
 so an absent signal is explicit, never silently missing. The `api_request` event
 carries model and token identity; the `mcp_server_connection` event carries neither
 and additionally lists `model`, `token_usage`, and `cache_usage` as unavailable.
-Neither event proves an executed tool call, an MCP **call** invocation, a skill
-invocation, a file operation, a task outcome, or trace/span correlation.
+Neither event proves an executed tool call, an MCP **call** invocation, a file
+operation, a task outcome, or trace/span correlation. Skill identity is reported
+only on `skill_activated` events (see
+`fixtures/claude/observed-sanitised/claude-code-2.1.263-skill-activated.json`);
+non-skill events omit `skill_detection` rather than fabricating `unavailable`.
+
 
 Events are sorted by observed time plus stable identifiers and deduplicated by
 event ID. Dedup key, ordering key, and an explicit `unknown` task-boundary
@@ -84,7 +88,7 @@ after a reviewed change, then inspect the diff.
 ## Out of scope
 
 Session JSONL is not parsed: no reviewed, sanitised JSONL fixture is committed, so
-that source stays `unknown`. Live HTTP ingest wiring for Claude Code is also
-deferred — the committed fixture is a sanitised summary shape, not a raw OTLP
-export — so this adapter is fixture replay/normalisation only, not complete Claude
-Code OTLP support.
+that source stays `unknown`. Live HTTP ingest for Claude Code OTLP logs is
+supported via `NormalizeLogs`; the sample-event fixture shape remains the
+reviewed golden path for `NormalizeEvents`.
+
