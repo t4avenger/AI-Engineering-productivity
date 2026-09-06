@@ -48,6 +48,21 @@ Committed evidence:
 
 - `fixtures/codex/observed-sanitised/codex-0.153.4-skill-injected-metrics.json`
 
+## Outcome-contract capture
+
+Use an isolated `CODEX_HOME` with auth + harness OTEL config. Capture:
+
+1. `codex.tool_result` with `success` and `model` (strip `arguments`/`output` before commit).
+2. `codex.api_request` with `success`, status, `attempt` (retry), and `model` when present.
+
+A live unittest run (`python3 test_add.py` via `exec_command`) produced
+`tool_result success=true` with model `gpt-6-astra` on CLI 0.153.4.
+
+Committed evidence:
+
+- `fixtures/codex/observed-sanitised/codex-0.153.4-outcome-contracts.json`
+- `fixtures/codex/observed-sanitised/codex-0.153.4-outcome-contracts-otlp.json`
+
 ## Review checklist
 
 - Confirm prompts, responses, source code, paths, command arguments, account identifiers, and credentials are absent.

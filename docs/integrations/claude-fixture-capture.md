@@ -48,6 +48,21 @@ Committed evidence:
 - `fixtures/claude/observed-sanitised/claude-code-2.1.263-skill-activated-otlp.json`
   (sanitised OTLP `resourceLogs` for live ingest)
 
+## Outcome-contract capture
+
+To raise Task outcome above `unknown`, capture provider-completion signals without
+content logging:
+
+1. Successful turn → OTLP `event.name = api_request` with `model`, tokens, `duration_ms`.
+2. Failed turn → OTLP `event.name = api_error` with `model`, `status_code`/`error`, `duration_ms`.
+
+Committed evidence:
+
+- `fixtures/claude/observed-sanitised/claude-code-2.1.263-api-request-outcome.json`
+- `fixtures/claude/observed-sanitised/claude-code-2.1.263-api-request-outcome-otlp.json`
+- `fixtures/claude/observed-sanitised/claude-code-2.1.263-api-error-outcome.json`
+- `fixtures/claude/observed-sanitised/claude-code-2.1.263-api-error-outcome-otlp.json`
+
 ## Validation
 
 The validator rejects missing origin or tool-version metadata, prohibited field

@@ -65,9 +65,10 @@ type timelineRow struct {
 }
 
 type insightsData struct {
-	MCP    insights.MCPInventory
-	Skills insights.SkillUsage
-	Error  string
+	MCP              insights.MCPInventory
+	Skills           insights.SkillUsage
+	ModelPerformance insights.ModelPerformance
+	Error            string
 }
 
 type integrationsData struct {
@@ -244,6 +245,7 @@ func (s *Server) insightsPage(w http.ResponseWriter, r *http.Request) {
 	} else {
 		data.MCP = insights.MCPInventoryFromEvents(events)
 		data.Skills = insights.SkillUsageFromEvents(events)
+		data.ModelPerformance = insights.ModelPerformanceFromEvents(events)
 	}
 	s.render(w, tmplInsights, layoutData{Title: "Insights", Nav: "insights", Health: s.healthLabel(), Content: data})
 }

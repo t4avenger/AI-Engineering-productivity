@@ -1,0 +1,74 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "openai",
+  "tool": "codex",
+  "tool_version": "0.153.4",
+  "captured_at": "2026-09-06T18:02:43Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "source_type": "otlp_http_json_logs",
+    "capture": {
+      "workspace": "isolated_tmp",
+      "telemetry_endpoint": "loopback_dump_receiver",
+      "outcomes": [
+        "api_request success/failed with attempt",
+        "tool_result success/failed with model"
+      ],
+      "test_execution_note": "Live unittest run produced tool_result success=true for exec_command; command args stripped"
+    },
+    "observations": [
+      {
+        "name": "task_outcome",
+        "state": "partial",
+        "evidence": "codex.tool_result success+model and codex.api_request success/status/attempt are outcome-contract sources"
+      },
+      {
+        "name": "retry",
+        "state": "partial",
+        "evidence": "codex.api_request attempt>0 observed on failed auth recovery"
+      }
+    ],
+    "sample_events": [
+      {
+        "event_name": "codex.api_request",
+        "session_id": "synthetic-codex-session",
+        "event_timestamp": "2026-09-06T18:02:40.000Z",
+        "model": "gpt-6-astra",
+        "success": true,
+        "status_code": 200,
+        "attempt": 0,
+        "duration_ms": 435
+      },
+      {
+        "event_name": "codex.api_request",
+        "session_id": "synthetic-codex-session",
+        "event_timestamp": "2026-09-06T18:02:41.000Z",
+        "model": "gpt-6-astra",
+        "success": false,
+        "status_code": 401,
+        "attempt": 2,
+        "duration_ms": 268,
+        "error_code": "http_401"
+      },
+      {
+        "event_name": "codex.tool_result",
+        "session_id": "synthetic-codex-session",
+        "event_timestamp": "2026-09-06T18:02:43.000Z",
+        "model": "gpt-6-astra",
+        "tool_name": "exec_command",
+        "success": true,
+        "duration_ms": 92
+      },
+      {
+        "event_name": "codex.tool_result",
+        "session_id": "synthetic-codex-session",
+        "event_timestamp": "2026-09-06T18:02:43.100Z",
+        "model": "gpt-6-astra",
+        "tool_name": "apply_patch",
+        "success": false,
+        "duration_ms": 87
+      }
+    ]
+  }
+}

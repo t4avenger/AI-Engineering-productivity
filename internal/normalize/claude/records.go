@@ -88,6 +88,10 @@ func sampleModelInteraction(fingerprint func([]byte) string, raw map[string]any)
 		startedDerived = true
 	}
 
+	result := "success"
+	var errorCode *string
+	extensions := recordExtensions(raw, requestID, started, startedDerived)
+	attachOutcomeContract(extensions, raw, eventAPIRequest)
 	interaction := canonical.ModelInteraction{
 		SchemaVersion:      canonical.RecordSchemaVersion,
 		RequestID:          requestID,
@@ -102,10 +106,10 @@ func sampleModelInteraction(fingerprint func([]byte) string, raw map[string]any)
 		OutputTokens:       outputTokens,
 		CachedInputTokens:  normalize.OptionalTokenCount(raw["cache_read_tokens"]),
 		ReasoningTokens:    nil,
-		Result:             "unknown",
-		ErrorCode:          nil,
+		Result:             result,
+		ErrorCode:          errorCode,
 		Provenance:         normalize.InteractionProvenance(modelObserved, inputTokens, outputTokens),
-		ProviderExtensions: recordExtensions(raw, requestID, started, startedDerived),
+		ProviderExtensions: extensions,
 	}
 	return interaction, true, nil
 }

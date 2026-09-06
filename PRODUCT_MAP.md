@@ -641,9 +641,29 @@ Evidence:
 
 ### 13.9 Model-performance scorecard
 Per model, report raw metrics with sample size: success/failed/abandoned, retry rate, error
-codes, tokens-per-completed-task, latency p50/p95. Built on **outcome contracts** (test/build
-result, reverted patch, PR result, or provider completion status), not raw session state. No
-cross-model ranking without workload caveats and sufficient sample size.
+codes, tokens-per-completed-task, latency p50/p95. Built on **outcome contracts**, not raw
+session state.
+
+**Chosen outcome-contract sources (fixture-backed):**
+
+- Claude Code `api_request` → provider-completion **success**; `api_error` → **failed**
+  (fixtures `claude-code-2.1.263-api-request-outcome*` / `…-api-error-outcome*`, tool 2.1.263).
+- Codex `codex.api_request` success/failed (+ `attempt` for retry rate) and
+  `codex.tool_result` success/failed with `model` (fixture
+  `codex-0.153.4-outcome-contracts*`, CLI 0.153.4; live unittest used `exec_command`).
+- Cursor Agent stream-json `result.subtype`/`is_error` with init `model` (fixture
+  `cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.json`) — ingest deferred to P5.
+
+Contracts are stamped on events as `provider_extensions.outcome_contract`. Abandoned, PR
+result, and reverted-patch contracts remain unobserved and are not invented. No cross-model
+ranking unless every compared model has `sample_size >= 10` (workload caveats always apply).
+
+Evidence:
+- per-model sample size and outcome counts
+- retry rate state `observed | unavailable`
+- error-code histogram
+- tokens-per-completed-task and latency p50/p95 when durations/tokens are present
+- ranking suppressed below the sample-size guard
 
 ### 13.10 Context-waste insight
 Trigger when cached-context ratio or input-token growth exceeds a configurable threshold.
@@ -924,6 +944,10 @@ field may imply provider parity that is not backed by the capability matrix.
 - observed skills with invocation count and per-skill outcome breakdown (explicit identity only)
 - detection coverage per provider/tool (`explicit | inferred | unavailable | unknown`)
 - providers without skill identity shown as unavailable, never as a silent zero
+- Model performance
+- per-model outcome-contract scorecard with sample size, retries/errors, tokens-per-completed-task, latency p50/p95
+- ranking suppressed below minimum sample size; never scored from session lifecycle alone
+- evidence limits for unobserved contract sources (abandon/PR/revert)
 
 ### 17.4 Costs
 - cost by day

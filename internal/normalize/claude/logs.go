@@ -54,6 +54,7 @@ var wireKeyMapping = map[string]string{
 	"event.timestamp": "event_timestamp",
 	"event.sequence":  "event_sequence",
 	"session.id":      "session_id",
+	"request.id":      "request_id",
 }
 
 // droppedKeyPrefixes are attribute keys that identify the operator, machine, or

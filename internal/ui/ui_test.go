@@ -144,6 +144,7 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 		{"/sessions/s1", "model_interaction"},
 		{"/insights", "MCP inventory"},
 		{"/insights", "Skill usage"},
+		{"/insights", "Model performance"},
 		{"/integrations", "codex"},
 		{"/privacy", "local-only"},
 		{"/privacy?confirm=1", "Type DELETE ALL"},
