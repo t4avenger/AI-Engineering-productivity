@@ -37,15 +37,20 @@ export interface MCPInventoryInsight {
   notes: string[];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object';
+}
+
+function isMCPInventory(value: unknown): value is MCPInventoryInsight {
+  if (!isRecord(value) || !Array.isArray(value.servers)) return false;
+  return isRecord(value.totals);
+}
+
 export async function fetchMCPInventory(): Promise<MCPInventoryInsight> {
-  const response = await request<{ data?: MCPInventoryInsight }>(
+  const response = await request<{ data?: unknown }>(
     apiRequestURL(['insights', 'mcp-inventory']),
   );
-  if (
-    response.data === undefined ||
-    !Array.isArray(response.data.servers) ||
-    typeof response.data.totals !== 'object'
-  ) {
+  if (!isMCPInventory(response.data)) {
     throw new TypeError('MCP inventory response was malformed');
   }
   return response.data;
