@@ -39,6 +39,10 @@ When implementation and documentation conflict, stop and report the conflict. Do
 - Tests use synthetic data only.
 - Local APIs bind to loopback by default.
 - Unknown values must not be represented as zero.
+- Provider-native session/conversation IDs may be retained and displayed in the
+  local-only edition with a stable provider prefix; this exception does not
+  apply to account identifiers, email, hostnames, API keys, tokens, prompts,
+  responses, source code, raw command arguments, or raw secret-bearing paths.
 
 Any proposed change that weakens these invariants must be rejected unless the product specification is explicitly revised.
 

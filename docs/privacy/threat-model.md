@@ -13,7 +13,12 @@ Companion: [pipeline.md](pipeline.md) (current transformations), the sanitizer i
 - Secret values: tokens, API keys, passwords, private keys.
 - Sensitive paths that reveal secrets by name: `.env`, `~/.ssh/id_rsa`, `*.pem`, `credentials`.
 - Command arguments and shell command lines (can embed any of the above).
-- Identifiers: account, email, hostname, conversation id.
+- Protected identifiers: account, email, hostname, API keys, tokens, and identifiers
+  derived from paths or command arguments.
+- Local provider session/conversation identifiers: retained as provider-prefixed
+  correlation keys in the local-only individual edition. This is a deliberate
+  exception for IDs the local user already sees in supported tools; cloud, team,
+  or cross-device sharing must re-evaluate before upload or aggregation.
 
 ## Threats specific to the reorientation
 1. **Redaction gaps in new raw fields.** New sources — command lines, tool arguments, and
@@ -54,6 +59,11 @@ Companion: [pipeline.md](pipeline.md) (current transformations), the sanitizer i
   `RotateSalt` re-keys the installation (atomic temp-file/fsync/rename). Rotation is
   forward-only: it does not re-key already-persisted identifiers; complete local deletion
   (the salt file suffices) severs their linkage.
+- **Provider session IDs:** in the local-only individual edition, retain provider-native
+  session/conversation IDs with a stable provider prefix (`codex:`, `claude-code:`,
+  `cursor-agent:`) so session lists, detail pages, and insights expose real correlation
+  keys. Do not apply this exception to account IDs, emails, hostnames, API keys, tokens,
+  raw paths, command arguments, prompts, responses, or source code.
 - **Command args / shell lines:** redacted to `[REDACTED]`; intent (category) is derived and
   kept, raw text is not.
 - **Findings carry privacy-safe evidence only:** rule id, access method, project boundary,

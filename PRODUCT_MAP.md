@@ -576,7 +576,8 @@ sharing:
 - Redact again before persistent storage as a defense-in-depth boundary.
 - Redact before diagnostics.
 - Never persist a raw file path. Persist a coarse, non-reversible path class (`dotenv`, `ssh_key`, `cert`, `credentials_file`, `project_relative`, `non_project`) plus a syntactic project boundary (`project`, `external`, `indeterminate`). The class is intentionally-retained governance signal (category of access), never the identity of the file. A bare keyed hash is rejected here: the universe of interesting secret paths is a tiny dictionary a leaked local key could match.
-- Where a stable identifier must be persisted, use a rotatable, scoped keyed HMAC (`FingerprintScoped`) — domain-separated per scope, and re-keyable via `RotateSalt` so fingerprints are unlinkable across installations and across rotations. Rotation is forward-only; complete local deletion severs pre-existing identifiers.
+- In the local-only individual developer edition, provider-native session or conversation IDs may be persisted and displayed with a stable provider prefix for namespacing (`codex:`, `claude-code:`, `cursor-agent:`). These are correlation keys the local user already sees in their tools; HMAC fingerprinting is not required for this narrow identity class. Cloud, team, or cross-device sharing must re-evaluate this decision before upload or aggregation.
+- Other stable identifiers that remain protected — including account identifiers, emails, hostnames, repository identifiers where raw identity is not explicitly retained, API keys, tokens, and any identifier derived from paths or command arguments — require a rotatable, scoped keyed HMAC (`FingerprintScoped`) when they must be persisted. `FingerprintScoped` is domain-separated per scope and re-keyable via `RotateSalt` so fingerprints are unlinkable across installations and across rotations. Rotation is forward-only; complete local deletion severs pre-existing identifiers.
 - Provide field-level provenance showing why a field was retained.
 - Support complete local deletion.
 - Use synthetic secrets in tests.
@@ -618,7 +619,7 @@ the behaviour/efficiency/performance ones below (13.7–13.10); cost-only insigh
 Show how many MCP servers are connected from reviewed telemetry, whether explicit invocation evidence shows use, and request-level token context for sessions where MCP telemetry is present. Flag "connected but unused" only when a server fingerprint is observed and no matching invocation is observed; otherwise show usage as unavailable. Per-MCP token *allocation* is never presented as exact — request token context is labelled as session/request-level only.
 
 Evidence:
-- connected MCP servers (provider-reported server name when available, plus a privacy-safe fingerprint for correlation; generated connection fingerprint when identity is unavailable)
+- connected MCP servers (provider-reported server name when available, plus a privacy-safe fingerprint for correlation; generated connection fingerprint only when the name is unavailable)
 - explicit invocation evidence where present
 - request-level tokens where MCP telemetry is present
 - usage state (`observed | not_observed | unavailable`) and context-waste state
