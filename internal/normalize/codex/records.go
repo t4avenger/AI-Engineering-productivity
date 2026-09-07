@@ -24,7 +24,7 @@ var modelInteractionEvents = map[string]struct{}{
 // duplicated between the typed record and its extensions. event.name is NOT
 // listed: it drives eligibility but has no typed field, so it is preserved as
 // evidence under provider_extensions.log_attributes rather than dropped.
-var extractedLogFields = []string{"model", "input_token_count", "output_token_count"}
+var extractedLogFields = []string{"model", "input_token_count", "output_token_count", "conversation.id"}
 
 // ExtractLogModelInteractions maps the reviewed Codex OTLP log shape into
 // stable-primitive canonical.ModelInteraction records. It is the honest,
@@ -34,9 +34,9 @@ var extractedLogFields = []string{"model", "input_token_count", "output_token_co
 // outcome are left unknown (nil / "unknown"), never fabricated as zero. It
 // neither persists nor logs the payload.
 //
-// Codex 0.145.0 logs expose no stable session or trace ID, so an
-// installation-specific HMAC fingerprint identifies the record and its session
-// without storing a sensitive conversation identifier.
+// When a retained conversation.id is present, it becomes the provider-prefixed
+// native session ID for the local-only edition. Older or sanitised records
+// without that field fall back to the local record fingerprint.
 func ExtractLogModelInteractions(data []byte, receivedAt time.Time, fingerprint func([]byte) string) ([]canonical.ModelInteraction, error) {
 	if fingerprint == nil {
 		return nil, fmt.Errorf("codex log fingerprint is required")
@@ -78,6 +78,7 @@ func logRecordModelInteraction(resource map[string]any, record logRecord, receiv
 		return canonical.ModelInteraction{}, false, fmt.Errorf("marshal Codex log record: %w", err)
 	}
 	id := "codex-log:" + fingerprint(recordData)
+	sessionID := codexLogSessionID(fields, id, fingerprint)
 
 	model, modelObserved := normalize.ObservedString(fields["model"])
 	inputTokens := normalize.OptionalTokenCount(fields["input_token_count"])
@@ -89,7 +90,7 @@ func logRecordModelInteraction(resource map[string]any, record logRecord, receiv
 	interaction := canonical.ModelInteraction{
 		SchemaVersion:      canonical.RecordSchemaVersion,
 		RequestID:          id,
-		SessionID:          id,
+		SessionID:          sessionID,
 		Provider:           "openai",
 		Tool:               "codex",
 		Model:              model,

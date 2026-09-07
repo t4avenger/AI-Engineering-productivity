@@ -5,9 +5,9 @@ Task 005 provides the local-only privacy boundary for TelemetryIQ. Callers must 
 ## Transformations
 
 - Prompts, responses, source code, and recognised secret-bearing fields (for example `token` and `api_key`) are removed.
-- File paths and filenames are replaced with `hmac-sha256:` hashes.
+- File paths and filenames are replaced with coarse `path-class:<class>;boundary:<boundary>` tokens, never per-path hashes.
 - Command arguments are replaced with `[REDACTED]`.
-- Other fields are retained as operational metadata, including unknown provider-extension fields unless they are themselves sensitive.
+- Provider-native session/conversation IDs are retained in the local-only individual edition with stable provider prefixes; other fields are retained as operational metadata, including unknown provider-extension fields unless they are themselves sensitive.
 
 The result includes field-level provenance (`path`, `action`, and `reason`) but never original sensitive values.
 

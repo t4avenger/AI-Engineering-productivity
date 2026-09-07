@@ -11,7 +11,7 @@
     "source_version": "2026.09.02-c22c1a3",
     "actor_id": "unavailable",
     "device_id": "unavailable",
-    "session_id": "cursor-agent:fixture",
+    "session_id": "cursor-agent:synthetic-session-id",
     "task_id": null,
     "repository_id": null,
     "privacy_level": "operational",

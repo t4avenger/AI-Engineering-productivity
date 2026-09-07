@@ -43,6 +43,24 @@ func TestObservedString(t *testing.T) {
 	}
 }
 
+func TestProviderNativeSessionIDRetainsLocalProviderID(t *testing.T) {
+	fingerprint := func([]byte) string { return "fixture" }
+	if got := ProviderNativeSessionID("codex:", " synthetic-session ", fingerprint); got != "codex:synthetic-session" {
+		t.Fatalf("session id = %q, want provider-native ID", got)
+	}
+}
+
+func TestProviderNativeSessionIDFingerprintsSecretLikeValue(t *testing.T) {
+	fingerprint := func(value []byte) string { return "fp-" + string(value) }
+	got := ProviderNativeSessionID("claude-code:", "token=synthetic-secret", fingerprint)
+	if got != "claude-code:redacted:fp-token=synthetic-secret" {
+		t.Fatalf("secret-like session id = %q", got)
+	}
+	if got := ProviderNativeSessionID("cursor-agent:", "[REDACTED]", nil); got != "cursor-agent:redacted" {
+		t.Fatalf("redacted session id without fingerprint = %q", got)
+	}
+}
+
 func TestOptionalTokenCount(t *testing.T) {
 	cases := map[string]struct {
 		value any

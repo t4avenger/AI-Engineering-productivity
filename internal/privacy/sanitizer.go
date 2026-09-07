@@ -639,7 +639,7 @@ func scalarString(value any) string {
 
 func classify(key string) Action {
 	normalized := strings.NewReplacer("_", "", "-", "", " ", "", ".", "").Replace(strings.ToLower(key))
-	for _, suffix := range []string{"email", "accountid", "conversationid", "hostname"} {
+	for _, suffix := range []string{"email", "accountid", "hostname"} {
 		if strings.HasSuffix(normalized, suffix) {
 			return ActionRemoved
 		}
@@ -649,7 +649,7 @@ func classify(key string) Action {
 		return ActionCommandClassified
 	case "commandarguments", "commandargs", "arguments":
 		return ActionRedacted
-	case "prompt", "prompts", "response", "responses", "sourcecode", "output", "body", "email", "accountid", "conversationid", "hostname":
+	case "prompt", "prompts", "response", "responses", "sourcecode", "output", "body", "email", "accountid", "hostname":
 		return ActionRemoved
 	case "filepath", "filepaths", "filename", "filenames":
 		return ActionClassified

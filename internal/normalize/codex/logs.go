@@ -39,9 +39,9 @@ type logRecord struct {
 }
 
 // NormalizeLogs maps the reviewed Codex OTLP log shape directly to canonical
-// events. Codex 0.145.0 log records expose no stable session or trace ID, so a
-// local HMAC fingerprint identifies one retained event/session without storing
-// the sensitive conversation identifier.
+// events. When a retained conversation.id is present, it becomes the
+// provider-prefixed native session ID for the local-only edition. Older or
+// sanitised records without that field fall back to a local fingerprint.
 func NormalizeLogs(data []byte, receivedAt time.Time, fingerprint func([]byte) string) ([]canonical.Event, error) {
 	if fingerprint == nil {
 		return nil, errors.New("codex log fingerprint is required")
@@ -89,6 +89,7 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 	}
 	id := "codex-log:" + fingerprint(recordData)
 	fields := attributes(record.Attributes)
+	sessionID := codexLogSessionID(fields, id, fingerprint)
 	attributes := map[string]any{"unavailable_fields": []string{"session_lifecycle", "cache_usage", "reasoning_tokens", "tool_calls", "file_operations", "command_execution", "approvals", "prompt_content", "response_content", "repository_context", "provider_cost"}}
 	for _, key := range []string{"model", "input_token_count", "output_token_count"} {
 		if value, ok := fields[key]; ok {
@@ -105,7 +106,14 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 		extensions["mcp_call"] = mcpCall
 	}
 	attachCodexOutcomeContract(extensions, fields, eventName)
-	return canonical.Event{SchemaVersion: canonicalSchemaVersion, EventID: id, EventType: eventName, OccurredAt: receivedAt.UTC(), ReceivedAt: receivedAt.UTC(), Provider: "openai", Tool: "codex", SourceSchema: sourceSchema, SourceVersion: stringValue(resource["service.version"], unavailable), ActorID: unavailable, DeviceID: unavailable, SessionID: id, PrivacyLevel: "operational", Attributes: attributes, ProviderExtensions: extensions}, nil
+	return canonical.Event{SchemaVersion: canonicalSchemaVersion, EventID: id, EventType: eventName, OccurredAt: receivedAt.UTC(), ReceivedAt: receivedAt.UTC(), Provider: "openai", Tool: "codex", SourceSchema: sourceSchema, SourceVersion: stringValue(resource["service.version"], unavailable), ActorID: unavailable, DeviceID: unavailable, SessionID: sessionID, PrivacyLevel: "operational", Attributes: attributes, ProviderExtensions: extensions}, nil
+}
+
+func codexLogSessionID(fields map[string]any, fallback string, fingerprint func([]byte) string) string {
+	if conversationID, ok := normalize.ObservedString(fields["conversation.id"]); ok {
+		return normalize.ProviderNativeSessionID("codex:", conversationID, fingerprint)
+	}
+	return fallback
 }
 
 func hasCodexOutcomeContract(eventName string) bool {
@@ -192,7 +200,7 @@ func codexErrorCode(fields map[string]any, status string) string {
 }
 
 func codexLogAttributes(fields map[string]any) map[string]any {
-	return normalize.UnknownFields(fields, "mcp_server")
+	return normalize.UnknownFields(fields, "mcp_server", "conversation.id")
 }
 
 func codexMCPCall(fields map[string]any, fingerprint func([]byte) string) (map[string]any, bool) {
@@ -203,7 +211,7 @@ func codexMCPCall(fields map[string]any, fingerprint func([]byte) string) (map[s
 	call := map[string]any{
 		"server_fingerprint": "codex:" + fingerprint([]byte(server)),
 		"server_name":        server,
-		"identity_state":     "fingerprinted",
+		"identity_state":     "provider_reported",
 	}
 	for _, key := range []string{"mcp_server_origin", "tool_name", "tool_namespace", "call_id", "duration_ms", "success", "output_truncated", "tool_result_seq", "decision"} {
 		if value, ok := fields[key]; ok {

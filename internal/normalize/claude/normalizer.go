@@ -4,10 +4,9 @@
 // It is capability-bounded: only signals the P2 Claude Code capability matrix
 // marks supported/partial are extracted; every absent signal is reported as an
 // explicit unavailable/unknown state, never fabricated. Session and request
-// identifiers are reduced to installation-specific HMAC fingerprints so a
-// sensitive identifier is never retained verbatim, while correlation stays
-// deterministic. Session JSONL is out of scope until a reviewed JSONL fixture
-// is committed.
+// session identifiers are retained as provider-prefixed native IDs in the
+// local-only edition. Request identifiers still use installation-specific HMAC
+// fingerprints unless a future privacy review allows native request IDs.
 package claude
 
 import (
@@ -45,7 +44,7 @@ const (
 // fixture.
 //
 // A capability-probe fixture carries no events, so it yields an empty slice
-// rather than a fabricated all-unknown record. session_id/request_id are
+// rather than a fabricated all-unknown record. request_id values are
 // fingerprinted, so the caller supplies the installation HMAC fingerprint.
 func NormalizeEvents(data []byte, fingerprint func([]byte) string) ([]canonical.Event, error) {
 	if fingerprint == nil {
@@ -86,8 +85,8 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, finger
 	if err != nil {
 		return canonical.Event{}, err
 	}
-	sessionFingerprint := "claude-code:" + fingerprint([]byte(sessionID))
-	eventID := sessionFingerprint + ":" + sequenceKey(raw, index)
+	nativeSessionID := normalize.ProviderNativeSessionID("claude-code:", sessionID, fingerprint)
+	eventID := nativeSessionID + ":" + sequenceKey(raw, index)
 
 	extensions := map[string]any{
 		"correlation": eventCorrelation(eventID, occurredAt),
@@ -102,7 +101,7 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, finger
 		SchemaVersion: canonicalSchemaVersion, EventID: eventID, EventType: name,
 		OccurredAt: occurredAt, ReceivedAt: capturedAt, Provider: provider, Tool: tool,
 		SourceSchema: sourceSchema, SourceVersion: document.ToolVersion, ActorID: unavailable, DeviceID: unavailable,
-		SessionID: sessionFingerprint, TaskID: nil, RepositoryID: nil, PrivacyLevel: "operational",
+		SessionID: nativeSessionID, TaskID: nil, RepositoryID: nil, PrivacyLevel: "operational",
 		Attributes:         map[string]any{"unavailable_fields": unavailableFields(name)},
 		ProviderExtensions: extensions,
 	}, nil

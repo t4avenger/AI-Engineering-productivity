@@ -29,7 +29,7 @@ func TestMCPInventoryFromEventsReportsUsageAndHeuristicTokenContext(t *testing.T
 			t.Fatalf("token context label = %q", server.TokenContextLabel)
 		}
 	}
-	if byFingerprint["mcp:hmac:filesystem"].ServerName != "filesystem" || !byFingerprint["mcp:hmac:filesystem"].Used || byFingerprint["mcp:hmac:filesystem"].ContextWasteState != "used" {
+	if byFingerprint["mcp:hmac:filesystem"].ServerName != "filesystem" || byFingerprint["mcp:hmac:filesystem"].IdentityState != "provider_reported" || !byFingerprint["mcp:hmac:filesystem"].Used || byFingerprint["mcp:hmac:filesystem"].ContextWasteState != "used" {
 		t.Fatalf("used server = %#v", byFingerprint["mcp:hmac:filesystem"])
 	}
 	if byFingerprint["mcp:hmac:git"].Used || byFingerprint["mcp:hmac:git"].ContextWasteState != "connected_but_unused" {
@@ -55,11 +55,25 @@ func TestMCPInventoryReportsInvocationOnlyMCPUse(t *testing.T) {
 	if !server.Used || server.UsageState != "observed" || server.ContextWasteState != "used" || server.InvocationCount != 1 {
 		t.Fatalf("server = %#v", server)
 	}
-	if server.ServerName != "filesystem" {
-		t.Fatalf("server name = %q", server.ServerName)
+	if server.ServerName != "filesystem" || server.IdentityState != "provider_reported" {
+		t.Fatalf("server identity = %q/%q", server.ServerName, server.IdentityState)
 	}
 	if len(server.ToolNames) != 1 || server.ToolNames[0] != "read_file" {
 		t.Fatalf("tool names = %#v", server.ToolNames)
+	}
+}
+
+func TestMCPInventoryMarksNamedFingerprintConnectionUnused(t *testing.T) {
+	inventory := MCPInventoryFromEvents([]canonical.Event{
+		testMCPEvent("connected", "mcp_server_connection", map[string]any{}, map[string]any{"event": map[string]any{"server_fingerprint": "mcp:hmac:filesystem", "server_name": "filesystem", "status": "connected"}}),
+	})
+
+	if inventory.Totals.ConnectedServers != 1 || inventory.Totals.UnusedServers != 1 || inventory.Totals.UsageUnavailableServers != 0 {
+		t.Fatalf("totals = %#v", inventory.Totals)
+	}
+	server := inventory.Servers[0]
+	if server.IdentityState != "provider_reported" || server.UsageState != "not_observed" || server.ContextWasteState != "connected_but_unused" {
+		t.Fatalf("server = %#v", server)
 	}
 }
 
@@ -85,8 +99,8 @@ func TestMCPInventoryIncludesProviderReportedServerName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(payload), "filesystem") {
-		t.Fatalf("MCP server name missing: %s", payload)
+	if !strings.Contains(string(payload), "filesystem") || inventory.Servers[0].IdentityState != "provider_reported" {
+		t.Fatalf("MCP server identity missing: %#v payload=%s", inventory.Servers, payload)
 	}
 }
 

@@ -39,7 +39,7 @@ func TestSkillUsageInsightIngestEndToEnd(t *testing.T) {
 	assertExplicitSkillUsage(t, usage)
 
 	assertNoRawIdentifiers(t,
-		[]string{"tiq-canary-session", "tiq-canary@example.test", "tiq-canary-api-key"},
+		[]string{"tiq-canary@example.test", "tiq-canary-api-key"},
 		marshalJSON(t, usage))
 }
 

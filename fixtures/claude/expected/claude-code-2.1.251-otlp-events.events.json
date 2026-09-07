@@ -1,7 +1,7 @@
 [
   {
     "schema_version": "0.1.0",
-    "event_id": "claude-code:fixture:7",
+    "event_id": "claude-code:synthetic-session-id:7",
     "event_type": "mcp_server_connection",
     "occurred_at": "2026-08-31T13:37:04.548Z",
     "received_at": "2026-08-31T13:37:07Z",
@@ -11,7 +11,7 @@
     "source_version": "2.1.251",
     "actor_id": "unavailable",
     "device_id": "unavailable",
-    "session_id": "claude-code:fixture",
+    "session_id": "claude-code:synthetic-session-id",
     "task_id": null,
     "repository_id": null,
     "privacy_level": "operational",
@@ -34,8 +34,8 @@
     },
     "provider_extensions": {
       "correlation": {
-        "dedup_key": "claude-code:fixture:7",
-        "ordering_key": "01788183424548000000:claude-code:fixture:7",
+        "dedup_key": "claude-code:synthetic-session-id:7",
+        "ordering_key": "01788183424548000000:claude-code:synthetic-session-id:7",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
@@ -52,7 +52,7 @@
   },
   {
     "schema_version": "0.1.0",
-    "event_id": "claude-code:fixture:9",
+    "event_id": "claude-code:synthetic-session-id:9",
     "event_type": "api_request",
     "occurred_at": "2026-08-31T13:37:07.791Z",
     "received_at": "2026-08-31T13:37:07Z",
@@ -62,7 +62,7 @@
     "source_version": "2.1.251",
     "actor_id": "unavailable",
     "device_id": "unavailable",
-    "session_id": "claude-code:fixture",
+    "session_id": "claude-code:synthetic-session-id",
     "task_id": null,
     "repository_id": null,
     "privacy_level": "operational",
@@ -81,8 +81,8 @@
     },
     "provider_extensions": {
       "correlation": {
-        "dedup_key": "claude-code:fixture:9",
-        "ordering_key": "01788183427791000000:claude-code:fixture:9",
+        "dedup_key": "claude-code:synthetic-session-id:9",
+        "ordering_key": "01788183427791000000:claude-code:synthetic-session-id:9",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Claude Code event telemetry has no reviewed task-boundary signal"

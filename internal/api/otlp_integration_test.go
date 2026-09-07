@@ -186,7 +186,6 @@ func assertNoCanaryLeak(t *testing.T, data []byte) {
 		"tiq-canary-provider-extension",
 		"tiq-canary-api-key",
 		"synthetic.test",
-		"synthetic-conversation",
 		"synthetic body",
 	} {
 		if strings.Contains(string(data), prohibited) {

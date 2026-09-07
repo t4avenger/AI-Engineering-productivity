@@ -70,6 +70,9 @@ func TestCursorAgentIngestPersistsSanitizedCanonicalSession(t *testing.T) {
 	if err != nil || len(sessions) != 1 {
 		t.Fatalf("sessions = %#v, %v", sessions, err)
 	}
+	if sessions[0].SessionID != "cursor-agent:tiq-canary-cursor-session" {
+		t.Fatalf("session id = %q, want native provider ID", sessions[0].SessionID)
+	}
 	events, err := repository.ListEvents(context.Background(), storage.EventFilter{SessionID: sessions[0].SessionID, Limit: 10})
 	if err != nil || len(events) != 1 {
 		t.Fatalf("events = %#v, %v", events, err)
@@ -77,7 +80,6 @@ func TestCursorAgentIngestPersistsSanitizedCanonicalSession(t *testing.T) {
 
 	serialized, _ := json.Marshal(map[string]any{"sessions": sessions, "events": events})
 	for _, prohibited := range []string{
-		"tiq-canary-cursor-session",
 		"tiq-canary-cursor-request",
 		"tiq-canary-cursor-prompt",
 	} {

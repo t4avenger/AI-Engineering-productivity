@@ -43,7 +43,8 @@ type adapterDocument struct {
 // Normalize maps a reviewed Cursor Agent fixture wrapper into one canonical
 // event for the result (or no events for a capability probe). It validates the
 // fixture through the shared fixture boundary and does not persist or log it.
-// The caller supplies an installation-scoped HMAC fingerprint function.
+// The caller supplies an installation-scoped HMAC fingerprint function for
+// protected non-session identifiers and fallback correlation.
 func Normalize(data []byte, fingerprint func([]byte) string) ([]canonical.Event, error) {
 	if fingerprint == nil {
 		return nil, errors.New("cursor fingerprint is required")
@@ -131,13 +132,13 @@ func normaliseResult(toolVersion, sourceType string, init, result, capture map[s
 	if err != nil {
 		return canonical.Event{}, err
 	}
-	sessionFingerprint := "cursor-agent:" + fingerprint([]byte(sessionID))
+	nativeSessionID := normalize.ProviderNativeSessionID("cursor-agent:", sessionID, fingerprint)
 
 	var eventID string
 	if requestID := normalize.OptionalString(result, "request_id"); requestID != nil {
 		eventID = "cursor-agent:" + fingerprint([]byte(*requestID))
 	} else {
-		eventID = sessionFingerprint + ":result"
+		eventID = nativeSessionID + ":result"
 	}
 
 	model := "unknown"
@@ -204,7 +205,7 @@ func normaliseResult(toolVersion, sourceType string, init, result, capture map[s
 		SourceVersion:      toolVersion,
 		ActorID:            unavailable,
 		DeviceID:           unavailable,
-		SessionID:          sessionFingerprint,
+		SessionID:          nativeSessionID,
 		TaskID:             nil,
 		RepositoryID:       nil,
 		PrivacyLevel:       "operational",

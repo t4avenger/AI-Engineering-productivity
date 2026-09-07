@@ -2,7 +2,7 @@
 
 The live synthetic run confirmed Codex 0.145.0 exports OTLP JSON logs to the
 loopback receiver. It exposed operational attributes for model and token usage,
-plus sensitive account, email, host, and conversation identifiers.
+plus account, email, host, and provider conversation identifiers. Account, email, and host identifiers remain protected; provider conversation IDs are retained only as local provider-prefixed session correlation keys after the #73 privacy revision.
 
 The development inspector sanitizes OTLP attribute-pair values before
 in-memory inspection. Regression tests cover the observed sensitive categories.

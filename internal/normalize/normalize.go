@@ -54,6 +54,43 @@ func ObservedString(value any) (string, bool) {
 	return text, true
 }
 
+// ProviderNativeSessionID returns the local-edition canonical session identity:
+// a stable provider prefix plus the provider-native session/conversation ID.
+// If a malformed payload carries a secret-like value despite the upstream
+// sanitizer, fall back to a fingerprint so the sensitive value is not retained.
+func ProviderNativeSessionID(prefix, value string, fingerprint func([]byte) string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return prefix + "unknown"
+	}
+	if looksSecretLikeIdentifier(value) {
+		if fingerprint == nil {
+			return prefix + "redacted"
+		}
+		return prefix + "redacted:" + fingerprint([]byte(value))
+	}
+	return prefix + value
+}
+
+func looksSecretLikeIdentifier(value string) bool {
+	normalized := strings.ToLower(value)
+	for _, marker := range []string{
+		"api_key=",
+		"apikey=",
+		"authorization:",
+		"bearer ",
+		"password=",
+		"secret=",
+		"token=",
+		"-----begin private key-----",
+	} {
+		if strings.Contains(normalized, marker) {
+			return true
+		}
+	}
+	return strings.HasPrefix(normalized, "sk-") || value == "[REDACTED]"
+}
+
 // OptionalTokenCount parses a token attribute into a *int64. Decoded JSON
 // encodes an integer string as a string and a number as float64; both are
 // accepted. An absent, unparseable, negative, non-integral, or out-of-range

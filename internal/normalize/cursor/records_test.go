@@ -71,15 +71,18 @@ func TestExtractModelInteractionsCapabilityProbeYieldsNoRecords(t *testing.T) {
 	}
 }
 
-func TestExtractDoesNotLeakRawIDs(t *testing.T) {
+func TestExtractKeepsNativeSessionAndDoesNotLeakProtectedIDs(t *testing.T) {
 	records, err := ExtractModelInteractions(readFixture(t, "cursor-agent-2026.05.16-0338208-print-result.json"), stubFingerprint)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
 	serialized, _ := json.Marshal(records)
-	for _, leaked := range []string{"synthetic-session-id", "synthetic-request-id"} {
+	if records[0].SessionID != "cursor-agent:synthetic-session-id" {
+		t.Fatalf("session id = %q, want native provider ID", records[0].SessionID)
+	}
+	for _, leaked := range []string{"synthetic-request-id"} {
 		if strings.Contains(string(serialized), leaked) {
-			t.Fatalf("raw identifier leaked into canonical output: %q", leaked)
+			t.Fatalf("protected identifier leaked into canonical output: %q", leaked)
 		}
 	}
 }

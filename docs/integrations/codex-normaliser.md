@@ -47,11 +47,12 @@ the raw server name is excluded from generic log attributes to avoid duplicate
 evidence but is retained in the MCP-specific record for display. Empty `mcp_server`
 means the provider did not report that tool result as an MCP server call, so it
 remains an internal Codex/tool invocation rather than MCP inventory evidence.
-Since the observed logs lack trace correlation and a safe retained session
-identifier, each retained log forms an explicitly `unknown` lifecycle session
-identified by an installation-specific HMAC fingerprint. Account, hostname,
-email, conversation ID, raw command arguments, tool output, and body fields are
-removed by the privacy pipeline before storage.
+When a retained `conversation.id` is present, observed logs use the local-only
+provider-native session identity `codex:<conversation.id>`. If older or already
+sanitised records lack that field, each retained log falls back to an explicitly
+`unknown` lifecycle session identified by an installation-specific HMAC
+fingerprint. Account, hostname, email, raw command arguments, tool output, and
+body fields are removed by the privacy pipeline before storage.
 
 ## Model-interaction records
 
@@ -70,9 +71,11 @@ Codex log shape into stable-primitive `canonical.ModelInteraction` records
   distinguishable from a real zero.
 - **Cached and reasoning tokens, task outcome** (`unknown` for typed model records) are left
   `nil`/`"unknown"`; no typed model field is fabricated from provider-extension evidence.
-- **MCP-backed tool results** (`partial` for events) are represented only when Codex reports a non-empty `mcp_server`; the provider-reported server name and fingerprint are retained under `provider_extensions.mcp_call` with safe invocation fields.
-- **Session/request identity** derives from the installation HMAC fingerprint,
-  because `conversation.id` is stripped by the privacy pipeline.
+- **MCP-backed tool results** (`partial` for events) are represented only when Codex reports a non-empty `mcp_server`; the provider-reported server name is retained under `provider_extensions.mcp_call` for display, with a fingerprint retained only as the correlation fallback/key.
+- **Session/request identity** uses `codex:<conversation.id>` for the session
+  when a retained conversation ID is present in the local-only edition. Request
+  IDs and records without a retained conversation ID still use installation
+  HMAC fingerprints for deterministic correlation.
 - **Correlation evidence** records the dedup key, ordering key, and explicit
   unknown task-boundary confidence under `provider_extensions.correlation`; log
   records are sorted by `started_at`, `request_id`, and `completed_at`, then

@@ -16,8 +16,8 @@ an empty result rather than a fabricated all-unknown record. Any other
 ## Event path — `NormalizeEvents`
 
 Each sample event becomes one `canonical.Event`. The event ID is
-`claude-code:<session-fingerprint>:<event_sequence>`, the session ID is
-`claude-code:<session-fingerprint>`, `source_schema` is `otel`, and `source_version`
+`claude-code:<session_id>:<event_sequence>`, the session ID is
+`claude-code:<session_id>`, `source_schema` is `otel`, and `source_version`
 is the pinned tool version. `occurred_at` is the observed `event_timestamp`;
 `received_at` is the fixture `captured_at`. Actor and device IDs use the explicit
 string `unavailable`.
@@ -37,7 +37,7 @@ Events are sorted by observed time plus stable identifiers and deduplicated by
 event ID. Dedup key, ordering key, and an explicit `unknown` task-boundary
 confidence are stored under `provider_extensions.correlation`. Safe fields outside
 the mapped set survive verbatim under `provider_extensions.event`, minus the
-fingerprinted identifiers.
+promoted identifiers.
 
 ## Model-interaction records — `ExtractModelInteractions`
 
@@ -65,10 +65,10 @@ deduplicated by `request_id`.
 
 ## Privacy
 
-`NormalizeEvents` and `ExtractModelInteractions` require an installation HMAC
-fingerprint and reduce `session_id`/`request_id` to fingerprints, so a sensitive
-or unstable identifier is never retained verbatim while within-session correlation
-stays deterministic. The fixture validator runs before mapping, rejecting
+`NormalizeEvents` and `ExtractModelInteractions` retain `session_id` as a
+provider-prefixed native local correlation key (`claude-code:<session_id>`).
+They still require an installation HMAC fingerprint for protected request IDs
+and fallback redaction when a malformed session identifier looks secret-bearing. The fixture validator runs before mapping, rejecting
 prohibited field names and likely secrets without exposing their values. When the
 adapter is fed a live payload, the shared privacy pipeline (issue #23) must run
 first, exactly as the Codex ingest path does;

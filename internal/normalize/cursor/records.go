@@ -62,9 +62,9 @@ func resultInteraction(document adapterDocument, capturedAt time.Time, fingerpri
 	if err != nil {
 		return canonical.ModelInteraction{}, false, err
 	}
-	sessionFingerprint := "cursor-agent:" + fingerprint([]byte(sessionID))
+	nativeSessionID := normalize.ProviderNativeSessionID("cursor-agent:", sessionID, fingerprint)
 
-	requestID := sessionFingerprint + ":result"
+	requestID := nativeSessionID + ":result"
 	if rawRequest := normalize.OptionalString(document.Payload.Result, "request_id"); rawRequest != nil {
 		requestID = "cursor-agent:" + fingerprint([]byte(*rawRequest))
 	}
@@ -114,7 +114,7 @@ func resultInteraction(document adapterDocument, capturedAt time.Time, fingerpri
 	return canonical.ModelInteraction{
 		SchemaVersion:      canonical.RecordSchemaVersion,
 		RequestID:          requestID,
-		SessionID:          sessionFingerprint,
+		SessionID:          nativeSessionID,
 		Provider:           provider,
 		Tool:               tool,
 		Model:              model,

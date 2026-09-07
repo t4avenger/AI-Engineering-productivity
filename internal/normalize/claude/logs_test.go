@@ -71,7 +71,7 @@ func TestNormalizeLogsMapsClaudeWireEventsAndSkipsOtherServices(t *testing.T) {
 	}
 }
 
-func TestNormalizeLogsFingerprintsServerIdentityAndDropsOperatorFields(t *testing.T) {
+func TestNormalizeLogsKeepsNativeSessionAndDropsOperatorFields(t *testing.T) {
 	events, err := NormalizeLogs([]byte(rawClaudeLogs), time.Unix(0, 0).UTC(), stubFingerprint)
 	if err != nil {
 		t.Fatalf("normalise: %v", err)
@@ -94,12 +94,12 @@ func TestNormalizeLogsFingerprintsServerIdentityAndDropsOperatorFields(t *testin
 		t.Fatalf("server_fingerprint = %#v, want claude-code:* fingerprint", connection["server_fingerprint"])
 	}
 
-	// No operator/machine/conversation identifier reaches canonical output.
+	// No operator, machine, or prompt identifier reaches canonical output; local provider session IDs are retained by policy.
 	serialized, err := json.Marshal(events)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, prohibited := range []string{"synthetic-user-hash", "synthetic-org", "synthetic-prompt", "synthetic-session-uuid"} {
+	for _, prohibited := range []string{"synthetic-user-hash", "synthetic-org", "synthetic-prompt"} {
 		if strings.Contains(string(serialized), prohibited) {
 			t.Fatalf("identity leaked into canonical events: %q", prohibited)
 		}
