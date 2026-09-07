@@ -122,34 +122,30 @@ func coverageStateFor(coverage []insights.SkillCoverage, provider, tool string) 
 	return ""
 }
 
-func TestUnapprovedMCPInsightAPI(t *testing.T) {
+// fetchUnapprovedMCP persists one MCP connection for serverName, serves it
+// through a live handler carrying thresholds, and returns the decoded decision.
+func fetchUnapprovedMCP(t *testing.T, thresholds InsightThresholds, serverName string) unapprovedMCPResponse {
+	t.Helper()
 	repo := sessionTestRepository(t)
 	connected := sessionTestEvent(t, "mcp-connected", "mcp-session", "claude-code", "active", "2026-01-04T09:00:00Z", "")
 	connected.Provider = "anthropic"
 	connected.EventType = "mcp_server_connection"
-	connected.ProviderExtensions = map[string]any{"event": map[string]any{"server_fingerprint": "mcp:hmac:rogue", "server_name": "rogue-tool", "status": "connected"}}
+	connected.ProviderExtensions = map[string]any{"event": map[string]any{"server_fingerprint": "mcp:hmac:" + serverName, "server_name": serverName, "status": "connected"}}
 	if err := repo.SaveEvents(context.Background(), []canonical.Event{connected}); err != nil {
 		t.Fatal(err)
 	}
-	// A configured allowlist that does not include the observed server must yield a
-	// violation, threaded from config through InsightThresholds.
-	thresholds := DefaultInsightThresholds()
-	thresholds.MCPAllowlist = []string{"filesystem"}
 	server := httptest.NewServer(newHandler(slog.Default(), nil, nil, nil, repo, thresholds))
 	t.Cleanup(server.Close)
+	return getInsightJSON[unapprovedMCPResponse](t, server.URL+"/api/v1/insights/unapproved-mcp")
+}
 
-	response, err := http.Get(server.URL + "/api/v1/insights/unapproved-mcp")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = response.Body.Close() }()
-	if response.StatusCode != http.StatusOK {
-		t.Fatalf("unapproved-mcp status = %d", response.StatusCode)
-	}
-	var body unapprovedMCPResponse
-	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
-		t.Fatal(err)
-	}
+func TestUnapprovedMCPInsightAPI(t *testing.T) {
+	// A configured allowlist that does not include the observed server must yield
+	// a violation, threaded from config through InsightThresholds.
+	thresholds := DefaultInsightThresholds()
+	thresholds.MCPAllowlist = []string{"filesystem"}
+	body := fetchUnapprovedMCP(t, thresholds, "rogue-tool")
+
 	if body.Data.Outcome != governance.OutcomeViolation {
 		t.Fatalf("expected violation outcome, got %q", body.Data.Outcome)
 	}
@@ -159,31 +155,10 @@ func TestUnapprovedMCPInsightAPI(t *testing.T) {
 }
 
 func TestUnapprovedMCPInsightAPIIndeterminateWhenUnconfigured(t *testing.T) {
-	repo := sessionTestRepository(t)
-	connected := sessionTestEvent(t, "mcp-connected", "mcp-session", "claude-code", "active", "2026-01-04T09:00:00Z", "")
-	connected.Provider = "anthropic"
-	connected.EventType = "mcp_server_connection"
-	connected.ProviderExtensions = map[string]any{"event": map[string]any{"server_fingerprint": "mcp:hmac:filesystem", "server_name": "filesystem", "status": "connected"}}
-	if err := repo.SaveEvents(context.Background(), []canonical.Event{connected}); err != nil {
-		t.Fatal(err)
-	}
-	// The default handler carries no allowlist, so the policy must report
+	// The default thresholds carry no allowlist, so the policy must report
 	// indeterminate rather than fabricating a clean or violating result.
-	server := httptest.NewServer(NewHandler(slog.Default(), repo))
-	t.Cleanup(server.Close)
+	body := fetchUnapprovedMCP(t, DefaultInsightThresholds(), "filesystem")
 
-	response, err := http.Get(server.URL + "/api/v1/insights/unapproved-mcp")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = response.Body.Close() }()
-	if response.StatusCode != http.StatusOK {
-		t.Fatalf("unapproved-mcp status = %d", response.StatusCode)
-	}
-	var body unapprovedMCPResponse
-	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
-		t.Fatal(err)
-	}
 	if body.Data.Outcome != governance.OutcomeIndeterminate {
 		t.Fatalf("expected indeterminate outcome, got %q", body.Data.Outcome)
 	}

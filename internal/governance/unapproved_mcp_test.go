@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/santhosh-tekuri/jsonschema/v6"
+
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
@@ -27,7 +29,7 @@ func mcpConnectionEvent(id string, event map[string]any) canonical.Event {
 	}
 }
 
-func TestUnapprovedMCPAllowsListedServer(t *testing.T) {
+func TestUnapprovedMCPAllowlistedServerPasses(t *testing.T) {
 	report := UnapprovedMCPFromEvents([]canonical.Event{
 		mcpConnectionEvent("connected", map[string]any{
 			"server_fingerprint": "mcp:hmac:filesystem",
@@ -147,17 +149,24 @@ func TestUnapprovedMCPDecisionValidatesAgainstPolicySchema(t *testing.T) {
 		"indeterminate_no_servers": UnapprovedMCPFromEvents(nil, []string{"filesystem"}),
 	} {
 		t.Run(name, func(t *testing.T) {
-			raw, err := json.Marshal(report.Decision())
-			if err != nil {
-				t.Fatalf("marshal decision: %v", err)
-			}
-			var decoded any
-			if err := json.Unmarshal(raw, &decoded); err != nil {
-				t.Fatalf("decode decision: %v", err)
-			}
-			if err := schema.Validate(decoded); err != nil {
-				t.Fatalf("decision must satisfy policy schema: %v", err)
-			}
+			requireDecisionMatchesSchema(t, schema, report.Decision())
 		})
+	}
+}
+
+// requireDecisionMatchesSchema marshals a policy decision and asserts it
+// validates against the compiled policy schema.
+func requireDecisionMatchesSchema(t *testing.T, schema *jsonschema.Schema, decision PolicyDecision) {
+	t.Helper()
+	raw, err := json.Marshal(decision)
+	if err != nil {
+		t.Fatalf("marshal decision: %v", err)
+	}
+	var decoded any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatalf("decode decision: %v", err)
+	}
+	if err := schema.Validate(decoded); err != nil {
+		t.Fatalf("decision must satisfy policy schema: %v", err)
 	}
 }

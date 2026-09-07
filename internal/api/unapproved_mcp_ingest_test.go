@@ -51,36 +51,18 @@ func TestUnapprovedMCPInsightIngestEndToEnd(t *testing.T) {
 
 func rawClaudeUnapprovedMCPOTLP(t *testing.T) string {
 	t.Helper()
-	return string(marshalJSON(t, map[string]any{
-		"resourceLogs": []any{
-			map[string]any{
-				"resource": map[string]any{
-					"attributes": []any{
-						map[string]any{"key": "service.name", "value": map[string]any{"stringValue": "claude-code"}},
-						map[string]any{"key": "service.version", "value": map[string]any{"stringValue": "2.1.263"}},
-					},
-				},
-				"scopeLogs": []any{
-					map[string]any{
-						"logRecords": []any{
-							map[string]any{"attributes": []any{
-								map[string]any{"key": "event.name", "value": map[string]any{"stringValue": "mcp_server_connection"}},
-								map[string]any{"key": "event.timestamp", "value": map[string]any{"stringValue": "2026-09-06T19:00:00.000Z"}},
-								map[string]any{"key": "event.sequence", "value": map[string]any{"intValue": "1"}},
-								map[string]any{"key": "session.id", "value": map[string]any{"stringValue": "tiq-canary-session"}},
-								map[string]any{"key": "status", "value": map[string]any{"stringValue": "connected"}},
-								map[string]any{"key": "transport_type", "value": map[string]any{"stringValue": "stdio"}},
-								map[string]any{"key": "server_scope", "value": map[string]any{"stringValue": "user"}},
-								map[string]any{"key": "is_plugin", "value": map[string]any{"boolValue": false}},
-								map[string]any{"key": "server_name", "value": map[string]any{"stringValue": "unapproved-rogue-server"}},
-								map[string]any{"key": "user.id", "value": map[string]any{"stringValue": "synthetic-user-hash"}},
-								map[string]any{"key": "organization.id", "value": map[string]any{"stringValue": "synthetic-org"}},
-								map[string]any{"key": "prompt.id", "value": map[string]any{"stringValue": "synthetic-prompt"}},
-							}},
-						},
-					},
-				},
-			},
-		},
-	}))
+	return claudeOTLPLogPayload(t, []any{
+		otlpStringAttr("event.name", "mcp_server_connection"),
+		otlpStringAttr("event.timestamp", "2026-09-06T19:00:00.000Z"),
+		map[string]any{"key": "event.sequence", "value": map[string]any{"intValue": "1"}},
+		otlpStringAttr("session.id", "tiq-canary-session"),
+		otlpStringAttr("status", "connected"),
+		otlpStringAttr("transport_type", "stdio"),
+		otlpStringAttr("server_scope", "user"),
+		map[string]any{"key": "is_plugin", "value": map[string]any{"boolValue": false}},
+		otlpStringAttr("server_name", "unapproved-rogue-server"),
+		otlpStringAttr("user.id", "synthetic-user-hash"),
+		otlpStringAttr("organization.id", "synthetic-org"),
+		otlpStringAttr("prompt.id", "synthetic-prompt"),
+	})
 }
