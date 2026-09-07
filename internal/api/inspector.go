@@ -19,6 +19,13 @@ func newSanitizedInspector(sanitizer *privacy.Sanitizer) *sanitizedInspector {
 	return &sanitizedInspector{sanitizer: sanitizer}
 }
 
+func (i *sanitizedInspector) captureValue(raw map[string]any) {
+	result := i.sanitizer.Sanitize(raw)
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.value, i.provenance = result.Value, result.Provenance
+}
+
 func (i *sanitizedInspector) capture(payload map[string]json.RawMessage) {
 	raw := make(map[string]any, len(payload))
 	for key, value := range payload {
@@ -27,10 +34,7 @@ func (i *sanitizedInspector) capture(payload map[string]json.RawMessage) {
 			raw[key] = decoded
 		}
 	}
-	result := i.sanitizer.Sanitize(raw)
-	i.mu.Lock()
-	defer i.mu.Unlock()
-	i.value, i.provenance = result.Value, result.Provenance
+	i.captureValue(raw)
 }
 
 func (i *sanitizedInspector) handler(w http.ResponseWriter, _ *http.Request) {

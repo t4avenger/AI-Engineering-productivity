@@ -1,0 +1,51 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "request_id": "cursor-agent:fixture",
+    "session_id": "cursor-agent:fixture",
+    "provider": "cursor",
+    "tool": "cursor-agent",
+    "model": "GPT-5.2 Medium",
+    "started_at": "2026-09-06T18:00:24.614Z",
+    "completed_at": "2026-09-06T18:00:30Z",
+    "duration_ms": 5386,
+    "input_tokens": 8402,
+    "output_tokens": 19,
+    "cached_input_tokens": 5504,
+    "reasoning_tokens": null,
+    "result": "success",
+    "error_code": null,
+    "provenance": "observed",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "cursor-agent:fixture",
+        "ordering_key": "01788717624614000000:cursor-agent:fixture",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Cursor Agent fixtures have no reviewed task-boundary signal"
+        }
+      },
+      "cursor": {
+        "usage": {
+          "cache_write_tokens": 0
+        }
+      },
+      "init": {},
+      "outcome_contract": {
+        "confidence": "observed",
+        "duration_ms": 5386,
+        "input_tokens": 8402,
+        "model": "GPT-5.2 Medium",
+        "output_tokens": 19,
+        "source": "provider_completion",
+        "status": "success"
+      },
+      "result": {},
+      "source_type": "local_cli_stream_json",
+      "timestamps": {
+        "completed_at": "captured_at",
+        "started_at": "derived_from_duration"
+      }
+    }
+  }
+]

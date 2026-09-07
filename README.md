@@ -31,7 +31,7 @@ browser session on loopback (use the `localhost` hostname so browsers accept the
 Secure cookie over local HTTP). The daemon exposes HTML dashboard routes plus
 `GET /api/v1/health`, `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}`,
 `DELETE /api/v1/sessions/{id}`, `DELETE /api/v1/sessions`, `POST /v1/logs`,
-`POST /v1/traces`, `POST /v1/metrics`, and `GET /api/v1/ingest/counters`.
+`POST /v1/traces`, `POST /v1/metrics`, `POST /v1/cursor-agent`, and `GET /api/v1/ingest/counters`.
 
 ## OTLP/HTTP ingest
 
@@ -52,6 +52,25 @@ was accepted.
 Raw OTLP payloads are never logged or persisted. The supported, observed Codex
 and Claude Code OTLP shapes are normalised and sanitised before canonical
 events are saved locally.
+
+## Cursor Agent live ingest
+
+Cursor Agent stream-json output does not currently arrive via OTLP logs in this
+repository’s reviewed captures. To include Cursor runs in the local daemon,
+TelemetryIQ supports:
+
+- `POST /v1/cursor-agent`
+
+The helper script `scripts/ingest-cursor-agent-stream-json.py` reads Cursor
+Agent `--output-format stream-json` from stdin, extracts only the privacy-safe
+`init` + `result` records, and posts them to the daemon.
+
+For convenience, the wrapper `scripts/cursor-agent-tiq` runs Cursor Agent and
+automatically ingests the safe subset into the daemon:
+
+```bash
+TELEMETRYIQ_DAEMON=http://localhost:8080 scripts/cursor-agent-tiq "say ok"
+```
 
 ## Codex fixture normalisation
 
