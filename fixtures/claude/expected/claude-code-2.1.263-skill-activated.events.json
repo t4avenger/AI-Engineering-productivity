@@ -1,7 +1,7 @@
 [
   {
     "schema_version": "0.1.0",
-    "event_id": "claude-code:fixture:9",
+    "event_id": "claude-code:synthetic-session-id:9",
     "event_type": "skill_activated",
     "occurred_at": "2026-09-06T14:50:00.962Z",
     "received_at": "2026-09-06T14:50:01Z",
@@ -11,7 +11,7 @@
     "source_version": "2.1.263",
     "actor_id": "unavailable",
     "device_id": "unavailable",
-    "session_id": "claude-code:fixture",
+    "session_id": "claude-code:synthetic-session-id",
     "task_id": null,
     "repository_id": null,
     "privacy_level": "operational",
@@ -34,8 +34,8 @@
     },
     "provider_extensions": {
       "correlation": {
-        "dedup_key": "claude-code:fixture:9",
-        "ordering_key": "01788706200962000000:claude-code:fixture:9",
+        "dedup_key": "claude-code:synthetic-session-id:9",
+        "ordering_key": "01788706200962000000:claude-code:synthetic-session-id:9",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Claude Code event telemetry has no reviewed task-boundary signal"

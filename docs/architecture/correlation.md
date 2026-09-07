@@ -12,7 +12,7 @@ codex:<traceId>:<spanId>
 
 The same value is used as the canonical `event_id` and is copied to `provider_extensions.correlation.dedup_key` so downstream storage, diagnostics, and tests can explain why a duplicate collapsed. Replaying a fixture twice must not create a second observation. If two source spans present the same trace/span identity, the normaliser sorts first and keeps one deterministic canonical event for that key.
 
-Codex OTLP log records observed in 0.145.0 do not expose a reviewed stable trace or session identifier. Log-derived `canonical.ModelInteraction` records therefore continue to use the local installation fingerprint described by the Codex normaliser; no raw conversation identifier is retained. Their deduplication key is the `request_id`, which is copied to `provider_extensions.correlation.dedup_key`.
+Codex OTLP log records observed in 0.145.0 can carry `conversation.id`. When retained by the local-only privacy policy, log-derived events and `canonical.ModelInteraction` records use `codex:<conversation.id>` as the session ID. Records without a retained conversation ID fall back to the local installation fingerprint described by the Codex normaliser. Their deduplication key remains the `request_id`, which is copied to `provider_extensions.correlation.dedup_key`.
 
 ## Ordering
 

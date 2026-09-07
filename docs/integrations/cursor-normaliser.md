@@ -43,8 +43,8 @@ responses, no source code, no file paths, no command arguments).
 
 The following signals are promoted because reviewed fixtures prove them:
 
-- **Session boundaries (partial)**: `result.session_id` is fingerprinted into a
-  stable `session_id` (installation-scoped HMAC).
+- **Session boundaries (partial)**: `result.session_id` is retained as the
+  provider-prefixed native local correlation key `cursor-agent:<session_id>`.
 - **Token usage (supported)**: `result.usage.inputTokens` and
   `result.usage.outputTokens` → `ModelInteraction.input_tokens` /
   `ModelInteraction.output_tokens` (nullable when absent; never fabricated 0).
@@ -72,9 +72,9 @@ explicitly unavailable/unknown and are never fabricated):
 
 ## Privacy handling
 
-- **No raw identifiers are persisted**: `session_id` and `request_id` are reduced
-  to an installation-scoped HMAC fingerprint before they appear in canonical
-  output.
+- **Session IDs are retained locally**: `session_id` appears in canonical output
+  as `cursor-agent:<session_id>` under the local-only provider-session exception.
+  `request_id` remains protected with an installation-scoped HMAC fingerprint.
 - **No content is retained**: the adapter relies on the shared privacy
   sanitiser and on `fixture.Validate` to reject prohibited fields.
 

@@ -88,10 +88,13 @@ func TestSanitizeRemovesSensitiveOTLPAttributeValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, prohibited := range []string{"synthetic@example.test", "synthetic-account", "synthetic-host", "synthetic-conversation", "synthetic body"} {
+	for _, prohibited := range []string{"synthetic@example.test", "synthetic-account", "synthetic-host", "synthetic body"} {
 		if strings.Contains(string(persisted), prohibited) {
 			t.Fatalf("prohibited OTLP value retained: %q", prohibited)
 		}
+	}
+	if !strings.Contains(string(persisted), "synthetic-conversation") {
+		t.Fatalf("provider conversation ID should be retained in local-only mode: %s", persisted)
 	}
 }
 

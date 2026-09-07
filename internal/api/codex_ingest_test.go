@@ -61,6 +61,9 @@ func TestCodexLogsIngestEndToEnd(t *testing.T) {
 	if session.Provider != "openai" || session.Tool != "codex" {
 		t.Fatalf("session provider/tool = %q/%q", session.Provider, session.Tool)
 	}
+	if session.SessionID != "codex:synthetic-conversation" {
+		t.Fatalf("session id = %q, want native provider conversation ID", session.SessionID)
+	}
 	model, _ := session.Attributes["model"].(string)
 	if model != "tiq-live-codex-model" {
 		t.Fatalf("session model = %#v, want tiq-live-codex-model", session.Attributes["model"])
@@ -76,7 +79,6 @@ func TestCodexLogsIngestEndToEnd(t *testing.T) {
 			"tiq-canary-provider-extension",
 			"tiq-canary-api-key",
 			"synthetic@example.test",
-			"synthetic-conversation",
 			"synthetic body",
 		},
 		marshalJSON(t, sessions))

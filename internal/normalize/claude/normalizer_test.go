@@ -10,8 +10,8 @@ import (
 	"testing"
 )
 
-// stubFingerprint keeps fingerprinted identifiers deterministic for golden
-// comparison. A real caller supplies the installation HMAC fingerprint.
+// stubFingerprint keeps protected identifier fingerprints deterministic for
+// golden comparison. A real caller supplies the installation HMAC fingerprint.
 func stubFingerprint([]byte) string { return "fixture" }
 
 func TestNormalizeEventsGolden(t *testing.T) {
@@ -34,7 +34,7 @@ func TestNormalizeEventsGolden(t *testing.T) {
 	assertMatchesGolden(t, "claude-code-2.1.251-otlp-events.events.json", first)
 }
 
-func TestNormalizeEventsFingerprintsSessionAndOmitsFabricatedSkillUnavailable(t *testing.T) {
+func TestNormalizeEventsKeepsNativeSessionAndOmitsFabricatedSkillUnavailable(t *testing.T) {
 	events, err := NormalizeEvents(readFixture(t, "claude-code-2.1.251-otlp-events.json"), stubFingerprint)
 	if err != nil {
 		t.Fatalf("normalise: %v", err)
@@ -43,8 +43,8 @@ func TestNormalizeEventsFingerprintsSessionAndOmitsFabricatedSkillUnavailable(t 
 		t.Fatalf("event count = %d, want 2", len(events))
 	}
 	for _, event := range events {
-		if event.SessionID != "claude-code:fixture" {
-			t.Fatalf("session id = %q, want fingerprint", event.SessionID)
+		if event.SessionID != "claude-code:synthetic-session-id" {
+			t.Fatalf("session id = %q, want native provider ID", event.SessionID)
 		}
 		if _, stamped := event.ProviderExtensions["skill_detection"]; stamped {
 			t.Fatalf("non-skill events must not stamp skill_detection, got %v", event.ProviderExtensions["skill_detection"])
@@ -54,8 +54,8 @@ func TestNormalizeEventsFingerprintsSessionAndOmitsFabricatedSkillUnavailable(t 
 			t.Fatalf("unavailable_fields = %v", event.Attributes["unavailable_fields"])
 		}
 		preserved := event.ProviderExtensions["event"].(map[string]any)
-		if _, leaked := preserved["session_id"]; leaked {
-			t.Fatal("raw session_id must not be preserved verbatim")
+		if _, duplicated := preserved["session_id"]; duplicated {
+			t.Fatal("session_id should be promoted to canonical identity, not duplicated in provider_extensions.event")
 		}
 	}
 	// The connection event additionally lacks model/token identity.

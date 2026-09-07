@@ -75,8 +75,8 @@ func sampleModelInteraction(fingerprint func([]byte) string, raw map[string]any)
 		return canonical.ModelInteraction{}, false, err
 	}
 
-	sessionFingerprint := "claude-code:" + fingerprint([]byte(sessionID))
-	requestID := sessionFingerprint + ":" + sequenceSuffix(raw, completed)
+	nativeSessionID := normalize.ProviderNativeSessionID("claude-code:", sessionID, fingerprint)
+	requestID := nativeSessionID + ":" + sequenceSuffix(raw, completed)
 	if rawRequest := normalize.OptionalString(raw, "request_id"); rawRequest != nil {
 		requestID = "claude-code:" + fingerprint([]byte(*rawRequest))
 	}
@@ -95,7 +95,7 @@ func sampleModelInteraction(fingerprint func([]byte) string, raw map[string]any)
 	interaction := canonical.ModelInteraction{
 		SchemaVersion:      canonical.RecordSchemaVersion,
 		RequestID:          requestID,
-		SessionID:          sessionFingerprint,
+		SessionID:          nativeSessionID,
 		Provider:           provider,
 		Tool:               tool,
 		Model:              model,

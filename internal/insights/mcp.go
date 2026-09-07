@@ -93,7 +93,7 @@ func MCPInventoryFromEvents(events []canonical.Event) MCPInventory {
 				servers[use.fingerprint] = &MCPServer{
 					ServerFingerprint: use.fingerprint,
 					ServerName:        use.serverName,
-					IdentityState:     "fingerprinted",
+					IdentityState:     usageIdentityState(use.serverName),
 					Provider:          event.Provider,
 					Tool:              event.Tool,
 					SessionID:         event.SessionID,
@@ -188,7 +188,7 @@ func mcpConnection(event canonical.Event) (MCPServer, bool) {
 		return MCPServer{}, false
 	}
 	rawEvent, _ := event.ProviderExtensions["event"].(map[string]any)
-	fingerprint, identityState := serverFingerprint(event, rawEvent)
+	fingerprint, identityState := serverIdentity(event, rawEvent)
 	return MCPServer{
 		ServerFingerprint: fingerprint,
 		ServerName:        stringValue(rawEvent, "server_name", ""),
@@ -257,12 +257,27 @@ func firstSortedValue(values map[string]struct{}) string {
 	return sorted[0]
 }
 
-func serverFingerprint(event canonical.Event, rawEvent map[string]any) (string, string) {
+func serverIdentity(event canonical.Event, rawEvent map[string]any) (string, string) {
+	serverName := stringValue(rawEvent, "server_name", "")
 	if fingerprint, ok := hashedValue(rawEvent); ok {
-		return fingerprint, "fingerprinted"
+		return fingerprint, usageIdentityState(serverName)
 	}
 	sum := sha256.Sum256([]byte(event.EventID))
-	return "connection:" + hex.EncodeToString(sum[:16]), "unavailable"
+	return "connection:" + hex.EncodeToString(sum[:16]), identityStateForName(serverName)
+}
+
+func usageIdentityState(name string) string {
+	if strings.TrimSpace(name) != "" {
+		return "provider_reported"
+	}
+	return "fingerprinted"
+}
+
+func identityStateForName(name string) string {
+	if strings.TrimSpace(name) != "" {
+		return "provider_reported"
+	}
+	return "unavailable"
 }
 
 func hashedValue(values map[string]any) (string, bool) {

@@ -16,7 +16,7 @@ func TestNormalizeCapabilityProbeYieldsNoEvents(t *testing.T) {
 	}
 }
 
-func TestNormalizeFingerprintsIDsAndDoesNotLeakRawIDs(t *testing.T) {
+func TestNormalizeKeepsNativeSessionAndDoesNotLeakProtectedIDs(t *testing.T) {
 	events, err := Normalize(readFixture(t, "cursor-agent-2026.05.16-0338208-print-result.json"), stubFingerprint)
 	if err != nil {
 		t.Fatalf("normalise: %v", err)
@@ -25,13 +25,13 @@ func TestNormalizeFingerprintsIDsAndDoesNotLeakRawIDs(t *testing.T) {
 		t.Fatalf("event count = %d, want 1", len(events))
 	}
 	event := events[0]
-	if event.SessionID != "cursor-agent:fixture" {
-		t.Fatalf("session id = %q, want fingerprint", event.SessionID)
+	if event.SessionID != "cursor-agent:synthetic-session-id" {
+		t.Fatalf("session id = %q, want native provider ID", event.SessionID)
 	}
 	serialized, _ := json.Marshal(events)
-	for _, leaked := range []string{"synthetic-session-id", "synthetic-request-id"} {
+	for _, leaked := range []string{"synthetic-request-id"} {
 		if strings.Contains(string(serialized), leaked) {
-			t.Fatalf("raw identifier leaked into canonical output: %q", leaked)
+			t.Fatalf("protected identifier leaked into canonical output: %q", leaked)
 		}
 	}
 }

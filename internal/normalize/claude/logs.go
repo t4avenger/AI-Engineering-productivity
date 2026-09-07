@@ -57,20 +57,19 @@ var wireKeyMapping = map[string]string{
 	"request.id":      "request_id",
 }
 
-// droppedKeyPrefixes are attribute keys that identify the operator, machine, or
-// conversation rather than behaviour. They are dropped here so they never reach
+// droppedKeyPrefixes are attribute keys that identify the operator or machine
+// rather than behaviour. They are dropped here so they never reach
 // provider_extensions.event, belt-and-braces with the upstream sanitiser (which
-// already removes user.email/user.account_id but retains user.id, session.id,
-// organization.id, and user.account_uuid).
+// already removes user.email/user.account_id but retains provider session IDs
+// under the local-only exception).
 var droppedKeyPrefixes = []string{"user.", "organization.", "terminal."}
 
 // droppedKeys are individual identifier attributes with no behavioural value.
 var droppedKeys = map[string]struct{}{"prompt.id": {}, "message.uuid": {}}
 
-// serverIdentityKeys carry a raw MCP server identity. Any such value is reduced
-// to an installation HMAC fingerprint under server_fingerprint (which the MCP
-// inventory reads) and the raw value is dropped, so a server name or path is
-// never persisted verbatim.
+// serverIdentityKeys carry a provider-reported MCP server identity. The name is
+// retained for local inventory display and a fingerprint is also retained for
+// correlation fallback.
 var serverIdentityKeys = []string{"server_name", "mcp_server_name", "server.name", "mcp.server_name"}
 
 // NormalizeLogs maps a raw, already-sanitised Claude Code OTLP/HTTP log payload
@@ -138,8 +137,9 @@ func normaliseResourceLogs(resource resourceLog, receivedAt time.Time, fingerpri
 
 // sampleEventFromRecord reduces one OTLP log record to the underscore-keyed
 // sample-event map normaliseSampleEvent consumes: it maps the dotted semantic
-// keys, drops operator/machine/conversation identifiers, fingerprints any raw
-// MCP server identity, and forwards the remaining behaviour attributes verbatim.
+// keys, drops operator/machine identifiers, retains provider session and MCP
+// server display identities allowed by local policy, and forwards the remaining
+// behaviour attributes verbatim.
 func sampleEventFromRecord(record logRecord, fingerprint func([]byte) string) map[string]any {
 	sample := make(map[string]any, len(record.Attributes))
 	for _, attribute := range record.Attributes {

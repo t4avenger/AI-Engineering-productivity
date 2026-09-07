@@ -18,7 +18,6 @@ var canaryTokens = []string{
 	"tiq-canary-arguments",
 	"tiq-canary-account",
 	"tiq-canary-embedded",
-	"tiq-canary-session",
 }
 
 // TestClaudeAdapterHonoursRedactionBoundary proves the adapter never emits
@@ -37,7 +36,7 @@ func TestClaudeAdapterHonoursRedactionBoundary(t *testing.T) {
 		"payload": map[string]any{
 			"source_type": "otlp_http_json_logs",
 			"sample_events": []any{map[string]any{
-				"event_name": "api_request", "session_id": "session-tiq-canary-session", "event_sequence": float64(9),
+				"event_name": "api_request", "session_id": "synthetic-session-canary-safe", "event_sequence": float64(9),
 				"event_timestamp": "2026-08-31T13:37:07.791Z", "model": "claude-opus-4-8",
 				"input_tokens": float64(2), "output_tokens": float64(4), "cache_read_tokens": float64(0),
 				"duration_ms": float64(3077),
@@ -66,9 +65,12 @@ func TestClaudeAdapterHonoursRedactionBoundary(t *testing.T) {
 		t.Fatalf("expected one event and one record, got %d/%d", len(events), len(records))
 	}
 
-	// The sanitiser removes/redacts content fields but retains session_id by
-	// policy; the adapter is what fingerprints it, so the raw session canary is
-	// expected to survive into `safe` and must be gone only from adapter output.
+	if events[0].SessionID != "claude-code:synthetic-session-canary-safe" || records[0].SessionID != events[0].SessionID {
+		t.Fatalf("native session ID not retained consistently: event=%q record=%q", events[0].SessionID, records[0].SessionID)
+	}
+
+	// The sanitiser removes/redacts content fields while retaining local provider
+	// session IDs by policy; canaries in sensitive fields must still be absent.
 	for _, value := range []any{events, records} {
 		data, err := json.Marshal(value)
 		if err != nil {

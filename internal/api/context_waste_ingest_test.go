@@ -18,7 +18,7 @@ func TestContextWasteInsightIngestEndToEnd(t *testing.T) {
 	}
 
 	assertNoRawIdentifiers(t,
-		[]string{"tiq-canary-session", "tiq-canary@example.test", "tiq-canary-api-key"},
+		[]string{"tiq-canary@example.test", "tiq-canary-api-key"},
 		marshalJSON(t, waste))
 }
 

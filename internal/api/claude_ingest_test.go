@@ -65,7 +65,7 @@ func TestClaudeLogsIngestEndToEnd(t *testing.T) {
 
 	// Sensitive identifiers still do not survive the round trip through the read API.
 	assertNoRawIdentifiers(t,
-		[]string{"tiq-canary-session", "tiq-canary@example.test", "tiq-canary-api-key"},
+		[]string{"tiq-canary@example.test", "tiq-canary-api-key"},
 		marshalJSON(t, sessions), marshalJSON(t, inventory))
 }
 
@@ -111,6 +111,9 @@ func requireClaudeSession(t *testing.T, repository storage.Repository) []canonic
 	}
 	if sessions[0].Provider != "anthropic" || sessions[0].Tool != "claude-code" {
 		t.Fatalf("session provider/tool = %q/%q", sessions[0].Provider, sessions[0].Tool)
+	}
+	if sessions[0].SessionID != "claude-code:tiq-canary-session" {
+		t.Fatalf("session id = %q, want native provider ID", sessions[0].SessionID)
 	}
 	return sessions
 }
