@@ -63,6 +63,20 @@ func TestMCPInventoryReportsInvocationOnlyMCPUse(t *testing.T) {
 	}
 }
 
+func TestMCPInventoryMarksNamedFingerprintConnectionUnused(t *testing.T) {
+	inventory := MCPInventoryFromEvents([]canonical.Event{
+		testMCPEvent("connected", "mcp_server_connection", map[string]any{}, map[string]any{"event": map[string]any{"server_fingerprint": "mcp:hmac:filesystem", "server_name": "filesystem", "status": "connected"}}),
+	})
+
+	if inventory.Totals.ConnectedServers != 1 || inventory.Totals.UnusedServers != 1 || inventory.Totals.UsageUnavailableServers != 0 {
+		t.Fatalf("totals = %#v", inventory.Totals)
+	}
+	server := inventory.Servers[0]
+	if server.IdentityState != "provider_reported" || server.UsageState != "not_observed" || server.ContextWasteState != "connected_but_unused" {
+		t.Fatalf("server = %#v", server)
+	}
+}
+
 func TestMCPInventoryKeepsUsageUnavailableWhenIdentityIsUnavailable(t *testing.T) {
 	inventory := MCPInventoryFromEvents([]canonical.Event{
 		testMCPEvent("connected", "mcp_server_connection", map[string]any{}, map[string]any{"event": map[string]any{"status": "connected", "transport_type": "stdio"}}),

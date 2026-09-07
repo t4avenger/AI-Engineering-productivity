@@ -141,7 +141,7 @@ func annotatedServer(server *MCPServer, used map[string]mcpUsage, tokensBySessio
 		server.ToolNames = sortedSet(usage.toolNames)
 		server.UsageState = "observed"
 		server.ContextWasteState = "used"
-	} else if server.IdentityState == "fingerprinted" {
+	} else if hasCorrelatableMCPIdentity(server.ServerFingerprint) {
 		server.UsageState = "not_observed"
 		server.ContextWasteState = "connected_but_unused"
 	} else {
@@ -155,6 +155,11 @@ func annotatedServer(server *MCPServer, used map[string]mcpUsage, tokensBySessio
 	server.RequestCacheCreatedTokens = context.cacheCreated
 	server.TokenContextLabel = tokenContextLabel()
 	return *server
+}
+
+func hasCorrelatableMCPIdentity(fingerprint string) bool {
+	fingerprint = strings.TrimSpace(fingerprint)
+	return fingerprint != "" && !strings.HasPrefix(fingerprint, "connection:")
 }
 
 func mcpTotals(servers []MCPServer) MCPTotals {
