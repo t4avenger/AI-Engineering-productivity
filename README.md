@@ -65,6 +65,13 @@ The helper script `scripts/ingest-cursor-agent-stream-json.py` reads Cursor
 Agent `--output-format stream-json` from stdin, extracts only the privacy-safe
 `init` + `result` records, and posts them to the daemon.
 
+For convenience, the wrapper `scripts/cursor-agent-tiq` runs Cursor Agent and
+automatically ingests the safe subset into the daemon:
+
+```bash
+TELEMETRYIQ_DAEMON=http://localhost:8080 scripts/cursor-agent-tiq "say ok"
+```
+
 ## Codex fixture normalisation
 
 The Codex adapter supports reviewed trace fixtures and the observed Codex CLI
