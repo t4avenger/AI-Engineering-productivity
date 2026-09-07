@@ -15,6 +15,7 @@ import (
 const (
 	codexLogsFixture   = "codex/observed-sanitised/codex-0.145.0-logs.json"
 	claudeEventFixture = "claude/observed-sanitised/claude-code-2.1.251-otlp-events.json"
+	cursorEventFixture = "cursor/observed-sanitised/cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.json"
 )
 
 // stubFingerprint keeps record and session identifiers deterministic; the suite
@@ -55,6 +56,14 @@ func codexReviewedInput(t *testing.T) []byte {
 func claudeReviewedInput(t *testing.T) []byte {
 	t.Helper()
 	return readFixture(t, claudeEventFixture)
+}
+
+// cursorReviewedInput returns the full reviewed Cursor Agent fixture wrapper,
+// the byte shape the Cursor adapters consume (they validate the wrapper
+// themselves).
+func cursorReviewedInput(t *testing.T) []byte {
+	t.Helper()
+	return readFixture(t, cursorEventFixture)
 }
 
 // sanitise runs a provider-shaped payload through the real privacy sanitiser and
@@ -151,6 +160,56 @@ func claudeCanaryPayload() map[string]any {
 					"user_email":        canaryMarker + "-email-leak@example.test",
 					"arguments":         "--secret " + canaryMarker + "-arguments-leak",
 					"note":              "token=" + canaryMarker + "-secret-leak",
+				},
+			},
+		},
+	}
+}
+
+// cursorCanaryPayload builds a full Cursor Agent fixture wrapper carrying the
+// canaryMarker across sanitiser-handled fields. It stays eligible (usage tokens
+// present) so a ModelInteraction record is produced, proving the marker is
+// stripped without suppressing the whole record.
+func cursorCanaryPayload() map[string]any {
+	return map[string]any{
+		"fixture_version":       1,
+		"fixture_origin":        "observed-sanitised",
+		"provider":              "cursor",
+		"tool":                  "cursor-agent",
+		"tool_version":          "2026.09.02-c22c1a3",
+		"captured_at":           "2026-09-06T18:00:30Z",
+		"sanitisation_reviewed": true,
+		"payload": map[string]any{
+			"source_type": "local_cli_stream_json",
+			"capture": map[string]any{
+				"workspace":    "isolated_tmp",
+				"mode":         "ask",
+				"user.email":   canaryMarker + "-email-leak@example.test",
+				"arguments":    "--secret " + canaryMarker + "-arguments-leak",
+				"note":         "token=" + canaryMarker + "-secret-leak",
+				"prompt":       canaryMarker + "-prompt-leak",
+				"response":     canaryMarker + "-response-leak",
+				"account_id":   canaryMarker + "-account-leak",
+				"custom_field": "ok",
+			},
+			"init": map[string]any{
+				"type":       "system",
+				"subtype":    "init",
+				"model":      "GPT-5.2 Medium",
+				"session_id": "canary-session",
+			},
+			"result": map[string]any{
+				"type":        "result",
+				"subtype":     "success",
+				"is_error":    false,
+				"duration_ms": 1000,
+				"session_id":  "canary-session",
+				"request_id":  "canary-request",
+				"usage": map[string]any{
+					"inputTokens":      123,
+					"outputTokens":     4,
+					"cacheReadTokens":  5,
+					"cacheWriteTokens": 6,
 				},
 			},
 		},

@@ -16,6 +16,7 @@ import (
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/normalize/claude"
 	"github.com/wayne/telemetryiq/internal/normalize/codex"
+	"github.com/wayne/telemetryiq/internal/normalize/cursor"
 )
 
 // signalState mirrors a capability-matrix cell for one canonical, promotable
@@ -87,7 +88,7 @@ var fixtureReceivedAt = time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
 // adapters returns every provider adapter the suite runs against. Adding a
 // provider here subjects it to the full capability contract.
 func adapters() []adapter {
-	return []adapter{codexAdapter(), claudeAdapter()}
+	return []adapter{codexAdapter(), claudeAdapter(), cursorAdapter()}
 }
 
 func codexAdapter() adapter {
@@ -129,5 +130,24 @@ func claudeAdapter() adapter {
 		records:  claude.ExtractModelInteractions,
 		reviewed: claudeReviewedInput,
 		canary:   claudeCanaryPayload,
+	}
+}
+
+func cursorAdapter() adapter {
+	return adapter{
+		name: "cursor-agent",
+		// Matrix (docs/integrations/capability-matrix.md), Cursor column.
+		profile: profile{
+			modelIdentity:     statePartial,
+			inputOutputTokens: stateSupported,
+			cachedTokens:      stateSupported,
+			reasoningTokens:   stateUnknown,
+			taskOutcome:       statePartial,
+			promptResponse:    stateUnsupported,
+		},
+		events:   cursor.Normalize,
+		records:  cursor.ExtractModelInteractions,
+		reviewed: cursorReviewedInput,
+		canary:   cursorCanaryPayload,
 	}
 }

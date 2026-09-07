@@ -1,0 +1,73 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "cursor-agent:fixture",
+    "event_type": "result",
+    "occurred_at": "2026-08-31T13:42:00Z",
+    "received_at": "2026-08-31T13:42:00Z",
+    "provider": "cursor",
+    "tool": "cursor-agent",
+    "source_schema": "fixture",
+    "source_version": "2026.05.16-0338208",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "cursor-agent:fixture",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "input_token_count": 16941,
+      "output_token_count": 1,
+      "unavailable_fields": [
+        "tool_calls",
+        "mcp_calls",
+        "skill_invocations",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "model"
+      ]
+    },
+    "provider_extensions": {
+      "capture": {
+        "accepted_payloads_after_capture": 2,
+        "accepted_payloads_before_capture": 2,
+        "mode": "ask",
+        "otlp_http_json_logs": "not_observed",
+        "telemetryiq_endpoint": "loopback_development_inspector",
+        "trust_scope": "isolated_tmp",
+        "workspace": "isolated_tmp"
+      },
+      "correlation": {
+        "dedup_key": "cursor-agent:fixture",
+        "ordering_key": "01788183720000000000:cursor-agent:fixture",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Cursor Agent fixtures have no reviewed task-boundary signal"
+        }
+      },
+      "cursor": {
+        "usage": {
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0
+        }
+      },
+      "outcome_contract": {
+        "confidence": "observed",
+        "duration_ms": 8897,
+        "input_tokens": 16941,
+        "output_tokens": 1,
+        "source": "provider_completion",
+        "status": "success"
+      },
+      "result": {},
+      "source_type": "local_cli_print_json"
+    }
+  }
+]
