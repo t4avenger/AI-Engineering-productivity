@@ -78,3 +78,25 @@ explicitly unavailable/unknown and are never fabricated):
 - **No content is retained**: the adapter relies on the shared privacy
   sanitiser and on `fixture.Validate` to reject prohibited fields.
 
+## Live ingest into the daemon (local-only)
+
+Cursor Agent does **not** currently emit OTLP logs to `POST /v1/logs` in this
+repository’s reviewed captures. To still include Cursor runs in the local
+daemon, TelemetryIQ supports a dedicated local-only ingest path:
+
+- `POST /v1/cursor-agent`
+
+This endpoint accepts a **minimal** Cursor envelope (model/session init + run
+result usage/outcome) and rejects unexpected fields so prompt/response content
+is not ingested by default.
+
+To ingest a real Cursor run, you can use the helper script:
+
+```bash
+cursor-agent agent --print --output-format stream-json --mode ask --trust "ok" \
+  | python3 scripts/ingest-cursor-agent-stream-json.py --daemon http://localhost:8080
+```
+
+Only the `system/init` and `result` records are sent; `user`/`assistant` message
+records are ignored.
+

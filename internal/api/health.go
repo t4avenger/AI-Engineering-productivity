@@ -44,6 +44,7 @@ func sessionReader(readers []storage.SessionReader) storage.SessionReader {
 
 func newHandler(logger *slog.Logger, inspector *sanitizedInspector, repository storage.Repository, sanitizer *privacy.Sanitizer, sessions storage.SessionReader, thresholds InsightThresholds) http.Handler {
 	ingest := newOTLPHTTPIngest(inspector, sanitizer, repository)
+	cursorIngest := newCursorAgentIngest(inspector, sanitizer, repository)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", healthHandler(logger))
 	sessionAPI := newSessionAPI(sessions, thresholds)
@@ -63,6 +64,7 @@ func newHandler(logger *slog.Logger, inspector *sanitizedInspector, repository s
 	mux.HandleFunc("POST /v1/traces", ingest.tracesHandler)
 	mux.HandleFunc("POST /v1/metrics", ingest.metricsHandler)
 	mux.HandleFunc("POST /v1/logs", ingest.logsHandler)
+	mux.HandleFunc("POST /v1/cursor-agent", cursorIngest.handler)
 	mux.HandleFunc("GET /api/v1/ingest/counters", ingest.countersHandler)
 	if inspector != nil {
 		mux.HandleFunc("GET /api/v1/development/last-ingest", inspector.handler)

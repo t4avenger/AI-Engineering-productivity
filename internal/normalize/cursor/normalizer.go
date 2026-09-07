@@ -46,7 +46,41 @@ func Normalize(data []byte, fingerprint func([]byte) string) ([]canonical.Event,
 	}
 	switch document.Payload.SourceType {
 	case sourceTypePrintJSON, sourceTypeStreamJSON:
-		event, err := normaliseResult(document, capturedAt, fingerprint)
+		event, err := normaliseResult(document.ToolVersion, document.Payload.SourceType, document.Payload.Init, document.Payload.Result, document.Payload.Capture, capturedAt, fingerprint)
+		if err != nil {
+			return nil, err
+		}
+		return normalize.CorrelateEvents([]canonical.Event{event}), nil
+	case sourceTypeCapabilityProbe:
+		return []canonical.Event{}, nil
+	default:
+		return nil, fmt.Errorf("unsupported Cursor payload source_type %q", document.Payload.SourceType)
+	}
+}
+
+// NormalizeIngest maps a live Cursor Agent ingest envelope (not a committed
+// fixture wrapper) into canonical events. Unlike Normalize, it does not require
+// fixture metadata such as fixture_version or sanitisation_reviewed; the live
+// ingest path must run the shared privacy sanitiser upstream (mirroring the
+// OTLP adapters).
+func NormalizeIngest(data []byte, fingerprint func([]byte) string) ([]canonical.Event, error) {
+	if fingerprint == nil {
+		return nil, errors.New("cursor fingerprint is required")
+	}
+	var document ingestDocument
+	if err := json.Unmarshal(data, &document); err != nil {
+		return nil, errors.New("decode Cursor ingest payload")
+	}
+	if document.Provider != provider || document.Tool != tool {
+		return nil, errors.New("supported ingest provider and tool are cursor and cursor-agent")
+	}
+	capturedAt, err := time.Parse(time.RFC3339, document.CapturedAt)
+	if err != nil {
+		return nil, errors.New("cursor ingest captured_at must be RFC3339")
+	}
+	switch document.Payload.SourceType {
+	case sourceTypePrintJSON, sourceTypeStreamJSON:
+		event, err := normaliseResult(document.ToolVersion, document.Payload.SourceType, document.Payload.Init, document.Payload.Result, nil, capturedAt.UTC(), fingerprint)
 		if err != nil {
 			return nil, err
 		}
@@ -59,6 +93,14 @@ func Normalize(data []byte, fingerprint func([]byte) string) ([]canonical.Event,
 }
 
 type fixtureDocument struct {
+	Provider    string  `json:"provider"`
+	Tool        string  `json:"tool"`
+	ToolVersion string  `json:"tool_version"`
+	CapturedAt  string  `json:"captured_at"`
+	Payload     payload `json:"payload"`
+}
+
+type ingestDocument struct {
 	Provider    string  `json:"provider"`
 	Tool        string  `json:"tool"`
 	ToolVersion string  `json:"tool_version"`
@@ -91,18 +133,18 @@ func decodeDocument(data []byte) (fixtureDocument, time.Time, error) {
 	return document, capturedAt.UTC(), nil
 }
 
-func normaliseResult(document fixtureDocument, capturedAt time.Time, fingerprint func([]byte) string) (canonical.Event, error) {
-	if document.Payload.Result == nil {
+func normaliseResult(toolVersion, sourceType string, init, result, capture map[string]any, capturedAt time.Time, fingerprint func([]byte) string) (canonical.Event, error) {
+	if result == nil {
 		return canonical.Event{}, errors.New("cursor payload.result must be present for result source_type")
 	}
-	sessionID, err := normalize.RequiredString(document.Payload.Result, "session_id")
+	sessionID, err := normalize.RequiredString(result, "session_id")
 	if err != nil {
 		return canonical.Event{}, err
 	}
 	sessionFingerprint := "cursor-agent:" + fingerprint([]byte(sessionID))
 
 	var eventID string
-	if requestID := normalize.OptionalString(document.Payload.Result, "request_id"); requestID != nil {
+	if requestID := normalize.OptionalString(result, "request_id"); requestID != nil {
 		eventID = "cursor-agent:" + fingerprint([]byte(*requestID))
 	} else {
 		eventID = sessionFingerprint + ":result"
@@ -110,11 +152,11 @@ func normaliseResult(document fixtureDocument, capturedAt time.Time, fingerprint
 
 	model := "unknown"
 	modelObserved := false
-	if document.Payload.SourceType == sourceTypeStreamJSON && document.Payload.Init != nil {
-		model, modelObserved = normalize.ObservedString(document.Payload.Init["model"])
+	if sourceType == sourceTypeStreamJSON && init != nil {
+		model, modelObserved = normalize.ObservedString(init["model"])
 	}
 
-	usage, ok := document.Payload.Result["usage"].(map[string]any)
+	usage, ok := result["usage"].(map[string]any)
 	if !ok {
 		usage = map[string]any{}
 	}
@@ -124,7 +166,7 @@ func normaliseResult(document fixtureDocument, capturedAt time.Time, fingerprint
 	cacheWriteTokens := normalize.OptionalTokenCount(usage["cacheWriteTokens"])
 
 	attributes := map[string]any{
-		"unavailable_fields": unavailableFields(modelObserved, inputTokens, outputTokens, cacheReadTokens, document.Payload.Result),
+		"unavailable_fields": unavailableFields(modelObserved, inputTokens, outputTokens, cacheReadTokens, result),
 	}
 	if modelObserved {
 		attributes["model"] = model
@@ -138,12 +180,12 @@ func normaliseResult(document fixtureDocument, capturedAt time.Time, fingerprint
 
 	extensions := map[string]any{
 		"correlation": eventCorrelation(eventID, capturedAt),
-		"source_type": document.Payload.SourceType,
-		"capture":     document.Payload.Capture,
-		"result":      normalize.UnknownFields(document.Payload.Result, "type", "subtype", "is_error", "duration_ms", "duration_api_ms", "result_summary", "session_id", "request_id", "usage"),
+		"source_type": sourceType,
+		"capture":     capture,
+		"result":      normalize.UnknownFields(result, "type", "subtype", "is_error", "duration_ms", "duration_api_ms", "result_summary", "session_id", "request_id", "usage"),
 	}
-	if document.Payload.Init != nil {
-		extensions["init"] = normalize.UnknownFields(document.Payload.Init, "type", "subtype", "model", "session_id")
+	if init != nil {
+		extensions["init"] = normalize.UnknownFields(init, "type", "subtype", "model", "session_id")
 	}
 
 	extensions["cursor"] = map[string]any{
@@ -153,10 +195,10 @@ func normaliseResult(document fixtureDocument, capturedAt time.Time, fingerprint
 		},
 	}
 
-	attachOutcomeContract(extensions, document.Payload.Result, modelObserved, model, inputTokens, outputTokens)
+	attachOutcomeContract(extensions, result, modelObserved, model, inputTokens, outputTokens)
 
 	eventType := "result"
-	if typed, ok := document.Payload.Result["type"].(string); ok && typed != "" {
+	if typed, ok := result["type"].(string); ok && typed != "" {
 		eventType = typed
 	}
 
@@ -169,7 +211,7 @@ func normaliseResult(document fixtureDocument, capturedAt time.Time, fingerprint
 		Provider:           provider,
 		Tool:               tool,
 		SourceSchema:       sourceSchema,
-		SourceVersion:      document.ToolVersion,
+		SourceVersion:      toolVersion,
 		ActorID:            unavailable,
 		DeviceID:           unavailable,
 		SessionID:          sessionFingerprint,
