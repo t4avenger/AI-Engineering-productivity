@@ -147,8 +147,8 @@
           <tr>
             <td>{{.Tool}}</td>
             <td>{{.SessionID}}</td>
-            <td>{{if eq .CachedContextRatioState "observed"}}{{with .CachedContextRatio}}{{printf "%.2f" .}}{{end}}{{else}}{{.CachedContextRatioState}}{{end}}</td>
-            <td>{{if eq .InputTokenGrowthState "observed"}}{{with .InputTokenGrowth}}{{printf "%.2f" .}}{{end}}{{else}}{{.InputTokenGrowthState}}{{end}}</td>
+            <td>{{if eq .CachedContextRatioState "observed"}}{{with .CachedContextRatio}}{{printf "%.2f" (deref .)}}{{end}}{{else}}{{.CachedContextRatioState}}{{end}}</td>
+            <td>{{if eq .InputTokenGrowthState "observed"}}{{with .InputTokenGrowth}}{{printf "%.2f" (deref .)}}{{end}}{{else}}{{.InputTokenGrowthState}}{{end}}</td>
             <td>{{if .Triggered}}yes{{else}}no{{end}}</td>
           </tr>
           {{end}}

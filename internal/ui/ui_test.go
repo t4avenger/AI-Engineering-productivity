@@ -274,6 +274,72 @@ func TestUnlockAndHome(t *testing.T) {
 	}
 }
 
+func TestContextWasteObservedFloatsRenderNumeric(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fullStub{
+		sessions: []canonical.Session{{
+			SessionID: "context-session",
+			Provider:  "anthropic",
+			Tool:      "claude-code",
+			State:     "completed",
+			StartedAt: now,
+		}},
+		events: map[string][]canonical.Event{
+			"context-session": {{
+				EventID:    "ctx-1",
+				EventType:  "model_interaction",
+				SessionID:  "context-session",
+				OccurredAt: now,
+				ReceivedAt: now,
+				Provider:   "anthropic",
+				Tool:       "claude-code",
+				Attributes: map[string]any{
+					"input_token_count":   int64(100),
+					"cached_input_tokens": int64(75),
+				},
+			}, {
+				EventID:    "ctx-2",
+				EventType:  "model_interaction",
+				SessionID:  "context-session",
+				OccurredAt: now.Add(time.Second),
+				ReceivedAt: now.Add(time.Second),
+				Provider:   "anthropic",
+				Tool:       "claude-code",
+				Attributes: map[string]any{
+					"input_token_count":   int64(200),
+					"cached_input_tokens": int64(150),
+				},
+			}},
+		},
+	}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	rec := getAuthed(t, handler, cookie, "/insights")
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("insights = %d %q", rec.Code, body)
+	}
+	if strings.Contains(body, "%!f(*float64") {
+		t.Fatalf("observed context-waste floats rendered pointer formatter output: %q", body)
+	}
+	rowStart := strings.Index(body, "context-session")
+	if rowStart == -1 {
+		t.Fatalf("context-waste row missing: %q", body)
+	}
+	rowEnd := strings.Index(body[rowStart:], "</tr>")
+	if rowEnd == -1 {
+		t.Fatalf("context-waste row did not close: %q", body[rowStart:])
+	}
+	row := body[rowStart : rowStart+rowEnd]
+	if !strings.Contains(row, ">0.75<") || !strings.Contains(row, ">2.00<") {
+		t.Fatalf("context-waste row should render observed cached ratio and input growth as floats: %q", row)
+	}
+}
+
 func TestUnavailableNotZeroOnCosts(t *testing.T) {
 	server, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds)
 	if err != nil {
