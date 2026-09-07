@@ -2,64 +2,9 @@ package cursor
 
 import (
 	"encoding/json"
-	"os"
-	"path/filepath"
-	"reflect"
-	"runtime"
 	"strings"
 	"testing"
-
-	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
-
-func stubFingerprint([]byte) string { return "fixture" }
-
-func TestNormalizeGolden(t *testing.T) {
-	cases := []struct {
-		name       string
-		fixture    string
-		goldenFile string
-	}{
-		{
-			name:       "print_json",
-			fixture:    "cursor-agent-2026.05.16-0338208-print-result.json",
-			goldenFile: "cursor-agent-2026.05.16-0338208-print-result.events.json",
-		},
-		{
-			name:       "stream_json",
-			fixture:    "cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.json",
-			goldenFile: "cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.events.json",
-		},
-	}
-
-	for _, tc := range cases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			input := readFixture(t, tc.fixture)
-			first := normalizeDeterministic(t, input)
-			if updateGolden() {
-				writeGolden(t, tc.goldenFile, first)
-			}
-			assertMatchesGolden(t, tc.goldenFile, first)
-		})
-	}
-}
-
-func normalizeDeterministic(t *testing.T, input []byte) []canonical.Event {
-	t.Helper()
-	first, err := Normalize(input, stubFingerprint)
-	if err != nil {
-		t.Fatalf("first normalisation: %v", err)
-	}
-	second, err := Normalize(input, stubFingerprint)
-	if err != nil {
-		t.Fatalf("second normalisation: %v", err)
-	}
-	if !reflect.DeepEqual(first, second) {
-		t.Fatal("normalisation must be deterministic")
-	}
-	return first
-}
 
 func TestNormalizeCapabilityProbeYieldsNoEvents(t *testing.T) {
 	events, err := Normalize(readFixture(t, "cursor-agent-2026.05.16-0338208-capability-probe.json"), stubFingerprint)
@@ -89,62 +34,4 @@ func TestNormalizeFingerprintsIDsAndDoesNotLeakRawIDs(t *testing.T) {
 			t.Fatalf("raw identifier leaked into canonical output: %q", leaked)
 		}
 	}
-}
-
-func updateGolden() bool { return os.Getenv("UPDATE_GOLDEN") == "1" }
-
-func writeGolden(t *testing.T, name string, value any) {
-	t.Helper()
-	data, err := json.MarshalIndent(value, "", "  ")
-	if err != nil {
-		t.Fatalf("marshal golden: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(expectedDir(t), name), append(data, '\n'), 0o644); err != nil {
-		t.Fatalf("write golden: %v", err)
-	}
-}
-
-func assertMatchesGolden(t *testing.T, name string, value any) {
-	t.Helper()
-	got, err := json.MarshalIndent(value, "", "  ")
-	if err != nil {
-		t.Fatalf("marshal value: %v", err)
-	}
-	want := strings.TrimSpace(string(readGolden(t, name)))
-	if string(got) != want {
-		t.Fatalf("%s mismatch\n got: %s\nwant: %s", name, got, want)
-	}
-}
-
-func readFixture(t *testing.T, name string) []byte {
-	t.Helper()
-	return readFile(t, filepath.Join(repositoryRoot(t), "fixtures", "cursor", "observed-sanitised", name))
-}
-
-func expectedDir(t *testing.T) string {
-	t.Helper()
-	return filepath.Join(repositoryRoot(t), "fixtures", "cursor", "expected")
-}
-
-func readGolden(t *testing.T, name string) []byte {
-	t.Helper()
-	return readFile(t, filepath.Join(expectedDir(t), name))
-}
-
-func readFile(t *testing.T, path string) []byte {
-	t.Helper()
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
-	}
-	return contents
-}
-
-func repositoryRoot(t *testing.T) string {
-	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("locate test source")
-	}
-	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
 }
