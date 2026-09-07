@@ -8,32 +8,45 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
 func stubFingerprint([]byte) string { return "fixture" }
 
-func TestNormalizeGolden_PrintJSON(t *testing.T) {
-	input := readFixture(t, "cursor-agent-2026.05.16-0338208-print-result.json")
-	first, err := Normalize(input, stubFingerprint)
-	if err != nil {
-		t.Fatalf("first normalisation: %v", err)
-	}
-	second, err := Normalize(input, stubFingerprint)
-	if err != nil {
-		t.Fatalf("second normalisation: %v", err)
-	}
-	if !reflect.DeepEqual(first, second) {
-		t.Fatal("normalisation must be deterministic")
+func TestNormalizeGolden(t *testing.T) {
+	cases := []struct {
+		name       string
+		fixture    string
+		goldenFile string
+	}{
+		{
+			name:       "print_json",
+			fixture:    "cursor-agent-2026.05.16-0338208-print-result.json",
+			goldenFile: "cursor-agent-2026.05.16-0338208-print-result.events.json",
+		},
+		{
+			name:       "stream_json",
+			fixture:    "cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.json",
+			goldenFile: "cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.events.json",
+		},
 	}
 
-	if updateGolden() {
-		writeGolden(t, "cursor-agent-2026.05.16-0338208-print-result.events.json", first)
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			input := readFixture(t, tc.fixture)
+			first := normalizeDeterministic(t, input)
+			if updateGolden() {
+				writeGolden(t, tc.goldenFile, first)
+			}
+			assertMatchesGolden(t, tc.goldenFile, first)
+		})
 	}
-	assertMatchesGolden(t, "cursor-agent-2026.05.16-0338208-print-result.events.json", first)
 }
 
-func TestNormalizeGolden_StreamJSON(t *testing.T) {
-	input := readFixture(t, "cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.json")
+func normalizeDeterministic(t *testing.T, input []byte) []canonical.Event {
+	t.Helper()
 	first, err := Normalize(input, stubFingerprint)
 	if err != nil {
 		t.Fatalf("first normalisation: %v", err)
@@ -45,11 +58,7 @@ func TestNormalizeGolden_StreamJSON(t *testing.T) {
 	if !reflect.DeepEqual(first, second) {
 		t.Fatal("normalisation must be deterministic")
 	}
-
-	if updateGolden() {
-		writeGolden(t, "cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.events.json", first)
-	}
-	assertMatchesGolden(t, "cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.events.json", first)
+	return first
 }
 
 func TestNormalizeCapabilityProbeYieldsNoEvents(t *testing.T) {

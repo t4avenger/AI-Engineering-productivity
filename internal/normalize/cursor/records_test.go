@@ -10,27 +10,38 @@ import (
 )
 
 func TestExtractModelInteractionsGolden_PrintJSON(t *testing.T) {
-	input := readFixture(t, "cursor-agent-2026.05.16-0338208-print-result.json")
-	first, err := ExtractModelInteractions(input, stubFingerprint)
-	if err != nil {
-		t.Fatalf("first extraction: %v", err)
-	}
-	second, err := ExtractModelInteractions(input, stubFingerprint)
-	if err != nil {
-		t.Fatalf("second extraction: %v", err)
-	}
-	if !reflect.DeepEqual(first, second) {
-		t.Fatal("extraction must be deterministic")
+	cases := []struct {
+		name       string
+		fixture    string
+		goldenFile string
+	}{
+		{
+			name:       "print_json",
+			fixture:    "cursor-agent-2026.05.16-0338208-print-result.json",
+			goldenFile: "cursor-agent-2026.05.16-0338208-print-result.records.json",
+		},
+		{
+			name:       "stream_json",
+			fixture:    "cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.json",
+			goldenFile: "cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.records.json",
+		},
 	}
 
-	if updateGolden() {
-		writeGolden(t, "cursor-agent-2026.05.16-0338208-print-result.records.json", first)
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			input := readFixture(t, tc.fixture)
+			first := extractDeterministic(t, input)
+			if updateGolden() {
+				writeGolden(t, tc.goldenFile, first)
+			}
+			assertMatchesGolden(t, tc.goldenFile, first)
+		})
 	}
-	assertMatchesGolden(t, "cursor-agent-2026.05.16-0338208-print-result.records.json", first)
 }
 
-func TestExtractModelInteractionsGolden_StreamJSON(t *testing.T) {
-	input := readFixture(t, "cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.json")
+func extractDeterministic(t *testing.T, input []byte) []canonical.ModelInteraction {
+	t.Helper()
 	first, err := ExtractModelInteractions(input, stubFingerprint)
 	if err != nil {
 		t.Fatalf("first extraction: %v", err)
@@ -42,11 +53,7 @@ func TestExtractModelInteractionsGolden_StreamJSON(t *testing.T) {
 	if !reflect.DeepEqual(first, second) {
 		t.Fatal("extraction must be deterministic")
 	}
-
-	if updateGolden() {
-		writeGolden(t, "cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.records.json", first)
-	}
-	assertMatchesGolden(t, "cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.records.json", first)
+	return first
 }
 
 func TestExtractModelInteractionsIsHonestAboutUnknowns(t *testing.T) {

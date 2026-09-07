@@ -32,7 +32,7 @@ func ExtractModelInteractions(data []byte, fingerprint func([]byte) string) ([]c
 	if fingerprint == nil {
 		return nil, fmt.Errorf("cursor fingerprint is required")
 	}
-	document, capturedAt, err := decodeDocument(data)
+	document, capturedAt, err := decodeFixtureDocument(data)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func ExtractModelInteractions(data []byte, fingerprint func([]byte) string) ([]c
 	return normalize.CorrelateModelInteractions([]canonical.ModelInteraction{interaction}), nil
 }
 
-func resultInteraction(document fixtureDocument, capturedAt time.Time, fingerprint func([]byte) string) (canonical.ModelInteraction, bool, error) {
+func resultInteraction(document adapterDocument, capturedAt time.Time, fingerprint func([]byte) string) (canonical.ModelInteraction, bool, error) {
 	if document.Payload.Result == nil {
 		return canonical.ModelInteraction{}, false, errors.New("cursor payload.result must be present for result source_type")
 	}
@@ -131,7 +131,7 @@ func resultInteraction(document fixtureDocument, capturedAt time.Time, fingerpri
 	}, true, nil
 }
 
-func recordExtensions(document fixtureDocument, requestID string, started time.Time, startedDerived bool, cacheWriteTokens *int64) map[string]any {
+func recordExtensions(document adapterDocument, requestID string, started time.Time, startedDerived bool, cacheWriteTokens *int64) map[string]any {
 	startedProvenance := "observed_equals_completed"
 	if startedDerived {
 		startedProvenance = "derived_from_duration"

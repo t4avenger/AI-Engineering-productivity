@@ -32,6 +32,14 @@ const (
 	unavailable = "unavailable"
 )
 
+type adapterDocument struct {
+	Provider    string  `json:"provider"`
+	Tool        string  `json:"tool"`
+	ToolVersion string  `json:"tool_version"`
+	CapturedAt  string  `json:"captured_at"`
+	Payload     payload `json:"payload"`
+}
+
 // Normalize maps a reviewed Cursor Agent fixture wrapper into one canonical
 // event for the result (or no events for a capability probe). It validates the
 // fixture through the shared fixture boundary and does not persist or log it.
@@ -40,22 +48,11 @@ func Normalize(data []byte, fingerprint func([]byte) string) ([]canonical.Event,
 	if fingerprint == nil {
 		return nil, errors.New("cursor fingerprint is required")
 	}
-	document, capturedAt, err := decodeDocument(data)
+	document, capturedAt, err := decodeFixtureDocument(data)
 	if err != nil {
 		return nil, err
 	}
-	switch document.Payload.SourceType {
-	case sourceTypePrintJSON, sourceTypeStreamJSON:
-		event, err := normaliseResult(document.ToolVersion, document.Payload.SourceType, document.Payload.Init, document.Payload.Result, document.Payload.Capture, capturedAt, fingerprint)
-		if err != nil {
-			return nil, err
-		}
-		return normalize.CorrelateEvents([]canonical.Event{event}), nil
-	case sourceTypeCapabilityProbe:
-		return []canonical.Event{}, nil
-	default:
-		return nil, fmt.Errorf("unsupported Cursor payload source_type %q", document.Payload.SourceType)
-	}
+	return normalizePayload(document.ToolVersion, document.Payload, capturedAt, fingerprint)
 }
 
 // NormalizeIngest maps a live Cursor Agent ingest envelope (not a committed
@@ -67,45 +64,11 @@ func NormalizeIngest(data []byte, fingerprint func([]byte) string) ([]canonical.
 	if fingerprint == nil {
 		return nil, errors.New("cursor fingerprint is required")
 	}
-	var document ingestDocument
-	if err := json.Unmarshal(data, &document); err != nil {
-		return nil, errors.New("decode Cursor ingest payload")
-	}
-	if document.Provider != provider || document.Tool != tool {
-		return nil, errors.New("supported ingest provider and tool are cursor and cursor-agent")
-	}
-	capturedAt, err := time.Parse(time.RFC3339, document.CapturedAt)
+	document, capturedAt, err := decodeIngestDocument(data)
 	if err != nil {
-		return nil, errors.New("cursor ingest captured_at must be RFC3339")
+		return nil, err
 	}
-	switch document.Payload.SourceType {
-	case sourceTypePrintJSON, sourceTypeStreamJSON:
-		event, err := normaliseResult(document.ToolVersion, document.Payload.SourceType, document.Payload.Init, document.Payload.Result, nil, capturedAt.UTC(), fingerprint)
-		if err != nil {
-			return nil, err
-		}
-		return normalize.CorrelateEvents([]canonical.Event{event}), nil
-	case sourceTypeCapabilityProbe:
-		return []canonical.Event{}, nil
-	default:
-		return nil, fmt.Errorf("unsupported Cursor payload source_type %q", document.Payload.SourceType)
-	}
-}
-
-type fixtureDocument struct {
-	Provider    string  `json:"provider"`
-	Tool        string  `json:"tool"`
-	ToolVersion string  `json:"tool_version"`
-	CapturedAt  string  `json:"captured_at"`
-	Payload     payload `json:"payload"`
-}
-
-type ingestDocument struct {
-	Provider    string  `json:"provider"`
-	Tool        string  `json:"tool"`
-	ToolVersion string  `json:"tool_version"`
-	CapturedAt  string  `json:"captured_at"`
-	Payload     payload `json:"payload"`
+	return normalizePayload(document.ToolVersion, document.Payload, capturedAt, fingerprint)
 }
 
 type payload struct {
@@ -115,20 +78,47 @@ type payload struct {
 	Result     map[string]any `json:"result"`
 }
 
-func decodeDocument(data []byte) (fixtureDocument, time.Time, error) {
-	if err := fixture.Validate(data); err != nil {
-		return fixtureDocument{}, time.Time{}, fmt.Errorf("validate Cursor fixture: %w", err)
+func normalizePayload(toolVersion string, payload payload, capturedAt time.Time, fingerprint func([]byte) string) ([]canonical.Event, error) {
+	switch payload.SourceType {
+	case sourceTypePrintJSON, sourceTypeStreamJSON:
+		event, err := normaliseResult(toolVersion, payload.SourceType, payload.Init, payload.Result, payload.Capture, capturedAt, fingerprint)
+		if err != nil {
+			return nil, err
+		}
+		return normalize.CorrelateEvents([]canonical.Event{event}), nil
+	case sourceTypeCapabilityProbe:
+		return []canonical.Event{}, nil
+	default:
+		return nil, fmt.Errorf("unsupported Cursor payload source_type %q", payload.SourceType)
 	}
-	var document fixtureDocument
+}
+
+func decodeFixtureDocument(data []byte) (adapterDocument, time.Time, error) {
+	if err := fixture.Validate(data); err != nil {
+		return adapterDocument{}, time.Time{}, fmt.Errorf("validate Cursor fixture: %w", err)
+	}
+	document, capturedAt, err := decodeAdapterDocument(data, "fixture")
+	if err != nil {
+		return adapterDocument{}, time.Time{}, err
+	}
+	return document, capturedAt, nil
+}
+
+func decodeIngestDocument(data []byte) (adapterDocument, time.Time, error) {
+	return decodeAdapterDocument(data, "ingest")
+}
+
+func decodeAdapterDocument(data []byte, label string) (adapterDocument, time.Time, error) {
+	var document adapterDocument
 	if err := json.Unmarshal(data, &document); err != nil {
-		return fixtureDocument{}, time.Time{}, errors.New("decode Cursor fixture")
+		return adapterDocument{}, time.Time{}, fmt.Errorf("decode Cursor %s payload", label)
 	}
 	if document.Provider != provider || document.Tool != tool {
-		return fixtureDocument{}, time.Time{}, errors.New("supported fixture provider and tool are cursor and cursor-agent")
+		return adapterDocument{}, time.Time{}, errors.New("supported provider and tool are cursor and cursor-agent")
 	}
 	capturedAt, err := time.Parse(time.RFC3339, document.CapturedAt)
 	if err != nil {
-		return fixtureDocument{}, time.Time{}, errors.New("cursor fixture captured_at must be RFC3339")
+		return adapterDocument{}, time.Time{}, fmt.Errorf("cursor %s captured_at must be RFC3339", label)
 	}
 	return document, capturedAt.UTC(), nil
 }
