@@ -162,3 +162,25 @@ func marshalJSON(t *testing.T, value any) []byte {
 	}
 	return data
 }
+
+// otlpStringAttr builds a single string-valued OTLP attribute entry.
+func otlpStringAttr(key, value string) map[string]any {
+	return map[string]any{"key": key, "value": map[string]any{"stringValue": value}}
+}
+
+// claudeOTLPLogPayload wraps one log record's attributes in the Claude Code
+// OTLP/HTTP envelope (service.name claude-code) used by the live ingest tests.
+func claudeOTLPLogPayload(t *testing.T, attributes []any) string {
+	t.Helper()
+	return string(marshalJSON(t, map[string]any{
+		"resourceLogs": []any{map[string]any{
+			"resource": map[string]any{"attributes": []any{
+				otlpStringAttr("service.name", "claude-code"),
+				otlpStringAttr("service.version", "2.1.263"),
+			}},
+			"scopeLogs": []any{map[string]any{"logRecords": []any{
+				map[string]any{"attributes": attributes},
+			}}},
+		}},
+	}))
+}

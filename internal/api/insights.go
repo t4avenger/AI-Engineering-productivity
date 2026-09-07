@@ -36,6 +36,10 @@ type riskyAccessResponse struct {
 	Data governance.RiskyAccess `json:"data"`
 }
 
+type unapprovedMCPResponse struct {
+	Data governance.UnapprovedMCP `json:"data"`
+}
+
 func (a sessionAPI) mcpInventory(w http.ResponseWriter, r *http.Request) {
 	events, ok := a.loadInsightEvents(w, r)
 	if !ok {
@@ -74,6 +78,14 @@ func (a sessionAPI) riskyAccess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSessionJSON(w, http.StatusOK, riskyAccessResponse{Data: governance.RiskyAccessFromEvents(events)})
+}
+
+func (a sessionAPI) unapprovedMCP(w http.ResponseWriter, r *http.Request) {
+	events, ok := a.loadInsightEvents(w, r)
+	if !ok {
+		return
+	}
+	writeSessionJSON(w, http.StatusOK, unapprovedMCPResponse{Data: governance.UnapprovedMCPFromEvents(events, a.thresholds.MCPAllowlist)})
 }
 
 // loadInsightEvents returns retained events for an insight handler, or writes

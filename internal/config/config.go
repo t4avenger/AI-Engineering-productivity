@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -28,6 +29,7 @@ type Config struct {
 	Sharing       Sharing    `yaml:"sharing"`
 	Pricing       Pricing    `yaml:"pricing"`
 	Insights      Insights   `yaml:"insights"`
+	Governance    Governance `yaml:"governance"`
 	Host          string     `yaml:"-"`
 	Port          string     `yaml:"-"`
 }
@@ -61,6 +63,16 @@ type Pricing struct {
 
 type Insights struct {
 	ContextWaste ContextWaste `yaml:"context_waste"`
+}
+
+// Governance configures the §14 detect-and-report policies. All fields are
+// optional; an unset policy input yields an indeterminate decision rather than a
+// fabricated clean result.
+type Governance struct {
+	// MCPAllowlist is the set of approved MCP server names for the §14.4
+	// unapproved-MCP policy. When empty, the policy reports indeterminate because
+	// approval cannot be judged without a declared allowlist.
+	MCPAllowlist []string `yaml:"mcp_allowlist"`
 }
 
 // ContextWaste configures the §13.10 context-waste insight thresholds.
@@ -148,6 +160,9 @@ func (c Config) Validate() error {
 	if err := c.validateInsights(); err != nil {
 		return err
 	}
+	if err := c.validateGovernance(); err != nil {
+		return err
+	}
 	return c.validatePricing()
 }
 
@@ -212,6 +227,15 @@ func (c Config) validateInsights() error {
 	}
 	if c.Insights.ContextWaste.InputTokenGrowthThreshold < 1 {
 		return fmt.Errorf("insights.context_waste.input_token_growth_threshold must be >= 1, got %v", c.Insights.ContextWaste.InputTokenGrowthThreshold)
+	}
+	return nil
+}
+
+func (c Config) validateGovernance() error {
+	for i, name := range c.Governance.MCPAllowlist {
+		if strings.TrimSpace(name) == "" {
+			return fmt.Errorf("governance.mcp_allowlist[%d] must not be blank", i)
+		}
 	}
 	return nil
 }
