@@ -47,7 +47,7 @@ func (i *cursorAgentIngest) handler(w http.ResponseWriter, r *http.Request) {
 		writeCursorIngestError(w, http.StatusBadRequest, "malformed_payload", "request body must be valid JSON")
 		return
 	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+	if decoder.Decode(&struct{}{}) != io.EOF {
 		writeCursorIngestError(w, http.StatusBadRequest, "malformed_payload", "request body must contain one JSON value")
 		return
 	}

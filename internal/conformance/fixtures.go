@@ -18,6 +18,21 @@ const (
 	cursorEventFixture = "cursor/observed-sanitised/cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.json"
 )
 
+const (
+	canaryPromptLeakSuffix    = "-prompt-leak"
+	canaryResponseLeakSuffix  = "-response-leak"
+	canaryEmailLeakSuffix     = "-email-leak@example.test"
+	canaryArgumentsLeakSuffix = "-arguments-leak"
+	canarySecretLeakSuffix    = "-secret-leak"
+
+	canarySecretPrefix = "--secret "
+	canaryTokenPrefix  = "token="
+
+	canarySessionID = "canary-session"
+)
+
+func canaryValue(suffix string) string { return canaryMarker + suffix }
+
 // stubFingerprint keeps record and session identifiers deterministic; the suite
 // asserts contracts, not fingerprint values.
 func stubFingerprint([]byte) string { return "fixture" }
@@ -111,11 +126,11 @@ func codexCanaryPayload() map[string]any {
 									attr("model", "gpt-5-codex"),
 									attr("input_token_count", "1200"),
 									attr("output_token_count", "340"),
-									attr("prompt", canaryMarker+"-prompt-leak"),
-									attr("response", canaryMarker+"-response-leak"),
-									attr("user.email", canaryMarker+"-email-leak@example.test"),
-									attr("arguments", "--secret "+canaryMarker+"-arguments-leak"),
-									attr("note", "token="+canaryMarker+"-secret-leak"),
+									attr("prompt", canaryValue(canaryPromptLeakSuffix)),
+									attr("response", canaryValue(canaryResponseLeakSuffix)),
+									attr("user.email", canaryValue(canaryEmailLeakSuffix)),
+									attr("arguments", canarySecretPrefix+canaryValue(canaryArgumentsLeakSuffix)),
+									attr("note", canaryTokenPrefix+canaryValue(canarySecretLeakSuffix)),
 								},
 							},
 						},
@@ -155,11 +170,11 @@ func claudeCanaryPayload() map[string]any {
 					"input_tokens":      900,
 					"output_tokens":     120,
 					"cache_read_tokens": 50,
-					"prompt":            canaryMarker + "-prompt-leak",
-					"response":          canaryMarker + "-response-leak",
-					"user_email":        canaryMarker + "-email-leak@example.test",
-					"arguments":         "--secret " + canaryMarker + "-arguments-leak",
-					"note":              "token=" + canaryMarker + "-secret-leak",
+					"prompt":            canaryValue(canaryPromptLeakSuffix),
+					"response":          canaryValue(canaryResponseLeakSuffix),
+					"user_email":        canaryValue(canaryEmailLeakSuffix),
+					"arguments":         canarySecretPrefix + canaryValue(canaryArgumentsLeakSuffix),
+					"note":              canaryTokenPrefix + canaryValue(canarySecretLeakSuffix),
 				},
 			},
 		},
@@ -184,11 +199,11 @@ func cursorCanaryPayload() map[string]any {
 			"capture": map[string]any{
 				"workspace":    "isolated_tmp",
 				"mode":         "ask",
-				"user.email":   canaryMarker + "-email-leak@example.test",
-				"arguments":    "--secret " + canaryMarker + "-arguments-leak",
-				"note":         "token=" + canaryMarker + "-secret-leak",
-				"prompt":       canaryMarker + "-prompt-leak",
-				"response":     canaryMarker + "-response-leak",
+				"user.email":   canaryValue(canaryEmailLeakSuffix),
+				"arguments":    canarySecretPrefix + canaryValue(canaryArgumentsLeakSuffix),
+				"note":         canaryTokenPrefix + canaryValue(canarySecretLeakSuffix),
+				"prompt":       canaryValue(canaryPromptLeakSuffix),
+				"response":     canaryValue(canaryResponseLeakSuffix),
 				"account_id":   canaryMarker + "-account-leak",
 				"custom_field": "ok",
 			},
@@ -196,14 +211,14 @@ func cursorCanaryPayload() map[string]any {
 				"type":       "system",
 				"subtype":    "init",
 				"model":      "GPT-5.2 Medium",
-				"session_id": "canary-session",
+				"session_id": canarySessionID,
 			},
 			"result": map[string]any{
 				"type":        "result",
 				"subtype":     "success",
 				"is_error":    false,
 				"duration_ms": 1000,
-				"session_id":  "canary-session",
+				"session_id":  canarySessionID,
 				"request_id":  "canary-request",
 				"usage": map[string]any{
 					"inputTokens":      123,

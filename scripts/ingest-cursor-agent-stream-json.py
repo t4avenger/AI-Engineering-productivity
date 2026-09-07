@@ -122,28 +122,47 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    init = None
-    result = None
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            obj = json.loads(line)
-        except Exception:
-            continue
-        if isinstance(obj, dict):
-            if init is None:
-                init = extract_safe_init(obj)
-            if result is None:
-                result = extract_safe_result(obj)
-        if init is not None and result is not None:
-            break
+    init, result = read_cursor_stream_json(sys.stdin)
 
     if result is None:
         print("No Cursor result record found on stdin.", file=sys.stderr)
         return 2
 
+    envelope = build_envelope(init, result)
+    status = post_json(args.daemon.rstrip("/"), "/v1/cursor-agent", envelope)
+    if status != 202:
+        print(f"Unexpected daemon status {status}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def read_cursor_stream_json(stream) -> tuple[dict | None, dict | None]:
+    init = None
+    result = None
+    for line in stream:
+        line = line.strip()
+        if not line:
+            continue
+        obj = parse_json_line(line)
+        if not isinstance(obj, dict):
+            continue
+        if init is None:
+            init = extract_safe_init(obj)
+        if result is None:
+            result = extract_safe_result(obj)
+        if init is not None and result is not None:
+            break
+    return init, result
+
+
+def parse_json_line(line: str):
+    try:
+        return json.loads(line)
+    except Exception:
+        return None
+
+
+def build_envelope(init: dict | None, result: dict) -> dict:
     envelope = {
         "provider": "cursor",
         "tool": "cursor-agent",
@@ -158,12 +177,7 @@ def main() -> int:
     # Drop init when absent; the daemon validator allows it.
     if envelope["payload"]["init"] is None:
         del envelope["payload"]["init"]
-
-    status = post_json(args.daemon.rstrip("/"), "/v1/cursor-agent", envelope)
-    if status != 202:
-        print(f"Unexpected daemon status {status}", file=sys.stderr)
-        return 1
-    return 0
+    return envelope
 
 
 if __name__ == "__main__":
