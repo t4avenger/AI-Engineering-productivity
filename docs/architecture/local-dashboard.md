@@ -18,6 +18,11 @@ loaded only after navigation to `/sessions/{id}`. Deletion requires an in-app
 confirmation before `POST /sessions/{id}/delete`; the repository removes the
 session and all retained events transactionally.
 
+In the local-only edition, session lists and details may display provider-native
+session or conversation IDs with a stable provider prefix (`codex:`,
+`claude-code:`, `cursor-agent:`). Opaque fingerprints are reserved for protected
+identifiers outside this narrow local correlation-key exception.
+
 The dashboard never converts unavailable telemetry into zero. Examples include
 an unavailable model or completion time. Integration status is derived only
 from observed local sessions: with none observed it says `Awaiting telemetry`,
@@ -37,7 +42,8 @@ The Costs page reads local calculation summaries, shows calculated estimates
 and cost statuses, and never represents an unknown price as zero.
 
 The Privacy page documents the enforced local-only defaults: no prompt,
-response, or source-code retention; hashed file paths; redacted command
-arguments; no sharing; and a default 30-day retention period. These values are
+response, or source-code retention; raw file paths reduced to coarse path-class
+tokens; redacted command arguments; no sharing; and a default 30-day retention
+period. These values are
 not editable in the dashboard because configuration remains file-based and is
 validated by the daemon. Bulk deletion requires typing `DELETE ALL`.
