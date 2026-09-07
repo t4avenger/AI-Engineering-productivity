@@ -258,3 +258,4 @@ Avoid purple gradients, cream/serif marketing looks, and decorative card chrome.
 4. Home must not surface cost aggregates.
 5. Playwright targets the daemon origin (single process).
 6. Replace React `web/` SPA entirely after parity.
+7. Use `docs/ui/field-glossary.md` for dashboard field labels, enum humanization, units, and unavailable-state copy.
