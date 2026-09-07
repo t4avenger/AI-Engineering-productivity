@@ -9,9 +9,10 @@ import (
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
-// promotedRecordFields are Cursor result/init keys mapped onto a typed
-// ModelInteraction. They are excluded from provider_extensions to avoid
-// duplicating evidence between the typed record and its preserved raw shape.
+// promotedRecordFields are Cursor result/init keys that are consumed to build
+// typed ModelInteraction fields (or to derive typed outcome), and therefore are
+// excluded from provider_extensions.result to avoid duplicating evidence
+// between the typed record and the preserved raw shape.
 var promotedRecordFields = []string{
 	"type", "subtype", "is_error", "duration_ms", "duration_api_ms", "result_summary", "session_id", "request_id", "usage",
 }
@@ -132,7 +133,7 @@ func resultInteraction(document adapterDocument, capturedAt time.Time, fingerpri
 }
 
 func recordExtensions(document adapterDocument, requestID string, started time.Time, startedDerived bool, cacheWriteTokens *int64) map[string]any {
-	startedProvenance := "observed_equals_completed"
+	startedProvenance := "captured_at"
 	if startedDerived {
 		startedProvenance = "derived_from_duration"
 	}
@@ -156,7 +157,11 @@ func recordExtensions(document adapterDocument, requestID string, started time.T
 		extensions["init"] = normalize.UnknownFields(document.Payload.Init, "type", "subtype", "model", "session_id")
 	}
 	if cacheWriteTokens != nil {
-		extensions["cache_write_tokens"] = *cacheWriteTokens
+		extensions["cursor"] = map[string]any{
+			"usage": map[string]any{
+				"cache_write_tokens": *cacheWriteTokens,
+			},
+		}
 	}
 	return extensions
 }

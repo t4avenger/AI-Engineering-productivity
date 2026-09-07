@@ -17,13 +17,17 @@
     "error_code": null,
     "provenance": "unknown",
     "provider_extensions": {
-      "cache_write_tokens": 0,
       "correlation": {
         "dedup_key": "cursor-agent:fixture",
         "ordering_key": "01788183711103000000:cursor-agent:fixture",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Cursor Agent fixtures have no reviewed task-boundary signal"
+        }
+      },
+      "cursor": {
+        "usage": {
+          "cache_write_tokens": 0
         }
       },
       "outcome_contract": {
