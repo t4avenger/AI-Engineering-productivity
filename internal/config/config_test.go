@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -32,8 +33,23 @@ func TestLoadAcceptsDocumentedConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load configuration: %v", err)
 	}
-	if cfg != Default() {
+	if !reflect.DeepEqual(cfg, Default()) {
 		t.Fatalf("expected documented defaults, got %#v", cfg)
+	}
+}
+
+func TestLoadAcceptsGovernanceMCPAllowlist(t *testing.T) {
+	path := writeConfig(t, validConfiguration+`governance:
+  mcp_allowlist:
+    - filesystem
+    - git
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("load configuration: %v", err)
+	}
+	if !reflect.DeepEqual(cfg.Governance.MCPAllowlist, []string{"filesystem", "git"}) {
+		t.Fatalf("expected parsed allowlist, got %#v", cfg.Governance.MCPAllowlist)
 	}
 }
 
@@ -83,6 +99,7 @@ func TestValidateRejectsUnsafeOrUnsupportedSettings(t *testing.T) {
 		{"research", func(c *Config) { c.Sharing.ResearchSessions = "always" }, "sharing.research_sessions"},
 		{"context waste cached ratio threshold", func(c *Config) { c.Insights.ContextWaste.CachedContextRatioThreshold = 1.1 }, "insights.context_waste.cached_context_ratio_threshold"},
 		{"context waste input growth threshold", func(c *Config) { c.Insights.ContextWaste.InputTokenGrowthThreshold = 0.9 }, "insights.context_waste.input_token_growth_threshold"},
+		{"governance blank allowlist entry", func(c *Config) { c.Governance.MCPAllowlist = []string{"filesystem", "  "} }, "governance.mcp_allowlist[1]"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

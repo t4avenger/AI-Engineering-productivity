@@ -732,7 +732,18 @@ A repository may be tagged with a local classification.
 Run detection only on content that is intentionally available to the privacy pipeline. Persist only secret type, confidence, and a non-reversible fingerprint.
 
 ### 14.4 Unapproved MCP server
-Compare reported MCP endpoint identity against an allowlist.
+Compare each observed MCP server's provider-reported identity against a configured allowlist (`governance.mcp_allowlist`).
+
+Server identity is derived from the §13.x MCP inventory (issue #27), which builds it from provider-reported server names and privacy-safe fingerprints; the detector never reads raw connection detail itself. Comparison is on the provider-reported server name, matched case- and whitespace-insensitively against the allowlist. Findings carry only that server name (the same identity the MCP inventory already surfaces) and a coarse allowlist state — never a raw path, command, or secret value.
+
+The policy is honest about what the telemetry supports:
+- an unset/empty allowlist means the policy is not configured, so approval cannot be judged either way → `indeterminate` (never a fabricated clean result from an absent policy);
+- no MCP servers observed at all → `indeterminate`;
+- a server with no provider-reported name → `indeterminate` for that server, since it can be neither confirmed approved nor flagged;
+- a named server absent from the allowlist → `violation`;
+- all identifiable servers allowlisted → `not_violation`.
+
+Surfaced at `GET /api/v1/insights/unapproved-mcp` and rendered as a `schemas/policy.schema.json` decision (`policy_id: governance.unapproved_mcp`). Never infer a violation when the underlying telemetry is insufficient. Use `indeterminate`.
 
 ### 14.5 Dangerous command category
 Categorise commands without retaining raw arguments by default.

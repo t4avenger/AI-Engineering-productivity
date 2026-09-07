@@ -7,6 +7,10 @@ import "github.com/wayne/telemetryiq/internal/insights"
 // consistent results from the same retained telemetry.
 type InsightThresholds struct {
 	ContextWaste insights.ContextWasteThresholds
+	// MCPAllowlist is the set of approved MCP server names for the §14.4
+	// unapproved-MCP policy. Empty means the policy is unconfigured and reports
+	// indeterminate rather than fabricating a clean result.
+	MCPAllowlist []string
 }
 
 func DefaultInsightThresholds() InsightThresholds {
