@@ -170,8 +170,8 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 		{"/insights", "MCP inventory"},
 		{"/insights", "Skill usage"},
 		{"/insights", "Model performance"},
-		{"/insights", "1234"},
-		{"/insights", "Context waste"},
+		{"/insights", "1234 ms"},
+		{"/insights", "Context pressure"},
 		{"/integrations", "codex"},
 		{"/privacy", "local-only"},
 		{"/privacy?confirm=1", "Type DELETE ALL"},
@@ -353,6 +353,123 @@ func TestUnlockPageHidesLogout(t *testing.T) {
 	}
 }
 
+func TestInsightsRenderGlossaryLabelsUnitsNotesAndLinks(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fullStub{
+		sessions: []canonical.Session{{
+			SessionID: "insight-session",
+			Provider:  "anthropic",
+			Tool:      "claude-code",
+			State:     "completed",
+			StartedAt: now,
+		}},
+		events: map[string][]canonical.Event{
+			"insight-session": {{
+				EventID:    "mcp-connection",
+				EventType:  "mcp_server_connection",
+				SessionID:  "insight-session",
+				OccurredAt: now,
+				ReceivedAt: now,
+				Provider:   "anthropic",
+				Tool:       "claude-code",
+				ProviderExtensions: map[string]any{
+					"event": map[string]any{
+						"server_name":       "tiq-mcp",
+						"server_hash":       "mcp-hash",
+						"status":            "connected",
+						"server_scope":      "project",
+						"transport_type":    "stdio",
+						"is_plugin":         false,
+						"input_tokens":      int64(1200),
+						"output_tokens":     int64(50),
+						"cache_read_tokens": int64(900),
+					},
+				},
+			}, {
+				EventID:    "skill-1",
+				EventType:  "skill_invocation",
+				SessionID:  "insight-session",
+				OccurredAt: now.Add(time.Second),
+				ReceivedAt: now.Add(time.Second),
+				Provider:   "anthropic",
+				Tool:       "claude-code",
+				ProviderExtensions: map[string]any{
+					"skill_detection": "explicit",
+					"skill": map[string]any{
+						"name":    "tiq-probe",
+						"outcome": "success",
+					},
+				},
+			}, {
+				EventID:    "model-1",
+				EventType:  "operation",
+				SessionID:  "insight-session",
+				OccurredAt: now.Add(2 * time.Second),
+				ReceivedAt: now.Add(2 * time.Second),
+				Provider:   "anthropic",
+				Tool:       "claude-code",
+				ProviderExtensions: map[string]any{
+					"outcome_contract": map[string]any{
+						"model":         "claude-test",
+						"status":        "success",
+						"retry_attempt": int64(1),
+						"duration_ms":   1234.0,
+						"input_tokens":  int64(10),
+						"output_tokens": int64(5),
+						"source":        "test",
+					},
+				},
+			}, {
+				EventID:    "ctx-1",
+				EventType:  "model_interaction",
+				SessionID:  "insight-session",
+				OccurredAt: now.Add(3 * time.Second),
+				ReceivedAt: now.Add(3 * time.Second),
+				Provider:   "anthropic",
+				Tool:       "claude-code",
+				Attributes: map[string]any{"input_token_count": int64(100), "cached_input_tokens": int64(75)},
+			}, {
+				EventID:    "ctx-2",
+				EventType:  "model_interaction",
+				SessionID:  "insight-session",
+				OccurredAt: now.Add(4 * time.Second),
+				ReceivedAt: now.Add(4 * time.Second),
+				Provider:   "anthropic",
+				Tool:       "claude-code",
+				Attributes: map[string]any{"input_token_count": int64(200), "cached_input_tokens": int64(150)},
+			}},
+		},
+	}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	body := getAuthed(t, handler, cookie, "/insights").Body.String()
+
+	for _, want := range []string{
+		"Provider reported",
+		"Connected, never invoked",
+		"1500 tokens",
+		"Explicitly identified",
+		"Seen in telemetry",
+		"100% retried",
+		"1234 ms",
+		"75% cached",
+		"2.0×",
+		`href="/sessions/insight-session"`,
+		"Evidence notes",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("insights page missing %q in body: %q", want, body)
+		}
+	}
+	if strings.Contains(body, "%!f(*float64") {
+		t.Fatalf("insights page should not expose pointer formatter output: %q", body)
+	}
+}
+
 func TestContextWasteObservedFloatsRenderNumeric(t *testing.T) {
 	now := time.Now().UTC()
 	repo := &fullStub{
@@ -414,8 +531,11 @@ func TestContextWasteObservedFloatsRenderNumeric(t *testing.T) {
 		t.Fatalf("context-waste row did not close: %q", body[rowStart:])
 	}
 	row := body[rowStart : rowStart+rowEnd]
-	if !strings.Contains(row, ">0.75<") || !strings.Contains(row, ">2.00<") {
-		t.Fatalf("context-waste row should render observed cached ratio and input growth as floats: %q", row)
+	if !strings.Contains(row, ">75% cached<") || !strings.Contains(row, ">2.0×<") {
+		t.Fatalf("context-pressure row should render observed cached ratio and input growth with glossary units: %q", row)
+	}
+	if !strings.Contains(body, `href="/sessions/context-session"`) {
+		t.Fatalf("context-pressure row should link to session detail: %q", body)
 	}
 }
 

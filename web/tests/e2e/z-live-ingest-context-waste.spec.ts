@@ -34,7 +34,7 @@ test('renders context-waste insight for live cached-token logs', async ({
     .getByLabel('Primary navigation')
     .getByRole('link', { name: 'Insights' })
     .click();
-  await expect(page.getByRole('heading', { name: 'Context waste' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Context pressure' })).toBeVisible();
   await expect(page.getByText('Triggered').first()).toBeVisible();
 });
 
