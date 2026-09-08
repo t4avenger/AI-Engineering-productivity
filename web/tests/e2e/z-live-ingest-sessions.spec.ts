@@ -34,7 +34,11 @@ test('renders a session ingested through the live daemon', async ({ page }) => {
 
   await unlockDashboard(page, authToken);
   await page.getByRole('link', { name: 'Sessions', exact: true }).click();
+  await expect(
+    page.getByRole('link', { name: /codex · started/ }).first(),
+  ).toBeVisible();
   await expect(page.getByRole('cell', { name: 'codex' }).first()).toBeVisible();
+  await expect(page.getByText('Seen in telemetry').first()).toBeVisible();
   await expect(
     page.getByRole('heading', { name: 'No retained sessions yet.' }),
   ).toHaveCount(0);

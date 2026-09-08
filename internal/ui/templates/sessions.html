@@ -3,7 +3,7 @@
 {{template "nav" .}}
 <main id="main-content" class="page">
   <h1>Sessions</h1>
-  <p>Newest first. Open a row for evidence.</p>
+  <p>Newest first. Open a row for retained evidence.</p>
   {{with .Content}}
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
   {{if .Sessions}}
@@ -11,28 +11,36 @@
     <table>
       <thead>
         <tr>
+          <th scope="col">Session</th>
           <th scope="col">Tool</th>
           <th scope="col">Provider</th>
           <th scope="col">State</th>
           <th scope="col">Started</th>
-          <th scope="col">Session</th>
+          <th scope="col">Model</th>
         </tr>
       </thead>
       <tbody>
         {{range .Sessions}}
         <tr>
+          <td>
+            <a class="session-primary" href="{{.Path}}">{{.PrimaryLabel}}</a>
+            <span class="muted mono">{{.SecondaryLabel}}</span>
+          </td>
           <td>{{.Tool}}</td>
           <td>{{.Provider}}</td>
           <td>{{.State}}</td>
-          <td>{{formatTime .StartedAt}}</td>
-          <td><a href="/sessions/{{.SessionID}}">{{.SessionID}}</a></td>
+          <td title="{{.StartedAtTitle}}">{{.StartedAt}}</td>
+          <td>{{template "status-badge" .ModelAvailability}}</td>
         </tr>
         {{end}}
       </tbody>
     </table>
   </section>
   {{else}}
-  <p>No retained sessions yet.</p>
+  <section>
+    <h2>No retained sessions yet.</h2>
+    <p>Point Codex or Claude Code OTLP logs at this daemon, or use the supported local Cursor Agent ingest path, then refresh this page.</p>
+  </section>
   {{end}}
   {{end}}
 </main>

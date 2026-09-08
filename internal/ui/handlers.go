@@ -4,12 +4,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
+	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
@@ -46,30 +48,63 @@ type homeData struct {
 }
 
 type sessionsData struct {
-	Sessions []canonical.Session
+	Sessions []sessionRow
 	Error    string
+}
+
+type sessionRow struct {
+	SessionID         string
+	Path              string
+	PrimaryLabel      string
+	SecondaryLabel    string
+	Provider          string
+	Tool              string
+	State             string
+	StartedAt         string
+	StartedAtTitle    string
+	ModelAvailability string
 }
 
 type sessionDetailData struct {
 	Session      canonical.Session
 	SessionID    string
-	Availability map[string]string
+	SessionPath  string
+	Availability []availabilityRow
 	Events       []timelineRow
 	NextCursor   string
 	Error        string
 	Confirm      bool
 }
 
+type availabilityRow struct {
+	Label string
+	State string
+}
+
 type timelineRow struct {
 	EventID           string
-	EventType         string
+	Title             string
+	RawEventType      string
 	OccurredAt        string
 	Provider          string
 	Tool              string
 	Model             string
-	InputTokens       string
-	OutputTokens      string
+	InputTokens       tokenDisplay
+	OutputTokens      tokenDisplay
 	UnavailableFields []string
+	Provenance        []provenanceRow
+}
+
+type tokenDisplay struct {
+	Text     string
+	Observed bool
+	Machine  string
+}
+
+type provenanceRow struct {
+	Path   string
+	Action string
+	Reason string
 }
 
 type insightsData struct {
@@ -172,7 +207,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) sessionsList(w http.ResponseWriter, r *http.Request) {
 	sessions, err := s.listAllSessions(r)
-	data := sessionsData{Sessions: sessions}
+	data := sessionsData{Sessions: sessionRows(sessions)}
 	if err != nil {
 		data.Error = "Unable to load sessions."
 	}
@@ -195,7 +230,7 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, next, err := s.loadTimeline(r, id, r.URL.Query().Get("cursor"))
-	data := sessionDetailData{Session: session, SessionID: id, Availability: sessionAvailability(session), Events: rows, NextCursor: next, Confirm: r.URL.Query().Get("confirm") == "1"}
+	data := sessionDetailData{Session: session, SessionID: id, SessionPath: sessionPath(id), Availability: sessionAvailability(session), Events: rows, NextCursor: next, Confirm: r.URL.Query().Get("confirm") == "1"}
 	if err != nil {
 		data.Error = "Unable to load timeline."
 	}
@@ -467,31 +502,96 @@ func (s *Server) loadTimeline(r *http.Request, sessionID, cursorRaw string) ([]t
 	}
 	rows := make([]timelineRow, len(page))
 	for i, event := range page {
+		provenance, _, err := s.events.EventProvenance(r.Context(), event.EventID)
+		if err != nil {
+			return nil, "", err
+		}
 		rows[i] = timelineRow{
 			EventID:           event.EventID,
-			EventType:         event.EventType,
+			Title:             eventTitle(event.EventType),
+			RawEventType:      event.EventType,
 			OccurredAt:        event.OccurredAt.UTC().Format(time.RFC3339Nano),
 			Provider:          event.Provider,
 			Tool:              event.Tool,
 			Model:             attrString(event.Attributes["model"]),
-			InputTokens:       attrString(event.Attributes["input_token_count"]),
-			OutputTokens:      attrString(event.Attributes["output_token_count"]),
-			UnavailableFields: unavailableFields(event.Attributes["unavailable_fields"]),
+			InputTokens:       tokenValue(event.Attributes["input_token_count"]),
+			OutputTokens:      tokenValue(event.Attributes["output_token_count"]),
+			UnavailableFields: fieldLabels(unavailableFields(event.Attributes["unavailable_fields"])),
+			Provenance:        provenanceRows(provenance),
 		}
 	}
 	return rows, next, nil
+}
+
+func sessionRows(sessions []canonical.Session) []sessionRow {
+	rows := make([]sessionRow, len(sessions))
+	for i, session := range sessions {
+		started := relativeTime(session.StartedAt)
+		if started == statusLabel("unavailable") {
+			started = "started time unavailable"
+		} else {
+			started = "started " + started
+		}
+		tool := session.Tool
+		if tool == "" {
+			tool = statusLabel("unavailable")
+		}
+		provider := session.Provider
+		if provider == "" {
+			provider = statusLabel("unavailable")
+		}
+		rows[i] = sessionRow{
+			SessionID:         session.SessionID,
+			Path:              sessionPath(session.SessionID),
+			PrimaryLabel:      tool + " · " + started,
+			SecondaryLabel:    session.SessionID,
+			Provider:          provider,
+			Tool:              tool,
+			State:             sessionStateLabel(session.State),
+			StartedAt:         started,
+			StartedAtTitle:    formatTimestamp(session.StartedAt),
+			ModelAvailability: modelAvailability(session),
+		}
+	}
+	return rows
 }
 
 func attrString(value any) string {
 	switch v := value.(type) {
 	case string:
 		if v == "" {
-			return "unavailable"
+			return statusLabel("unavailable")
 		}
 		return v
 	default:
-		return "unavailable"
+		return statusLabel("unavailable")
 	}
+}
+
+func tokenValue(value any) tokenDisplay {
+	switch v := value.(type) {
+	case string:
+		if strings.TrimSpace(v) == "" {
+			return unavailableToken()
+		}
+		return tokenDisplay{Text: v + " tokens", Observed: true}
+	case int:
+		return tokenDisplay{Text: formatTokenCount(int64(v)), Observed: true}
+	case int64:
+		return tokenDisplay{Text: formatTokenCount(v), Observed: true}
+	case float64:
+		return tokenDisplay{Text: formatTokenCount(int64(v)), Observed: true}
+	default:
+		return unavailableToken()
+	}
+}
+
+func unavailableToken() tokenDisplay {
+	return tokenDisplay{Text: statusLabel("unavailable"), Machine: "unavailable"}
+}
+
+func formatTokenCount(value int64) string {
+	return strings.TrimSpace(formatOptionalInt64(&value, "tokens"))
 }
 
 func unavailableFields(value any) []string {
@@ -513,14 +613,14 @@ func unavailableFields(value any) []string {
 
 var errUnavailable = errors.New("storage unavailable")
 
-func sessionAvailability(session canonical.Session) map[string]string {
-	return map[string]string{
-		"provider":     observedIf(session.Provider != ""),
-		"tool":         observedIf(session.Tool != ""),
-		"outcome":      outcomeAvailability(session.State),
-		"started_at":   observedIf(!session.StartedAt.IsZero()),
-		"completed_at": observedIf(session.CompletedAt != nil),
-		"model":        modelAvailability(session),
+func sessionAvailability(session canonical.Session) []availabilityRow {
+	return []availabilityRow{
+		{Label: "Provider", State: observedIf(session.Provider != "")},
+		{Label: "Tool", State: observedIf(session.Tool != "")},
+		{Label: "Session state", State: outcomeAvailability(session.State)},
+		{Label: "Started", State: observedIf(!session.StartedAt.IsZero())},
+		{Label: "Completed", State: observedIf(session.CompletedAt != nil)},
+		{Label: "Model", State: modelAvailability(session)},
 	}
 }
 
@@ -548,6 +648,112 @@ func modelAvailability(session canonical.Session) string {
 		}
 	}
 	return "unavailable"
+}
+
+func eventTitle(eventType string) string {
+	switch eventType {
+	case "model_interaction", "codex.sse_event", "api_request":
+		return "Model interaction"
+	case "api_error":
+		return "Model error"
+	case "operation":
+		return "Operation"
+	case "mcp_server_connection":
+		return "MCP server connection"
+	case "skill_invocation":
+		return "Skill invocation"
+	case "session.active":
+		return "Session active"
+	case "session.completed":
+		return "Session completed"
+	default:
+		return strings.NewReplacer("_", " ", ".", " ").Replace(eventType)
+	}
+}
+
+func fieldLabels(fields []string) []string {
+	labels := make([]string, len(fields))
+	for i, field := range fields {
+		labels[i] = fieldLabel(field)
+	}
+	return labels
+}
+
+func fieldLabel(field string) string {
+	field = strings.TrimPrefix(field, "attributes.")
+	field = strings.TrimPrefix(field, "provider_extensions.")
+	switch field {
+	case "started_at":
+		return "Started"
+	case "completed_at":
+		return "Completed"
+	case "outcome":
+		return "Session state"
+	case "model":
+		return "Model"
+	case "latency":
+		return "Latency"
+	case "input_token_count":
+		return "Input tokens"
+	case "output_token_count":
+		return "Output tokens"
+	default:
+		return strings.TrimSpace(strings.NewReplacer("_", " ", ".", " ").Replace(field))
+	}
+}
+
+func provenanceRows(provenance []privacy.Provenance) []provenanceRow {
+	rows := make([]provenanceRow, len(provenance))
+	for i, entry := range provenance {
+		rows[i] = provenanceRow{Path: fieldLabel(entry.Path), Action: statusLabel(string(entry.Action)), Reason: entry.Reason}
+	}
+	return rows
+}
+
+func sessionStateLabel(state string) string {
+	if strings.TrimSpace(state) == "" {
+		return statusLabel("unknown")
+	}
+	return statusLabel(state)
+}
+
+func relativeTime(t time.Time) string {
+	if t.IsZero() {
+		return statusLabel("unavailable")
+	}
+	now := time.Now().UTC()
+	if t.After(now) {
+		return formatTimestamp(t)
+	}
+	d := now.Sub(t.UTC())
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return formatAgo(int(d.Minutes()), "minute")
+	case d < 24*time.Hour:
+		return formatAgo(int(d.Hours()), "hour")
+	case d < 30*24*time.Hour:
+		return formatAgo(int(d.Hours()/24), "day")
+	case d < 365*24*time.Hour:
+		return formatAgo(int(d.Hours()/(24*30)), "month")
+	default:
+		return formatAgo(int(d.Hours()/(24*365)), "year")
+	}
+}
+
+func formatAgo(value int, unit string) string {
+	if value <= 1 {
+		return "1 " + unit + " ago"
+	}
+	return fmt.Sprintf("%d %ss ago", value, unit)
+}
+
+func formatTimestamp(t time.Time) string {
+	if t.IsZero() {
+		return statusLabel("unavailable")
+	}
+	return t.UTC().Format(time.RFC3339)
 }
 
 func safePathID(raw string) (string, bool) {

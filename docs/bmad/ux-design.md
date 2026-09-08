@@ -70,8 +70,8 @@ Replace the React/Mantine SPA with a server-rendered local dashboard that helps 
 |-------|--------|---------|
 | `GET /unlock` | Unlock | Paste `make auth-token` once |
 | `GET /` | Home | Orchestration snapshot |
-| `GET /sessions` | Sessions | Find and open sessions |
-| `GET /sessions/{id}` | Session detail | Evidence + delete |
+| `GET /sessions` | Sessions | Find and open readable session evidence |
+| `GET /sessions/{id}` | Session detail | Timeline evidence + provenance + delete |
 | `GET /insights` | Insights | Educate on MCP + skills |
 | `GET /integrations` | Integrations | Observed tools only |
 | `GET /privacy` | Privacy | Defaults + DELETE ALL |
@@ -145,12 +145,13 @@ See [user-flow.md](user-flow.md) for full paths. Primary flows:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ Sessions                                                │
-│ Newest first. Open a row for evidence.                  │
+│ Newest first. Open a row for retained evidence.         │
 │                                                         │
-│ ┌ tool │ provider │ state │ started │ model avail. ──┐ │
-│ │ …    │ …        │ …     │ …       │ observed|…     │ │
+│ ┌ session label │ tool │ provider │ state │ model ───┐ │
+│ │ codex · started 2 minutes ago                       │ │
+│ │ codex:<native-session-id> │ … │ Seen in telemetry   │ │
 │ └────────────────────────────────────────────────────┘ │
-│ Empty: “No retained sessions yet.”                      │
+│ Empty: “No retained sessions yet” + ingest guidance.    │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -161,10 +162,10 @@ MVP filters: document date/tool/provider as later if API query params are not ye
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ ← Sessions                                              │
-│ Session {id}                                            │
-│ Availability table (field → state)                      │
-│ Timeline (HTMX load more)                               │
-│ Provenance expand per event                             │
+│ Session {provider-prefixed native id}                   │
+│ Availability list with glossary badges                  │
+│ Timeline with friendly titles + token units             │
+│ Privacy provenance expand per event when retained       │
 │ [ Delete this session ] → confirm dialog                │
 └─────────────────────────────────────────────────────────┘
 ```

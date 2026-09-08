@@ -7,12 +7,13 @@
   {{with .Content}}
   <h1>Session {{.Session.SessionID}}</h1>
   <p>{{.Session.Tool}} · {{.Session.Provider}} · {{.Session.State}}</p>
+  <p><span class="muted">Session ID</span> <code>{{.Session.SessionID}}</code></p>
   <section>
     <h2>Availability</h2>
     {{if .Availability}}
-    <ul>
-      {{range $field, $state := .Availability}}
-      <li><span class="avail">{{$field}}</span>: {{template "status-badge" $state}}</li>
+    <ul class="availability-list">
+      {{range .Availability}}
+      <li><span>{{.Label}}</span> {{template "status-badge" .State}}</li>
       {{end}}
     </ul>
     {{else}}
@@ -30,14 +31,14 @@
     <h2>Delete</h2>
     {{if .Confirm}}
     <!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token -->
-  <form method="post" action="/sessions/{{.Session.SessionID}}/delete" class="stack">
+    <form method="post" action="{{.SessionPath}}/delete" class="stack">
       <p role="alert">This permanently deletes the session and its retained events.</p>
       <input type="hidden" name="confirm" value="1">
       <button type="submit" class="danger">Confirm delete</button>
-      <a href="/sessions/{{.Session.SessionID}}">Cancel</a>
+      <a href="{{.SessionPath}}">Cancel</a>
     </form>
     {{else}}
-    <p><a class="button danger" href="/sessions/{{.Session.SessionID}}?confirm=1">Delete this session</a></p>
+    <p><a class="button danger" href="{{.SessionPath}}?confirm=1">Delete this session</a></p>
     {{end}}
   </section>
   {{end}}
