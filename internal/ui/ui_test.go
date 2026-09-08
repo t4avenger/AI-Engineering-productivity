@@ -95,6 +95,27 @@ func getAuthed(t *testing.T, handler http.Handler, cookie *http.Cookie, path str
 	return rec
 }
 
+func syntheticSession(id string, now time.Time) canonical.Session {
+	return canonical.Session{
+		SessionID: id,
+		Provider:  "anthropic",
+		Tool:      "claude-code",
+		State:     "completed",
+		StartedAt: now,
+	}
+}
+
+func renderInsights(t *testing.T, repo *fullStub) string {
+	t.Helper()
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	return getAuthed(t, handler, cookie, "/insights").Body.String()
+}
+
 func TestDashboardPagesAndMutations(t *testing.T) {
 	now := time.Now().UTC()
 	repo := &fullStub{
@@ -356,13 +377,7 @@ func TestUnlockPageHidesLogout(t *testing.T) {
 func TestInsightsMCPInvocationCountUnavailableDoesNotRenderZero(t *testing.T) {
 	now := time.Now().UTC()
 	repo := &fullStub{
-		sessions: []canonical.Session{{
-			SessionID: "mcp-unavailable-session",
-			Provider:  "anthropic",
-			Tool:      "claude-code",
-			State:     "completed",
-			StartedAt: now,
-		}},
+		sessions: []canonical.Session{syntheticSession("mcp-unavailable-session", now)},
 		events: map[string][]canonical.Event{
 			"mcp-unavailable-session": {{
 				EventID:    "connection-only",
@@ -380,13 +395,7 @@ func TestInsightsMCPInvocationCountUnavailableDoesNotRenderZero(t *testing.T) {
 			}},
 		},
 	}
-	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
-	if err != nil {
-		t.Fatal(err)
-	}
-	handler := server.Wrap(http.NotFoundHandler())
-	cookie := unlock(t, handler)
-	body := getAuthed(t, handler, cookie, "/insights").Body.String()
+	body := renderInsights(t, repo)
 	rowStart := strings.Index(body, "connection-only-mcp")
 	if rowStart == -1 {
 		t.Fatalf("MCP row missing: %q", body)
@@ -407,13 +416,7 @@ func TestInsightsMCPInvocationCountUnavailableDoesNotRenderZero(t *testing.T) {
 func TestInsightsRenderGlossaryLabelsUnitsNotesAndLinks(t *testing.T) {
 	now := time.Now().UTC()
 	repo := &fullStub{
-		sessions: []canonical.Session{{
-			SessionID: "insight-session",
-			Provider:  "anthropic",
-			Tool:      "claude-code",
-			State:     "completed",
-			StartedAt: now,
-		}},
+		sessions: []canonical.Session{syntheticSession("insight-session", now)},
 		events: map[string][]canonical.Event{
 			"insight-session": {{
 				EventID:    "mcp-connection",
@@ -491,13 +494,7 @@ func TestInsightsRenderGlossaryLabelsUnitsNotesAndLinks(t *testing.T) {
 			}},
 		},
 	}
-	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
-	if err != nil {
-		t.Fatal(err)
-	}
-	handler := server.Wrap(http.NotFoundHandler())
-	cookie := unlock(t, handler)
-	body := getAuthed(t, handler, cookie, "/insights").Body.String()
+	body := renderInsights(t, repo)
 
 	for _, want := range []string{
 		"Provider reported",
