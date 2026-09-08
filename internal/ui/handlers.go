@@ -116,6 +116,11 @@ type insightsData struct {
 	Error            string
 }
 
+const (
+	htmlContentTypeHeader = "Content-Type"
+	htmlContentTypeValue  = "text/html; charset=utf-8"
+)
+
 type integrationsData struct {
 	Tools []integrationRow
 	Empty bool
@@ -250,7 +255,7 @@ func (s *Server) sessionTimelinePartial(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "unable to load timeline", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
 	_ = s.templates.ExecuteTemplate(w, tmplTimelineRows, struct {
 		SessionID  string
 		Events     []timelineRow
@@ -274,7 +279,7 @@ func (s *Server) eventProvenancePartial(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "unable to load provenance", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
 	_ = s.templates.ExecuteTemplate(w, "provenance_rows.html", provenanceRows(provenance))
 }
 
@@ -403,7 +408,7 @@ func (s *Server) costsPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) render(w http.ResponseWriter, page string, data layoutData) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
 	if err := s.templates.ExecuteTemplate(w, page, data); err != nil {
 		http.Error(w, "template error", http.StatusInternalServerError)
 	}

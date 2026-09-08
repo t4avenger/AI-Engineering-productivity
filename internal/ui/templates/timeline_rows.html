@@ -15,7 +15,7 @@
     hx-get="{{eventProvenancePath .EventID}}"
     hx-trigger="toggle once"
     hx-target="find ul"
-    hx-swap="innerHTML"
+    hx-swap="outerHTML"
   >
     <summary>Privacy provenance</summary>
     <ul><li>Load privacy provenance</li></ul>
@@ -38,9 +38,11 @@
 {{end}}
 
 {{define "provenance_rows.html"}}
-{{range .}}
-<li><span class="mono">{{.Path}}</span>{{if .Label}} ({{.Label}}){{end}}: {{.Action}}{{if .Reason}} - {{.Reason}}{{end}}</li>
-{{else}}
-<li>No privacy provenance retained for this event.</li>
-{{end}}
+<ul>
+  {{range .}}
+  <li><span class="mono">{{.Path}}</span>{{if .Label}} ({{.Label}}){{end}}: {{.Action}}{{if .Reason}} - {{.Reason}}{{end}}</li>
+  {{else}}
+  <li>No privacy provenance retained for this event.</li>
+  {{end}}
+</ul>
 {{end}}
