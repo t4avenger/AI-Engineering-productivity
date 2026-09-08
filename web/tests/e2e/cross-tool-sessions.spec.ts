@@ -24,6 +24,12 @@ test('renders availability labels on a live session detail', async ({
   await expect(page.getByRole('heading', { name: /^Session / })).toBeVisible();
   // Availability states render as plain-label status badges (issue #76),
   // matching the field glossary rather than raw machine enums.
-  await expect(page.getByText('model: Seen in telemetry')).toBeVisible();
-  await expect(page.getByText('tool: Seen in telemetry')).toBeVisible();
+  await expect(page.getByText('Model').first()).toBeVisible();
+  await expect(page.getByText('Tool').first()).toBeVisible();
+  await expect(page.getByText('Seen in telemetry').first()).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Model interaction' }),
+  ).toBeVisible();
+  await expect(page.getByText('Input tokens').first()).toBeVisible();
+  await expect(page.getByText('11 tokens')).toBeVisible();
 });

@@ -22,11 +22,12 @@ var defaultContextWasteThresholds = insights.ContextWasteThresholds{
 }
 
 type fullStub struct {
-	sessions []canonical.Session
-	events   map[string][]canonical.Event
-	costs    []cost.Record
-	deleted  []string
-	cleared  bool
+	sessions   []canonical.Session
+	events     map[string][]canonical.Event
+	provenance map[string][]privacy.Provenance
+	costs      []cost.Record
+	deleted    []string
+	cleared    bool
 }
 
 func (s *fullStub) Session(_ context.Context, id string) (canonical.Session, bool, error) {
@@ -64,8 +65,9 @@ func (s *fullStub) ListEvents(_ context.Context, filter storage.EventFilter) ([]
 	return append([]canonical.Event(nil), s.events[filter.SessionID]...), nil
 }
 
-func (s *fullStub) EventProvenance(context.Context, string) ([]privacy.Provenance, bool, error) {
-	return nil, false, nil
+func (s *fullStub) EventProvenance(_ context.Context, id string) ([]privacy.Provenance, bool, error) {
+	provenance, ok := s.provenance[id]
+	return provenance, ok, nil
 }
 
 func (s *fullStub) ListCostRecords(context.Context, string) ([]cost.Record, error) {
@@ -164,6 +166,9 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 				},
 			}},
 		},
+		provenance: map[string][]privacy.Provenance{
+			"e1": {{Path: "attributes.input_token_count", Action: privacy.ActionRetained, Reason: "safe operational telemetry"}},
+		},
 		costs: []cost.Record{{
 			Currency: "USD",
 			Status:   "calculated",
@@ -186,8 +191,15 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 	}{
 		{"/", "Orchestration overview"},
 		{"/sessions", "codex"},
+		{"/sessions", "codex · started"},
+		{"/sessions", "Model"},
 		{"/sessions/s1", "Availability"},
-		{"/sessions/s1", "model_interaction"},
+		{"/sessions/s1", "Model interaction"},
+		{"/sessions/s1", "Input tokens"},
+		{"/sessions/s1", "2 tokens"},
+		{"/sessions/s1", "Privacy provenance"},
+		{"/events/e1/provenance", "attributes.input_token_count"},
+		{"/events/e1/provenance", "Retained"},
 		{"/insights", "MCP inventory"},
 		{"/insights", "Skill usage"},
 		{"/insights", "Model performance"},
@@ -342,6 +354,53 @@ func (errStub) Session(context.Context, string) (canonical.Session, bool, error)
 
 func (errStub) ListSessions(context.Context, storage.SessionFilter) ([]canonical.Session, error) {
 	return nil, context.DeadlineExceeded
+}
+
+func TestTimelineInvalidTokenStringIsUnavailable(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fullStub{
+		sessions: []canonical.Session{syntheticSession("invalid-token-session", now)},
+		events: map[string][]canonical.Event{
+			"invalid-token-session": {{
+				EventID:    "bad-token",
+				EventType:  "model_interaction",
+				SessionID:  "invalid-token-session",
+				OccurredAt: now,
+				ReceivedAt: now,
+				Provider:   "openai",
+				Tool:       "codex",
+				Attributes: map[string]any{"input_token_count": "not-a-number"},
+			}},
+		},
+	}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	body := getAuthed(t, handler, cookie, "/sessions/invalid-token-session").Body.String()
+	if strings.Contains(body, "not-a-number tokens") {
+		t.Fatalf("invalid token strings must not get token units: %q", body)
+	}
+	if !strings.Contains(body, "Not available from this provider") {
+		t.Fatalf("invalid token strings should render unavailable: %q", body)
+	}
+}
+
+func TestSessionsEmptyStateExplainsIngestNextStep(t *testing.T) {
+	server, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	body := getAuthed(t, handler, cookie, "/sessions").Body.String()
+	for _, want := range []string{"No retained sessions yet.", "Point Codex or Claude Code OTLP logs", "supported local Cursor Agent ingest path"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("sessions empty state missing %q in body: %q", want, body)
+		}
+	}
 }
 
 func TestHealthDegradesWhenStorageFails(t *testing.T) {

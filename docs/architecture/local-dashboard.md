@@ -13,10 +13,15 @@ local HTTP; bare `127.0.0.1` may reject Secure cookies. JSON management
 endpoints continue to accept `Authorization: Bearer` and also accept the
 session cookie.
 
-The Sessions page uses the stable Task 009 read API data. A session detail is
-loaded only after navigation to `/sessions/{id}`. Deletion requires an in-app
-confirmation before `POST /sessions/{id}/delete`; the repository removes the
-session and all retained events transactionally.
+The Sessions page uses the stable Task 009 read API data and renders retained
+sessions as an evidence browser: the primary row label combines tool and
+relative start time, while the provider-prefixed native session ID remains
+visible as secondary detail. A session detail is loaded only after navigation to
+`/sessions/{id}`. The detail view renders glossary-backed availability badges,
+friendly timeline event titles, token values with units, and lazy-loaded privacy
+provenance `<details>` backed by the event store. Deletion
+requires an in-app confirmation before `POST /sessions/{id}/delete`; the
+repository removes the session and all retained events transactionally.
 
 In the local-only edition, session lists and details may display provider-native
 session or conversation IDs with a stable provider prefix (`codex:`,

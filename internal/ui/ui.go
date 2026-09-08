@@ -26,6 +26,7 @@ const (
 	pathSessions       = "/sessions"
 	pathSessionsPrefix = "/sessions/"
 	pathInsights       = "/insights"
+	pathEventsPrefix   = "/events/"
 	pathIntegrations   = "/integrations"
 	pathPrivacy        = "/privacy"
 	pathPrivacyDelete  = "/privacy/delete-all"
@@ -86,12 +87,13 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 			}
 			return *v
 		},
-		"formatPercent":     formatPercent,
-		"formatMultiplier":  formatMultiplier,
-		"formatMillis":      formatMillis,
-		"formatOptionalInt": formatOptionalInt64,
-		"sessionPath":       sessionPath,
-		"microusd":          formatMicroUSD,
+		"formatPercent":       formatPercent,
+		"formatMultiplier":    formatMultiplier,
+		"formatMillis":        formatMillis,
+		"formatOptionalInt":   formatOptionalInt64,
+		"sessionPath":         sessionPath,
+		"eventProvenancePath": eventProvenancePath,
+		"microusd":            formatMicroUSD,
 	}).ParseFS(embedded, "templates/*.html")
 	if err != nil {
 		return nil, err
@@ -280,4 +282,8 @@ func formatOptionalInt64(value *int64, unit string) string {
 
 func sessionPath(id string) string {
 	return pathSessions + "/" + url.PathEscape(id)
+}
+
+func eventProvenancePath(id string) string {
+	return pathEventsPrefix + url.PathEscape(id) + "/provenance"
 }
