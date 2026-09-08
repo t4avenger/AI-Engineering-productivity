@@ -267,10 +267,70 @@ func TestUnlockAndHome(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(body, "Orchestration overview") || !strings.Contains(body, "codex") {
 		t.Fatalf("home = %d %q", rec.Code, body)
 	}
-	for _, forbidden := range []string{`href="/costs"`, `>Costs<`, "Calculated amount", "Cost estimates", "Secondary estimates"} {
+	// Issue #76 adds a global "Costs" nav link (last), so the link itself now
+	// legitimately appears on Home. "Never on Home" is about cost *figures*:
+	// Home must still not surface any calculated/estimated cost content.
+	for _, forbidden := range []string{"Calculated amount", "Cost estimates", "Secondary estimates"} {
 		if strings.Contains(body, forbidden) {
-			t.Fatalf("home must not surface cost UI %q", forbidden)
+			t.Fatalf("home must not surface cost figures %q", forbidden)
 		}
+	}
+	// Costs nav link is present and ordered last (after Privacy).
+	if !strings.Contains(body, `href="/costs"`) {
+		t.Fatalf("home nav must link Costs: %q", body)
+	}
+	if strings.Index(body, `href="/privacy"`) > strings.Index(body, `href="/costs"`) {
+		t.Fatalf("Costs nav link must come after Privacy")
+	}
+	// Logout control is visible once authenticated.
+	if !strings.Contains(body, `action="/logout"`) {
+		t.Fatalf("authenticated home must show a logout control: %q", body)
+	}
+	// Health is honest: a reachable store reports Healthy with the ok badge.
+	if !strings.Contains(body, "Daemon: Healthy") || !strings.Contains(body, `class="health ok"`) {
+		t.Fatalf("home must show honest healthy daemon badge: %q", body)
+	}
+}
+
+// errStub is a SessionReader whose store always fails, to prove the health
+// label degrades honestly instead of always reporting "Healthy".
+type errStub struct{}
+
+func (errStub) Session(context.Context, string) (canonical.Session, bool, error) {
+	return canonical.Session{}, false, context.DeadlineExceeded
+}
+
+func (errStub) ListSessions(context.Context, storage.SessionFilter) ([]canonical.Session, error) {
+	return nil, context.DeadlineExceeded
+}
+
+func TestHealthDegradesWhenStorageFails(t *testing.T) {
+	server, err := ui.New("test-token", errStub{}, defaultContextWasteThresholds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	body := getAuthed(t, handler, cookie, "/").Body.String()
+	if !strings.Contains(body, "Daemon: Degraded") || !strings.Contains(body, `class="health degraded"`) {
+		t.Fatalf("failing storage must render a degraded daemon badge, got: %q", body)
+	}
+}
+
+func TestUnlockPageHidesLogout(t *testing.T) {
+	server, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/unlock", nil))
+	body := rec.Body.String()
+	if strings.Contains(body, `action="/logout"`) {
+		t.Fatalf("unlock page must not show a logout control: %q", body)
+	}
+	if strings.Contains(body, "Daemon:") {
+		t.Fatalf("unlock page must not show a daemon health badge: %q", body)
 	}
 }
 

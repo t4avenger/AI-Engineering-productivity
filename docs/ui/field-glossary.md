@@ -26,6 +26,17 @@ insight notes; this document does not define new metrics or calculation rules.
 If later UI work keeps the section title "Context waste", the MCP table column
 must still avoid that exact title and should use "Unused connection".
 
+## Status Badge Primitive
+
+Templates render availability and detection enums through the shared
+`status-badge` partial (`internal/ui/templates/partials.html`), backed by the
+`statusLabel` and `statusClass` helpers in `internal/ui/ui.go`. `statusLabel`
+maps each machine value to the plain label defined in the Enum Label Map below;
+`statusClass` selects the badge CSS in `internal/ui/static/app.css`, where the
+label is always paired with a leading glyph so state is never conveyed by colour
+alone. Use `{{template "status-badge" $state}}` rather than printing raw enum
+strings.
+
 ## Enum Label Map
 
 | Machine value | Plain label | Definition | Units | When unavailable |

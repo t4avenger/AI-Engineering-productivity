@@ -61,7 +61,9 @@ type Server struct {
 // New builds a dashboard server. sessions may be a full Repository.
 func New(token string, sessions storage.SessionReader, contextWasteThresholds insights.ContextWasteThresholds) (*Server, error) {
 	tmpl, err := template.New("").Funcs(template.FuncMap{
-		"avail": availabilityLabel,
+		"avail":       availabilityLabel,
+		"statusLabel": statusLabel,
+		"statusClass": statusClass,
 		"formatTime": func(t time.Time) string {
 			if t.IsZero() {
 				return "unavailable"
@@ -168,6 +170,37 @@ func availabilityLabel(value string) string {
 		return "unavailable"
 	default:
 		return value
+	}
+}
+
+// statusLabel maps a machine availability/detection enum to the plain UI label
+// from docs/ui/field-glossary.md ("Enum Label Map"). Unrecognised values fall
+// back to the raw machine value so a state is never silently dropped.
+func statusLabel(value string) string {
+	switch value {
+	case "observed":
+		return "Seen in telemetry"
+	case "partial":
+		return "Partially seen"
+	case "unavailable":
+		return "Not available from this provider"
+	case "unsupported":
+		return "Not supported"
+	case "unknown", "":
+		return "Not proven yet"
+	default:
+		return value
+	}
+}
+
+// statusClass maps the same enum to its badge CSS class. Unrecognised or empty
+// values use the neutral "status-unknown" treatment.
+func statusClass(value string) string {
+	switch value {
+	case "observed", "partial", "unavailable", "unsupported", "unknown":
+		return "status-" + value
+	default:
+		return "status-unknown"
 	}
 }
 
