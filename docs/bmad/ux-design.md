@@ -165,7 +165,7 @@ MVP filters: document date/tool/provider as later if API query params are not ye
 │ Session {provider-prefixed native id}                   │
 │ Availability list with glossary badges                  │
 │ Timeline with friendly titles + token units             │
-│ Privacy provenance expand per event when retained       │
+│ Privacy provenance lazy-loads on event expansion        │
 │ [ Delete this session ] → confirm dialog                │
 └─────────────────────────────────────────────────────────┘
 ```

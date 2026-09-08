@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -92,7 +93,6 @@ type timelineRow struct {
 	InputTokens       tokenDisplay
 	OutputTokens      tokenDisplay
 	UnavailableFields []string
-	Provenance        []provenanceRow
 }
 
 type tokenDisplay struct {
@@ -103,6 +103,7 @@ type tokenDisplay struct {
 
 type provenanceRow struct {
 	Path   string
+	Label  string
 	Action string
 	Reason string
 }
@@ -255,6 +256,26 @@ func (s *Server) sessionTimelinePartial(w http.ResponseWriter, r *http.Request) 
 		Events     []timelineRow
 		NextCursor string
 	}{SessionID: id, Events: rows, NextCursor: next})
+}
+
+func (s *Server) eventProvenancePartial(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, pathEventsPrefix)
+	id, ok := safePathID(strings.TrimSuffix(path, "/provenance"))
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	if s.events == nil {
+		http.Error(w, "provenance unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	provenance, _, err := s.events.EventProvenance(r.Context(), id)
+	if err != nil {
+		http.Error(w, "unable to load provenance", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = s.templates.ExecuteTemplate(w, "provenance_rows.html", provenanceRows(provenance))
 }
 
 func (s *Server) sessionDelete(w http.ResponseWriter, r *http.Request) {
@@ -502,10 +523,6 @@ func (s *Server) loadTimeline(r *http.Request, sessionID, cursorRaw string) ([]t
 	}
 	rows := make([]timelineRow, len(page))
 	for i, event := range page {
-		provenance, _, err := s.events.EventProvenance(r.Context(), event.EventID)
-		if err != nil {
-			return nil, "", err
-		}
 		rows[i] = timelineRow{
 			EventID:           event.EventID,
 			Title:             eventTitle(event.EventType),
@@ -517,7 +534,6 @@ func (s *Server) loadTimeline(r *http.Request, sessionID, cursorRaw string) ([]t
 			InputTokens:       tokenValue(event.Attributes["input_token_count"]),
 			OutputTokens:      tokenValue(event.Attributes["output_token_count"]),
 			UnavailableFields: fieldLabels(unavailableFields(event.Attributes["unavailable_fields"])),
-			Provenance:        provenanceRows(provenance),
 		}
 	}
 	return rows, next, nil
@@ -571,10 +587,11 @@ func attrString(value any) string {
 func tokenValue(value any) tokenDisplay {
 	switch v := value.(type) {
 	case string:
-		if strings.TrimSpace(v) == "" {
+		value, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+		if err != nil {
 			return unavailableToken()
 		}
-		return tokenDisplay{Text: v + " tokens", Observed: true}
+		return tokenDisplay{Text: formatTokenCount(value), Observed: true}
 	case int:
 		return tokenDisplay{Text: formatTokenCount(int64(v)), Observed: true}
 	case int64:
@@ -705,9 +722,28 @@ func fieldLabel(field string) string {
 func provenanceRows(provenance []privacy.Provenance) []provenanceRow {
 	rows := make([]provenanceRow, len(provenance))
 	for i, entry := range provenance {
-		rows[i] = provenanceRow{Path: fieldLabel(entry.Path), Action: statusLabel(string(entry.Action)), Reason: entry.Reason}
+		rows[i] = provenanceRow{Path: entry.Path, Label: fieldLabel(entry.Path), Action: privacyActionLabel(entry.Action), Reason: entry.Reason}
 	}
 	return rows
+}
+
+func privacyActionLabel(action privacy.Action) string {
+	switch action {
+	case privacy.ActionRetained:
+		return "Retained"
+	case privacy.ActionRemoved:
+		return "Removed"
+	case privacy.ActionHashed:
+		return "Hashed"
+	case privacy.ActionRedacted:
+		return "Redacted"
+	case privacy.ActionClassified:
+		return "Classified"
+	case privacy.ActionCommandClassified:
+		return "Command classified"
+	default:
+		return strings.TrimSpace(strings.NewReplacer("_", " ").Replace(string(action)))
+	}
 }
 
 func sessionStateLabel(state string) string {

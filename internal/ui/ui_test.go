@@ -198,6 +198,8 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 		{"/sessions/s1", "Input tokens"},
 		{"/sessions/s1", "2 tokens"},
 		{"/sessions/s1", "Privacy provenance"},
+		{"/events/e1/provenance", "attributes.input_token_count"},
+		{"/events/e1/provenance", "Retained"},
 		{"/insights", "MCP inventory"},
 		{"/insights", "Skill usage"},
 		{"/insights", "Model performance"},
@@ -352,6 +354,38 @@ func (errStub) Session(context.Context, string) (canonical.Session, bool, error)
 
 func (errStub) ListSessions(context.Context, storage.SessionFilter) ([]canonical.Session, error) {
 	return nil, context.DeadlineExceeded
+}
+
+func TestTimelineInvalidTokenStringIsUnavailable(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fullStub{
+		sessions: []canonical.Session{syntheticSession("invalid-token-session", now)},
+		events: map[string][]canonical.Event{
+			"invalid-token-session": {{
+				EventID:    "bad-token",
+				EventType:  "model_interaction",
+				SessionID:  "invalid-token-session",
+				OccurredAt: now,
+				ReceivedAt: now,
+				Provider:   "openai",
+				Tool:       "codex",
+				Attributes: map[string]any{"input_token_count": "not-a-number"},
+			}},
+		},
+	}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	body := getAuthed(t, handler, cookie, "/sessions/invalid-token-session").Body.String()
+	if strings.Contains(body, "not-a-number tokens") {
+		t.Fatalf("invalid token strings must not get token units: %q", body)
+	}
+	if !strings.Contains(body, "Not available from this provider") {
+		t.Fatalf("invalid token strings should render unavailable: %q", body)
+	}
 }
 
 func TestSessionsEmptyStateExplainsIngestNextStep(t *testing.T) {

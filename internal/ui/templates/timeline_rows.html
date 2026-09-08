@@ -11,16 +11,15 @@
   {{if .UnavailableFields}}
   <p class="muted">Unavailable: {{range $i, $f := .UnavailableFields}}{{if $i}}, {{end}}{{$f}}{{end}}</p>
   {{end}}
-  {{if .Provenance}}
-  <details>
+  <details
+    hx-get="{{eventProvenancePath .EventID}}"
+    hx-trigger="toggle once"
+    hx-target="find ul"
+    hx-swap="innerHTML"
+  >
     <summary>Privacy provenance</summary>
-    <ul>
-      {{range .Provenance}}
-      <li><span class="mono">{{.Path}}</span>: {{.Action}}{{if .Reason}} - {{.Reason}}{{end}}</li>
-      {{end}}
-    </ul>
+    <ul><li>Load privacy provenance</li></ul>
   </details>
-  {{end}}
 </article>
 {{else}}
 {{if not .NextCursor}}<p>No events retained for this session.</p>{{end}}
@@ -35,5 +34,13 @@
     hx-on::after-swap="this.closest('#timeline-more').remove()"
   >Load more</a>
 </p>
+{{end}}
+{{end}}
+
+{{define "provenance_rows.html"}}
+{{range .}}
+<li><span class="mono">{{.Path}}</span>{{if .Label}} ({{.Label}}){{end}}: {{.Action}}{{if .Reason}} - {{.Reason}}{{end}}</li>
+{{else}}
+<li>No privacy provenance retained for this event.</li>
 {{end}}
 {{end}}

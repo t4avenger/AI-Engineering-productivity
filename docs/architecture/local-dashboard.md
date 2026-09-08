@@ -18,8 +18,8 @@ sessions as an evidence browser: the primary row label combines tool and
 relative start time, while the provider-prefixed native session ID remains
 visible as secondary detail. A session detail is loaded only after navigation to
 `/sessions/{id}`. The detail view renders glossary-backed availability badges,
-friendly timeline event titles, token values with units, and privacy provenance
-`<details>` when the event store has retained field treatment evidence. Deletion
+friendly timeline event titles, token values with units, and lazy-loaded privacy
+provenance `<details>` backed by the event store. Deletion
 requires an in-app confirmation before `POST /sessions/{id}/delete`; the
 repository removes the session and all retained events transactionally.
 
