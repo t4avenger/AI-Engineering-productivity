@@ -353,6 +353,57 @@ func TestUnlockPageHidesLogout(t *testing.T) {
 	}
 }
 
+func TestInsightsMCPInvocationCountUnavailableDoesNotRenderZero(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fullStub{
+		sessions: []canonical.Session{{
+			SessionID: "mcp-unavailable-session",
+			Provider:  "anthropic",
+			Tool:      "claude-code",
+			State:     "completed",
+			StartedAt: now,
+		}},
+		events: map[string][]canonical.Event{
+			"mcp-unavailable-session": {{
+				EventID:    "connection-only",
+				EventType:  "mcp_server_connection",
+				SessionID:  "mcp-unavailable-session",
+				OccurredAt: now,
+				ReceivedAt: now,
+				Provider:   "anthropic",
+				Tool:       "claude-code",
+				ProviderExtensions: map[string]any{
+					"event": map[string]any{
+						"server_name": "connection-only-mcp",
+					},
+				},
+			}},
+		},
+	}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	body := getAuthed(t, handler, cookie, "/insights").Body.String()
+	rowStart := strings.Index(body, "connection-only-mcp")
+	if rowStart == -1 {
+		t.Fatalf("MCP row missing: %q", body)
+	}
+	rowEnd := strings.Index(body[rowStart:], "</tr>")
+	if rowEnd == -1 {
+		t.Fatalf("MCP row did not close: %q", body[rowStart:])
+	}
+	row := body[rowStart : rowStart+rowEnd]
+	if strings.Contains(row, "0 invocations") {
+		t.Fatalf("usage-unavailable MCP row must not imply measured zero invocations: %q", row)
+	}
+	if !strings.Contains(row, "Usage not available") {
+		t.Fatalf("usage-unavailable MCP row should render unavailable badge in invocations cell: %q", row)
+	}
+}
+
 func TestInsightsRenderGlossaryLabelsUnitsNotesAndLinks(t *testing.T) {
 	now := time.Now().UTC()
 	repo := &fullStub{
