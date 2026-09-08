@@ -16,9 +16,17 @@ import (
 type layoutData struct {
 	Title   string
 	Nav     string
-	Health  string
+	Health  healthStatus
 	Content any
 	Error   string
+}
+
+// healthStatus is the honest daemon health rendered in the app shell. Text is
+// the human label ("Healthy"/"Unknown"/"Degraded"); State selects the badge
+// class (ok/unknown/degraded).
+type healthStatus struct {
+	Text  string
+	State string
 }
 
 type unlockData struct {
@@ -125,7 +133,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	data := homeData{}
 	sessions, err := s.listAllSessions(r)
 	if err != nil {
-		s.render(w, tmplHome, layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(), Error: "Unable to load sessions.", Content: data})
+		s.render(w, tmplHome, layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(r), Error: "Unable to load sessions.", Content: data})
 		return
 	}
 	data.Empty = len(sessions) == 0
@@ -159,7 +167,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		data.MCPUnused = mcp.Totals.UnusedServers
 		data.SkillCount = skills.Totals.ObservedSkills
 	}
-	s.render(w, tmplHome, layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(), Content: data})
+	s.render(w, tmplHome, layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(r), Content: data})
 }
 
 func (s *Server) sessionsList(w http.ResponseWriter, r *http.Request) {
@@ -168,7 +176,7 @@ func (s *Server) sessionsList(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		data.Error = "Unable to load sessions."
 	}
-	s.render(w, tmplSessions, layoutData{Title: "Sessions", Nav: "sessions", Health: s.healthLabel(), Content: data})
+	s.render(w, tmplSessions, layoutData{Title: "Sessions", Nav: "sessions", Health: s.healthLabel(r), Content: data})
 }
 
 func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
@@ -179,7 +187,7 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	session, found, err := s.sessions.Session(r.Context(), id)
 	if err != nil {
-		s.render(w, tmplSessionDetail, layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(), Error: "Unable to load session.", Content: sessionDetailData{}})
+		s.render(w, tmplSessionDetail, layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(r), Error: "Unable to load session.", Content: sessionDetailData{}})
 		return
 	}
 	if !found {
@@ -191,7 +199,7 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		data.Error = "Unable to load timeline."
 	}
-	s.render(w, tmplSessionDetail, layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(), Content: data})
+	s.render(w, tmplSessionDetail, layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(r), Content: data})
 }
 
 func (s *Server) sessionTimelinePartial(w http.ResponseWriter, r *http.Request) {
@@ -249,14 +257,14 @@ func (s *Server) insightsPage(w http.ResponseWriter, r *http.Request) {
 		data.ModelPerformance = insights.ModelPerformanceFromEvents(events)
 		data.ContextWaste = insights.ContextWasteFromEvents(events, s.contextWasteThresholds)
 	}
-	s.render(w, tmplInsights, layoutData{Title: "Insights", Nav: "insights", Health: s.healthLabel(), Content: data})
+	s.render(w, tmplInsights, layoutData{Title: "Insights", Nav: "insights", Health: s.healthLabel(r), Content: data})
 }
 
 func (s *Server) integrationsPage(w http.ResponseWriter, r *http.Request) {
 	sessions, err := s.listAllSessions(r)
 	data := integrationsData{}
 	if err != nil {
-		s.render(w, tmplIntegrations, layoutData{Title: "Integrations", Nav: "integrations", Health: s.healthLabel(), Error: "Unable to load integrations.", Content: data})
+		s.render(w, tmplIntegrations, layoutData{Title: "Integrations", Nav: "integrations", Health: s.healthLabel(r), Error: "Unable to load integrations.", Content: data})
 		return
 	}
 	seen := map[string]integrationRow{}
@@ -268,7 +276,7 @@ func (s *Server) integrationsPage(w http.ResponseWriter, r *http.Request) {
 		data.Tools = append(data.Tools, row)
 	}
 	data.Empty = len(data.Tools) == 0
-	s.render(w, tmplIntegrations, layoutData{Title: "Integrations", Nav: "integrations", Health: s.healthLabel(), Content: data})
+	s.render(w, tmplIntegrations, layoutData{Title: "Integrations", Nav: "integrations", Health: s.healthLabel(r), Content: data})
 }
 
 func (s *Server) privacyPage(w http.ResponseWriter, r *http.Request) {
@@ -282,7 +290,7 @@ func (s *Server) privacyPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, tmplPrivacy, layoutData{
 		Title:   "Privacy",
 		Nav:     "privacy",
-		Health:  s.healthLabel(),
+		Health:  s.healthLabel(r),
 		Content: privacyData{Confirm: r.URL.Query().Get("confirm") == "1", Error: errMsg},
 	})
 }
@@ -311,13 +319,13 @@ func (s *Server) costsPage(w http.ResponseWriter, r *http.Request) {
 	data := costsData{Statuses: map[string]int{}}
 	if s.costs == nil {
 		data.Error = "Cost storage is unavailable."
-		s.render(w, tmplCosts, layoutData{Title: "Costs", Nav: "costs", Health: s.healthLabel(), Content: data})
+		s.render(w, tmplCosts, layoutData{Title: "Costs", Nav: "costs", Health: s.healthLabel(r), Content: data})
 		return
 	}
 	records, err := s.costs.ListCostRecords(r.Context(), "")
 	if err != nil {
 		data.Error = "Unable to load costs."
-		s.render(w, tmplCosts, layoutData{Title: "Costs", Nav: "costs", Health: s.healthLabel(), Content: data})
+		s.render(w, tmplCosts, layoutData{Title: "Costs", Nav: "costs", Health: s.healthLabel(r), Content: data})
 		return
 	}
 	var amount int64
@@ -335,7 +343,7 @@ func (s *Server) costsPage(w http.ResponseWriter, r *http.Request) {
 	if hasKnownAmount {
 		data.Amount = &amount
 	}
-	s.render(w, tmplCosts, layoutData{Title: "Costs", Nav: "costs", Health: s.healthLabel(), Content: data})
+	s.render(w, tmplCosts, layoutData{Title: "Costs", Nav: "costs", Health: s.healthLabel(r), Content: data})
 }
 
 func (s *Server) render(w http.ResponseWriter, page string, data layoutData) {
@@ -345,8 +353,20 @@ func (s *Server) render(w http.ResponseWriter, page string, data layoutData) {
 	}
 }
 
-func (s *Server) healthLabel() string {
-	return "Healthy"
+// healthLabel reports daemon health honestly. Rendering this page already
+// proves the HTTP and auth path is up, so storage is the only uncertain
+// dependency: a bounded one-row probe distinguishes a reachable store
+// (Healthy) from a missing one (Unknown) or a failing one (Degraded). The
+// happy path keeps the literal "Healthy" text the dashboard journey e2e
+// asserts.
+func (s *Server) healthLabel(r *http.Request) healthStatus {
+	if s.sessions == nil {
+		return healthStatus{Text: "Unknown", State: "unknown"}
+	}
+	if _, err := s.sessions.ListSessions(r.Context(), storage.SessionFilter{Limit: 1}); err != nil {
+		return healthStatus{Text: "Degraded", State: "degraded"}
+	}
+	return healthStatus{Text: "Healthy", State: "ok"}
 }
 
 func (s *Server) listAllSessions(r *http.Request) ([]canonical.Session, error) {

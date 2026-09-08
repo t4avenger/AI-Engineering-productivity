@@ -12,7 +12,7 @@
     {{if .Availability}}
     <ul>
       {{range $field, $state := .Availability}}
-      <li><span class="avail">{{$field}}</span>: {{avail $state}}</li>
+      <li><span class="avail">{{$field}}</span>: {{template "status-badge" $state}}</li>
       {{end}}
     </ul>
     {{else}}

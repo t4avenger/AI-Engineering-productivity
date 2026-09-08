@@ -12,8 +12,23 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <div class="app-shell">
     <header class="app-header">
-      <p class="brand">TelemetryIQ <span>Local developer edition</span></p>
-      {{if .Health}}<p class="health healthy" aria-live="polite">Daemon: {{.Health}}</p>{{end}}
+      <p class="brand"><a href="/">TelemetryIQ</a> <span>Local developer edition</span></p>
+      <div class="header-meta">
+        {{if .Health.Text}}<p class="health {{.Health.State}}" aria-live="polite">Daemon: {{.Health.Text}}</p>{{end}}
+        {{/* Nav is empty on the unlock page, so the logout control only shows once authenticated. */}}
+        {{if .Nav}}
+        {{/*
+          CSRF: the telemetryiq_auth cookie is SameSite=Strict + HttpOnly, so a
+          cross-site POST cannot carry it, and logout only clears that cookie.
+          The Django rule id below is the id used by this repo's semgrep config;
+          it flags the missing framework CSRF token, which does not apply here.
+        */}}
+        <!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token -->
+        <form method="post" action="/logout" class="logout-form">
+          <button type="submit">Log out</button>
+        </form>
+        {{end}}
+      </div>
     </header>
 {{end}}
 
@@ -24,6 +39,7 @@
       <a class="nav-link{{if eq .Nav "insights"}} active{{end}}" href="/insights" {{if eq .Nav "insights"}}aria-current="page"{{end}}>Insights</a>
       <a class="nav-link{{if eq .Nav "integrations"}} active{{end}}" href="/integrations" {{if eq .Nav "integrations"}}aria-current="page"{{end}}>Integrations</a>
       <a class="nav-link{{if eq .Nav "privacy"}} active{{end}}" href="/privacy" {{if eq .Nav "privacy"}}aria-current="page"{{end}}>Privacy</a>
+      <a class="nav-link{{if eq .Nav "costs"}} active{{end}}" href="/costs" {{if eq .Nav "costs"}}aria-current="page"{{end}}>Costs</a>
     </nav>
 {{end}}
 
@@ -32,3 +48,12 @@
 </body>
 </html>
 {{end}}
+
+{{/*
+  status-badge renders a machine availability/detection enum as a labelled
+  badge. The visible text is the plain label from docs/ui/field-glossary.md
+  (via statusLabel); the machine value is kept in the title for debugging.
+  Colour is never the sole state cue — the label and a leading glyph carry it.
+  Dot context is the enum string, e.g. {{template "status-badge" $state}}.
+*/}}
+{{define "status-badge"}}<span class="status {{statusClass .}}" title="{{.}}">{{statusLabel .}}</span>{{end}}

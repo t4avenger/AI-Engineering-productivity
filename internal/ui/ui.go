@@ -61,7 +61,9 @@ type Server struct {
 // New builds a dashboard server. sessions may be a full Repository.
 func New(token string, sessions storage.SessionReader, contextWasteThresholds insights.ContextWasteThresholds) (*Server, error) {
 	tmpl, err := template.New("").Funcs(template.FuncMap{
-		"avail": availabilityLabel,
+		"avail":       availabilityLabel,
+		"statusLabel": statusLabel,
+		"statusClass": statusClass,
 		"formatTime": func(t time.Time) string {
 			if t.IsZero() {
 				return "unavailable"
@@ -169,6 +171,68 @@ func availabilityLabel(value string) string {
 	default:
 		return value
 	}
+}
+
+// statusLabels maps every machine enum in the docs/ui/field-glossary.md
+// "Enum Label Map" to its plain UI label. Kept as data (not a switch) so the
+// shared status-badge partial can render any of these enums without tripping
+// cyclomatic-complexity limits, and so the table stays a 1:1 mirror of the doc.
+var statusLabels = map[string]string{
+	// Availability / detection states.
+	"observed":    "Seen in telemetry",
+	"partial":     "Partially seen",
+	"unavailable": "Not available from this provider",
+	"unsupported": "Not supported",
+	"unknown":     "Not proven yet",
+	// MCP inventory states.
+	"not_observed":         "Not seen in telemetry",
+	"connected_but_unused": "Connected, never invoked",
+	"used":                 "Invoked",
+	"usage_unavailable":    "Usage not available",
+	"fingerprinted":        "Fingerprint only",
+	// Skill detection.
+	"explicit": "Explicitly identified",
+	"inferred": "Inferred by provider",
+	// Outcome contracts.
+	"success":   "Succeeded",
+	"failed":    "Failed",
+	"abandoned": "Abandoned",
+	// Cost calculation.
+	"calculated":     "Calculated estimate",
+	"unknown_price":  "Price unknown",
+	"not_calculable": "Not calculable",
+}
+
+// availabilityBadgeClasses are the availability/detection states that have a
+// dedicated badge colour in app.css. Every other enum (MCP/outcome/cost) gets
+// the neutral "status-unknown" treatment until its surface (#77/#78) styles it.
+var availabilityBadgeClasses = map[string]bool{
+	"observed": true, "partial": true, "unavailable": true,
+	"unsupported": true, "unknown": true,
+}
+
+// statusLabel maps a machine enum to the plain UI label documented in
+// docs/ui/field-glossary.md. An empty value is treated as "unknown"; any
+// value outside the glossary falls back to the raw string so a state is never
+// silently dropped.
+func statusLabel(value string) string {
+	if value == "" {
+		return statusLabels["unknown"]
+	}
+	if label, ok := statusLabels[value]; ok {
+		return label
+	}
+	return value
+}
+
+// statusClass maps an enum to its badge CSS class. Availability/detection
+// states get their dedicated class; everything else (including empty or
+// unrecognised values) uses the neutral "status-unknown" treatment.
+func statusClass(value string) string {
+	if availabilityBadgeClasses[value] {
+		return "status-" + value
+	}
+	return "status-unknown"
 }
 
 func formatMicroUSD(amount *int64) string {

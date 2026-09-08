@@ -1,48 +1,94 @@
+/*
+ * TelemetryIQ dashboard visual system (issue #76).
+ * Design tokens mirror docs/bmad/ux-design.md; status badges mirror the
+ * enum labels in docs/ui/field-glossary.md. No CDN, no framework — the daemon
+ * serves this file statically.
+ */
 :root {
-  color: #172026;
-  background: #f6f8fa;
-  font-family: system-ui, ui-sans-serif, sans-serif;
+  /* Colour tokens — keep in sync with docs/bmad/ux-design.md "Design Tokens". */
+  --color-text: #172026;
+  --color-muted: #53616b;
+  --color-bg: #f6f8fa;
+  --color-border: #d8dee4;
+  --color-accent: #0969da;
+  --color-ok: #087443;
+  --color-danger: #cf222e;
+
+  /* Type: system sans for chrome, monospace for IDs and raw data. */
+  --font-sans: system-ui, ui-sans-serif, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sm: 0.85rem;
+  --font-base: 1rem;
+  --font-lg: 1.25rem;
+  --font-xl: clamp(1.8rem, 4vw, 2.6rem);
+
+  /* Spacing scale (4px base). */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 28px;
+
+  --radius: 6px;
+  --focus-ring: 3px;
+
+  color: var(--color-text);
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  font-size: var(--font-base);
 }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
-a { color: #0969da; }
+a { color: var(--color-accent); }
 button, .button {
   font: inherit;
-  background: #0969da;
+  background: var(--color-accent);
   border: 0;
+  border-radius: var(--radius);
   color: #fff;
   cursor: pointer;
   display: inline-block;
   padding: 0.55rem 0.9rem;
   text-decoration: none;
 }
-button.danger, .button.danger, a.danger { background: #cf222e; color: #fff; }
+button.danger, .button.danger, a.danger { background: var(--color-danger); color: #fff; }
+
+/* Single visible focus treatment for every interactive element. */
 button:focus-visible, a:focus-visible, input:focus-visible {
-  outline: 3px solid #0969da;
-  outline-offset: 3px;
+  outline: var(--focus-ring) solid var(--color-accent);
+  outline-offset: var(--focus-ring);
 }
 .skip-link {
   position: absolute;
   left: -9999px;
 }
 .skip-link:focus {
-  left: 16px;
-  top: 16px;
+  left: var(--space-4);
+  top: var(--space-4);
   background: #fff;
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   z-index: 10;
 }
-.app-shell { margin: 0 auto; max-width: 1120px; padding: 24px; }
+
+.app-shell { margin: 0 auto; max-width: 1120px; padding: var(--space-5); }
 .app-header {
   align-items: center;
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-4);
 }
-.brand { font-size: 1.25rem; font-weight: 800; margin: 0; }
+.header-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+.brand { font-size: var(--font-lg); font-weight: 800; margin: 0; }
+.brand a { color: inherit; text-decoration: none; }
 .brand span, .eyebrow, .muted {
-  color: #53616b;
-  font-size: 0.85rem;
+  color: var(--color-muted);
+  font-size: var(--font-sm);
 }
 .brand span {
   display: block;
@@ -51,42 +97,84 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   margin-top: 2px;
   text-transform: uppercase;
 }
+.logout-form { margin: 0; }
+.logout-form button {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-accent);
+  padding: 0.4rem 0.75rem;
+}
+
 .navigation {
-  border-bottom: 1px solid #d8dee4;
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: 28px 0;
+  gap: var(--space-2);
+  margin: var(--space-6) 0;
 }
 .nav-link {
   border-bottom: 3px solid transparent;
   color: inherit;
-  padding: 12px 16px;
+  padding: var(--space-3) var(--space-4);
   text-decoration: none;
 }
 .nav-link.active {
-  border-color: #0969da;
-  color: #0969da;
+  border-color: var(--color-accent);
+  color: var(--color-accent);
   font-weight: 700;
 }
-.health.healthy { color: #087443; font-weight: 700; }
+
+/* Daemon health — honest state, colour is never the sole cue (the word is). */
+.health { font-weight: 700; margin: 0; }
+.health.ok { color: var(--color-ok); }
+.health.unknown { color: var(--color-muted); }
+.health.degraded { color: var(--color-danger); }
+
 .page { max-width: 920px; }
-h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); margin-bottom: 0.4rem; }
-.stack { display: grid; gap: 12px; max-width: 28rem; }
+h1 { font-size: var(--font-xl); margin-bottom: 0.4rem; }
+.stack { display: grid; gap: var(--space-3); max-width: 28rem; }
 input[type="password"], input[type="text"] {
-  border: 1px solid #d8dee4;
+  border: 1px solid var(--color-border);
   font: inherit;
   padding: 0.55rem 0.7rem;
   width: 100%;
 }
-.error { color: #cf222e; font-weight: 600; }
+.error { color: var(--color-danger); font-weight: 600; }
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; }
-th, td { border-bottom: 1px solid #d8dee4; padding: 0.65rem 0.5rem; text-align: left; }
+th, td { border-bottom: 1px solid var(--color-border); padding: 0.65rem 0.5rem; text-align: left; }
 .timeline-item {
-  border-bottom: 1px solid #d8dee4;
+  border-bottom: 1px solid var(--color-border);
   margin-bottom: 0.75rem;
   padding-bottom: 0.75rem;
 }
-.avail { font-family: ui-monospace, monospace; }
+.avail { font-family: var(--font-mono); }
 section { margin: 1.5rem 0; }
+
+/*
+ * Status badge primitives (issue #76). Labels come from statusLabel(), which
+ * maps machine enums to the plain labels documented in
+ * docs/ui/field-glossary.md ("Enum Label Map"). Each badge pairs its text with
+ * a leading glyph so state is never conveyed by colour alone (WCAG 1.4.1).
+ */
+.status {
+  align-items: baseline;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: var(--font-sm);
+  gap: 0.35em;
+  padding: 0.1rem 0.55rem;
+  white-space: nowrap;
+}
+.status::before { font-weight: 700; }
+.status-observed { border-color: var(--color-ok); color: var(--color-ok); }
+.status-observed::before { content: "\25CF"; } /* ● seen */
+.status-partial { border-color: var(--color-accent); color: var(--color-accent); }
+.status-partial::before { content: "\25D0"; } /* ◐ partial */
+.status-unavailable { color: var(--color-muted); }
+.status-unavailable::before { content: "\25CB"; } /* ○ not available */
+.status-unsupported { color: var(--color-muted); }
+.status-unsupported::before { content: "\2715"; } /* ✕ unsupported */
+.status-unknown { color: var(--color-muted); }
+.status-unknown::before { content: "?"; } /* not proven yet */
