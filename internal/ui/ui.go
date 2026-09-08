@@ -173,35 +173,66 @@ func availabilityLabel(value string) string {
 	}
 }
 
-// statusLabel maps a machine availability/detection enum to the plain UI label
-// from docs/ui/field-glossary.md ("Enum Label Map"). Unrecognised values fall
-// back to the raw machine value so a state is never silently dropped.
-func statusLabel(value string) string {
-	switch value {
-	case "observed":
-		return "Seen in telemetry"
-	case "partial":
-		return "Partially seen"
-	case "unavailable":
-		return "Not available from this provider"
-	case "unsupported":
-		return "Not supported"
-	case "unknown", "":
-		return "Not proven yet"
-	default:
-		return value
-	}
+// statusLabels maps every machine enum in the docs/ui/field-glossary.md
+// "Enum Label Map" to its plain UI label. Kept as data (not a switch) so the
+// shared status-badge partial can render any of these enums without tripping
+// cyclomatic-complexity limits, and so the table stays a 1:1 mirror of the doc.
+var statusLabels = map[string]string{
+	// Availability / detection states.
+	"observed":    "Seen in telemetry",
+	"partial":     "Partially seen",
+	"unavailable": "Not available from this provider",
+	"unsupported": "Not supported",
+	"unknown":     "Not proven yet",
+	// MCP inventory states.
+	"not_observed":         "Not seen in telemetry",
+	"connected_but_unused": "Connected, never invoked",
+	"used":                 "Invoked",
+	"usage_unavailable":    "Usage not available",
+	"fingerprinted":        "Fingerprint only",
+	// Skill detection.
+	"explicit": "Explicitly identified",
+	"inferred": "Inferred by provider",
+	// Outcome contracts.
+	"success":   "Succeeded",
+	"failed":    "Failed",
+	"abandoned": "Abandoned",
+	// Cost calculation.
+	"calculated":     "Calculated estimate",
+	"unknown_price":  "Price unknown",
+	"not_calculable": "Not calculable",
 }
 
-// statusClass maps the same enum to its badge CSS class. Unrecognised or empty
-// values use the neutral "status-unknown" treatment.
-func statusClass(value string) string {
-	switch value {
-	case "observed", "partial", "unavailable", "unsupported", "unknown":
-		return "status-" + value
-	default:
-		return "status-unknown"
+// availabilityBadgeClasses are the availability/detection states that have a
+// dedicated badge colour in app.css. Every other enum (MCP/outcome/cost) gets
+// the neutral "status-unknown" treatment until its surface (#77/#78) styles it.
+var availabilityBadgeClasses = map[string]bool{
+	"observed": true, "partial": true, "unavailable": true,
+	"unsupported": true, "unknown": true,
+}
+
+// statusLabel maps a machine enum to the plain UI label documented in
+// docs/ui/field-glossary.md. An empty value is treated as "unknown"; any
+// value outside the glossary falls back to the raw string so a state is never
+// silently dropped.
+func statusLabel(value string) string {
+	if value == "" {
+		return statusLabels["unknown"]
 	}
+	if label, ok := statusLabels[value]; ok {
+		return label
+	}
+	return value
+}
+
+// statusClass maps an enum to its badge CSS class. Availability/detection
+// states get their dedicated class; everything else (including empty or
+// unrecognised values) uses the neutral "status-unknown" treatment.
+func statusClass(value string) string {
+	if availabilityBadgeClasses[value] {
+		return "status-" + value
+	}
+	return "status-unknown"
 }
 
 func formatMicroUSD(amount *int64) string {

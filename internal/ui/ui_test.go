@@ -275,18 +275,37 @@ func TestUnlockAndHome(t *testing.T) {
 			t.Fatalf("home must not surface cost figures %q", forbidden)
 		}
 	}
-	// Costs nav link is present and ordered last (after Privacy).
-	if !strings.Contains(body, `href="/costs"`) {
-		t.Fatalf("home nav must link Costs: %q", body)
+}
+
+// TestHomeShellControls covers the issue #76 app-shell affordances on an
+// authenticated page: the Costs nav link ordered last, a visible logout
+// control, and an honest daemon health badge.
+func TestHomeShellControls(t *testing.T) {
+	repo := &fullStub{sessions: []canonical.Session{{
+		SessionID: "s1", Provider: "openai", Tool: "codex",
+		State: "completed", StartedAt: time.Now().UTC(),
+	}}}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if strings.Index(body, `href="/privacy"`) > strings.Index(body, `href="/costs"`) {
-		t.Fatalf("Costs nav link must come after Privacy")
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	body := getAuthed(t, handler, cookie, "/").Body.String()
+
+	// Costs is present and ordered last (after Privacy). Require both indices
+	// to be found so a missing Privacy link cannot pass the ordering check.
+	privacy := strings.Index(body, `href="/privacy"`)
+	costs := strings.Index(body, `href="/costs"`)
+	if privacy < 0 || costs < 0 {
+		t.Fatalf("home nav must link both Privacy and Costs: privacy=%d costs=%d", privacy, costs)
 	}
-	// Logout control is visible once authenticated.
+	if privacy > costs {
+		t.Fatalf("Costs nav link must come last, after Privacy")
+	}
 	if !strings.Contains(body, `action="/logout"`) {
 		t.Fatalf("authenticated home must show a logout control: %q", body)
 	}
-	// Health is honest: a reachable store reports Healthy with the ok badge.
 	if !strings.Contains(body, "Daemon: Healthy") || !strings.Contains(body, `class="health ok"`) {
 		t.Fatalf("home must show honest healthy daemon badge: %q", body)
 	}

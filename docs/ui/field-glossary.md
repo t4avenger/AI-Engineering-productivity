@@ -31,10 +31,11 @@ must still avoid that exact title and should use "Unused connection".
 Templates render availability and detection enums through the shared
 `status-badge` partial (`internal/ui/templates/partials.html`), backed by the
 `statusLabel` and `statusClass` helpers in `internal/ui/ui.go`. `statusLabel`
-maps each machine value to the plain label defined in the Enum Label Map below;
-`statusClass` selects the badge CSS in `internal/ui/static/app.css`, where the
-label is always paired with a leading glyph so state is never conveyed by colour
-alone. Use `{{template "status-badge" $state}}` rather than printing raw enum
+mirrors the full Enum Label Map below, mapping each machine value to its plain
+label; `statusClass` gives the availability/detection states a dedicated badge
+colour in `internal/ui/static/app.css` (other enums use the neutral treatment
+until their surfaces adopt it), and every badge pairs its label with a leading
+glyph so state is never conveyed by colour alone. Use `{{template "status-badge" $state}}` rather than printing raw enum
 strings.
 
 ## Enum Label Map

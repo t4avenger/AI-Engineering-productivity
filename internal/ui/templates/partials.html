@@ -17,6 +17,12 @@
         {{if .Health.Text}}<p class="health {{.Health.State}}" aria-live="polite">Daemon: {{.Health.Text}}</p>{{end}}
         {{/* Nav is empty on the unlock page, so the logout control only shows once authenticated. */}}
         {{if .Nav}}
+        {{/*
+          CSRF: the telemetryiq_auth cookie is SameSite=Strict + HttpOnly, so a
+          cross-site POST cannot carry it, and logout only clears that cookie.
+          The Django rule id below is the id used by this repo's semgrep config;
+          it flags the missing framework CSRF token, which does not apply here.
+        */}}
         <!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token -->
         <form method="post" action="/logout" class="logout-form">
           <button type="submit">Log out</button>
