@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -85,7 +86,12 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 			}
 			return *v
 		},
-		"microusd": formatMicroUSD,
+		"formatPercent":     formatPercent,
+		"formatMultiplier":  formatMultiplier,
+		"formatMillis":      formatMillis,
+		"formatOptionalInt": formatOptionalInt64,
+		"sessionPath":       sessionPath,
+		"microusd":          formatMicroUSD,
 	}).ParseFS(embedded, "templates/*.html")
 	if err != nil {
 		return nil, err
@@ -190,6 +196,7 @@ var statusLabels = map[string]string{
 	"used":                 "Invoked",
 	"usage_unavailable":    "Usage not available",
 	"fingerprinted":        "Fingerprint only",
+	"provider_reported":    "Provider reported",
 	// Skill detection.
 	"explicit": "Explicitly identified",
 	"inferred": "Inferred by provider",
@@ -240,4 +247,37 @@ func formatMicroUSD(amount *int64) string {
 		return "unavailable"
 	}
 	return fmt.Sprintf("%.6f", float64(*amount)/1_000_000)
+}
+
+func formatPercent(value float64, suffix string) string {
+	if strings.TrimSpace(suffix) == "" {
+		return fmt.Sprintf("%.0f%%", value*100)
+	}
+	return fmt.Sprintf("%.0f%% %s", value*100, suffix)
+}
+
+func formatMultiplier(value float64) string {
+	return fmt.Sprintf("%.1f×", value)
+}
+
+func formatMillis(value *float64) string {
+	if value == nil {
+		return statusLabel("unavailable")
+	}
+	return fmt.Sprintf("%.0f ms", *value)
+}
+
+func formatOptionalInt64(value *int64, unit string) string {
+	if value == nil {
+		return statusLabel("unavailable")
+	}
+	unit = strings.TrimSpace(unit)
+	if unit == "" {
+		return fmt.Sprintf("%d", *value)
+	}
+	return fmt.Sprintf("%d %s", *value, unit)
+}
+
+func sessionPath(id string) string {
+	return pathSessions + "/" + url.PathEscape(id)
 }

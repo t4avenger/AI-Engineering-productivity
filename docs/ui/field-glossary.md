@@ -52,6 +52,7 @@ strings.
 | `used` | Invoked | Explicit MCP invocation evidence matched the server. | None | Not applicable. |
 | `usage_unavailable` | Usage not available | The provider data does not prove whether the connected MCP server was invoked. | None | Use this label instead of "unused". |
 | `fingerprinted` | Fingerprint only | The server identity is represented by a privacy-safe fingerprint because a provider name was unavailable. | None | Prefer `server_name` when present; fall back to the fingerprint label only when needed. |
+| `provider_reported` | Provider reported | The server identity came from provider telemetry retained for display. | None | Use `Fingerprint only` when provider name is unavailable. |
 | `explicit` | Explicitly identified | The provider stamped the skill identity directly. | None | Not applicable. |
 | `inferred` | Inferred by provider | The provider marked skill detection as inferred, but TelemetryIQ must not create named skill records from it. | None | Show in coverage only. |
 | `success` | Succeeded | An outcome contract reported successful completion. | Count | If no outcome contract exists, do not borrow session lifecycle state. |

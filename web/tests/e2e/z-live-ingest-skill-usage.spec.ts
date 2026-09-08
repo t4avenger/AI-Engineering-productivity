@@ -58,5 +58,5 @@ test('renders explicit skill usage for data ingested through the live daemon', a
   await expect(page.getByText('tiq-probe').first()).toBeVisible();
   await expect(page.getByText('claude-code').first()).toBeVisible();
   await expect(page.getByText('codex').first()).toBeVisible();
-  await expect(page.getByText('explicit', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Explicitly identified', { exact: true }).first()).toBeVisible();
 });

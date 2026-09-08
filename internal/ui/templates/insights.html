@@ -8,8 +8,14 @@
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
   <section>
     <h2>MCP inventory</h2>
-    <p>Connected {{.MCP.Totals.ConnectedServers}} · Used {{.MCP.Totals.UsedServers}} · Unused {{.MCP.Totals.UnusedServers}} · Usage unavailable {{.MCP.Totals.UsageUnavailableServers}}</p>
-    <p class="muted">{{.MCP.Totals.TokenContextLabel}}</p>
+    <p>MCP rows show connected servers, whether explicit invocation telemetry was seen, and the request-level token context available around those events.</p>
+    <p>Connected servers {{.MCP.Totals.ConnectedServers}} · Invoked servers {{.MCP.Totals.UsedServers}} · Unused connections {{.MCP.Totals.UnusedServers}} · Usage unavailable {{.MCP.Totals.UsageUnavailableServers}}</p>
+    <p class="muted">Token context: {{.MCP.Totals.TokenContextLabel}}</p>
+    <p class="muted">Request input: {{formatOptionalInt .MCP.Totals.RequestInputTokens "tokens"}} · output: {{formatOptionalInt .MCP.Totals.RequestOutputTokens "tokens"}} · cached input: {{formatOptionalInt .MCP.Totals.RequestCachedInputTokens "tokens"}}</p>
+    {{if .MCP.Notes}}
+    <h3>Evidence notes</h3>
+    <ul>{{range .MCP.Notes}}<li>{{.}}</li>{{end}}</ul>
+    {{end}}
     {{if .MCP.Servers}}
     <section class="table-wrap" aria-label="MCP servers">
       <table>
@@ -17,8 +23,9 @@
           <tr>
             <th scope="col">Server</th>
             <th scope="col">Tool</th>
+            <th scope="col">Identity evidence</th>
             <th scope="col">Usage</th>
-            <th scope="col">Context waste</th>
+            <th scope="col">Unused connection</th>
             <th scope="col">Invocations</th>
           </tr>
         </thead>
@@ -27,22 +34,27 @@
           <tr>
             <td>{{if .ServerName}}{{.ServerName}}{{else}}{{.ServerFingerprint}}{{end}}</td>
             <td>{{.Tool}}</td>
-            <td>{{.UsageState}}</td>
-            <td>{{.ContextWasteState}}</td>
-            <td>{{.InvocationCount}}</td>
+            <td>{{template "status-badge" .IdentityState}}</td>
+            <td>{{template "status-badge" .UsageState}}</td>
+            <td>{{template "status-badge" .ContextWasteState}}</td>
+            <td>{{if eq .ContextWasteState "usage_unavailable"}}{{template "status-badge" .ContextWasteState}}{{else}}{{.InvocationCount}} invocations{{end}}</td>
           </tr>
           {{end}}
         </tbody>
       </table>
     </section>
     {{else}}
-    <p>No MCP inventory rows yet.</p>
+    <p>No retained MCP connection or invocation rows yet. Point supported OTLP ingest at the daemon, then refresh this page.</p>
     {{end}}
-    {{if .MCP.Notes}}<ul>{{range .MCP.Notes}}<li>{{.}}</li>{{end}}</ul>{{end}}
   </section>
   <section>
     <h2>Skill usage</h2>
-    <p>Observed skills {{.Skills.Totals.ObservedSkills}} · Invocations {{.Skills.Totals.Invocations}}</p>
+    <p>Skills are listed only when a provider explicitly reports a skill identity. Coverage rows explain surfaces where skill identity is inferred, unavailable, or still not proven.</p>
+    <p>Observed skills {{.Skills.Totals.ObservedSkills}} · Skill invocations {{.Skills.Totals.Invocations}} · Explicit surfaces {{.Skills.Totals.ExplicitDetection}} · Inferred surfaces {{.Skills.Totals.InferredDetection}} · Unavailable surfaces {{.Skills.Totals.UnavailableDetection}} · Unknown surfaces {{.Skills.Totals.UnknownDetection}}</p>
+    {{if .Skills.Notes}}
+    <h3>Evidence notes</h3>
+    <ul>{{range .Skills.Notes}}<li>{{.}}</li>{{end}}</ul>
+    {{end}}
     {{if .Skills.Skills}}
     <section class="table-wrap" aria-label="Skills">
       <table>
@@ -51,6 +63,7 @@
             <th scope="col">Skill</th>
             <th scope="col">Tool</th>
             <th scope="col">Detection</th>
+            <th scope="col">Outcome evidence</th>
             <th scope="col">Invocations</th>
           </tr>
         </thead>
@@ -59,31 +72,51 @@
           <tr>
             <td>{{.SkillName}}</td>
             <td>{{.Tool}}</td>
-            <td>{{.DetectionState}}</td>
-            <td>{{.InvocationCount}}</td>
+            <td>{{template "status-badge" .DetectionState}}</td>
+            <td>{{template "status-badge" .OutcomeState}}</td>
+            <td>{{.InvocationCount}} invocations</td>
           </tr>
           {{end}}
         </tbody>
       </table>
     </section>
     {{else}}
-    <p>No explicit skills observed yet.</p>
+    <p>No explicit skills observed yet. Check detection coverage below before treating this as no skill usage.</p>
     {{end}}
     <h3>Detection coverage</h3>
     {{if .Skills.Coverage}}
-    <ul>
-      {{range .Skills.Coverage}}
-      <li>{{.Provider}} / {{.Tool}}: {{.DetectionState}}</li>
-      {{end}}
-    </ul>
+    <section class="table-wrap" aria-label="Skill detection coverage">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Provider</th>
+            <th scope="col">Tool</th>
+            <th scope="col">Detection</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Skills.Coverage}}
+          <tr>
+            <td>{{.Provider}}</td>
+            <td>{{.Tool}}</td>
+            <td>{{template "status-badge" .DetectionState}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </section>
     {{else}}
-    <p>Coverage unavailable.</p>
+    <p>No retained events with skill-detection metadata yet.</p>
     {{end}}
-    {{if .Skills.Notes}}<ul>{{range .Skills.Notes}}<li>{{.}}</li>{{end}}</ul>{{end}}
   </section>
   <section>
     <h2>Model performance</h2>
-    <p>Outcome-contract scorecard by model. Ranking available: {{if .ModelPerformance.RankingAvailable}}yes{{else}}no{{end}}.</p>
+    <p>Outcome-contract scorecards use provider-reported completion evidence, retry linkage, token totals, and latency where retained. Session lifecycle state is not used as a model outcome.</p>
+    <p>Ranking available: {{if .ModelPerformance.RankingAvailable}}yes{{else}}no, sample size below the ranking guard{{end}}.</p>
+    {{if .ModelPerformance.Notes}}
+    <h3>Evidence notes</h3>
+    <ul>{{range .ModelPerformance.Notes}}<li>{{.}}</li>{{end}}</ul>
+    {{end}}
     {{if .ModelPerformance.Models}}
     <section class="table-wrap" aria-label="Model performance">
       <table>
@@ -92,7 +125,7 @@
             <th scope="col">Model</th>
             <th scope="col">Tool</th>
             <th scope="col">Sample size</th>
-            <th scope="col">Success</th>
+            <th scope="col">Succeeded</th>
             <th scope="col">Failed</th>
             <th scope="col">Abandoned</th>
             <th scope="col">Retry rate</th>
@@ -105,50 +138,54 @@
           <tr>
             <td>{{.Model}}</td>
             <td>{{.Tool}}</td>
-            <td>{{.SampleSize}}</td>
-            <td>{{.Success}}</td>
-            <td>{{.Failed}}</td>
-            <td>{{.Abandoned}}</td>
-            <td>{{if eq .RetryRateState "observed"}}{{with .RetryRate}}{{printf "%.2f" (deref .)}}{{end}}{{else}}{{.RetryRateState}}{{end}}</td>
-            <td>{{with .LatencyP50Ms}}{{printf "%.0f" (deref .)}}{{else}}unavailable{{end}}</td>
-            <td>{{with .LatencyP95Ms}}{{printf "%.0f" (deref .)}}{{else}}unavailable{{end}}</td>
+            <td>{{.SampleSize}} contracts</td>
+            <td>{{.Success}} contracts</td>
+            <td>{{.Failed}} contracts</td>
+            <td>{{.Abandoned}} contracts</td>
+            <td>{{if eq .RetryRateState "observed"}}{{with .RetryRate}}{{formatPercent (deref .) "retried"}}{{end}}{{else}}{{template "status-badge" .RetryRateState}}{{end}}</td>
+            <td>{{formatMillis .LatencyP50Ms}}</td>
+            <td>{{formatMillis .LatencyP95Ms}}</td>
           </tr>
           {{end}}
         </tbody>
       </table>
     </section>
     {{else}}
-    <p>No outcome-contract rows yet.</p>
+    <p>No outcome-contract rows yet. Model performance remains unavailable until retained events include explicit outcome evidence.</p>
     {{end}}
     {{if .ModelPerformance.RankedModels}}
     <h3>Ranked models</h3>
     <ol>{{range .ModelPerformance.RankedModels}}<li>{{.}}</li>{{end}}</ol>
     {{end}}
-    {{if .ModelPerformance.Notes}}<ul>{{range .ModelPerformance.Notes}}<li>{{.}}</li>{{end}}</ul>{{end}}
   </section>
   <section>
-    <h2>Context waste</h2>
-    <p>Triggered {{.ContextWaste.Totals.TriggeredSessions}} / {{.ContextWaste.Totals.Sessions}} sessions · Cached ratio observed {{.ContextWaste.Totals.CachedRatioObserved}} · Input growth observed {{.ContextWaste.Totals.InputTokenGrowthObserved}}</p>
-    <p class="muted">Thresholds: cached-context ratio ≥ {{printf "%.2f" .ContextWaste.Thresholds.CachedContextRatioThreshold}} · input-token growth ≥ {{printf "%.2f" .ContextWaste.Thresholds.InputTokenGrowthThreshold}}</p>
+    <h2>Context pressure</h2>
+    <p>Context pressure flags sessions where retained token samples show high cached-context ratio or input-token growth. It is separate from the MCP unused-connection signal above.</p>
+    <p>Triggered sessions {{.ContextWaste.Totals.TriggeredSessions}} / {{.ContextWaste.Totals.Sessions}} · Cached context observed {{.ContextWaste.Totals.CachedRatioObserved}} · Input growth observed {{.ContextWaste.Totals.InputTokenGrowthObserved}} · Both metrics unavailable {{.ContextWaste.Totals.BothMetricsUnavailable}}</p>
+    <p class="muted">Thresholds: cached context at or above {{formatPercent .ContextWaste.Thresholds.CachedContextRatioThreshold "cached"}} · input growth at or above {{formatMultiplier .ContextWaste.Thresholds.InputTokenGrowthThreshold}}</p>
+    {{if .ContextWaste.Notes}}
+    <h3>Evidence notes</h3>
+    <ul>{{range .ContextWaste.Notes}}<li>{{.}}</li>{{end}}</ul>
+    {{end}}
     {{if .ContextWaste.Sessions}}
-    <section class="table-wrap" aria-label="Context waste sessions">
+    <section class="table-wrap" aria-label="Context pressure sessions">
       <table>
         <thead>
           <tr>
             <th scope="col">Tool</th>
             <th scope="col">Session</th>
-            <th scope="col">Cached ratio</th>
+            <th scope="col">Cached context</th>
             <th scope="col">Input growth</th>
-            <th scope="col">Triggered</th>
+            <th scope="col">Threshold triggered</th>
           </tr>
         </thead>
         <tbody>
           {{range .ContextWaste.Sessions}}
           <tr>
             <td>{{.Tool}}</td>
-            <td>{{.SessionID}}</td>
-            <td>{{if eq .CachedContextRatioState "observed"}}{{with .CachedContextRatio}}{{printf "%.2f" (deref .)}}{{end}}{{else}}{{.CachedContextRatioState}}{{end}}</td>
-            <td>{{if eq .InputTokenGrowthState "observed"}}{{with .InputTokenGrowth}}{{printf "%.2f" (deref .)}}{{end}}{{else}}{{.InputTokenGrowthState}}{{end}}</td>
+            <td><a href="{{sessionPath .SessionID}}">{{.SessionID}}</a></td>
+            <td>{{if eq .CachedContextRatioState "observed"}}{{with .CachedContextRatio}}{{formatPercent (deref .) "cached"}}{{end}}{{else}}{{template "status-badge" .CachedContextRatioState}}{{end}}</td>
+            <td>{{if eq .InputTokenGrowthState "observed"}}{{with .InputTokenGrowth}}{{formatMultiplier (deref .)}}{{end}}{{else}}{{template "status-badge" .InputTokenGrowthState}}{{end}}</td>
             <td>{{if .Triggered}}yes{{else}}no{{end}}</td>
           </tr>
           {{end}}
@@ -156,9 +193,8 @@
       </table>
     </section>
     {{else}}
-    <p>No context-waste rows yet.</p>
+    <p>No retained token-bearing sessions yet. The insight stays unavailable until input or cached token samples are retained.</p>
     {{end}}
-    {{if .ContextWaste.Notes}}<ul>{{range .ContextWaste.Notes}}<li>{{.}}</li>{{end}}</ul>{{end}}
   </section>
   {{end}}
 </main>

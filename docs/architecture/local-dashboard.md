@@ -32,11 +32,13 @@ Home emphasises orchestration usage (sessions today, tools observed, insight
 highlights) and does not surface cost labels or links. Costs remain a secondary
 page available at `/costs`, outside the primary navigation.
 
-The Insights page reads MCP inventory and skill usage summaries from retained
-canonical events. It renders provider-reported MCP server names when available,
-privacy-safe server fingerprints, explicit usage states, connected-but-unused
-context-waste states, and request-level token context labelled as not exact
-per-MCP allocation.
+The Insights page reads MCP inventory, skill usage, model-performance, and
+context-pressure summaries from retained canonical events. It renders
+provider-reported MCP server names when available, privacy-safe server
+fingerprints only as a fallback, glossary labels for enum states, an MCP
+"Unused connection" column for connected-but-unused servers, and request-level
+token context labelled as not exact per-MCP allocation. Context pressure rows
+link back to session detail so the retained evidence can be inspected.
 
 The Costs page reads local calculation summaries, shows calculated estimates
 and cost statuses, and never represents an unknown price as zero.
