@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	// Registers the "sqlite" driver so the test can seed a v2 database directly.
 	_ "modernc.org/sqlite"
 
 	"github.com/wayne/telemetryiq/internal/storage"

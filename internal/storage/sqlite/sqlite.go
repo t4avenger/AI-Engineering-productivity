@@ -99,8 +99,16 @@ func (r *Repository) dropEventProvenance(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// Rebuild and version bump run in one transaction so a failure or crash
+	// mid-migration cannot leave the events table half-swapped (SQLite applies
+	// DDL transactionally).
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin migration 3: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
 	if hasColumn {
-		if _, err := r.db.ExecContext(ctx, `CREATE TABLE events_new (event_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, occurred_at TEXT NOT NULL, event_json BLOB NOT NULL);
+		if _, err := tx.ExecContext(ctx, `CREATE TABLE events_new (event_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, occurred_at TEXT NOT NULL, event_json BLOB NOT NULL);
 INSERT INTO events_new(event_id,session_id,occurred_at,event_json) SELECT event_id,session_id,occurred_at,event_json FROM events;
 DROP TABLE events;
 ALTER TABLE events_new RENAME TO events;
@@ -108,8 +116,11 @@ CREATE INDEX IF NOT EXISTS events_session_occurred ON events(session_id, occurre
 			return fmt.Errorf("rebuild events without provenance: %w", err)
 		}
 	}
-	if _, err := r.db.ExecContext(ctx, "INSERT OR IGNORE INTO schema_migrations(version) VALUES (3)"); err != nil {
+	if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO schema_migrations(version) VALUES (3)"); err != nil {
 		return fmt.Errorf("record migration 3: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit migration 3: %w", err)
 	}
 	return nil
 }
