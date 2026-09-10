@@ -1,0 +1,19 @@
+{
+  "captured_at": "2026-09-10T20:09:20Z",
+  "fixture_origin": "observed-sanitised",
+  "fixture_version": 1,
+  "payload": {
+    "capture_method": "isolated synthetic CODEX_HOME with loopback OTLP HTTP JSON receiver",
+    "endpoint": "/v1/traces",
+    "evidence": "raw receiver observed no /v1/traces POSTs during codex_exec and codex_cli_rs synthetic sessions",
+    "post_count": 0,
+    "privacy_review": "no trace payload values retained",
+    "signal_type": "otlp_trace_endpoint",
+    "source_type": "codex_otlp_trace_endpoint_inventory",
+    "state": "unsupported"
+  },
+  "provider": "openai",
+  "sanitisation_reviewed": true,
+  "tool": "codex",
+  "tool_version": "0.153.4"
+}

@@ -56,19 +56,27 @@ func TestValidateRejectsUnsupportedTools(t *testing.T) {
 func providerFixturePaths(t *testing.T) []string {
 	t.Helper()
 	root := repositoryRoot(t)
-	patterns := []string{
-		filepath.Join(root, "fixtures", "codex", "synthetic", "*.json"),
-		filepath.Join(root, "fixtures", "codex", "observed-sanitised", "*.json"),
-		filepath.Join(root, "fixtures", "claude", "observed-sanitised", "*.json"),
-		filepath.Join(root, "fixtures", "cursor", "observed-sanitised", "*.json"),
+	roots := []string{
+		filepath.Join(root, "fixtures", "codex", "synthetic"),
+		filepath.Join(root, "fixtures", "codex", "observed-sanitised"),
+		filepath.Join(root, "fixtures", "claude", "observed-sanitised"),
+		filepath.Join(root, "fixtures", "cursor", "observed-sanitised"),
 	}
 	var paths []string
-	for _, pattern := range patterns {
-		matches, err := filepath.Glob(pattern)
+	for _, root := range roots {
+		err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || filepath.Ext(path) != ".json" {
+				return nil
+			}
+			paths = append(paths, path)
+			return nil
+		})
 		if err != nil {
-			t.Fatalf("glob fixtures: %v", err)
+			t.Fatalf("walk fixtures: %v", err)
 		}
-		paths = append(paths, matches...)
 	}
 	if len(paths) == 0 {
 		t.Fatal("expected provider fixtures")

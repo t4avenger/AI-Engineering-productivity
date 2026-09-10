@@ -1,0 +1,52 @@
+{
+  "captured_at": "2026-09-10T20:09:20Z",
+  "fixture_origin": "observed-sanitised",
+  "fixture_version": 1,
+  "payload": {
+    "attribute_keys": [
+      "app.version",
+      "auth_mode",
+      "conversation.id",
+      "duration_ms",
+      "event.name",
+      "event.timestamp",
+      "model",
+      "originator",
+      "slug",
+      "startup.phase",
+      "startup.status",
+      "terminal.type",
+      "user.account_id",
+      "user.email"
+    ],
+    "body_status": "absent_or_empty",
+    "capture_method": "isolated synthetic CODEX_HOME with loopback OTLP HTTP JSON receiver",
+    "event_name": "codex.startup_phase",
+    "privacy_review": "values removed; prompt, response, source, paths, command args, account identifiers, hostnames, and credentials are not retained",
+    "scope_names": [
+      "codex_otel.log_only"
+    ],
+    "service_names": [
+      "codex_cli_rs",
+      "codex_exec"
+    ],
+    "service_versions": [
+      "0.153.4"
+    ],
+    "severity_texts": [
+      "INFO"
+    ],
+    "signal_type": "otlp_log_event",
+    "source_type": "codex_otlp_log_signal_inventory",
+    "span_id_states": [
+      "empty"
+    ],
+    "trace_id_states": [
+      "empty"
+    ]
+  },
+  "provider": "openai",
+  "sanitisation_reviewed": true,
+  "tool": "codex",
+  "tool_version": "0.153.4"
+}

@@ -63,6 +63,14 @@ Committed evidence:
 - `fixtures/codex/observed-sanitised/codex-0.153.4-outcome-contracts.json`
 - `fixtures/codex/observed-sanitised/codex-0.153.4-outcome-contracts-otlp.json`
 
+## Current OTLP surface inventory
+
+Issue #110 captured Codex CLI 0.153.4 on 2026-09-10 with the same isolated `CODEX_HOME` rules and a raw loopback OTLP HTTP/JSON receiver. The committed inventory is one reviewed fixture per observed log event and metric instrument under:
+
+- `fixtures/codex/observed-sanitised/current-0.153.4-surface/`
+
+The run covered `codex_exec` and a PTY-backed `codex_cli_rs` session. The nested sandbox in this environment blocked reading the temporary synthetic skill and shell execution during normal probes, so those two synthetic-only probes used Codex's explicit bypass flag inside the temporary synthetic workspace; do not use that flag outside an isolated synthetic capture workspace. No `/v1/traces` POST was observed.
+
 ## Review checklist
 
 - Confirm prompts, responses, source code, paths, command arguments, account identifiers, and credentials are absent.

@@ -1,0 +1,33 @@
+{
+  "captured_at": "2026-09-10T20:09:20Z",
+  "fixture_origin": "observed-sanitised",
+  "fixture_version": 1,
+  "payload": {
+    "capture_method": "isolated synthetic CODEX_HOME with loopback OTLP HTTP JSON receiver",
+    "data_point_attribute_keys": [
+      "error",
+      "originator",
+      "status"
+    ],
+    "instrument_kinds": [
+      "sum"
+    ],
+    "metric_name": "codex.sqlite.logs.write.count",
+    "privacy_review": "values removed; prompt, response, source, paths, command args, account identifiers, hostnames, and credentials are not retained",
+    "scope_names": [
+      "codex"
+    ],
+    "service_names": [
+      "codex_cli_rs"
+    ],
+    "service_versions": [
+      "0.153.4"
+    ],
+    "signal_type": "otlp_metric_instrument",
+    "source_type": "codex_otlp_metric_signal_inventory"
+  },
+  "provider": "openai",
+  "sanitisation_reviewed": true,
+  "tool": "codex",
+  "tool_version": "0.153.4"
+}
