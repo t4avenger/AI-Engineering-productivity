@@ -19,9 +19,6 @@ func TestDefaultMatchesLocalOnlyPrivacySettings(t *testing.T) {
 	if cfg.Collection.Prompts || cfg.Collection.Responses || cfg.Collection.SourceCode {
 		t.Fatalf("content collection must be disabled by default, got %#v", cfg.Collection)
 	}
-	if cfg.Collection.FilePaths != "hash" || cfg.Collection.CommandArguments != "redact" {
-		t.Fatalf("expected protected operational fields, got %#v", cfg.Collection)
-	}
 	if cfg.Sharing.Diagnostics || cfg.Sharing.AnonymousAnalytics || cfg.Sharing.ResearchSessions != "explicit-only" {
 		t.Fatalf("expected sharing to remain disabled or explicit-only, got %#v", cfg.Sharing)
 	}
@@ -90,8 +87,6 @@ func TestValidateRejectsUnsafeOrUnsupportedSettings(t *testing.T) {
 		{"collection level", func(c *Config) { c.Collection.Level = "forensic" }, "collection.level"},
 		{"responses", func(c *Config) { c.Collection.Responses = true }, "collection.responses"},
 		{"source code", func(c *Config) { c.Collection.SourceCode = true }, "collection.source_code"},
-		{"file paths", func(c *Config) { c.Collection.FilePaths = "store" }, "collection.file_paths"},
-		{"command arguments", func(c *Config) { c.Collection.CommandArguments = "store" }, "collection.command_arguments"},
 		{"destination", func(c *Config) { c.Storage.Destination = "cloud" }, "storage.destination"},
 		{"retention", func(c *Config) { c.Storage.RetentionDays = 0 }, "storage.retention_days"},
 		{"diagnostics", func(c *Config) { c.Sharing.Diagnostics = true }, "sharing.diagnostics"},
@@ -193,8 +188,6 @@ collection:
   prompts: false
   responses: false
   source_code: false
-  file_paths: hash
-  command_arguments: redact
   tool_calls: true
   model_usage: true
 storage:

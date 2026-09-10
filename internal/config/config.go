@@ -35,14 +35,12 @@ type Config struct {
 }
 
 type Collection struct {
-	Level            string `yaml:"level"`
-	Prompts          bool   `yaml:"prompts"`
-	Responses        bool   `yaml:"responses"`
-	SourceCode       bool   `yaml:"source_code"`
-	FilePaths        string `yaml:"file_paths"`
-	CommandArguments string `yaml:"command_arguments"`
-	ToolCalls        bool   `yaml:"tool_calls"`
-	ModelUsage       bool   `yaml:"model_usage"`
+	Level      string `yaml:"level"`
+	Prompts    bool   `yaml:"prompts"`
+	Responses  bool   `yaml:"responses"`
+	SourceCode bool   `yaml:"source_code"`
+	ToolCalls  bool   `yaml:"tool_calls"`
+	ModelUsage bool   `yaml:"model_usage"`
 }
 
 type Storage struct {
@@ -89,7 +87,7 @@ type ContextWaste struct {
 // Default returns the safe local-only configuration specified in PRODUCT_MAP.md.
 func Default() Config {
 	return Config{SchemaVersion: SchemaVersion, Mode: ModeLocalOnly,
-		Collection: Collection{Level: "operational", FilePaths: "hash", CommandArguments: "redact", ToolCalls: true, ModelUsage: true},
+		Collection: Collection{Level: "operational", ToolCalls: true, ModelUsage: true},
 		Storage:    Storage{Destination: "local", RetentionDays: 30},
 		Sharing:    Sharing{ResearchSessions: "explicit-only"},
 		Pricing:    Pricing{},
@@ -188,12 +186,6 @@ func (c Config) validateCollection() error {
 	}
 	if c.Collection.SourceCode {
 		return errors.New("collection.source_code must be false in local-only mode")
-	}
-	if c.Collection.FilePaths != "hash" {
-		return fmt.Errorf("collection.file_paths must be \"hash\", got %q", c.Collection.FilePaths)
-	}
-	if c.Collection.CommandArguments != "redact" {
-		return fmt.Errorf("collection.command_arguments must be \"redact\", got %q", c.Collection.CommandArguments)
 	}
 	return nil
 }
