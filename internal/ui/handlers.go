@@ -12,7 +12,6 @@ import (
 
 	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
@@ -99,13 +98,6 @@ type tokenDisplay struct {
 	Text     string
 	Observed bool
 	Machine  string
-}
-
-type provenanceRow struct {
-	Path   string
-	Label  string
-	Action string
-	Reason string
 }
 
 type insightsData struct {
@@ -261,26 +253,6 @@ func (s *Server) sessionTimelinePartial(w http.ResponseWriter, r *http.Request) 
 		Events     []timelineRow
 		NextCursor string
 	}{SessionID: id, Events: rows, NextCursor: next})
-}
-
-func (s *Server) eventProvenancePartial(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, pathEventsPrefix)
-	id, ok := safePathID(strings.TrimSuffix(path, "/provenance"))
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-	if s.events == nil {
-		http.Error(w, "provenance unavailable", http.StatusServiceUnavailable)
-		return
-	}
-	provenance, _, err := s.events.EventProvenance(r.Context(), id)
-	if err != nil {
-		http.Error(w, "unable to load provenance", http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
-	_ = s.templates.ExecuteTemplate(w, "provenance_rows.html", provenanceRows(provenance))
 }
 
 func (s *Server) sessionDelete(w http.ResponseWriter, r *http.Request) {
@@ -721,33 +693,6 @@ func fieldLabel(field string) string {
 		return "Output tokens"
 	default:
 		return strings.TrimSpace(strings.NewReplacer("_", " ", ".", " ").Replace(field))
-	}
-}
-
-func provenanceRows(provenance []privacy.Provenance) []provenanceRow {
-	rows := make([]provenanceRow, len(provenance))
-	for i, entry := range provenance {
-		rows[i] = provenanceRow{Path: entry.Path, Label: fieldLabel(entry.Path), Action: privacyActionLabel(entry.Action), Reason: entry.Reason}
-	}
-	return rows
-}
-
-func privacyActionLabel(action privacy.Action) string {
-	switch action {
-	case privacy.ActionRetained:
-		return "Retained"
-	case privacy.ActionRemoved:
-		return "Removed"
-	case privacy.ActionHashed:
-		return "Hashed"
-	case privacy.ActionRedacted:
-		return "Redacted"
-	case privacy.ActionClassified:
-		return "Classified"
-	case privacy.ActionCommandClassified:
-		return "Command classified"
-	default:
-		return strings.TrimSpace(strings.NewReplacer("_", " ").Replace(string(action)))
 	}
 }
 

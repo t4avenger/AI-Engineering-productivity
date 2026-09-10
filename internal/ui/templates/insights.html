@@ -32,12 +32,12 @@
         <tbody>
           {{range .MCP.Servers}}
           <tr>
-            <td>{{if .ServerName}}{{.ServerName}}{{else}}{{.ServerFingerprint}}{{end}}</td>
+            <td>{{if .ServerName}}{{.ServerName}}{{else}}Unknown server{{end}}</td>
             <td>{{.Tool}}</td>
             <td>{{template "status-badge" .IdentityState}}</td>
             <td>{{template "status-badge" .UsageState}}</td>
             <td>{{template "status-badge" .ContextWasteState}}</td>
-            <td>{{if eq .ContextWasteState "usage_unavailable"}}{{template "status-badge" .ContextWasteState}}{{else}}{{.InvocationCount}} invocations{{end}}</td>
+            <td>{{if eq .UsageState "observed"}}{{.InvocationCount}} invocations{{else}}{{template "status-badge" "usage_unavailable"}}{{end}}</td>
           </tr>
           {{end}}
         </tbody>

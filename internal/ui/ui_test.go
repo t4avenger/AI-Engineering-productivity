@@ -11,7 +11,6 @@ import (
 	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 	"github.com/wayne/telemetryiq/internal/ui"
 )
@@ -22,12 +21,11 @@ var defaultContextWasteThresholds = insights.ContextWasteThresholds{
 }
 
 type fullStub struct {
-	sessions   []canonical.Session
-	events     map[string][]canonical.Event
-	provenance map[string][]privacy.Provenance
-	costs      []cost.Record
-	deleted    []string
-	cleared    bool
+	sessions []canonical.Session
+	events   map[string][]canonical.Event
+	costs    []cost.Record
+	deleted  []string
+	cleared  bool
 }
 
 func (s *fullStub) Session(_ context.Context, id string) (canonical.Session, bool, error) {
@@ -63,11 +61,6 @@ func (s *fullStub) DeleteAllSessions(context.Context) error {
 
 func (s *fullStub) ListEvents(_ context.Context, filter storage.EventFilter) ([]canonical.Event, error) {
 	return append([]canonical.Event(nil), s.events[filter.SessionID]...), nil
-}
-
-func (s *fullStub) EventProvenance(_ context.Context, id string) ([]privacy.Provenance, bool, error) {
-	provenance, ok := s.provenance[id]
-	return provenance, ok, nil
 }
 
 func (s *fullStub) ListCostRecords(context.Context, string) ([]cost.Record, error) {
@@ -166,9 +159,6 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 				},
 			}},
 		},
-		provenance: map[string][]privacy.Provenance{
-			"e1": {{Path: "attributes.input_token_count", Action: privacy.ActionRetained, Reason: "safe operational telemetry"}},
-		},
 		costs: []cost.Record{{
 			Currency: "USD",
 			Status:   "calculated",
@@ -197,9 +187,6 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 		{"/sessions/s1", "Model interaction"},
 		{"/sessions/s1", "Input tokens"},
 		{"/sessions/s1", "2 tokens"},
-		{"/sessions/s1", "Privacy provenance"},
-		{"/events/e1/provenance", "attributes.input_token_count"},
-		{"/events/e1/provenance", "Retained"},
 		{"/insights", "MCP inventory"},
 		{"/insights", "Skill usage"},
 		{"/insights", "Model performance"},

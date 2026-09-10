@@ -87,13 +87,12 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 			}
 			return *v
 		},
-		"formatPercent":       formatPercent,
-		"formatMultiplier":    formatMultiplier,
-		"formatMillis":        formatMillis,
-		"formatOptionalInt":   formatOptionalInt64,
-		"sessionPath":         sessionPath,
-		"eventProvenancePath": eventProvenancePath,
-		"microusd":            formatMicroUSD,
+		"formatPercent":     formatPercent,
+		"formatMultiplier":  formatMultiplier,
+		"formatMillis":      formatMillis,
+		"formatOptionalInt": formatOptionalInt64,
+		"sessionPath":       sessionPath,
+		"microusd":          formatMicroUSD,
 	}).ParseFS(embedded, "templates/*.html")
 	if err != nil {
 		return nil, err
@@ -197,7 +196,6 @@ var statusLabels = map[string]string{
 	"connected_but_unused": "Connected, never invoked",
 	"used":                 "Invoked",
 	"usage_unavailable":    "Usage not available",
-	"fingerprinted":        "Fingerprint only",
 	"provider_reported":    "Provider reported",
 	// Skill detection.
 	"explicit": "Explicitly identified",
@@ -282,8 +280,4 @@ func formatOptionalInt64(value *int64, unit string) string {
 
 func sessionPath(id string) string {
 	return pathSessions + "/" + url.PathEscape(id)
-}
-
-func eventProvenancePath(id string) string {
-	return pathEventsPrefix + url.PathEscape(id) + "/provenance"
 }
