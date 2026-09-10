@@ -5,11 +5,12 @@
   <h1>Privacy</h1>
   <p>These defaults are enforced by the daemon and are not editable here.</p>
   <ul>
-    <li>Mode: local-only</li>
+    <li>Mode: local-only — telemetry never leaves this machine</li>
     <li>Prompts, responses, and source code are not retained</li>
-    <li>File paths are classified by category, never stored raw; command arguments are redacted</li>
+    <li>Raw provider-native identifiers, file paths, and commands are captured and shown as-is; nothing is hashed or tokenised at ingest</li>
     <li>Retention: 30 days</li>
     <li>No sharing of diagnostics or analytics</li>
+    <li>You can delete all retained telemetry at any time below</li>
   </ul>
   {{with .Content}}
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}

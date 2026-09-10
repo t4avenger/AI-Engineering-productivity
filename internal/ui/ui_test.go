@@ -11,7 +11,6 @@ import (
 	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 	"github.com/wayne/telemetryiq/internal/ui"
 )
@@ -22,12 +21,11 @@ var defaultContextWasteThresholds = insights.ContextWasteThresholds{
 }
 
 type fullStub struct {
-	sessions   []canonical.Session
-	events     map[string][]canonical.Event
-	provenance map[string][]privacy.Provenance
-	costs      []cost.Record
-	deleted    []string
-	cleared    bool
+	sessions []canonical.Session
+	events   map[string][]canonical.Event
+	costs    []cost.Record
+	deleted  []string
+	cleared  bool
 }
 
 func (s *fullStub) Session(_ context.Context, id string) (canonical.Session, bool, error) {
@@ -63,11 +61,6 @@ func (s *fullStub) DeleteAllSessions(context.Context) error {
 
 func (s *fullStub) ListEvents(_ context.Context, filter storage.EventFilter) ([]canonical.Event, error) {
 	return append([]canonical.Event(nil), s.events[filter.SessionID]...), nil
-}
-
-func (s *fullStub) EventProvenance(_ context.Context, id string) ([]privacy.Provenance, bool, error) {
-	provenance, ok := s.provenance[id]
-	return provenance, ok, nil
 }
 
 func (s *fullStub) ListCostRecords(context.Context, string) ([]cost.Record, error) {
@@ -166,9 +159,6 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 				},
 			}},
 		},
-		provenance: map[string][]privacy.Provenance{
-			"e1": {{Path: "attributes.input_token_count", Action: privacy.ActionRetained, Reason: "safe operational telemetry"}},
-		},
 		costs: []cost.Record{{
 			Currency: "USD",
 			Status:   "calculated",
@@ -197,9 +187,6 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 		{"/sessions/s1", "Model interaction"},
 		{"/sessions/s1", "Input tokens"},
 		{"/sessions/s1", "2 tokens"},
-		{"/sessions/s1", "Privacy provenance"},
-		{"/events/e1/provenance", "attributes.input_token_count"},
-		{"/events/e1/provenance", "Retained"},
 		{"/insights", "MCP inventory"},
 		{"/insights", "Skill usage"},
 		{"/insights", "Model performance"},
@@ -433,29 +420,28 @@ func TestUnlockPageHidesLogout(t *testing.T) {
 	}
 }
 
-func TestInsightsMCPInvocationCountUnavailableDoesNotRenderZero(t *testing.T) {
+// renderMCPConnectionRow renders the insights page for a single MCP connection
+// event and returns the table row containing the given anchor text.
+func renderMCPConnectionRow(t *testing.T, sessionID, anchor string, rawEvent map[string]any) string {
+	t.Helper()
 	now := time.Now().UTC()
 	repo := &fullStub{
-		sessions: []canonical.Session{syntheticSession("mcp-unavailable-session", now)},
+		sessions: []canonical.Session{syntheticSession(sessionID, now)},
 		events: map[string][]canonical.Event{
-			"mcp-unavailable-session": {{
-				EventID:    "connection-only",
-				EventType:  "mcp_server_connection",
-				SessionID:  "mcp-unavailable-session",
-				OccurredAt: now,
-				ReceivedAt: now,
-				Provider:   "anthropic",
-				Tool:       "claude-code",
-				ProviderExtensions: map[string]any{
-					"event": map[string]any{
-						"server_name": "connection-only-mcp",
-					},
-				},
+			sessionID: {{
+				EventID:            "connection-only",
+				EventType:          "mcp_server_connection",
+				SessionID:          sessionID,
+				OccurredAt:         now,
+				ReceivedAt:         now,
+				Provider:           "anthropic",
+				Tool:               "claude-code",
+				ProviderExtensions: map[string]any{"event": rawEvent},
 			}},
 		},
 	}
 	body := renderInsights(t, repo)
-	rowStart := strings.Index(body, "connection-only-mcp")
+	rowStart := strings.Index(body, anchor)
 	if rowStart == -1 {
 		t.Fatalf("MCP row missing: %q", body)
 	}
@@ -463,12 +449,32 @@ func TestInsightsMCPInvocationCountUnavailableDoesNotRenderZero(t *testing.T) {
 	if rowEnd == -1 {
 		t.Fatalf("MCP row did not close: %q", body[rowStart:])
 	}
-	row := body[rowStart : rowStart+rowEnd]
+	return body[rowStart : rowStart+rowEnd]
+}
+
+func TestInsightsMCPInvocationCountUnavailableDoesNotRenderZero(t *testing.T) {
+	// A connection event with no server name has no correlatable identity, so
+	// usage genuinely cannot be measured — the invocations cell must not imply a
+	// measured zero.
+	row := renderMCPConnectionRow(t, "mcp-unavailable-session", "Unknown server", map[string]any{"status": "connected"})
 	if strings.Contains(row, "0 invocations") {
 		t.Fatalf("usage-unavailable MCP row must not imply measured zero invocations: %q", row)
 	}
 	if !strings.Contains(row, "Usage not available") {
 		t.Fatalf("usage-unavailable MCP row should render unavailable badge in invocations cell: %q", row)
+	}
+}
+
+func TestInsightsMCPConnectedButUnusedRendersMeasuredZero(t *testing.T) {
+	// A named server with no observed invocation is connected-but-unused: usage
+	// evidence was checked and the count is a genuine zero, so the invocations
+	// cell shows the measured count rather than the unavailable badge.
+	row := renderMCPConnectionRow(t, "mcp-unused-session", "connected-unused-mcp", map[string]any{"server_name": "connected-unused-mcp"})
+	if !strings.Contains(row, "0 invocations") {
+		t.Fatalf("connected-but-unused MCP row should render a measured zero count: %q", row)
+	}
+	if strings.Contains(row, "Usage not available") {
+		t.Fatalf("connected-but-unused MCP row must not claim usage was unavailable: %q", row)
 	}
 }
 

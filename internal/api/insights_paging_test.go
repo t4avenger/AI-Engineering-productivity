@@ -39,11 +39,11 @@ func TestMCPInventoryInsightPaginatesSessionEvents(t *testing.T) {
 	connection := sessionTestEvent(t, "paged-mcp-connected", "paged-mcp-session", "claude-code", "active", "2026-01-05T09:20:00Z", "")
 	connection.Provider = "anthropic"
 	connection.EventType = "mcp_server_connection"
-	connection.ProviderExtensions = map[string]any{"event": map[string]any{"server_fingerprint": "mcp:hmac:paged", "status": "connected"}}
+	connection.ProviderExtensions = map[string]any{"event": map[string]any{"server_name": "paged", "status": "connected"}}
 	use := sessionTestEvent(t, "paged-mcp-used", "paged-mcp-session", "claude-code", "active", "2026-01-05T09:20:01Z", "")
 	use.Provider = "anthropic"
 	use.EventType = "mcp_call"
-	use.ProviderExtensions = map[string]any{"mcp_call": map[string]any{"server_fingerprint": "mcp:hmac:paged"}}
+	use.ProviderExtensions = map[string]any{"mcp_call": map[string]any{"server_name": "paged"}}
 	events = append(events, connection, use)
 	if err := repo.SaveEvents(context.Background(), events); err != nil {
 		t.Fatal(err)

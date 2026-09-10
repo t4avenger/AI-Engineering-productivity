@@ -44,20 +44,21 @@ func TestObservedString(t *testing.T) {
 }
 
 func TestProviderNativeSessionIDRetainsLocalProviderID(t *testing.T) {
-	fingerprint := func([]byte) string { return "fixture" }
-	if got := ProviderNativeSessionID("codex:", " synthetic-session ", fingerprint); got != "codex:synthetic-session" {
+	if got := ProviderNativeSessionID("codex:", " synthetic-session "); got != "codex:synthetic-session" {
 		t.Fatalf("session id = %q, want provider-native ID", got)
 	}
 }
 
-func TestProviderNativeSessionIDFingerprintsSecretLikeValue(t *testing.T) {
-	fingerprint := func(value []byte) string { return "fp-" + string(value) }
-	got := ProviderNativeSessionID("claude-code:", "token=synthetic-secret", fingerprint)
-	if got != "claude-code:redacted:fp-token=synthetic-secret" {
-		t.Fatalf("secret-like session id = %q", got)
+// TestProviderNativeSessionIDPassesRawValueThrough asserts the no-hiding
+// invariant (issue #88): the raw provider-native value is retained verbatim,
+// never fingerprinted or redacted, regardless of how secret-like it looks. Only
+// an absent value falls back to the explicit "unknown" sentinel.
+func TestProviderNativeSessionIDPassesRawValueThrough(t *testing.T) {
+	if got := ProviderNativeSessionID("claude-code:", "token=synthetic-secret"); got != "claude-code:token=synthetic-secret" {
+		t.Fatalf("session id = %q, want raw value retained", got)
 	}
-	if got := ProviderNativeSessionID("cursor-agent:", "[REDACTED]", nil); got != "cursor-agent:redacted" {
-		t.Fatalf("redacted session id without fingerprint = %q", got)
+	if got := ProviderNativeSessionID("cursor-agent:", "   "); got != "cursor-agent:unknown" {
+		t.Fatalf("empty session id = %q, want unknown sentinel", got)
 	}
 }
 

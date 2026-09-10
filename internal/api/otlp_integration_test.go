@@ -12,7 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
 )
@@ -80,17 +79,19 @@ func TestOTLPTracesStillRefusedMetricsAccepted(t *testing.T) {
 	closeBody(t, metrics)
 }
 
-func TestCodexLogsPersistAsSanitizedCanonicalSession(t *testing.T) {
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	repository, err := sqlite.Open(":memory:", sanitizer)
+// TestCodexLogsPersistWithRawConversationIdentity proves the #88 invariant: the
+// raw provider-native conversation identity reaches storage verbatim, with no
+// HMAC fingerprint. Prompt/response/PII content-field gating (the api_key,
+// output, user.email attributes) has no owning mechanism after the storage-side
+// sanitizer was removed and is tracked separately in #94; #88 only de-hides
+// identifiers, paths, and commands.
+func TestCodexLogsPersistWithRawConversationIdentity(t *testing.T) {
+	repository, err := sqlite.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = repository.Close() })
-	server := httptest.NewServer(NewPersistentHandler(slog.Default(), sanitizer, repository))
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
 	t.Cleanup(server.Close)
 	payload := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_cli_rs"}},{"key":"service.version","value":{"stringValue":"0.145.0"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"synthetic-model"}},{"key":"arguments","value":{"stringValue":"--token=tiq-canary-argument-token"}},{"key":"output","value":{"stringValue":"tiq-canary-output"}},{"key":"custom_metadata","value":{"stringValue":"token=tiq-canary-provider-extension"}},{"key":"api_key","value":{"stringValue":"tiq-canary-api-key"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"conversation.id","value":{"stringValue":"synthetic-conversation"}}],"body":{"stringValue":"synthetic body"}}]}]}]}`)
 	response := postOTLPToPath(t, server.URL, "/v1/logs", payload, "application/json")
@@ -102,11 +103,6 @@ func TestCodexLogsPersistAsSanitizedCanonicalSession(t *testing.T) {
 	if err != nil || len(sessions) != 1 {
 		t.Fatalf("sessions = %#v, %v", sessions, err)
 	}
-	data, err := json.Marshal(sessions[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertNoCanaryLeak(t, data)
 	events, err := repository.ListEvents(context.Background(), storage.EventFilter{SessionID: sessions[0].SessionID, Limit: 10})
 	if err != nil || len(events) != 1 {
 		t.Fatalf("events = %#v, %v", events, err)
@@ -115,16 +111,13 @@ func TestCodexLogsPersistAsSanitizedCanonicalSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertNoCanaryLeak(t, eventData)
-	provenance, found, err := repository.EventProvenance(context.Background(), events[0].EventID)
-	if err != nil || !found {
-		t.Fatalf("provenance found = %v, err = %v", found, err)
+	// The raw conversation identity is stored verbatim — no HMAC fingerprint.
+	if !strings.Contains(string(eventData), "synthetic-conversation") {
+		t.Fatalf("raw conversation identity must survive to storage, got %s", eventData)
 	}
-	provenanceData, err := json.Marshal(provenance)
-	if err != nil {
-		t.Fatal(err)
+	if sessions[0].SessionID != "codex:synthetic-conversation" {
+		t.Fatalf("session id = %q, want raw provider-native conversation ID", sessions[0].SessionID)
 	}
-	assertNoCanaryLeak(t, provenanceData)
 }
 
 func TestObservedSanitisedFixtureReplaysToLogsReceiver(t *testing.T) {
@@ -147,14 +140,14 @@ func TestObservedSanitisedFixtureReplaysToLogsReceiver(t *testing.T) {
 	closeBody(t, response)
 }
 
-func TestDevelopmentInspectorSanitizesOTLPAttributes(t *testing.T) {
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	server := httptest.NewServer(NewDevelopmentHandler(slog.Default(), sanitizer))
+// TestDevelopmentInspectorRecordsLastIngest exercises the dev-only debug echo.
+// After issue #88 removed the storage-side sanitizer, the inspector reflects the
+// raw last-seen payload for local troubleshooting (dev mode is opt-in and
+// local-only); prompt/response/PII content-field gating is tracked in #94.
+func TestDevelopmentInspectorRecordsLastIngest(t *testing.T) {
+	server := httptest.NewServer(NewDevelopmentHandler(slog.Default()))
 	t.Cleanup(server.Close)
-	payload := []byte(`{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"attributes":[{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"model","value":{"stringValue":"synthetic-model"}}],"body":{"stringValue":"synthetic body"}}]}]}]}`)
+	payload := []byte(`{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"attributes":[{"key":"model","value":{"stringValue":"synthetic-model"}}],"body":{"stringValue":"synthetic body"}}]}]}]}`)
 	response := postOTLPToPath(t, server.URL, "/v1/logs", payload, "application/json")
 	if response.StatusCode != http.StatusAccepted {
 		t.Fatalf("inspector ingest status = %d", response.StatusCode)
@@ -173,24 +166,8 @@ func TestDevelopmentInspectorSanitizesOTLPAttributes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(serialized), "synthetic@example.test") || strings.Contains(string(serialized), "synthetic body") {
-		t.Fatalf("development inspector leaked sensitive content: %s", serialized)
-	}
-}
-
-func assertNoCanaryLeak(t *testing.T, data []byte) {
-	t.Helper()
-	for _, prohibited := range []string{
-		"tiq-canary-argument-token",
-		"tiq-canary-output",
-		"tiq-canary-provider-extension",
-		"tiq-canary-api-key",
-		"synthetic.test",
-		"synthetic body",
-	} {
-		if strings.Contains(string(data), prohibited) {
-			t.Fatalf("privacy leak %q in %s", prohibited, data)
-		}
+	if !strings.Contains(string(serialized), "synthetic-model") {
+		t.Fatalf("development inspector did not record the last ingest: %s", serialized)
 	}
 }
 

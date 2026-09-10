@@ -67,9 +67,8 @@ var droppedKeyPrefixes = []string{"user.", "organization.", "terminal."}
 // droppedKeys are individual identifier attributes with no behavioural value.
 var droppedKeys = map[string]struct{}{"prompt.id": {}, "message.uuid": {}}
 
-// serverIdentityKeys carry a provider-reported MCP server identity. The name is
-// retained for local inventory display and a fingerprint is also retained for
-// correlation fallback.
+// serverIdentityKeys carry a provider-reported MCP server identity. The raw name
+// is retained for local inventory display and correlation (epic #87 — no hiding).
 var serverIdentityKeys = []string{"server_name", "mcp_server_name", "server.name", "mcp.server_name"}
 
 // NormalizeLogs maps a raw, already-sanitised Claude Code OTLP/HTTP log payload
@@ -82,20 +81,16 @@ var serverIdentityKeys = []string{"server_name", "mcp_server_name", "server.name
 //
 // Only resources whose service.name is claude-code are normalised; any other
 // resource is skipped so a mixed payload is safe. A payload with no Claude
-// records yields ErrUnsupportedLogs. The caller supplies the installation HMAC
-// fingerprint, and must have run the shared privacy sanitiser over the payload
-// first, exactly as the Codex ingest path does.
-func NormalizeLogs(data []byte, receivedAt time.Time, fingerprint func([]byte) string) ([]canonical.Event, error) {
-	if fingerprint == nil {
-		return nil, errors.New("claude log fingerprint is required")
-	}
+// records yields ErrUnsupportedLogs. The raw payload is normalised verbatim —
+// no ingest-time hiding is applied (epic #87).
+func NormalizeLogs(data []byte, receivedAt time.Time) ([]canonical.Event, error) {
 	var payload logsPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
 		return nil, fmt.Errorf("decode Claude OTLP logs: %w", err)
 	}
 	var events []canonical.Event
 	for _, resource := range payload.ResourceLogs {
-		resourceEvents, err := normaliseResourceLogs(resource, receivedAt, fingerprint, len(events))
+		resourceEvents, err := normaliseResourceLogs(resource, receivedAt, len(events))
 		if err != nil {
 			return nil, err
 		}
@@ -111,7 +106,7 @@ func NormalizeLogs(data []byte, receivedAt time.Time, fingerprint func([]byte) s
 // only when its service.name is claude-code (nil otherwise, so a mixed payload is
 // safe). indexBase is the count of events already produced, keeping event indexing
 // stable and contiguous across resources.
-func normaliseResourceLogs(resource resourceLog, receivedAt time.Time, fingerprint func([]byte) string, indexBase int) ([]canonical.Event, error) {
+func normaliseResourceLogs(resource resourceLog, receivedAt time.Time, indexBase int) ([]canonical.Event, error) {
 	resourceAttrs := attributeValues(resource.Resource.Attributes)
 	if service, _ := resourceAttrs["service.name"].(string); service != claudeLogService {
 		return nil, nil
@@ -121,11 +116,11 @@ func normaliseResourceLogs(resource resourceLog, receivedAt time.Time, fingerpri
 	var events []canonical.Event
 	for _, scope := range resource.ScopeLogs {
 		for _, record := range scope.LogRecords {
-			sample := sampleEventFromRecord(record, fingerprint)
+			sample := sampleEventFromRecord(record)
 			if _, ok := sample["event_name"].(string); !ok {
 				continue
 			}
-			event, err := normaliseSampleEvent(document, receivedAt.UTC(), fingerprint, indexBase+len(events), sample)
+			event, err := normaliseSampleEvent(document, receivedAt.UTC(), indexBase+len(events), sample)
 			if err != nil {
 				return nil, err
 			}
@@ -140,7 +135,7 @@ func normaliseResourceLogs(resource resourceLog, receivedAt time.Time, fingerpri
 // keys, drops operator/machine identifiers, retains provider session and MCP
 // server display identities allowed by local policy, and forwards the remaining
 // behaviour attributes verbatim.
-func sampleEventFromRecord(record logRecord, fingerprint func([]byte) string) map[string]any {
+func sampleEventFromRecord(record logRecord) map[string]any {
 	sample := make(map[string]any, len(record.Attributes))
 	for _, attribute := range record.Attributes {
 		if _, dropped := droppedKeys[attribute.Key]; dropped || hasDroppedPrefix(attribute.Key) {
@@ -152,7 +147,6 @@ func sampleEventFromRecord(record logRecord, fingerprint func([]byte) string) ma
 		}
 		if isServerIdentityKey(attribute.Key) {
 			if text, ok := value.(string); ok && strings.TrimSpace(text) != "" {
-				sample["server_fingerprint"] = "claude-code:" + fingerprint([]byte(text))
 				sample["server_name"] = strings.TrimSpace(text)
 			}
 			continue

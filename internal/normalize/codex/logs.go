@@ -1,6 +1,8 @@
 package codex
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +12,14 @@ import (
 	"github.com/wayne/telemetryiq/internal/normalize"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
+
+// contentID derives a stable, non-keyed uniqueness key for a record that
+// carries no provider-native ID. It is a plain content hash for deduplication
+// only — not a privacy transform (epic #87 removed ingest-time hiding).
+func contentID(prefix string, data []byte) string {
+	sum := sha256.Sum256(data)
+	return prefix + hex.EncodeToString(sum[:])
+}
 
 // ErrUnsupportedLogs indicates that a valid OTLP log payload is not the
 // observed Codex log shape and therefore must not be normalised by this adapter.
@@ -39,20 +49,17 @@ type logRecord struct {
 }
 
 // NormalizeLogs maps the reviewed Codex OTLP log shape directly to canonical
-// events. When a retained conversation.id is present, it becomes the
-// provider-prefixed native session ID for the local-only edition. Older or
-// sanitised records without that field fall back to a local fingerprint.
-func NormalizeLogs(data []byte, receivedAt time.Time, fingerprint func([]byte) string) ([]canonical.Event, error) {
-	if fingerprint == nil {
-		return nil, errors.New("codex log fingerprint is required")
-	}
+// events. When a conversation.id is present, it becomes the provider-prefixed
+// native session ID. Records without that field fall back to a non-keyed
+// content ID for uniqueness only (epic #87 — no ingest-time hiding).
+func NormalizeLogs(data []byte, receivedAt time.Time) ([]canonical.Event, error) {
 	var payload logsPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
 		return nil, fmt.Errorf("decode Codex OTLP logs: %w", err)
 	}
 	var events []canonical.Event
 	for _, raw := range payload.ResourceLogs {
-		normalized, err := normalizeResourceLog(raw, receivedAt, fingerprint)
+		normalized, err := normalizeResourceLog(raw, receivedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -64,7 +71,7 @@ func NormalizeLogs(data []byte, receivedAt time.Time, fingerprint func([]byte) s
 	return events, nil
 }
 
-func normalizeResourceLog(raw resourceLog, receivedAt time.Time, fingerprint func([]byte) string) ([]canonical.Event, error) {
+func normalizeResourceLog(raw resourceLog, receivedAt time.Time) ([]canonical.Event, error) {
 	resource := attributes(raw.Resource.Attributes)
 	if !isCodexLogService(resource["service.name"]) {
 		return nil, nil
@@ -72,7 +79,7 @@ func normalizeResourceLog(raw resourceLog, receivedAt time.Time, fingerprint fun
 	var events []canonical.Event
 	for _, scope := range raw.ScopeLogs {
 		for _, record := range scope.LogRecords {
-			event, err := normalizeLogRecord(resource, record, receivedAt, fingerprint)
+			event, err := normalizeLogRecord(resource, record, receivedAt)
 			if err != nil {
 				return nil, err
 			}
@@ -82,14 +89,14 @@ func normalizeResourceLog(raw resourceLog, receivedAt time.Time, fingerprint fun
 	return events, nil
 }
 
-func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt time.Time, fingerprint func([]byte) string) (canonical.Event, error) {
+func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt time.Time) (canonical.Event, error) {
 	recordData, err := json.Marshal(record)
 	if err != nil {
 		return canonical.Event{}, fmt.Errorf("marshal Codex log record: %w", err)
 	}
-	id := "codex-log:" + fingerprint(recordData)
+	id := contentID("codex-log:", recordData)
 	fields := attributes(record.Attributes)
-	sessionID := codexLogSessionID(fields, id, fingerprint)
+	sessionID := codexLogSessionID(fields, id)
 	attributes := map[string]any{"unavailable_fields": []string{"session_lifecycle", "cache_usage", "reasoning_tokens", "tool_calls", "file_operations", "command_execution", "approvals", "prompt_content", "response_content", "repository_context", "provider_cost"}}
 	for _, key := range []string{"model", "input_token_count", "output_token_count"} {
 		if value, ok := fields[key]; ok {
@@ -101,7 +108,7 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 		attributes["unavailable_fields"] = append(attributes["unavailable_fields"].([]string), "task_outcome")
 	}
 	extensions := map[string]any{"resource_attributes": resource, "log_attributes": codexLogAttributes(fields), "severity": record.SeverityText}
-	if mcpCall, ok := codexMCPCall(fields, fingerprint); ok {
+	if mcpCall, ok := codexMCPCall(fields); ok {
 		attributes["category"] = string(canonical.OperationCategoryMCPCall)
 		extensions["mcp_call"] = mcpCall
 	}
@@ -109,9 +116,9 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 	return canonical.Event{SchemaVersion: canonicalSchemaVersion, EventID: id, EventType: eventName, OccurredAt: receivedAt.UTC(), ReceivedAt: receivedAt.UTC(), Provider: "openai", Tool: "codex", SourceSchema: sourceSchema, SourceVersion: stringValue(resource["service.version"], unavailable), ActorID: unavailable, DeviceID: unavailable, SessionID: sessionID, PrivacyLevel: "operational", Attributes: attributes, ProviderExtensions: extensions}, nil
 }
 
-func codexLogSessionID(fields map[string]any, fallback string, fingerprint func([]byte) string) string {
+func codexLogSessionID(fields map[string]any, fallback string) string {
 	if conversationID, ok := normalize.ObservedString(fields["conversation.id"]); ok {
-		return normalize.ProviderNativeSessionID("codex:", conversationID, fingerprint)
+		return normalize.ProviderNativeSessionID("codex:", conversationID)
 	}
 	return fallback
 }
@@ -203,15 +210,14 @@ func codexLogAttributes(fields map[string]any) map[string]any {
 	return normalize.UnknownFields(fields, "mcp_server", "conversation.id")
 }
 
-func codexMCPCall(fields map[string]any, fingerprint func([]byte) string) (map[string]any, bool) {
+func codexMCPCall(fields map[string]any) (map[string]any, bool) {
 	server, ok := normalize.ObservedString(fields["mcp_server"])
 	if !ok {
 		return nil, false
 	}
 	call := map[string]any{
-		"server_fingerprint": "codex:" + fingerprint([]byte(server)),
-		"server_name":        server,
-		"identity_state":     "provider_reported",
+		"server_name":    server,
+		"identity_state": "provider_reported",
 	}
 	for _, key := range []string{"mcp_server_origin", "tool_name", "tool_namespace", "call_id", "duration_ms", "success", "output_truncated", "tool_result_seq", "decision"} {
 		if value, ok := fields[key]; ok {

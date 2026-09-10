@@ -4,21 +4,20 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 	"github.com/wayne/telemetryiq/internal/ui"
 )
 
 // NewAuthenticatedPersistentHandler enables persistent ingestion and protects
 // management endpoints with a local bearer token or dashboard cookie.
-func NewAuthenticatedPersistentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer, repository storage.Repository, token string, thresholds InsightThresholds) http.Handler {
-	return wrapUI(token, repository, thresholds, withManagementAuth(token, withBulkDelete(repository, thresholds, newHandler(logger, nil, repository, sanitizer, repository, thresholds))))
+func NewAuthenticatedPersistentHandler(logger *slog.Logger, repository storage.Repository, token string, thresholds InsightThresholds) http.Handler {
+	return wrapUI(token, repository, thresholds, withManagementAuth(token, withBulkDelete(repository, thresholds, newHandler(logger, nil, repository, repository, thresholds))))
 }
 
 // NewAuthenticatedPersistentDevelopmentHandler retains the development-only
-// sanitized inspector while protecting management endpoints.
-func NewAuthenticatedPersistentDevelopmentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer, repository storage.Repository, token string, thresholds InsightThresholds) http.Handler {
-	return wrapUI(token, repository, thresholds, withManagementAuth(token, withBulkDelete(repository, thresholds, newHandler(logger, newSanitizedInspector(sanitizer), repository, sanitizer, repository, thresholds))))
+// ingest inspector while protecting management endpoints.
+func NewAuthenticatedPersistentDevelopmentHandler(logger *slog.Logger, repository storage.Repository, token string, thresholds InsightThresholds) http.Handler {
+	return wrapUI(token, repository, thresholds, withManagementAuth(token, withBulkDelete(repository, thresholds, newHandler(logger, newIngestInspector(), repository, repository, thresholds))))
 }
 
 func wrapUI(token string, repository storage.Repository, thresholds InsightThresholds, next http.Handler) http.Handler {

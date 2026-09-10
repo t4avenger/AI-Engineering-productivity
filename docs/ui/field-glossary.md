@@ -51,8 +51,7 @@ strings.
 | `connected_but_unused` | Connected, never invoked | A server connection was observed and no matching explicit invocation was observed. | None | If usage cannot be checked, use `usage_unavailable`. |
 | `used` | Invoked | Explicit MCP invocation evidence matched the server. | None | Not applicable. |
 | `usage_unavailable` | Usage not available | The provider data does not prove whether the connected MCP server was invoked. | None | Use this label instead of "unused". |
-| `fingerprinted` | Fingerprint only | The server identity is represented by a privacy-safe fingerprint because a provider name was unavailable. | None | Prefer `server_name` when present; fall back to the fingerprint label only when needed. |
-| `provider_reported` | Provider reported | The server identity came from provider telemetry retained for display. | None | Use `Fingerprint only` when provider name is unavailable. |
+| `provider_reported` | Provider reported | The raw provider-reported MCP server name retained for display; the correlation key itself (epic #87 removed server fingerprints). | None | When the provider name is unavailable, show `Usage not available` — never a fingerprint. |
 | `explicit` | Explicitly identified | The provider stamped the skill identity directly. | None | Not applicable. |
 | `inferred` | Inferred by provider | The provider marked skill detection as inferred, but TelemetryIQ must not create named skill records from it. | None | Show in coverage only. |
 | `success` | Succeeded | An outcome contract reported successful completion. | Count | If no outcome contract exists, do not borrow session lifecycle state. |
@@ -70,12 +69,11 @@ strings.
 | `used_servers` | Invoked servers | Count of connected MCP servers with explicit matching invocation evidence. | Servers | Do not infer use from connection alone. |
 | `unused_servers` | Unused connections | Count of connected MCP servers with `connected_but_unused` state. | Servers | Use `usage_unavailable_servers` when usage cannot be checked. |
 | `usage_unavailable_servers` | Usage unavailable | Count of server rows whose invocation state cannot be proven. | Servers | This is the honest fallback for blind provider surfaces. |
-| `server_name` | Server | Provider-reported MCP server name. | None | If absent, render the privacy-safe fingerprint as a fallback. |
-| `server_fingerprint` | Server fingerprint | Privacy-safe correlation key for a server. | None | Use only as fallback display text or secondary detail when `server_name` is empty. |
-| `identity_state` | Identity evidence | Whether display identity came from provider data or only a fingerprint. | Enum | Show `Fingerprint only` when the name is unavailable. |
+| `server_name` | Server | Raw provider-reported MCP server name; the correlation key itself (epic #87 — no fingerprint). | None | If absent, render `Unknown server`. |
+| `identity_state` | Identity evidence | Whether the raw server name came from provider data (`provider_reported`) or was unavailable. | Enum | Show `Provider reported` or `Usage not available`; never a fingerprint. |
 | `usage_state` | Usage | Whether explicit invocation evidence was seen. | Enum | Show `Usage not available` when the telemetry cannot carry invocation evidence. |
 | `context_waste_state` | Unused connection | MCP-specific unused-connection state; not the token context-pressure insight. | Enum | Show `Usage not available` when usage is blind. |
-| `invocation_count` | Invocations | Count of explicit MCP invocation events matched to the server. | Invocations | Show `0 invocations` only for `connected_but_unused`; otherwise show usage unavailable. |
+| `invocation_count` | Invocations | Count of explicit MCP invocation events matched to the server. | Invocations | Render the count only when `usage_state` is `observed`; otherwise show `Usage not available` (a connection alone must not imply a measured zero). |
 | `tool_names` | MCP tools | Provider-reported MCP tool names invoked through this server. | Names | Omit or show unavailable when no invocation evidence exists. |
 | `request_input_tokens` | Request input tokens | Input tokens on requests where MCP telemetry was present. | Tokens | Show unavailable when token context was not observed. |
 | `request_output_tokens` | Request output tokens | Output tokens on requests where MCP telemetry was present. | Tokens | Show unavailable when token context was not observed. |

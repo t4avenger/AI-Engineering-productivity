@@ -41,18 +41,17 @@ extensions. Local Codex 0.153.4 metadata also shows tool telemetry such as
 `tool_name`, `tool_namespace`, `call_id`, `duration_ms`, `success`,
 `mcp_server`, and `mcp_server_origin`. When a `codex.tool_result` carries a
 non-empty `mcp_server`, the event normaliser stores an explicit MCP-use signal
-under `provider_extensions.mcp_call` with the provider-reported `server_name`,
-an installation-specific `server_fingerprint`, and safe invocation metadata;
-the raw server name is excluded from generic log attributes to avoid duplicate
-evidence but is retained in the MCP-specific record for display. Empty `mcp_server`
-means the provider did not report that tool result as an MCP server call, so it
-remains an internal Codex/tool invocation rather than MCP inventory evidence.
-When a retained `conversation.id` is present, observed logs use the local-only
-provider-native session identity `codex:<conversation.id>`. If older or already
-sanitised records lack that field, each retained log falls back to an explicitly
-`unknown` lifecycle session identified by an installation-specific HMAC
-fingerprint. Account, hostname, email, raw command arguments, tool output, and
-body fields are removed by the privacy pipeline before storage.
+under `provider_extensions.mcp_call` with the provider-reported raw `server_name`
+(the correlation identity, `identity_state: provider_reported`) and safe
+invocation metadata; the server name is promoted out of generic log attributes to
+avoid duplicate evidence but retained in the MCP-specific record for display.
+Empty `mcp_server` means the provider did not report that tool result as an MCP
+server call, so it remains an internal Codex/tool invocation rather than MCP
+inventory evidence. When a `conversation.id` is present, logs use the raw
+provider-native session identity `codex:<conversation.id>`. Records without that
+field fall back to a non-keyed content ID for uniqueness only (epic #87 — no
+ingest-time hiding). Prompt/response/source-code content is not captured by
+default; its configurable capture is tracked in #94.
 
 ## Model-interaction records
 
@@ -71,11 +70,11 @@ Codex log shape into stable-primitive `canonical.ModelInteraction` records
   distinguishable from a real zero.
 - **Cached and reasoning tokens, task outcome** (`unknown` for typed model records) are left
   `nil`/`"unknown"`; no typed model field is fabricated from provider-extension evidence.
-- **MCP-backed tool results** (`partial` for events) are represented only when Codex reports a non-empty `mcp_server`; the provider-reported server name is retained under `provider_extensions.mcp_call` for display, with a fingerprint retained only as the correlation fallback/key.
-- **Session/request identity** uses `codex:<conversation.id>` for the session
-  when a retained conversation ID is present in the local-only edition. Request
-  IDs and records without a retained conversation ID still use installation
-  HMAC fingerprints for deterministic correlation.
+- **MCP-backed tool results** (`partial` for events) are represented only when Codex reports a non-empty `mcp_server`; the provider-reported raw server name is retained under `provider_extensions.mcp_call` and is itself the correlation identity.
+- **Session/request identity** uses the raw `codex:<conversation.id>` for the
+  session when a conversation ID is present. Request IDs and records without a
+  conversation ID use a non-keyed content ID for deterministic correlation and
+  uniqueness only — never an HMAC fingerprint (epic #87).
 - **Correlation evidence** records the dedup key, ordering key, and explicit
   unknown task-boundary confidence under `provider_extensions.correlation`; log
   records are sorted by `started_at`, `request_id`, and `completed_at`, then

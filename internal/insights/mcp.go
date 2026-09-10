@@ -1,9 +1,8 @@
-// Package insights derives explainable findings from sanitised canonical data.
+// Package insights derives explainable findings from raw canonical data
+// (epic #87 — no ingest-time hiding).
 package insights
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"sort"
 	"strings"
@@ -33,7 +32,6 @@ type MCPTotals struct {
 }
 
 type MCPServer struct {
-	ServerFingerprint         string   `json:"server_fingerprint"`
 	ServerName                string   `json:"server_name"`
 	IdentityState             string   `json:"identity_state"`
 	Provider                  string   `json:"provider"`
@@ -69,15 +67,15 @@ type mcpUsage struct {
 }
 
 type mcpUse struct {
-	fingerprint string
-	serverName  string
-	toolName    string
+	key        string
+	serverName string
+	toolName   string
 }
 
-// MCPInventoryFromEvents reports provider-reported MCP server names when
-// available, privacy-safe fingerprints for correlation, observed connection
-// metadata, and explicit MCP use. If no reviewed invocation signal is present,
-// usage remains unavailable rather than inferred.
+// MCPInventoryFromEvents reports raw provider-reported MCP server names,
+// observed connection metadata, and explicit MCP use. Servers are correlated by
+// their raw server name (epic #87 — no ingest-time hiding). If no reviewed
+// invocation signal is present, usage remains unavailable rather than inferred.
 func MCPInventoryFromEvents(events []canonical.Event) MCPInventory {
 	servers := map[string]*MCPServer{}
 	used := map[string]mcpUsage{}
@@ -88,12 +86,11 @@ func MCPInventoryFromEvents(events []canonical.Event) MCPInventory {
 			tokensBySession[event.SessionID] = mergeTokenContext(tokensBySession[event.SessionID], context)
 		}
 		if use, ok := mcpUseEvent(event); ok {
-			used[use.fingerprint] = mergeMCPUsage(used[use.fingerprint], use)
-			if _, exists := servers[use.fingerprint]; !exists {
-				servers[use.fingerprint] = &MCPServer{
-					ServerFingerprint: use.fingerprint,
+			used[use.key] = mergeMCPUsage(used[use.key], use)
+			if _, exists := servers[use.key]; !exists {
+				servers[use.key] = &MCPServer{
 					ServerName:        use.serverName,
-					IdentityState:     usageIdentityState(use.serverName),
+					IdentityState:     identityStateForName(use.serverName),
 					Provider:          event.Provider,
 					Tool:              event.Tool,
 					SessionID:         event.SessionID,
@@ -106,8 +103,8 @@ func MCPInventoryFromEvents(events []canonical.Event) MCPInventory {
 				}
 			}
 		}
-		if server, ok := mcpConnection(event); ok {
-			servers[server.ServerFingerprint] = &server
+		if key, server, ok := mcpConnection(event); ok {
+			servers[key] = &server
 		}
 	}
 
@@ -116,23 +113,23 @@ func MCPInventoryFromEvents(events []canonical.Event) MCPInventory {
 		Servers:       []MCPServer{},
 		Notes: []string{
 			"Request token context is session/request-level only and is not an exact per-MCP allocation.",
-			"MCP usage is marked observed only when an explicit invocation signal carries the same privacy-safe fingerprint.",
+			"MCP usage is marked observed only when an explicit invocation signal carries the same raw server name.",
 		},
 	}
-	for _, server := range servers {
-		result.Servers = append(result.Servers, annotatedServer(server, used, tokensBySession))
+	for key, server := range servers {
+		result.Servers = append(result.Servers, annotatedServer(key, server, used, tokensBySession))
 	}
 	sort.Slice(result.Servers, func(i, j int) bool {
 		left, right := result.Servers[i], result.Servers[j]
-		return fmt.Sprintf("%s:%s:%s", left.Provider, left.Tool, left.ServerFingerprint) < fmt.Sprintf("%s:%s:%s", right.Provider, right.Tool, right.ServerFingerprint)
+		return fmt.Sprintf("%s:%s:%s", left.Provider, left.Tool, left.ServerName) < fmt.Sprintf("%s:%s:%s", right.Provider, right.Tool, right.ServerName)
 	})
 	result.Totals = mcpTotals(result.Servers)
 	return result
 }
 
-func annotatedServer(server *MCPServer, used map[string]mcpUsage, tokensBySession map[string]tokenContext) MCPServer {
+func annotatedServer(key string, server *MCPServer, used map[string]mcpUsage, tokensBySession map[string]tokenContext) MCPServer {
 	server.ToolNames = []string{}
-	if usage, ok := used[server.ServerFingerprint]; ok {
+	if usage, ok := used[key]; ok {
 		server.Used = true
 		server.InvocationCount = usage.count
 		if server.ServerName == "" {
@@ -141,7 +138,7 @@ func annotatedServer(server *MCPServer, used map[string]mcpUsage, tokensBySessio
 		server.ToolNames = sortedSet(usage.toolNames)
 		server.UsageState = "observed"
 		server.ContextWasteState = "used"
-	} else if hasCorrelatableMCPIdentity(server.ServerFingerprint) {
+	} else if hasCorrelatableMCPIdentity(key) {
 		server.UsageState = "not_observed"
 		server.ContextWasteState = "connected_but_unused"
 	} else {
@@ -157,9 +154,11 @@ func annotatedServer(server *MCPServer, used map[string]mcpUsage, tokensBySessio
 	return *server
 }
 
-func hasCorrelatableMCPIdentity(fingerprint string) bool {
-	fingerprint = strings.TrimSpace(fingerprint)
-	return fingerprint != "" && !strings.HasPrefix(fingerprint, "connection:")
+// hasCorrelatableMCPIdentity reports whether a server key is a real raw server
+// name rather than the synthetic connection key used when no name was observed.
+func hasCorrelatableMCPIdentity(key string) bool {
+	key = strings.TrimSpace(key)
+	return key != "" && !strings.HasPrefix(key, "connection:")
 }
 
 func mcpTotals(servers []MCPServer) MCPTotals {
@@ -188,15 +187,15 @@ func mcpTotals(servers []MCPServer) MCPTotals {
 	return totals
 }
 
-func mcpConnection(event canonical.Event) (MCPServer, bool) {
+func mcpConnection(event canonical.Event) (string, MCPServer, bool) {
 	if event.EventType != "mcp_server_connection" {
-		return MCPServer{}, false
+		return "", MCPServer{}, false
 	}
 	rawEvent, _ := event.ProviderExtensions["event"].(map[string]any)
-	fingerprint, identityState := serverIdentity(event, rawEvent)
-	return MCPServer{
-		ServerFingerprint: fingerprint,
-		ServerName:        stringValue(rawEvent, "server_name", ""),
+	serverName := stringValue(rawEvent, "server_name", "")
+	key, identityState := serverKey(serverName, event.EventID)
+	return key, MCPServer{
+		ServerName:        serverName,
 		IdentityState:     identityState,
 		Provider:          event.Provider,
 		Tool:              event.Tool,
@@ -215,17 +214,15 @@ func mcpUseEvent(event canonical.Event) (mcpUse, bool) {
 	if event.EventType != "mcp_call" && event.EventType != "mcp.call" && event.Attributes["category"] != string(canonical.OperationCategoryMCPCall) {
 		return mcpUse{}, false
 	}
-	if fingerprint, ok := hashedValue(event.ProviderExtensions); ok {
-		return mcpUse{fingerprint: fingerprint}, true
+	rawCall, ok := event.ProviderExtensions["mcp_call"].(map[string]any)
+	if !ok {
+		return mcpUse{}, false
 	}
-	if rawCall, ok := event.ProviderExtensions["mcp_call"].(map[string]any); ok {
-		fingerprint, ok := hashedValue(rawCall)
-		if !ok {
-			return mcpUse{}, false
-		}
-		return mcpUse{fingerprint: fingerprint, serverName: stringValue(rawCall, "server_name", ""), toolName: stringValue(rawCall, "tool_name", "")}, true
+	serverName := stringValue(rawCall, "server_name", "")
+	if strings.TrimSpace(serverName) == "" {
+		return mcpUse{}, false
 	}
-	return mcpUse{}, false
+	return mcpUse{key: serverName, serverName: serverName, toolName: stringValue(rawCall, "tool_name", "")}, true
 }
 
 func mergeMCPUsage(current mcpUsage, use mcpUse) mcpUsage {
@@ -262,20 +259,15 @@ func firstSortedValue(values map[string]struct{}) string {
 	return sorted[0]
 }
 
-func serverIdentity(event canonical.Event, rawEvent map[string]any) (string, string) {
-	serverName := stringValue(rawEvent, "server_name", "")
-	if fingerprint, ok := hashedValue(rawEvent); ok {
-		return fingerprint, usageIdentityState(serverName)
+// serverKey returns the correlation key and identity state for an MCP server.
+// A raw server name is the key and marks the identity provider_reported; when no
+// name was observed the key is a synthetic per-connection value (never
+// displayed) and the identity is unavailable.
+func serverKey(serverName, eventID string) (string, string) {
+	if strings.TrimSpace(serverName) != "" {
+		return serverName, "provider_reported"
 	}
-	sum := sha256.Sum256([]byte(event.EventID))
-	return "connection:" + hex.EncodeToString(sum[:16]), identityStateForName(serverName)
-}
-
-func usageIdentityState(name string) string {
-	if strings.TrimSpace(name) != "" {
-		return "provider_reported"
-	}
-	return "fingerprinted"
+	return "connection:" + eventID, "unavailable"
 }
 
 func identityStateForName(name string) string {
@@ -283,15 +275,6 @@ func identityStateForName(name string) string {
 		return "provider_reported"
 	}
 	return "unavailable"
-}
-
-func hashedValue(values map[string]any) (string, bool) {
-	for _, key := range []string{"server_fingerprint", "server_hash", "server_hmac", "mcp_server_fingerprint", "mcp_server_hash", "mcp_server_hmac"} {
-		if value, ok := values[key].(string); ok && strings.TrimSpace(value) != "" {
-			return value, true
-		}
-	}
-	return "", false
 }
 
 func requestTokenContext(event canonical.Event) (tokenContext, bool) {

@@ -72,11 +72,13 @@ explicitly unavailable/unknown and are never fabricated):
 
 ## Privacy handling
 
-- **Session IDs are retained locally**: `session_id` appears in canonical output
-  as `cursor-agent:<session_id>` under the local-only provider-session exception.
-  `request_id` remains protected with an installation-scoped HMAC fingerprint.
-- **No content is retained**: the adapter relies on the shared privacy
-  sanitiser and on `fixture.Validate` to reject prohibited fields.
+- **Session and request IDs are retained raw**: `session_id` and `request_id`
+  appear in canonical output as `cursor-agent:<session_id>` /
+  `cursor-agent:<request_id>` verbatim — epic #87 removed ingest-time hiding, so
+  there is no HMAC fingerprint.
+- **No content is retained**: `fixture.Validate` rejects prohibited message-content
+  fields at the ingest boundary, so prompt/response content is not captured by
+  default; its configurable capture is tracked in #94.
 
 ## Live ingest into the daemon (local-only)
 

@@ -14,19 +14,18 @@ import (
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/normalize/claude"
 	"github.com/wayne/telemetryiq/internal/normalize/codex"
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
 const maxOTLPPayloadBytes int64 = 1 << 20 // 1 MiB
 
-// otlpHTTPIngest is deliberately transient. Task 004 proves that TelemetryIQ
-// can receive OTLP/HTTP safely; later tasks redact and persist canonical data.
+// otlpHTTPIngest receives OTLP/HTTP payloads, normalises them, and persists the
+// resulting canonical events verbatim — no ingest-time hiding is applied
+// (epic #87).
 type otlpHTTPIngest struct {
 	accepted   atomic.Uint64
 	rejected   atomic.Uint64
-	inspector  *sanitizedInspector
-	sanitizer  *privacy.Sanitizer
+	inspector  *ingestInspector
 	repository storage.Repository
 }
 
@@ -44,8 +43,8 @@ type ingestError struct {
 	Message string `json:"message"`
 }
 
-func newOTLPHTTPIngest(inspector *sanitizedInspector, sanitizer *privacy.Sanitizer, repository storage.Repository) *otlpHTTPIngest {
-	return &otlpHTTPIngest{inspector: inspector, sanitizer: sanitizer, repository: repository}
+func newOTLPHTTPIngest(inspector *ingestInspector, repository storage.Repository) *otlpHTTPIngest {
+	return &otlpHTTPIngest{inspector: inspector, repository: repository}
 }
 
 func (i *otlpHTTPIngest) tracesHandler(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +116,6 @@ func (i *otlpHTTPIngest) receive(w http.ResponseWriter, r *http.Request, resourc
 		i.reject(w, status, code, message)
 		return
 	}
-	// Raw payloads are never persisted or logged; only canonical sanitised events are stored.
 	i.accepted.Add(1)
 	w.WriteHeader(http.StatusAccepted)
 }
@@ -133,48 +131,47 @@ func (i *otlpHTTPIngest) persistSignal(request *http.Request, resourceField stri
 	}
 }
 
-func (i *otlpHTTPIngest) sanitizedPayload(payload map[string]json.RawMessage) ([]byte, error) {
+func rawPayload(payload map[string]json.RawMessage) ([]byte, error) {
 	raw := make(map[string]any, len(payload))
 	for key, value := range payload {
 		var decoded any
 		if err := json.Unmarshal(value, &decoded); err != nil {
-			return nil, fmt.Errorf("decode payload for sanitization: %w", err)
+			return nil, fmt.Errorf("decode payload: %w", err)
 		}
 		raw[key] = decoded
 	}
-	result := i.sanitizer.Sanitize(raw)
-	safe, err := json.Marshal(result.Value)
+	data, err := json.Marshal(raw)
 	if err != nil {
-		return nil, fmt.Errorf("marshal sanitized payload: %w", err)
+		return nil, fmt.Errorf("marshal payload: %w", err)
 	}
-	return safe, nil
+	return data, nil
 }
 
-// persistLogs sanitises an OTLP log payload once, then routes it through every
-// per-tool log adapter. Each adapter normalises only the resources whose
-// service.name it recognises (Codex: codex_cli_rs/codex_exec; Claude Code:
-// claude-code) and returns ErrUnsupportedLogs for a payload with none of its
-// own, so a payload from an unknown tool — or one mixing tools — is handled
-// safely rather than misattributed. Only canonical, sanitised events are stored.
+// persistLogs routes a raw OTLP log payload through every per-tool log adapter.
+// Each adapter normalises only the resources whose service.name it recognises
+// (Codex: codex_cli_rs/codex_exec; Claude Code: claude-code) and returns
+// ErrUnsupportedLogs for a payload with none of its own, so a payload from an
+// unknown tool — or one mixing tools — is handled safely rather than
+// misattributed. The payload is normalised verbatim — no ingest-time hiding is
+// applied (epic #87).
 func (i *otlpHTTPIngest) persistLogs(request *http.Request, payload map[string]json.RawMessage) error {
-	if i.repository == nil || i.sanitizer == nil {
+	if i.repository == nil {
 		return nil
 	}
-	safePayload, err := i.sanitizedPayload(payload)
+	rawBytes, err := rawPayload(payload)
 	if err != nil {
 		return err
 	}
-	fingerprint := func(value []byte) string { return i.sanitizer.Fingerprint(value) }
 	receivedAt := time.Now().UTC()
 
 	var events []canonical.Event
-	codexEvents, err := codex.NormalizeLogs(safePayload, receivedAt, fingerprint)
+	codexEvents, err := codex.NormalizeLogs(rawBytes, receivedAt)
 	if err != nil && !errors.Is(err, codex.ErrUnsupportedLogs) {
 		return fmt.Errorf("normalise: %w", err)
 	}
 	events = append(events, codexEvents...)
 
-	claudeEvents, err := claude.NormalizeLogs(safePayload, receivedAt, fingerprint)
+	claudeEvents, err := claude.NormalizeLogs(rawBytes, receivedAt)
 	if err != nil && !errors.Is(err, claude.ErrUnsupportedLogs) {
 		return fmt.Errorf("normalise: %w", err)
 	}
@@ -189,21 +186,21 @@ func (i *otlpHTTPIngest) persistLogs(request *http.Request, payload map[string]j
 	return nil
 }
 
-// persistMetrics sanitises an OTLP metrics payload and persists only reviewed
-// Codex skill-injection datapoints as canonical events. Non-skill metrics are
-// accepted at the HTTP layer (so exporters do not retry) but produce no events.
+// persistMetrics normalises a raw OTLP metrics payload and persists only
+// reviewed Codex skill-injection datapoints as canonical events. Non-skill
+// metrics are accepted at the HTTP layer (so exporters do not retry) but produce
+// no events.
 func (i *otlpHTTPIngest) persistMetrics(request *http.Request, payload map[string]json.RawMessage) error {
-	if i.repository == nil || i.sanitizer == nil {
+	if i.repository == nil {
 		return nil
 	}
-	safePayload, err := i.sanitizedPayload(payload)
+	rawBytes, err := rawPayload(payload)
 	if err != nil {
 		return err
 	}
-	fingerprint := func(value []byte) string { return i.sanitizer.Fingerprint(value) }
 	receivedAt := time.Now().UTC()
 
-	events, err := codex.NormalizeMetrics(safePayload, receivedAt, fingerprint)
+	events, err := codex.NormalizeMetrics(rawBytes, receivedAt)
 	if err != nil && !errors.Is(err, codex.ErrUnsupportedMetrics) {
 		return fmt.Errorf("normalise: %w", err)
 	}

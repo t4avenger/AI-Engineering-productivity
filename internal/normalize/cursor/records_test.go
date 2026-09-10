@@ -13,7 +13,7 @@ func TestExtractModelInteractionsGolden_PrintJSON(t *testing.T) {
 }
 
 func TestExtractModelInteractionsIsHonestAboutUnknowns(t *testing.T) {
-	records, err := ExtractModelInteractions(readFixture(t, "cursor-agent-2026.05.16-0338208-print-result.json"), stubFingerprint)
+	records, err := ExtractModelInteractions(readFixture(t, "cursor-agent-2026.05.16-0338208-print-result.json"))
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestExtractModelInteractionsIsHonestAboutUnknowns(t *testing.T) {
 }
 
 func TestExtractModelInteractionsStreamPromotesModelAndTokensWithObservedProvenance(t *testing.T) {
-	records, err := ExtractModelInteractions(readFixture(t, "cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.json"), stubFingerprint)
+	records, err := ExtractModelInteractions(readFixture(t, "cursor-agent-2026.09.02-c22c1a3-stream-result-with-model.json"))
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestExtractModelInteractionsStreamPromotesModelAndTokensWithObservedProvena
 }
 
 func TestExtractModelInteractionsCapabilityProbeYieldsNoRecords(t *testing.T) {
-	records, err := ExtractModelInteractions(readFixture(t, "cursor-agent-2026.05.16-0338208-capability-probe.json"), stubFingerprint)
+	records, err := ExtractModelInteractions(readFixture(t, "cursor-agent-2026.05.16-0338208-capability-probe.json"))
 	if err != nil {
 		t.Fatalf("extract probe: %v", err)
 	}
@@ -71,8 +71,11 @@ func TestExtractModelInteractionsCapabilityProbeYieldsNoRecords(t *testing.T) {
 	}
 }
 
-func TestExtractKeepsNativeSessionAndDoesNotLeakProtectedIDs(t *testing.T) {
-	records, err := ExtractModelInteractions(readFixture(t, "cursor-agent-2026.05.16-0338208-print-result.json"), stubFingerprint)
+// TestExtractRetainsNativeSessionAndRequestIDs asserts the no-hiding invariant
+// (issue #88): record session and request identifiers are the raw provider-native
+// values, retained verbatim rather than fingerprinted or redacted.
+func TestExtractRetainsNativeSessionAndRequestIDs(t *testing.T) {
+	records, err := ExtractModelInteractions(readFixture(t, "cursor-agent-2026.05.16-0338208-print-result.json"))
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -80,9 +83,10 @@ func TestExtractKeepsNativeSessionAndDoesNotLeakProtectedIDs(t *testing.T) {
 	if records[0].SessionID != "cursor-agent:synthetic-session-id" {
 		t.Fatalf("session id = %q, want native provider ID", records[0].SessionID)
 	}
-	for _, leaked := range []string{"synthetic-request-id"} {
-		if strings.Contains(string(serialized), leaked) {
-			t.Fatalf("protected identifier leaked into canonical output: %q", leaked)
-		}
+	if records[0].RequestID != "cursor-agent:synthetic-request-id" {
+		t.Fatalf("request id = %q, want raw native request ID retained", records[0].RequestID)
+	}
+	if !strings.Contains(string(serialized), "cursor-agent:synthetic-request-id") {
+		t.Fatalf("raw request identifier must be retained in canonical output: %s", serialized)
 	}
 }

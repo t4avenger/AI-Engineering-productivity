@@ -1,7 +1,7 @@
 [
   {
     "schema_version": "0.1.0",
-    "request_id": "cursor-agent:fixture",
+    "request_id": "cursor-agent:synthetic-request-id",
     "session_id": "cursor-agent:synthetic-session-id",
     "provider": "cursor",
     "tool": "cursor-agent",
@@ -18,8 +18,8 @@
     "provenance": "observed",
     "provider_extensions": {
       "correlation": {
-        "dedup_key": "cursor-agent:fixture",
-        "ordering_key": "01788717624614000000:cursor-agent:fixture",
+        "dedup_key": "cursor-agent:synthetic-request-id",
+        "ordering_key": "01788717624614000000:cursor-agent:synthetic-request-id",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Cursor Agent fixtures have no reviewed task-boundary signal"

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
@@ -17,22 +16,22 @@ type HealthResponse struct {
 }
 
 func NewHandler(logger *slog.Logger, sessions ...storage.SessionReader) http.Handler {
-	return newHandler(logger, nil, nil, nil, sessionReader(sessions), DefaultInsightThresholds())
+	return newHandler(logger, nil, nil, sessionReader(sessions), DefaultInsightThresholds())
 }
 
-func NewDevelopmentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer, sessions ...storage.SessionReader) http.Handler {
-	return newHandler(logger, newSanitizedInspector(sanitizer), nil, sanitizer, sessionReader(sessions), DefaultInsightThresholds())
+func NewDevelopmentHandler(logger *slog.Logger, sessions ...storage.SessionReader) http.Handler {
+	return newHandler(logger, newIngestInspector(), nil, sessionReader(sessions), DefaultInsightThresholds())
 }
 
 // NewPersistentHandler enables the supported live Codex OTLP log path.
-func NewPersistentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer, repository storage.Repository) http.Handler {
-	return newHandler(logger, nil, repository, sanitizer, repository, DefaultInsightThresholds())
+func NewPersistentHandler(logger *slog.Logger, repository storage.Repository) http.Handler {
+	return newHandler(logger, nil, repository, repository, DefaultInsightThresholds())
 }
 
-// NewPersistentDevelopmentHandler retains the development-only sanitized
-// inspector while enabling the supported persistent Codex log path.
-func NewPersistentDevelopmentHandler(logger *slog.Logger, sanitizer *privacy.Sanitizer, repository storage.Repository) http.Handler {
-	return newHandler(logger, newSanitizedInspector(sanitizer), repository, sanitizer, repository, DefaultInsightThresholds())
+// NewPersistentDevelopmentHandler retains the development-only ingest inspector
+// while enabling the supported persistent Codex log path.
+func NewPersistentDevelopmentHandler(logger *slog.Logger, repository storage.Repository) http.Handler {
+	return newHandler(logger, newIngestInspector(), repository, repository, DefaultInsightThresholds())
 }
 
 func sessionReader(readers []storage.SessionReader) storage.SessionReader {
@@ -42,9 +41,9 @@ func sessionReader(readers []storage.SessionReader) storage.SessionReader {
 	return readers[0]
 }
 
-func newHandler(logger *slog.Logger, inspector *sanitizedInspector, repository storage.Repository, sanitizer *privacy.Sanitizer, sessions storage.SessionReader, thresholds InsightThresholds) http.Handler {
-	ingest := newOTLPHTTPIngest(inspector, sanitizer, repository)
-	cursorIngest := newCursorAgentIngest(inspector, sanitizer, repository)
+func newHandler(logger *slog.Logger, inspector *ingestInspector, repository storage.Repository, sessions storage.SessionReader, thresholds InsightThresholds) http.Handler {
+	ingest := newOTLPHTTPIngest(inspector, repository)
+	cursorIngest := newCursorAgentIngest(inspector, repository)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", healthHandler(logger))
 	sessionAPI := newSessionAPI(sessions, thresholds)
@@ -59,7 +58,6 @@ func newHandler(logger *slog.Logger, inspector *sanitizedInspector, repository s
 	mux.HandleFunc("GET /api/v1/sessions/{id}/costs", sessionAPI.costs)
 	mux.HandleFunc("GET /api/v1/sessions/{id}", sessionAPI.detail)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/events", sessionAPI.events)
-	mux.HandleFunc("GET /api/v1/events/{id}/provenance", sessionAPI.provenance)
 	mux.HandleFunc("DELETE /api/v1/sessions/{id}", sessionAPI.delete)
 	mux.HandleFunc("POST /v1/traces", ingest.tracesHandler)
 	mux.HandleFunc("POST /v1/metrics", ingest.metricsHandler)

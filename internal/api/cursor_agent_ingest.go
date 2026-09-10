@@ -10,20 +10,18 @@ import (
 	"strings"
 
 	"github.com/wayne/telemetryiq/internal/normalize/cursor"
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
 const maxCursorPayloadBytes int64 = 1 << 20 // 1 MiB
 
 type cursorAgentIngest struct {
-	inspector  *sanitizedInspector
-	sanitizer  *privacy.Sanitizer
+	inspector  *ingestInspector
 	repository storage.Repository
 }
 
-func newCursorAgentIngest(inspector *sanitizedInspector, sanitizer *privacy.Sanitizer, repository storage.Repository) *cursorAgentIngest {
-	return &cursorAgentIngest{inspector: inspector, sanitizer: sanitizer, repository: repository}
+func newCursorAgentIngest(inspector *ingestInspector, repository storage.Repository) *cursorAgentIngest {
+	return &cursorAgentIngest{inspector: inspector, repository: repository}
 }
 
 func (i *cursorAgentIngest) handler(w http.ResponseWriter, r *http.Request) {
@@ -57,24 +55,23 @@ func (i *cursorAgentIngest) handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if i.repository == nil || i.sanitizer == nil {
+	if i.repository == nil {
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
 
-	// Sanitise before the adapter sees the payload, mirroring OTLP ingest.
-	sanitized := i.sanitizer.Sanitize(raw)
+	// The payload is normalised verbatim — no ingest-time hiding is applied
+	// (epic #87).
 	if i.inspector != nil {
 		i.inspector.captureValue(raw)
 	}
-	safeBytes, err := json.Marshal(sanitized.Value)
+	rawBytes, err := json.Marshal(raw)
 	if err != nil {
 		writeCursorIngestError(w, http.StatusInternalServerError, "persistence_failed", "supported telemetry could not be stored")
 		return
 	}
-	fingerprint := func(value []byte) string { return i.sanitizer.Fingerprint(value) }
 
-	events, err := cursor.NormalizeIngest(safeBytes, fingerprint)
+	events, err := cursor.NormalizeIngest(rawBytes)
 	if err != nil {
 		writeCursorIngestError(w, http.StatusUnprocessableEntity, "normalization_failed", "supported telemetry could not be normalised")
 		return

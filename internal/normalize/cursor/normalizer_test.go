@@ -7,7 +7,7 @@ import (
 )
 
 func TestNormalizeCapabilityProbeYieldsNoEvents(t *testing.T) {
-	events, err := Normalize(readFixture(t, "cursor-agent-2026.05.16-0338208-capability-probe.json"), stubFingerprint)
+	events, err := Normalize(readFixture(t, "cursor-agent-2026.05.16-0338208-capability-probe.json"))
 	if err != nil {
 		t.Fatalf("normalise probe: %v", err)
 	}
@@ -16,8 +16,11 @@ func TestNormalizeCapabilityProbeYieldsNoEvents(t *testing.T) {
 	}
 }
 
-func TestNormalizeKeepsNativeSessionAndDoesNotLeakProtectedIDs(t *testing.T) {
-	events, err := Normalize(readFixture(t, "cursor-agent-2026.05.16-0338208-print-result.json"), stubFingerprint)
+// TestNormalizeRetainsNativeSessionAndRequestIDs asserts the no-hiding invariant
+// (issue #88): the raw provider-native session and request identifiers are
+// retained verbatim in canonical output, never fingerprinted or redacted.
+func TestNormalizeRetainsNativeSessionAndRequestIDs(t *testing.T) {
+	events, err := Normalize(readFixture(t, "cursor-agent-2026.05.16-0338208-print-result.json"))
 	if err != nil {
 		t.Fatalf("normalise: %v", err)
 	}
@@ -28,10 +31,11 @@ func TestNormalizeKeepsNativeSessionAndDoesNotLeakProtectedIDs(t *testing.T) {
 	if event.SessionID != "cursor-agent:synthetic-session-id" {
 		t.Fatalf("session id = %q, want native provider ID", event.SessionID)
 	}
+	if event.EventID != "cursor-agent:synthetic-request-id" {
+		t.Fatalf("event id = %q, want raw native request ID retained", event.EventID)
+	}
 	serialized, _ := json.Marshal(events)
-	for _, leaked := range []string{"synthetic-request-id"} {
-		if strings.Contains(string(serialized), leaked) {
-			t.Fatalf("protected identifier leaked into canonical output: %q", leaked)
-		}
+	if !strings.Contains(string(serialized), "cursor-agent:synthetic-request-id") {
+		t.Fatalf("raw request identifier must be retained in canonical output: %s", serialized)
 	}
 }

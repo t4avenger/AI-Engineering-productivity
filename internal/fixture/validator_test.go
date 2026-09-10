@@ -1,13 +1,10 @@
 package fixture
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/wayne/telemetryiq/internal/privacy"
 )
 
 func TestValidateAcceptsAllReviewedProviderFixtures(t *testing.T) {
@@ -17,28 +14,6 @@ func TestValidateAcceptsAllReviewedProviderFixtures(t *testing.T) {
 			if err := Validate(data); err != nil {
 				t.Fatalf("validate fixture: %v", err)
 			}
-		})
-	}
-}
-
-func TestProviderFixturesPassSanitizerWithoutSensitiveSurvivors(t *testing.T) {
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatalf("create sanitizer: %v", err)
-	}
-
-	for _, path := range providerFixturePaths(t) {
-		t.Run(path, func(t *testing.T) {
-			var document map[string]any
-			if err := json.Unmarshal(readFixtureFile(t, path), &document); err != nil {
-				t.Fatalf("decode fixture: %v", err)
-			}
-			result := sanitizer.Sanitize(document)
-			encoded, err := json.Marshal(result.Value)
-			if err != nil {
-				t.Fatalf("marshal sanitized fixture: %v", err)
-			}
-			assertNoSensitiveSurvivors(t, string(encoded))
 		})
 	}
 }
@@ -108,25 +83,6 @@ func readFixtureFile(t *testing.T, path string) []byte {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	return data
-}
-
-func assertNoSensitiveSurvivors(t *testing.T, encoded string) {
-	t.Helper()
-	for _, forbidden := range []string{
-		"token-value-that-must-never-be-committed",
-		"q1w2E3r4T5y6U7i8O9p0AaBbCcDdEeFf",
-		"/tmp/project/.env",
-		"cat .env",
-		"prompt",
-		"response",
-		"source_code",
-		"file_path",
-		"command_arguments",
-	} {
-		if strings.Contains(encoded, forbidden) {
-			t.Fatalf("sanitized fixture contains forbidden value or field %q", forbidden)
-		}
-	}
 }
 
 func fixtureWithPayload(tool, payload string) string {

@@ -1,10 +1,12 @@
 // Package governance implements TelemetryIQ's detect-and-report policies
-// (PRODUCT_MAP.md §14). Policies never block; they surface privacy-safe findings
-// and use the indeterminate outcome whenever the underlying telemetry cannot
-// support a verdict, never a fabricated clean result.
+// (PRODUCT_MAP.md §14). Policies never block; they surface findings and use the
+// indeterminate outcome whenever the underlying telemetry cannot support a
+// verdict, never a fabricated clean result.
 package governance
 
 import (
+	"strings"
+
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/privacy"
 )
@@ -35,15 +37,18 @@ const (
 	OutcomeIndeterminate Outcome = "indeterminate"
 )
 
-// Finding is a single privacy-safe risky-access observation. It deliberately
-// carries only coarse, non-reversible evidence — never a raw path, command, or
-// secret value.
+// Finding is a single risky-access observation. It carries the coarse
+// classification (class/boundary) alongside the raw path or command that
+// triggered it: TelemetryIQ captures and displays raw evidence (epic #87 — no
+// ingest-time hiding), so the finding references the real value rather than a
+// hashed or tokenised placeholder.
 type Finding struct {
 	RuleID       string       `json:"rule_id"`
 	AccessMethod AccessMethod `json:"access_method"`
 	Class        string       `json:"class"`
 	Boundary     string       `json:"boundary"`
 	Confidence   string       `json:"confidence"`
+	Reference    string       `json:"reference"`
 	ObservedAt   string       `json:"observed_at"`
 }
 
@@ -80,19 +85,19 @@ var secretPathClasses = map[privacy.PathClass]struct{}{
 }
 
 // RiskyAccessFromEvents evaluates the risky credential/secret file-access policy
-// over canonical events. Detection runs entirely on the privacy-safe tokens the
-// sanitiser emits in place of raw paths and commands, so no raw evidence is ever
-// read here. When no filesystem-read or shell-command access is observed at all,
-// the outcome is indeterminate — the policy never claims a clean read from absent
-// visibility.
+// over canonical events. Detection runs ClassifyPath/ClassifyCommandAccess over
+// the raw file paths and command lines now present in event attributes and
+// provider extensions (epic #87 — no ingest-time hiding). When no
+// filesystem-read or shell-command access is observed at all, the outcome is
+// indeterminate — the policy never claims a clean read from absent visibility.
 func RiskyAccessFromEvents(events []canonical.Event) RiskyAccess {
 	report := RiskyAccess{Findings: []Finding{}, Outcome: OutcomeIndeterminate, Visibility: "unavailable"}
 	observedAccess := false
 
 	for _, event := range events {
 		observedAt := event.OccurredAt.UTC().Format("2006-01-02T15:04:05Z07:00")
-		for _, token := range collectTokens(event) {
-			finding, observed := classifyToken(token, observedAt)
+		for _, access := range collectAccesses(event) {
+			finding, observed := classifyAccess(access, observedAt)
 			if observed {
 				observedAccess = true
 			}
@@ -116,11 +121,13 @@ func RiskyAccessFromEvents(events []canonical.Event) RiskyAccess {
 	return report
 }
 
-// classifyToken inspects one privacy-safe token. It reports whether the token
+// classifyAccess classifies one raw access. It reports whether the access
 // records a file or command access at all (observed) and, when the access is a
-// credential/secret read, the resulting finding.
-func classifyToken(token, observedAt string) (finding *Finding, observed bool) {
-	if class, boundary, ok := privacy.ParsePathToken(token); ok {
+// credential/secret read, the resulting finding referencing the raw value.
+func classifyAccess(access access, observedAt string) (finding *Finding, observed bool) {
+	switch access.method {
+	case AccessFilesystemRead:
+		class, boundary := privacy.ClassifyPath(access.value)
 		if _, secret := secretPathClasses[class]; secret {
 			finding = &Finding{
 				RuleID:       riskyAccessRuleID,
@@ -128,22 +135,21 @@ func classifyToken(token, observedAt string) (finding *Finding, observed bool) {
 				Class:        string(class),
 				Boundary:     string(boundary),
 				Confidence:   "high",
+				Reference:    access.value,
 				ObservedAt:   observedAt,
 			}
 		}
 		return finding, true
-	}
-	if class, boundary, ok := privacy.ParseCommandAccessToken(token); ok {
+	case AccessShellCommand:
+		class, boundary := privacy.ClassifyCommandAccess(access.value)
 		if class == privacy.CommandAccessCredential {
-			// The command-access token carries only the coarse category, not the
-			// specific secret-file class, so the finding reports that category
-			// rather than assuming any single file type (e.g. dotenv).
 			finding = &Finding{
 				RuleID:       riskyAccessRuleID,
 				AccessMethod: AccessShellCommand,
 				Class:        string(class),
 				Boundary:     string(boundary),
 				Confidence:   "medium",
+				Reference:    access.value,
 				ObservedAt:   observedAt,
 			}
 		}
@@ -160,7 +166,7 @@ func (r RiskyAccess) Decision() PolicyDecision {
 	for _, finding := range r.Findings {
 		evidence = append(evidence, PolicyEvidence{
 			Kind:      "credential_access",
-			Reference: string(finding.AccessMethod) + ";class:" + finding.Class + ";boundary:" + finding.Boundary + ";confidence:" + finding.Confidence,
+			Reference: string(finding.AccessMethod) + ";class:" + finding.Class + ";boundary:" + finding.Boundary + ";confidence:" + finding.Confidence + ";path:" + finding.Reference,
 		})
 	}
 	if len(evidence) == 0 {
@@ -179,27 +185,66 @@ func (r RiskyAccess) Decision() PolicyDecision {
 	}
 }
 
-// collectTokens returns every string value in an event's attributes and provider
-// extensions, walked recursively, so a path/command token is found wherever a
-// normaliser placed it (top-level attributes, or nested under provider_extensions).
-func collectTokens(event canonical.Event) []string {
-	var tokens []string
-	walkStrings(event.Attributes, &tokens)
-	walkStrings(event.ProviderExtensions, &tokens)
-	return tokens
+// access is one raw file path or command line observed on an event, tagged with
+// how it was reached so the correct classifier is applied.
+type access struct {
+	method AccessMethod
+	value  string
 }
 
-func walkStrings(value any, out *[]string) {
+// pathFieldKeys name event attributes that carry a raw file path reached by a
+// filesystem read.
+var pathFieldKeys = map[string]struct{}{
+	"file_path": {}, "path": {}, "file": {}, "filename": {},
+}
+
+// commandFieldKeys name event attributes that carry a raw shell command line.
+var commandFieldKeys = map[string]struct{}{
+	"command": {}, "command_line": {}, "cmd": {},
+}
+
+// collectAccesses walks an event's attributes and provider extensions
+// recursively and returns every raw path or command it finds under a known
+// path/command field key, so detection runs on the raw value wherever a
+// normaliser placed it (top-level attributes, or nested under
+// provider_extensions).
+func collectAccesses(event canonical.Event) []access {
+	var accesses []access
+	walkAccesses(event.Attributes, &accesses)
+	walkAccesses(event.ProviderExtensions, &accesses)
+	return accesses
+}
+
+func walkAccesses(value any, out *[]access) {
 	switch typed := value.(type) {
-	case string:
-		*out = append(*out, typed)
 	case map[string]any:
-		for _, nested := range typed {
-			walkStrings(nested, out)
+		for key, nested := range typed {
+			if leafAccess(key, nested, out) {
+				continue
+			}
+			walkAccesses(nested, out)
 		}
 	case []any:
 		for _, nested := range typed {
-			walkStrings(nested, out)
+			walkAccesses(nested, out)
 		}
 	}
+}
+
+// leafAccess records a raw path or command when nested is a non-empty string
+// under a known field key, and reports whether it consumed the value.
+func leafAccess(key string, nested any, out *[]access) bool {
+	text, ok := nested.(string)
+	if !ok || strings.TrimSpace(text) == "" {
+		return false
+	}
+	if _, isPath := pathFieldKeys[key]; isPath {
+		*out = append(*out, access{method: AccessFilesystemRead, value: text})
+		return true
+	}
+	if _, isCommand := commandFieldKeys[key]; isCommand {
+		*out = append(*out, access{method: AccessShellCommand, value: text})
+		return true
+	}
+	return false
 }

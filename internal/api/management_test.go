@@ -7,17 +7,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
 func TestAuthenticatedManagementAPIRequiresTokenAndDeletesAll(t *testing.T) {
 	repository := sessionTestRepository(t)
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	server := httptest.NewServer(NewAuthenticatedPersistentHandler(slog.Default(), sanitizer, repository, "test-token", DefaultInsightThresholds()))
+	server := httptest.NewServer(NewAuthenticatedPersistentHandler(slog.Default(), repository, "test-token", DefaultInsightThresholds()))
 	t.Cleanup(server.Close)
 
 	unauthenticated, err := http.Get(server.URL + "/api/v1/sessions")

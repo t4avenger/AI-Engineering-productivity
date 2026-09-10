@@ -26,7 +26,7 @@ shared cross-tool fields rendered by the dashboard: `provider`, `tool`,
 or `unknown`. The UI must render non-observed states as labelled cells, never
 as blanks or numeric zeroes.
 
-The MCP inventory insight response contains `data.totals`, `data.servers`, and `data.notes`. Server identities include provider-reported MCP server names when available, plus privacy-safe fingerprints for correlation. Usage is `observed` only with explicit matching invocation evidence; otherwise it is `not_observed` or `unavailable`. Token context is request-level and labelled as not exact per-MCP allocation.
+The MCP inventory insight response contains `data.totals`, `data.servers`, and `data.notes`. Server identities are the raw provider-reported MCP server names (`identity_state: provider_reported`), which are themselves the correlation key — epic #87 removed the HMAC fingerprint. Usage is `observed` only with explicit matching invocation evidence; otherwise it is `not_observed` or `unavailable`. Token context is request-level and labelled as not exact per-MCP allocation.
 
 The daemon opens the existing local SQLite repository at the platform
 configuration directory and reuses its installation-specific privacy salt.

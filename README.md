@@ -4,7 +4,8 @@ Local-first AI engineering intelligence and governance.
 
 The local dashboard is served by the Go daemon (ADR 0002) using HTML templates
 and HTMX over the authenticated SQLite-backed session store. Supported Codex
-OTLP logs are normalised, sanitised, and persisted locally.
+OTLP logs are normalised and persisted locally with no ingest-time hiding
+(epic #87).
 
 ## Requirements
 
@@ -49,9 +50,10 @@ turned into insight rows. `POST /v1/traces` remains `501 Not Implemented` with
 `error.code` `not_implemented` so exporters are never told a dropped payload
 was accepted.
 
-Raw OTLP payloads are never logged or persisted. The supported, observed Codex
-and Claude Code OTLP shapes are normalised and sanitised before canonical
-events are saved locally.
+The raw OTLP envelope is never logged or persisted verbatim. The supported,
+observed Codex and Claude Code OTLP shapes are normalised into canonical events
+before being saved locally; epic #87 removed ingest-time hiding, so raw
+provider-native IDs, paths, and commands are retained inside those events.
 
 ## Cursor Agent live ingest
 
@@ -75,10 +77,11 @@ TELEMETRYIQ_DAEMON=http://localhost:8080 scripts/cursor-agent-tiq "say ok"
 ## Codex fixture normalisation
 
 The Codex adapter supports reviewed trace fixtures and the observed Codex CLI
-0.145.0 OTLP log shape. It retains model and available token metadata, never
-uses the sensitive conversation identifier as a session ID, and explicitly
-marks unavailable lifecycle and capability data. Canonical events pass through
-the privacy sanitizer before SQLite persistence.
+0.145.0 OTLP log shape. It retains model and available token metadata, uses the
+raw provider-native `codex:<conversation.id>` as the session ID when present, and
+explicitly marks unavailable lifecycle and capability data. Canonical events are
+persisted to SQLite verbatim — epic #87 removed the ingest-time sanitizer, so raw
+provider-native IDs, paths, and commands are stored as normalised.
 
 ## Session API
 
@@ -98,11 +101,11 @@ Privacy page uses a typed confirmation before bulk deletion.
 
 ## Privacy pipeline
 
-The local-only privacy pipeline removes prompts, responses, source code, and recognised secret-bearing fields; hashes file paths with an installation-specific HMAC salt; and redacts command arguments. Every retained or transformed field has provenance explaining the action. It is tested by serialising the safe output and proving synthetic prohibited content cannot cross the storage boundary.
+The local-only edition does not capture prompts, responses, or source code by default (configurable capture is tracked in #94). Epic #87 removed ingest-time hiding: there is no sanitiser choke point, no HMAC fingerprinting, and no path/command tokenisation. Raw provider-native identifiers, file paths, and command lines are persisted verbatim and shown to the local user so the operator on their own single-user machine can see the actual data to act on it. Pure classifiers (`ClassifyPath`/`ClassifyCommandAccess`) run over those raw values to power governance signals such as risky-access detection.
 
 ## Configuration and privacy
 
-The safe, local-only defaults use schema version `0.1.0`: operational collection, hashed file paths, redacted command arguments, 30-day local retention, and no diagnostics or analytics sharing. Prompts, responses, and source code are always disabled in this configuration version.
+The safe, local-only defaults use schema version `0.1.0`: operational collection, 30-day local retention, and no diagnostics or analytics sharing. Prompts, responses, and source code are always disabled in this configuration version; raw file paths and command lines are retained (epic #87 — no ingest-time hiding).
 
 Set `TELEMETRYIQ_CONFIG` to load an explicit YAML file:
 
@@ -114,8 +117,6 @@ collection:
   prompts: false
   responses: false
   source_code: false
-  file_paths: hash
-  command_arguments: redact
   tool_calls: true
   model_usage: true
 storage:

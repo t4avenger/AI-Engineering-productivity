@@ -34,13 +34,10 @@ var extractedLogFields = []string{"model", "input_token_count", "output_token_co
 // outcome are left unknown (nil / "unknown"), never fabricated as zero. It
 // neither persists nor logs the payload.
 //
-// When a retained conversation.id is present, it becomes the provider-prefixed
-// native session ID for the local-only edition. Older or sanitised records
-// without that field fall back to the local record fingerprint.
-func ExtractLogModelInteractions(data []byte, receivedAt time.Time, fingerprint func([]byte) string) ([]canonical.ModelInteraction, error) {
-	if fingerprint == nil {
-		return nil, fmt.Errorf("codex log fingerprint is required")
-	}
+// When a conversation.id is present, it becomes the provider-prefixed native
+// session ID. Records without that field fall back to a non-keyed content ID
+// for uniqueness only (epic #87 — no ingest-time hiding).
+func ExtractLogModelInteractions(data []byte, receivedAt time.Time) ([]canonical.ModelInteraction, error) {
 	var payload logsPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
 		return nil, fmt.Errorf("decode Codex OTLP logs: %w", err)
@@ -53,7 +50,7 @@ func ExtractLogModelInteractions(data []byte, receivedAt time.Time, fingerprint 
 		}
 		for _, scope := range resourceLog.ScopeLogs {
 			for _, record := range scope.LogRecords {
-				interaction, ok, err := logRecordModelInteraction(resource, record, receivedAt, fingerprint)
+				interaction, ok, err := logRecordModelInteraction(resource, record, receivedAt)
 				if err != nil {
 					return nil, err
 				}
@@ -68,7 +65,7 @@ func ExtractLogModelInteractions(data []byte, receivedAt time.Time, fingerprint 
 
 // logRecordModelInteraction builds one ModelInteraction from a log record,
 // returning ok=false when the record is not an eligible model interaction.
-func logRecordModelInteraction(resource map[string]any, record logRecord, receivedAt time.Time, fingerprint func([]byte) string) (canonical.ModelInteraction, bool, error) {
+func logRecordModelInteraction(resource map[string]any, record logRecord, receivedAt time.Time) (canonical.ModelInteraction, bool, error) {
 	fields := attributes(record.Attributes)
 	if !isModelInteraction(fields) {
 		return canonical.ModelInteraction{}, false, nil
@@ -77,8 +74,8 @@ func logRecordModelInteraction(resource map[string]any, record logRecord, receiv
 	if err != nil {
 		return canonical.ModelInteraction{}, false, fmt.Errorf("marshal Codex log record: %w", err)
 	}
-	id := "codex-log:" + fingerprint(recordData)
-	sessionID := codexLogSessionID(fields, id, fingerprint)
+	id := contentID("codex-log:", recordData)
+	sessionID := codexLogSessionID(fields, id)
 
 	model, modelObserved := normalize.ObservedString(fields["model"])
 	inputTokens := normalize.OptionalTokenCount(fields["input_token_count"])

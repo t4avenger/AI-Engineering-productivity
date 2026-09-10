@@ -10,23 +10,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
 )
 
-func TestCursorAgentIngestPersistsSanitizedCanonicalSession(t *testing.T) {
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	repository, err := sqlite.Open(":memory:", sanitizer)
+func TestCursorAgentIngestPersistsRawCanonicalSession(t *testing.T) {
+	repository, err := sqlite.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = repository.Close() })
 
-	server := httptest.NewServer(NewPersistentHandler(slog.Default(), sanitizer, repository))
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
 	t.Cleanup(server.Close)
 
 	payload := map[string]any{
@@ -78,29 +73,24 @@ func TestCursorAgentIngestPersistsSanitizedCanonicalSession(t *testing.T) {
 		t.Fatalf("events = %#v, %v", events, err)
 	}
 
+	// Issue #88 removed ingest-time hiding: the raw provider-native request ID is
+	// retained verbatim (no HMAC fingerprint), so correlation reflects real
+	// Cursor identity. Prompt/response content is refused at the ingest boundary
+	// (see TestCursorAgentIngestRejectsUnexpectedFields), not hidden here.
 	serialized, _ := json.Marshal(map[string]any{"sessions": sessions, "events": events})
-	for _, prohibited := range []string{
-		"tiq-canary-cursor-request",
-		"tiq-canary-cursor-prompt",
-	} {
-		if strings.Contains(string(serialized), prohibited) {
-			t.Fatalf("privacy leak %q in %s", prohibited, serialized)
-		}
+	if !strings.Contains(string(serialized), "tiq-canary-cursor-request") {
+		t.Fatalf("raw request identity must survive to storage, got %s", serialized)
 	}
 }
 
 func TestCursorAgentIngestRejectsUnexpectedFields(t *testing.T) {
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	repository, err := sqlite.Open(":memory:", sanitizer)
+	repository, err := sqlite.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = repository.Close() })
 
-	server := httptest.NewServer(NewPersistentHandler(slog.Default(), sanitizer, repository))
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
 	t.Cleanup(server.Close)
 
 	// user/assistant message content is not an allowed ingest field.

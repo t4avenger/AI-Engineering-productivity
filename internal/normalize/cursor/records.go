@@ -29,10 +29,7 @@ var promotedRecordFields = []string{
 // duration_ms when duration is observed, and this derivation is recorded under
 // provider_extensions.timestamps so it is never mistaken for an observed
 // endpoint.
-func ExtractModelInteractions(data []byte, fingerprint func([]byte) string) ([]canonical.ModelInteraction, error) {
-	if fingerprint == nil {
-		return nil, fmt.Errorf("cursor fingerprint is required")
-	}
+func ExtractModelInteractions(data []byte) ([]canonical.ModelInteraction, error) {
 	document, capturedAt, err := decodeFixtureDocument(data)
 	if err != nil {
 		return nil, err
@@ -44,7 +41,7 @@ func ExtractModelInteractions(data []byte, fingerprint func([]byte) string) ([]c
 	default:
 		return nil, fmt.Errorf("unsupported Cursor payload source_type %q", document.Payload.SourceType)
 	}
-	interaction, ok, err := resultInteraction(document, capturedAt, fingerprint)
+	interaction, ok, err := resultInteraction(document, capturedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +51,7 @@ func ExtractModelInteractions(data []byte, fingerprint func([]byte) string) ([]c
 	return normalize.CorrelateModelInteractions([]canonical.ModelInteraction{interaction}), nil
 }
 
-func resultInteraction(document adapterDocument, capturedAt time.Time, fingerprint func([]byte) string) (canonical.ModelInteraction, bool, error) {
+func resultInteraction(document adapterDocument, capturedAt time.Time) (canonical.ModelInteraction, bool, error) {
 	if document.Payload.Result == nil {
 		return canonical.ModelInteraction{}, false, errors.New("cursor payload.result must be present for result source_type")
 	}
@@ -62,11 +59,11 @@ func resultInteraction(document adapterDocument, capturedAt time.Time, fingerpri
 	if err != nil {
 		return canonical.ModelInteraction{}, false, err
 	}
-	nativeSessionID := normalize.ProviderNativeSessionID("cursor-agent:", sessionID, fingerprint)
+	nativeSessionID := normalize.ProviderNativeSessionID("cursor-agent:", sessionID)
 
 	requestID := nativeSessionID + ":result"
 	if rawRequest := normalize.OptionalString(document.Payload.Result, "request_id"); rawRequest != nil {
-		requestID = "cursor-agent:" + fingerprint([]byte(*rawRequest))
+		requestID = "cursor-agent:" + *rawRequest
 	}
 
 	model := "unknown"

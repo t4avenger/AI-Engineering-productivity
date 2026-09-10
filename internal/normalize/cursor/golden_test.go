@@ -48,11 +48,11 @@ func TestCursorGoldenFixtures(t *testing.T) {
 
 func normalizeDeterministic(t *testing.T, input []byte) any {
 	t.Helper()
-	first, err := Normalize(input, stubFingerprint)
+	first, err := Normalize(input)
 	if err != nil {
 		t.Fatalf("first normalisation: %v", err)
 	}
-	second, err := Normalize(input, stubFingerprint)
+	second, err := Normalize(input)
 	if err != nil {
 		t.Fatalf("second normalisation: %v", err)
 	}
@@ -64,11 +64,11 @@ func normalizeDeterministic(t *testing.T, input []byte) any {
 
 func extractDeterministic(t *testing.T, input []byte) any {
 	t.Helper()
-	first, err := ExtractModelInteractions(input, stubFingerprint)
+	first, err := ExtractModelInteractions(input)
 	if err != nil {
 		t.Fatalf("first extraction: %v", err)
 	}
-	second, err := ExtractModelInteractions(input, stubFingerprint)
+	second, err := ExtractModelInteractions(input)
 	if err != nil {
 		t.Fatalf("second extraction: %v", err)
 	}

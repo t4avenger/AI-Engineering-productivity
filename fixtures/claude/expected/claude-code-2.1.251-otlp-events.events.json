@@ -107,7 +107,7 @@
         "source": "provider_completion",
         "status": "success"
       },
-      "request_fingerprint": "claude-code:fixture"
+      "request_id": "claude-code:synthetic-request-id"
     }
   }
 ]

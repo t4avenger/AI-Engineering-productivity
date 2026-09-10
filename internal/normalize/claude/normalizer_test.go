@@ -10,17 +10,13 @@ import (
 	"testing"
 )
 
-// stubFingerprint keeps protected identifier fingerprints deterministic for
-// golden comparison. A real caller supplies the installation HMAC fingerprint.
-func stubFingerprint([]byte) string { return "fixture" }
-
 func TestNormalizeEventsGolden(t *testing.T) {
 	input := readFixture(t, "claude-code-2.1.251-otlp-events.json")
-	first, err := NormalizeEvents(input, stubFingerprint)
+	first, err := NormalizeEvents(input)
 	if err != nil {
 		t.Fatalf("first normalisation: %v", err)
 	}
-	second, err := NormalizeEvents(input, stubFingerprint)
+	second, err := NormalizeEvents(input)
 	if err != nil {
 		t.Fatalf("second normalisation: %v", err)
 	}
@@ -35,7 +31,7 @@ func TestNormalizeEventsGolden(t *testing.T) {
 }
 
 func TestNormalizeEventsKeepsNativeSessionAndOmitsFabricatedSkillUnavailable(t *testing.T) {
-	events, err := NormalizeEvents(readFixture(t, "claude-code-2.1.251-otlp-events.json"), stubFingerprint)
+	events, err := NormalizeEvents(readFixture(t, "claude-code-2.1.251-otlp-events.json"))
 	if err != nil {
 		t.Fatalf("normalise: %v", err)
 	}
@@ -69,7 +65,7 @@ func TestNormalizeEventsKeepsNativeSessionAndOmitsFabricatedSkillUnavailable(t *
 }
 
 func TestNormalizeEventsSkillActivatedIsExplicit(t *testing.T) {
-	events, err := NormalizeEvents(readFixture(t, "claude-code-2.1.263-skill-activated.json"), stubFingerprint)
+	events, err := NormalizeEvents(readFixture(t, "claude-code-2.1.263-skill-activated.json"))
 	if err != nil {
 		t.Fatalf("normalise: %v", err)
 	}
@@ -97,7 +93,7 @@ func TestNormalizeEventsSkillActivatedIsExplicit(t *testing.T) {
 }
 
 func TestNormalizeEventsCapabilityProbeYieldsNoEvents(t *testing.T) {
-	events, err := NormalizeEvents(readFixture(t, "claude-code-2.1.251-capability-probe.json"), stubFingerprint)
+	events, err := NormalizeEvents(readFixture(t, "claude-code-2.1.251-capability-probe.json"))
 	if err != nil {
 		t.Fatalf("normalise probe: %v", err)
 	}
@@ -117,7 +113,7 @@ func TestNormalizeEventsRejectsUnsupportedProviderTool(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if _, err := NormalizeEvents(mutated, stubFingerprint); err == nil || !strings.Contains(err.Error(), "anthropic and claude-code") {
+	if _, err := NormalizeEvents(mutated); err == nil || !strings.Contains(err.Error(), "anthropic and claude-code") {
 		t.Fatalf("expected provider/tool error, got %v", err)
 	}
 }
@@ -133,14 +129,8 @@ func TestNormalizeEventsRejectsUnsupportedSourceType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if _, err := NormalizeEvents(mutated, stubFingerprint); err == nil || !strings.Contains(err.Error(), "source_type") {
+	if _, err := NormalizeEvents(mutated); err == nil || !strings.Contains(err.Error(), "source_type") {
 		t.Fatalf("expected source_type error, got %v", err)
-	}
-}
-
-func TestNormalizeEventsRequiresFingerprint(t *testing.T) {
-	if _, err := NormalizeEvents(readFixture(t, "claude-code-2.1.251-otlp-events.json"), nil); err == nil {
-		t.Fatal("expected error when fingerprint is nil")
 	}
 }
 
@@ -162,6 +152,11 @@ func assertMatchesGolden(t *testing.T, name string, value any) {
 	got, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
 		t.Fatalf("marshal value: %v", err)
+	}
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		if err := os.WriteFile(filepath.Join(expectedDir(t), name), append(got, '\n'), 0o644); err != nil {
+			t.Fatalf("write golden: %v", err)
+		}
 	}
 	want := strings.TrimSpace(string(readGolden(t, name)))
 	if string(got) != want {

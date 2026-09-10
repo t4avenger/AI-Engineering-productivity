@@ -1,6 +1,7 @@
 package api
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -20,10 +21,14 @@ func TestRiskyAccessInsightIngestEndToEnd(t *testing.T) {
 		t.Fatalf("expected both filesystem_read and shell_command findings, got %#v", risky.Data.Findings)
 	}
 
-	// The raw path and command must never survive to the persisted finding.
-	assertNoRawIdentifiers(t,
-		[]string{"/home/dev/secret-app", "cat /home/dev", "s3cr3t-value", "--password"},
-		marshalJSON(t, risky))
+	// Issue #88 removed ingest-time hiding: the raw path and command survive to
+	// the persisted finding so an operator sees exactly what tripped the policy.
+	serialized := string(marshalJSON(t, risky))
+	for _, evidence := range []string{"/home/dev/secret-app/.env", "cat /home/dev/secret-app/.env --password s3cr3t-value"} {
+		if !strings.Contains(serialized, evidence) {
+			t.Fatalf("raw evidence %q must survive to the finding, got %s", evidence, serialized)
+		}
+	}
 }
 
 func rawClaudeRiskyAccessOTLP(t *testing.T) string {

@@ -23,11 +23,11 @@ func TestMCPInventoryInsightAPI(t *testing.T) {
 	connected := sessionTestEvent(t, "mcp-connected", "mcp-session", "claude-code", "active", "2026-01-04T09:00:01Z", "")
 	connected.Provider = "anthropic"
 	connected.EventType = "mcp_server_connection"
-	connected.ProviderExtensions = map[string]any{"event": map[string]any{"server_fingerprint": "mcp:hmac:filesystem", "status": "connected", "server_scope": "user", "transport_type": "stdio"}}
+	connected.ProviderExtensions = map[string]any{"event": map[string]any{"server_name": "filesystem", "status": "connected", "server_scope": "user", "transport_type": "stdio"}}
 	used := sessionTestEvent(t, "mcp-used", "mcp-session", "claude-code", "active", "2026-01-04T09:00:02Z", "")
 	used.Provider = "anthropic"
 	used.EventType = "mcp_call"
-	used.ProviderExtensions = map[string]any{"mcp_call": map[string]any{"server_fingerprint": "mcp:hmac:filesystem"}}
+	used.ProviderExtensions = map[string]any{"mcp_call": map[string]any{"server_name": "filesystem"}}
 	if err := repo.SaveEvents(context.Background(), []canonical.Event{request, connected, used}); err != nil {
 		t.Fatal(err)
 	}
@@ -130,11 +130,11 @@ func fetchUnapprovedMCP(t *testing.T, thresholds InsightThresholds, serverName s
 	connected := sessionTestEvent(t, "mcp-connected", "mcp-session", "claude-code", "active", "2026-01-04T09:00:00Z", "")
 	connected.Provider = "anthropic"
 	connected.EventType = "mcp_server_connection"
-	connected.ProviderExtensions = map[string]any{"event": map[string]any{"server_fingerprint": "mcp:hmac:" + serverName, "server_name": serverName, "status": "connected"}}
+	connected.ProviderExtensions = map[string]any{"event": map[string]any{"server_name": serverName, "status": "connected"}}
 	if err := repo.SaveEvents(context.Background(), []canonical.Event{connected}); err != nil {
 		t.Fatal(err)
 	}
-	server := httptest.NewServer(newHandler(slog.Default(), nil, nil, nil, repo, thresholds))
+	server := httptest.NewServer(newHandler(slog.Default(), nil, repo, repo, thresholds))
 	t.Cleanup(server.Close)
 	return getInsightJSON[unapprovedMCPResponse](t, server.URL+"/api/v1/insights/unapproved-mcp")
 }

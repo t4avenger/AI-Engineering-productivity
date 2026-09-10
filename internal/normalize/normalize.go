@@ -54,41 +54,16 @@ func ObservedString(value any) (string, bool) {
 	return text, true
 }
 
-// ProviderNativeSessionID returns the local-edition canonical session identity:
-// a stable provider prefix plus the provider-native session/conversation ID.
-// If a malformed payload carries a secret-like value despite the upstream
-// sanitizer, fall back to a fingerprint so the sensitive value is not retained.
-func ProviderNativeSessionID(prefix, value string, fingerprint func([]byte) string) string {
+// ProviderNativeSessionID returns the canonical session identity: a stable
+// provider prefix plus the raw provider-native session/conversation ID. Raw
+// identifiers are captured verbatim (epic #87); only a genuinely absent value
+// falls back to the "unknown" sentinel so a blank is never mistaken for a real ID.
+func ProviderNativeSessionID(prefix, value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return prefix + "unknown"
 	}
-	if looksSecretLikeIdentifier(value) {
-		if fingerprint == nil {
-			return prefix + "redacted"
-		}
-		return prefix + "redacted:" + fingerprint([]byte(value))
-	}
 	return prefix + value
-}
-
-func looksSecretLikeIdentifier(value string) bool {
-	normalized := strings.ToLower(value)
-	for _, marker := range []string{
-		"api_key=",
-		"apikey=",
-		"authorization:",
-		"bearer ",
-		"password=",
-		"secret=",
-		"token=",
-		"-----begin private key-----",
-	} {
-		if strings.Contains(normalized, marker) {
-			return true
-		}
-	}
-	return strings.HasPrefix(normalized, "sk-") || value == "[REDACTED]"
 }
 
 // OptionalTokenCount parses a token attribute into a *int64. Decoded JSON

@@ -4,9 +4,8 @@
 // It is capability-bounded: only signals the P2 Claude Code capability matrix
 // marks supported/partial are extracted; every absent signal is reported as an
 // explicit unavailable/unknown state, never fabricated. Session and request
-// session identifiers are retained as provider-prefixed native IDs in the
-// local-only edition. Request identifiers still use installation-specific HMAC
-// fingerprints unless a future privacy review allows native request IDs.
+// identifiers are retained verbatim as provider-prefixed native IDs; no
+// ingest-time hiding is applied (epic #87).
 package claude
 
 import (
@@ -44,12 +43,9 @@ const (
 // fixture.
 //
 // A capability-probe fixture carries no events, so it yields an empty slice
-// rather than a fabricated all-unknown record. request_id values are
-// fingerprinted, so the caller supplies the installation HMAC fingerprint.
-func NormalizeEvents(data []byte, fingerprint func([]byte) string) ([]canonical.Event, error) {
-	if fingerprint == nil {
-		return nil, errors.New("claude fingerprint is required")
-	}
+// rather than a fabricated all-unknown record. Session and request identifiers
+// are retained raw.
+func NormalizeEvents(data []byte) ([]canonical.Event, error) {
 	document, capturedAt, err := decodeDocument(data)
 	if err != nil {
 		return nil, err
@@ -63,7 +59,7 @@ func NormalizeEvents(data []byte, fingerprint func([]byte) string) ([]canonical.
 	}
 	events := make([]canonical.Event, 0, len(document.Payload.SampleEvents))
 	for index, raw := range document.Payload.SampleEvents {
-		event, err := normaliseSampleEvent(document, capturedAt, fingerprint, index, raw)
+		event, err := normaliseSampleEvent(document, capturedAt, index, raw)
 		if err != nil {
 			return nil, err
 		}
@@ -72,7 +68,7 @@ func NormalizeEvents(data []byte, fingerprint func([]byte) string) ([]canonical.
 	return normalize.CorrelateEvents(events), nil
 }
 
-func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, fingerprint func([]byte) string, index int, raw map[string]any) (canonical.Event, error) {
+func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index int, raw map[string]any) (canonical.Event, error) {
 	name, err := normalize.RequiredString(raw, "event_name")
 	if err != nil {
 		return canonical.Event{}, err
@@ -85,7 +81,7 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, finger
 	if err != nil {
 		return canonical.Event{}, err
 	}
-	nativeSessionID := normalize.ProviderNativeSessionID("claude-code:", sessionID, fingerprint)
+	nativeSessionID := normalize.ProviderNativeSessionID("claude-code:", sessionID)
 	eventID := nativeSessionID + ":" + sequenceKey(raw, index)
 
 	extensions := map[string]any{
@@ -93,7 +89,7 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, finger
 		"event":       normalize.UnknownFields(raw, promotedEventFields(name)...),
 	}
 	if requestID := normalize.OptionalString(raw, "request_id"); requestID != nil {
-		extensions["request_fingerprint"] = "claude-code:" + fingerprint([]byte(*requestID))
+		extensions["request_id"] = "claude-code:" + *requestID
 	}
 	attachSkillDetection(extensions, raw, name)
 	attachOutcomeContract(extensions, raw, name)

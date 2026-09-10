@@ -72,7 +72,6 @@ var protectedRoutes = []route{
 	{match: prefixSuffix(http.MethodGet, pathSessionsPrefix, "/timeline"), handle: (*Server).sessionTimelinePartial},
 	{match: prefix(http.MethodGet, pathSessionsPrefix), handle: (*Server).sessionDetail},
 	{match: exact(http.MethodGet, pathInsights), handle: (*Server).insightsPage},
-	{match: prefixSuffix(http.MethodGet, pathEventsPrefix, "/provenance"), handle: (*Server).eventProvenancePartial},
 	{match: exact(http.MethodGet, pathIntegrations), handle: (*Server).integrationsPage},
 	{match: exact(http.MethodGet, pathPrivacy), handle: (*Server).privacyPage},
 	{match: exact(http.MethodPost, pathPrivacyDelete), handle: (*Server).privacyDeleteAll},

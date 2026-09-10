@@ -1,7 +1,7 @@
 [
   {
     "schema_version": "0.1.0",
-    "request_id": "claude-code:fixture",
+    "request_id": "claude-code:synthetic-request-id",
     "session_id": "claude-code:synthetic-session-id",
     "provider": "anthropic",
     "tool": "claude-code",
@@ -18,8 +18,8 @@
     "provenance": "observed",
     "provider_extensions": {
       "correlation": {
-        "dedup_key": "claude-code:fixture",
-        "ordering_key": "01788183424714000000:claude-code:fixture",
+        "dedup_key": "claude-code:synthetic-request-id",
+        "ordering_key": "01788183424714000000:claude-code:synthetic-request-id",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Claude Code event telemetry has no reviewed task-boundary signal"

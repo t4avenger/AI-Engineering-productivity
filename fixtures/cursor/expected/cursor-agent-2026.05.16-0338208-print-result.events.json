@@ -1,7 +1,7 @@
 [
   {
     "schema_version": "0.1.0",
-    "event_id": "cursor-agent:fixture",
+    "event_id": "cursor-agent:synthetic-request-id",
     "event_type": "result",
     "occurred_at": "2026-08-31T13:42:00Z",
     "received_at": "2026-08-31T13:42:00Z",
@@ -45,8 +45,8 @@
         "workspace": "isolated_tmp"
       },
       "correlation": {
-        "dedup_key": "cursor-agent:fixture",
-        "ordering_key": "01788183720000000000:cursor-agent:fixture",
+        "dedup_key": "cursor-agent:synthetic-request-id",
+        "ordering_key": "01788183720000000000:cursor-agent:synthetic-request-id",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Cursor Agent fixtures have no reviewed task-boundary signal"

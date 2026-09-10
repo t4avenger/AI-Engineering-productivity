@@ -48,7 +48,7 @@ const rawClaudeLogs = `{"resourceLogs":[
      {"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}}]}]}]}]}`
 
 func TestNormalizeLogsMapsClaudeWireEventsAndSkipsOtherServices(t *testing.T) {
-	events, err := NormalizeLogs([]byte(rawClaudeLogs), time.Unix(0, 0).UTC(), stubFingerprint)
+	events, err := NormalizeLogs([]byte(rawClaudeLogs), time.Unix(0, 0).UTC())
 	if err != nil {
 		t.Fatalf("normalise: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestNormalizeLogsMapsClaudeWireEventsAndSkipsOtherServices(t *testing.T) {
 }
 
 func TestNormalizeLogsKeepsNativeSessionAndDropsOperatorFields(t *testing.T) {
-	events, err := NormalizeLogs([]byte(rawClaudeLogs), time.Unix(0, 0).UTC(), stubFingerprint)
+	events, err := NormalizeLogs([]byte(rawClaudeLogs), time.Unix(0, 0).UTC())
 	if err != nil {
 		t.Fatalf("normalise: %v", err)
 	}
@@ -86,12 +86,13 @@ func TestNormalizeLogsKeepsNativeSessionAndDropsOperatorFields(t *testing.T) {
 	if plugin, ok := connection["is_plugin"].(bool); !ok || plugin {
 		t.Fatalf("is_plugin = %#v, want false bool", connection["is_plugin"])
 	}
-	// Provider-reported MCP server name is retained for inventory display, and a fingerprint remains available for correlation.
+	// The raw provider-reported MCP server name is retained verbatim for
+	// inventory display — no fingerprint, no hiding (issue #88).
 	if connection["server_name"] != "synthetic-filesystem-server" {
 		t.Fatalf("server_name = %#v", connection["server_name"])
 	}
-	if fp, ok := connection["server_fingerprint"].(string); !ok || !strings.HasPrefix(fp, "claude-code:") {
-		t.Fatalf("server_fingerprint = %#v, want claude-code:* fingerprint", connection["server_fingerprint"])
+	if _, hidden := connection["server_fingerprint"]; hidden {
+		t.Fatalf("server_fingerprint must not be emitted; raw server_name is retained instead: %#v", connection)
 	}
 
 	// No operator, machine, or prompt identifier reaches canonical output; local provider session IDs are retained by policy.
@@ -126,7 +127,7 @@ func requireConnectionExtensions(t *testing.T, events []canonical.Event) map[str
 
 func TestNormalizeLogsRejectsPayloadWithoutClaudeResources(t *testing.T) {
 	other := `{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_cli_rs"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}}]}]}]}]}`
-	if _, err := NormalizeLogs([]byte(other), time.Unix(0, 0).UTC(), stubFingerprint); err != ErrUnsupportedLogs {
+	if _, err := NormalizeLogs([]byte(other), time.Unix(0, 0).UTC()); err != ErrUnsupportedLogs {
 		t.Fatalf("expected ErrUnsupportedLogs, got %v", err)
 	}
 }

@@ -1,80 +1,55 @@
-# Privacy Threat Model & Redaction Boundary
+# Privacy Threat Model & No-Hiding Invariant
 
 P0 gate artifact. The behaviour-observability reorientation widens what we ingest (tool
-calls, MCP/skill invocations, file operations, command categories). This document defines
-the redaction boundary that must be settled **before** those signals are extracted, so
-privacy is designed into ingestion rather than bolted onto dashboards later.
+calls, MCP/skill invocations, file operations, command categories). Epic #87 (issue #88)
+reversed the earlier ingest-time-hiding stance: for the local-only individual edition, raw
+provider-native identifiers, file paths, and command lines are **persisted verbatim and shown
+to the local user**, because the product now needs real session/request/MCP identity and real
+paths to be useful, and the operator running on their own machine must see the actual data —
+never a hashed or tokenised placeholder.
 
-Companion: [pipeline.md](pipeline.md) (current transformations), the sanitizer in
-`internal/privacy/sanitizer.go`.
+Companion: [pipeline.md](pipeline.md) (current transformations). The classifiers that governance
+runs over raw values live in `internal/privacy/sanitizer.go` (`ClassifyPath`,
+`ClassifyCommandAccess`).
 
-## Assets to protect
-- Prompt / response / source-code content (already removed by default).
-- Secret values: tokens, API keys, passwords, private keys.
-- Sensitive paths that reveal secrets by name: `.env`, `~/.ssh/id_rsa`, `*.pem`, `credentials`.
-- Command arguments and shell command lines (can embed any of the above).
-- Protected identifiers: account, email, hostname, API keys, tokens, and identifiers
-  derived from paths or command arguments.
-- Local provider session/conversation identifiers: retained as provider-prefixed
-  correlation keys in the local-only individual edition. This is a deliberate
-  exception for IDs the local user already sees in supported tools; cloud, team,
-  or cross-device sharing must re-evaluate before upload or aggregation.
+## Trust model
+The individual edition is local-only and single-user: the SQLite store lives on the operator's
+own machine and is theirs to read. There is no ingest-time obfuscation "defence in depth" — the
+value of the store is that it faithfully reflects what the tools did. Cloud, team, or
+cross-device sharing is a different trust boundary and MUST re-evaluate every field before any
+upload or aggregation; nothing in this document authorises off-machine transmission.
 
-## Threats specific to the reorientation
-1. **Redaction gaps in new raw fields.** New sources — command lines, tool arguments, and
-   Claude Code session JSONL blocks — are raw text that can carry secrets. Redacting only a
-   single canonical `path` field is insufficient. **Redaction must run at ingestion across
-   every raw field of every source**, before normalisation, persistence, logs, or diagnostics.
-2. **Reversible path fingerprints.** A plain `hmac-sha256` of a path looks opaque, but the key
-   is a local, on-disk secret and the universe of interesting paths (`.env`, `~/.ssh/id_rsa`,
-   `credentials.json`) is a tiny dictionary. Anyone who obtains both the local key and the
-   persisted output can hash the dictionary and match it back to the exact file. A finding that
-   only says "credential access" is also hard for the user to verify or dismiss.
-   **Mitigation (implemented):** file paths are never persisted as a per-path fingerprint at
-   all. `privacy.ClassifyPath` maps a path to a coarse class (`dotenv`, `ssh_key`, `cert`,
-   `credentials_file`, `project_relative`, `non_project`) and a syntactic project boundary
-   (`project`, `external`, `indeterminate`), persisted as the token `path-class:<class>;boundary:<boundary>`.
-   Classification is OS-independent and case-insensitive (both separators normalised; Windows
-   drive-letter and `~` paths recognised). Distinct files of the same class collapse to one
-   token, so the specific path cannot be recovered even with the key. The class token *is*
-   retained semantic signal — the category of access, deliberately kept for governance — but
-   never the file identity.
-3. **Indirect leakage.** The same secret path can appear in a command line, a tool-arg blob,
-   and a JSONL message. Redacting one representation while persisting another defeats the point.
-4. **Risky-access blind spots.** `cat .env` via a shell tool is a filesystem read the
-   filesystem-read category will miss unless shell command intent is normalised too.
+## Assets and how they are handled
+- **Prompt / response / source-code content** — still not captured by default. The normalisers
+  declare these fields unavailable and refuse content at the ingest boundary (e.g. Cursor
+  rejects message-content fields). Configurable capture of this content is tracked separately in
+  #94 and remains gated by `collection.prompts` / `collection.responses` / `collection.source_code`.
+- **Provider-native identifiers** (session/conversation/request IDs, MCP server names) — retained
+  raw with a stable provider prefix (`codex:`, `claude-code:`, `cursor-agent:`) so session lists,
+  detail pages, and insights expose real correlation keys. No HMAC fingerprint is emitted; when a
+  native ID is genuinely absent a non-keyed positional/content ID is used for uniqueness only
+  (explicitly not a hiding transform).
+- **File paths and command lines** — retained raw. They are the evidence risky-access governance
+  needs, and the operator must be able to see exactly which file or command tripped a policy.
+- **Sensitive paths** (`.env`, `~/.ssh/id_rsa`, `*.pem`, `credentials`) — retained raw *and*
+  classified. `privacy.ClassifyPath` / `privacy.ClassifyCommandAccess` run over the raw stored
+  value to add a governance signal (class + project boundary); they no longer replace the value.
 
-## Redaction boundary (required)
-- **Single choke point, before persistence.** Every provider adapter routes raw records
-  through the sanitizer before any storage/diagnostics/log call. No adapter persists raw.
-- **Field-agnostic classification.** Classification is by field semantics (secret-bearing,
-  path-like, command-arg, content) applied recursively to *all* fields, including
-  provider-extension and JSONL-derived fields — not a fixed whitelist of key names.
-- **Paths:** do not persist raw paths. Persist a coarse class (`dotenv`, `ssh_key`, `cert`,
-  `credentials_file`, `project_relative`, `non_project`) plus project-boundary metadata via
-  `privacy.ClassifyPath` — no per-path fingerprint. If a stable identifier is needed elsewhere,
-  use a **rotatable, scoped keyed HMAC** (`Sanitizer.FingerprintScoped` + `RotateSalt`) — not a
-  bare hash — so a leaked value cannot be dictionary-matched across installs or over time.
-  `FingerprintScoped` domain-separates by scope (`privacy-hmac-v1|scope|<scope>`), and
-  `RotateSalt` re-keys the installation (atomic temp-file/fsync/rename). Rotation is
-  forward-only: it does not re-key already-persisted identifiers; complete local deletion
-  (the salt file suffices) severs their linkage.
-- **Provider session IDs:** in the local-only individual edition, retain provider-native
-  session/conversation IDs with a stable provider prefix (`codex:`, `claude-code:`,
-  `cursor-agent:`) so session lists, detail pages, and insights expose real correlation
-  keys. Do not apply this exception to account IDs, emails, hostnames, API keys, tokens,
-  raw paths, command arguments, prompts, responses, or source code.
-- **Command args / shell lines:** redacted to `[REDACTED]`; intent (category) is derived and
-  kept, raw text is not.
-- **Findings carry privacy-safe evidence only:** rule id, access method, project boundary,
-  timestamp, confidence — never the raw path, arg, or secret.
+## Governance over raw values
+`privacy.ClassifyPath` maps a raw path to a coarse class (`dotenv`, `ssh_key`, `cert`,
+`credentials_file`, `project_relative`, `non_project`) and a syntactic project boundary
+(`project`, `external`, `indeterminate`). Classification is OS-independent and case-insensitive
+(both separators normalised; Windows drive-letter and `~` paths recognised). This class is an
+*additional* signal layered on top of the retained raw path — governance findings reference the
+real path/command so the operator can verify or dismiss them.
+
+`cat .env` via a shell tool is a filesystem read that `ClassifyCommandAccess` recognises, so
+shell-command intent is classified alongside direct file operations.
 
 ## Verification requirements
-- Canary-string leakage tests: seed synthetic secrets into *every* raw source shape (OTLP
-  attrs, command lines, tool args, JSONL) and scan all output locations — none may appear.
-- Path-class tests: prove a small dictionary of known secret paths cannot be recovered from
-  persisted output — paths become class+boundary tokens, distinct files of one class collapse
-  to one token, and no per-path fingerprint is emitted. Rotation tests prove re-keying changes
-  scoped fingerprints and cross-install fingerprints differ.
-- Redaction runs before persistence AND before diagnostics export (both boundaries tested).
+- Raw-survival tests: a seeded raw identifier, file path, and command line survive ingest →
+  storage → read verbatim, with no HMAC/`path-class:`/`command-access:` placeholder anywhere.
+- Governance evidence tests: risky-access findings carry the raw path/command as evidence.
+- Content-gating tests: prompt/response/source-code content is not captured by default (refused
+  at the ingest boundary), pending the configurable-capture work in #94.
 - `indeterminate` is returned when visibility is absent — no fabricated certainty.

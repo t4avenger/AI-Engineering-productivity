@@ -10,17 +10,12 @@ import (
 
 	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
 func TestPersistenceAcceptance(t *testing.T) {
 	ctx := context.Background()
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	repo, err := Open(filepath.Join(t.TempDir(), "telemetry.db"), sanitizer)
+	repo, err := Open(filepath.Join(t.TempDir(), "telemetry.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,15 +35,11 @@ func TestPersistenceAcceptance(t *testing.T) {
 }
 
 func TestCostRecordsPersistAndDelete(t *testing.T) {
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
 	calculator, err := cost.LoadDefault("")
 	if err != nil {
 		t.Fatal(err)
 	}
-	repo, err := Open(":memory:", sanitizer, calculator)
+	repo, err := Open(":memory:", calculator)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,18 +117,19 @@ func assertSessionDeleted(t *testing.T, ctx context.Context, repo *Repository) {
 	}
 }
 
-func TestPersistenceSanitizesBeforeStorage(t *testing.T) {
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	repo, err := Open(":memory:", sanitizer)
+// TestPersistenceStoresEventRaw asserts the no-hiding invariant (issue #88):
+// storage persists the canonical event verbatim, with no ingest-time
+// sanitisation. A raw provider-native identifier and file path survive into
+// event_json exactly as normalised.
+func TestPersistenceStoresEventRaw(t *testing.T) {
+	repo, err := Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = repo.Close() }()
-	input := event(t, "event-private", "session-private", "session.created", "2026-01-02T09:00:00Z")
-	input.ProviderExtensions = map[string]any{"prompt": "synthetic secret-like prompt content"}
+	input := event(t, "event-raw", "session-raw", "session.created", "2026-01-02T09:00:00Z")
+	input.ProviderExtensions = map[string]any{"mcp_call": map[string]any{"server_name": "filesystem"}}
+	input.Attributes = map[string]any{"file_path": "/home/dev/app/main.go"}
 	if err := repo.SaveEvents(context.Background(), []canonical.Event{input}); err != nil {
 		t.Fatal(err)
 	}
@@ -145,17 +137,13 @@ func TestPersistenceSanitizesBeforeStorage(t *testing.T) {
 	if err := repo.db.QueryRow("SELECT event_json FROM events WHERE event_id=?", input.EventID).Scan(&stored); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(stored, "synthetic secret-like prompt content") || strings.Contains(stored, "\"prompt\"") {
-		t.Fatalf("prohibited field reached storage: %s", stored)
+	if !strings.Contains(stored, "/home/dev/app/main.go") || !strings.Contains(stored, "filesystem") {
+		t.Fatalf("raw values must be stored verbatim, got: %s", stored)
 	}
 }
 
 func TestPersistenceClearsCompletionForLaterActiveEvent(t *testing.T) {
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	repo, err := Open(":memory:", sanitizer)
+	repo, err := Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,12 +165,8 @@ func TestPersistenceClearsCompletionForLaterActiveEvent(t *testing.T) {
 }
 
 func TestOpenSecuresDatabaseAndDirectory(t *testing.T) {
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
 	path := filepath.Join(t.TempDir(), "private", "telemetry.db")
-	repo, err := Open(path, sanitizer)
+	repo, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,11 +176,7 @@ func TestOpenSecuresDatabaseAndDirectory(t *testing.T) {
 }
 
 func TestListSessionsFiltersAndOrdersDeterministically(t *testing.T) {
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	repo, err := Open(":memory:", sanitizer)
+	repo, err := Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,18 +230,13 @@ func event(t *testing.T, id, sessionID, kind, at string) canonical.Event {
 	return canonical.Event{SchemaVersion: "0.1.0", EventID: id, EventType: kind, OccurredAt: occurred, ReceivedAt: occurred, Provider: "openai", Tool: "codex", SourceSchema: "otel", SourceVersion: "test", ActorID: "unavailable", DeviceID: "unavailable", SessionID: sessionID, PrivacyLevel: "operational", Attributes: map[string]any{}, ProviderExtensions: map[string]any{}}
 }
 
-func TestEventTimelineReadsAndProvenance(t *testing.T) {
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	repo, err := Open(":memory:", sanitizer)
+func TestEventTimelineReads(t *testing.T) {
+	repo, err := Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = repo.Close() }()
 	first := event(t, "first", "timeline", "session.active", "2026-01-02T09:00:00Z")
-	first.ProviderExtensions = map[string]any{"prompt": "synthetic"}
 	second := event(t, "second", "timeline", "session.completed", "2026-01-02T10:00:00Z")
 	if err := repo.SaveEvents(context.Background(), []canonical.Event{second, first}); err != nil {
 		t.Fatal(err)
@@ -274,10 +249,6 @@ func TestEventTimelineReadsAndProvenance(t *testing.T) {
 	remaining, err := repo.ListEvents(context.Background(), storage.EventFilter{SessionID: "timeline", Cursor: cursor, Limit: 1})
 	if err != nil || len(remaining) != 1 || remaining[0].EventID != "second" {
 		t.Fatalf("remaining = %#v, %v", remaining, err)
-	}
-	provenance, found, err := repo.EventProvenance(context.Background(), "first")
-	if err != nil || !found || len(provenance) == 0 {
-		t.Fatalf("provenance = %#v, %v, %v", provenance, found, err)
 	}
 	if _, err := repo.ListEvents(context.Background(), storage.EventFilter{SessionID: "timeline"}); err == nil {
 		t.Fatal("expected invalid limit")

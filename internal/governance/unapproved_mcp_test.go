@@ -32,9 +32,8 @@ func mcpConnectionEvent(id string, event map[string]any) canonical.Event {
 func TestUnapprovedMCPAllowlistedServerPasses(t *testing.T) {
 	report := UnapprovedMCPFromEvents([]canonical.Event{
 		mcpConnectionEvent("connected", map[string]any{
-			"server_fingerprint": "mcp:hmac:filesystem",
-			"server_name":        "filesystem",
-			"status":             "connected",
+			"server_name": "filesystem",
+			"status":      "connected",
 		}),
 	}, []string{"filesystem", "git"})
 
@@ -52,9 +51,8 @@ func TestUnapprovedMCPAllowlistedServerPasses(t *testing.T) {
 func TestUnapprovedMCPFlagsUnknownServer(t *testing.T) {
 	report := UnapprovedMCPFromEvents([]canonical.Event{
 		mcpConnectionEvent("connected", map[string]any{
-			"server_fingerprint": "mcp:hmac:rogue",
-			"server_name":        "rogue-tool",
-			"status":             "connected",
+			"server_name": "rogue-tool",
+			"status":      "connected",
 		}),
 	}, []string{"filesystem"})
 
@@ -91,8 +89,7 @@ func TestUnapprovedMCPIndeterminateWhenIdentityUnavailable(t *testing.T) {
 func TestUnapprovedMCPIndeterminateWhenAllowlistUnconfigured(t *testing.T) {
 	report := UnapprovedMCPFromEvents([]canonical.Event{
 		mcpConnectionEvent("connected", map[string]any{
-			"server_fingerprint": "mcp:hmac:filesystem",
-			"server_name":        "filesystem",
+			"server_name": "filesystem",
 		}),
 	}, nil)
 
@@ -121,8 +118,7 @@ func TestUnapprovedMCPIndeterminateWhenNoServersObserved(t *testing.T) {
 func TestUnapprovedMCPAllowlistMatchIsCaseInsensitive(t *testing.T) {
 	report := UnapprovedMCPFromEvents([]canonical.Event{
 		mcpConnectionEvent("connected", map[string]any{
-			"server_fingerprint": "mcp:hmac:filesystem",
-			"server_name":        "FileSystem",
+			"server_name": "FileSystem",
 		}),
 	}, []string{"  filesystem  "})
 
@@ -135,13 +131,13 @@ func TestUnapprovedMCPDecisionValidatesAgainstPolicySchema(t *testing.T) {
 	schema := compilePolicySchema(t)
 	for name, report := range map[string]UnapprovedMCP{
 		"violation": UnapprovedMCPFromEvents([]canonical.Event{
-			mcpConnectionEvent("c", map[string]any{"server_fingerprint": "mcp:hmac:rogue", "server_name": "rogue"}),
+			mcpConnectionEvent("c", map[string]any{"server_name": "rogue"}),
 		}, []string{"filesystem"}),
 		"not_violation": UnapprovedMCPFromEvents([]canonical.Event{
-			mcpConnectionEvent("c", map[string]any{"server_fingerprint": "mcp:hmac:filesystem", "server_name": "filesystem"}),
+			mcpConnectionEvent("c", map[string]any{"server_name": "filesystem"}),
 		}, []string{"filesystem"}),
 		"indeterminate_unconfigured": UnapprovedMCPFromEvents([]canonical.Event{
-			mcpConnectionEvent("c", map[string]any{"server_fingerprint": "mcp:hmac:filesystem", "server_name": "filesystem"}),
+			mcpConnectionEvent("c", map[string]any{"server_name": "filesystem"}),
 		}, nil),
 		"indeterminate_unidentified": UnapprovedMCPFromEvents([]canonical.Event{
 			mcpConnectionEvent("c", map[string]any{"status": "connected"}),

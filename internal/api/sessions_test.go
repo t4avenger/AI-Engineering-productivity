@@ -13,7 +13,6 @@ import (
 
 	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
 )
 
@@ -110,7 +109,7 @@ func TestSessionAPIReportsMixedProviderAvailability(t *testing.T) {
 	}
 }
 
-func TestCostAPIProvidesSummaryAndSessionProvenance(t *testing.T) {
+func TestCostAPIProvidesSummaryAndSessionCosts(t *testing.T) {
 	repo := sessionTestRepository(t)
 	server := httptest.NewServer(NewHandler(slog.Default(), repo))
 	t.Cleanup(server.Close)
@@ -253,15 +252,11 @@ func assertInvalidSessionQuery(t *testing.T, rawURL string) {
 
 func sessionTestRepository(t *testing.T) *sqlite.Repository {
 	t.Helper()
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
 	calculator, err := cost.LoadDefault("")
 	if err != nil {
 		t.Fatal(err)
 	}
-	repo, err := sqlite.Open(":memory:", sanitizer, calculator)
+	repo, err := sqlite.Open(":memory:", calculator)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,12 +302,11 @@ func getSessionList(t *testing.T, rawURL string) sessionListResponse {
 	return list
 }
 
-func TestSessionEventTimelineAndProvenanceAPI(t *testing.T) {
+func TestSessionEventTimelineAPI(t *testing.T) {
 	server := timelineTestServer(t)
 	firstPage := timelinePage(t, server.URL+"/api/v1/sessions/timeline-session/events?limit=1")
 	assertFirstTimelinePage(t, firstPage)
 	assertSecondTimelinePage(t, server.URL, firstPage)
-	assertTimelineProvenance(t, server.URL)
 }
 
 func timelineTestServer(t *testing.T) *httptest.Server {
@@ -367,23 +361,4 @@ func assertSecondTimelinePage(t *testing.T, baseURL string, first eventListRespo
 	if len(page.Data) != 1 || page.Data[0].EventID != "timeline-second" || page.Pagination.NextCursor != nil {
 		t.Fatalf("second timeline page = %#v", page)
 	}
-}
-
-func assertTimelineProvenance(t *testing.T, baseURL string) {
-	t.Helper()
-	response, err := http.Get(baseURL + "/api/v1/events/timeline-first/provenance")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = response.Body.Close() }()
-	var provenance eventProvenanceResponse
-	if err := json.NewDecoder(response.Body).Decode(&provenance); err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range provenance.Data {
-		if entry.Action == privacy.ActionRemoved {
-			return
-		}
-	}
-	t.Fatalf("provenance = %#v", provenance)
 }
