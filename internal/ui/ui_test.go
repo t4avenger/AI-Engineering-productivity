@@ -420,32 +420,28 @@ func TestUnlockPageHidesLogout(t *testing.T) {
 	}
 }
 
-func TestInsightsMCPInvocationCountUnavailableDoesNotRenderZero(t *testing.T) {
+// renderMCPConnectionRow renders the insights page for a single MCP connection
+// event and returns the table row containing the given anchor text.
+func renderMCPConnectionRow(t *testing.T, sessionID, anchor string, rawEvent map[string]any) string {
+	t.Helper()
 	now := time.Now().UTC()
-	// A connection event with no server name has no correlatable identity, so
-	// usage genuinely cannot be measured — the invocations cell must not imply a
-	// measured zero.
 	repo := &fullStub{
-		sessions: []canonical.Session{syntheticSession("mcp-unavailable-session", now)},
+		sessions: []canonical.Session{syntheticSession(sessionID, now)},
 		events: map[string][]canonical.Event{
-			"mcp-unavailable-session": {{
-				EventID:    "connection-only",
-				EventType:  "mcp_server_connection",
-				SessionID:  "mcp-unavailable-session",
-				OccurredAt: now,
-				ReceivedAt: now,
-				Provider:   "anthropic",
-				Tool:       "claude-code",
-				ProviderExtensions: map[string]any{
-					"event": map[string]any{
-						"status": "connected",
-					},
-				},
+			sessionID: {{
+				EventID:            "connection-only",
+				EventType:          "mcp_server_connection",
+				SessionID:          sessionID,
+				OccurredAt:         now,
+				ReceivedAt:         now,
+				Provider:           "anthropic",
+				Tool:               "claude-code",
+				ProviderExtensions: map[string]any{"event": rawEvent},
 			}},
 		},
 	}
 	body := renderInsights(t, repo)
-	rowStart := strings.Index(body, "Unknown server")
+	rowStart := strings.Index(body, anchor)
 	if rowStart == -1 {
 		t.Fatalf("MCP row missing: %q", body)
 	}
@@ -453,7 +449,14 @@ func TestInsightsMCPInvocationCountUnavailableDoesNotRenderZero(t *testing.T) {
 	if rowEnd == -1 {
 		t.Fatalf("MCP row did not close: %q", body[rowStart:])
 	}
-	row := body[rowStart : rowStart+rowEnd]
+	return body[rowStart : rowStart+rowEnd]
+}
+
+func TestInsightsMCPInvocationCountUnavailableDoesNotRenderZero(t *testing.T) {
+	// A connection event with no server name has no correlatable identity, so
+	// usage genuinely cannot be measured — the invocations cell must not imply a
+	// measured zero.
+	row := renderMCPConnectionRow(t, "mcp-unavailable-session", "Unknown server", map[string]any{"status": "connected"})
 	if strings.Contains(row, "0 invocations") {
 		t.Fatalf("usage-unavailable MCP row must not imply measured zero invocations: %q", row)
 	}
@@ -463,39 +466,10 @@ func TestInsightsMCPInvocationCountUnavailableDoesNotRenderZero(t *testing.T) {
 }
 
 func TestInsightsMCPConnectedButUnusedRendersMeasuredZero(t *testing.T) {
-	now := time.Now().UTC()
 	// A named server with no observed invocation is connected-but-unused: usage
 	// evidence was checked and the count is a genuine zero, so the invocations
 	// cell shows the measured count rather than the unavailable badge.
-	repo := &fullStub{
-		sessions: []canonical.Session{syntheticSession("mcp-unused-session", now)},
-		events: map[string][]canonical.Event{
-			"mcp-unused-session": {{
-				EventID:    "connection-only",
-				EventType:  "mcp_server_connection",
-				SessionID:  "mcp-unused-session",
-				OccurredAt: now,
-				ReceivedAt: now,
-				Provider:   "anthropic",
-				Tool:       "claude-code",
-				ProviderExtensions: map[string]any{
-					"event": map[string]any{
-						"server_name": "connected-unused-mcp",
-					},
-				},
-			}},
-		},
-	}
-	body := renderInsights(t, repo)
-	rowStart := strings.Index(body, "connected-unused-mcp")
-	if rowStart == -1 {
-		t.Fatalf("MCP row missing: %q", body)
-	}
-	rowEnd := strings.Index(body[rowStart:], "</tr>")
-	if rowEnd == -1 {
-		t.Fatalf("MCP row did not close: %q", body[rowStart:])
-	}
-	row := body[rowStart : rowStart+rowEnd]
+	row := renderMCPConnectionRow(t, "mcp-unused-session", "connected-unused-mcp", map[string]any{"server_name": "connected-unused-mcp"})
 	if !strings.Contains(row, "0 invocations") {
 		t.Fatalf("connected-but-unused MCP row should render a measured zero count: %q", row)
 	}
