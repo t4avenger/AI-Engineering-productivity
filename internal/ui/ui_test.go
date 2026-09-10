@@ -422,6 +422,9 @@ func TestUnlockPageHidesLogout(t *testing.T) {
 
 func TestInsightsMCPInvocationCountUnavailableDoesNotRenderZero(t *testing.T) {
 	now := time.Now().UTC()
+	// A connection event with no server name has no correlatable identity, so
+	// usage genuinely cannot be measured — the invocations cell must not imply a
+	// measured zero.
 	repo := &fullStub{
 		sessions: []canonical.Session{syntheticSession("mcp-unavailable-session", now)},
 		events: map[string][]canonical.Event{
@@ -435,14 +438,14 @@ func TestInsightsMCPInvocationCountUnavailableDoesNotRenderZero(t *testing.T) {
 				Tool:       "claude-code",
 				ProviderExtensions: map[string]any{
 					"event": map[string]any{
-						"server_name": "connection-only-mcp",
+						"status": "connected",
 					},
 				},
 			}},
 		},
 	}
 	body := renderInsights(t, repo)
-	rowStart := strings.Index(body, "connection-only-mcp")
+	rowStart := strings.Index(body, "Unknown server")
 	if rowStart == -1 {
 		t.Fatalf("MCP row missing: %q", body)
 	}
@@ -456,6 +459,48 @@ func TestInsightsMCPInvocationCountUnavailableDoesNotRenderZero(t *testing.T) {
 	}
 	if !strings.Contains(row, "Usage not available") {
 		t.Fatalf("usage-unavailable MCP row should render unavailable badge in invocations cell: %q", row)
+	}
+}
+
+func TestInsightsMCPConnectedButUnusedRendersMeasuredZero(t *testing.T) {
+	now := time.Now().UTC()
+	// A named server with no observed invocation is connected-but-unused: usage
+	// evidence was checked and the count is a genuine zero, so the invocations
+	// cell shows the measured count rather than the unavailable badge.
+	repo := &fullStub{
+		sessions: []canonical.Session{syntheticSession("mcp-unused-session", now)},
+		events: map[string][]canonical.Event{
+			"mcp-unused-session": {{
+				EventID:    "connection-only",
+				EventType:  "mcp_server_connection",
+				SessionID:  "mcp-unused-session",
+				OccurredAt: now,
+				ReceivedAt: now,
+				Provider:   "anthropic",
+				Tool:       "claude-code",
+				ProviderExtensions: map[string]any{
+					"event": map[string]any{
+						"server_name": "connected-unused-mcp",
+					},
+				},
+			}},
+		},
+	}
+	body := renderInsights(t, repo)
+	rowStart := strings.Index(body, "connected-unused-mcp")
+	if rowStart == -1 {
+		t.Fatalf("MCP row missing: %q", body)
+	}
+	rowEnd := strings.Index(body[rowStart:], "</tr>")
+	if rowEnd == -1 {
+		t.Fatalf("MCP row did not close: %q", body[rowStart:])
+	}
+	row := body[rowStart : rowStart+rowEnd]
+	if !strings.Contains(row, "0 invocations") {
+		t.Fatalf("connected-but-unused MCP row should render a measured zero count: %q", row)
+	}
+	if strings.Contains(row, "Usage not available") {
+		t.Fatalf("connected-but-unused MCP row must not claim usage was unavailable: %q", row)
 	}
 }
 

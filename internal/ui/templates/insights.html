@@ -37,7 +37,7 @@
             <td>{{template "status-badge" .IdentityState}}</td>
             <td>{{template "status-badge" .UsageState}}</td>
             <td>{{template "status-badge" .ContextWasteState}}</td>
-            <td>{{if eq .UsageState "observed"}}{{.InvocationCount}} invocations{{else}}{{template "status-badge" "usage_unavailable"}}{{end}}</td>
+            <td>{{if eq .UsageState "unavailable"}}{{template "status-badge" "usage_unavailable"}}{{else}}{{.InvocationCount}} invocations{{end}}</td>
           </tr>
           {{end}}
         </tbody>
