@@ -28,10 +28,7 @@ var promotedRecordFields = []string{"event_name", "event_timestamp", "event_sequ
 // derived as completed_at minus the observed duration_ms and labelled as such
 // under provider_extensions, so it is never mistaken for a directly observed
 // endpoint.
-func ExtractModelInteractions(data []byte, fingerprint func([]byte) string) ([]canonical.ModelInteraction, error) {
-	if fingerprint == nil {
-		return nil, fmt.Errorf("claude fingerprint is required")
-	}
+func ExtractModelInteractions(data []byte) ([]canonical.ModelInteraction, error) {
 	document, _, err := decodeDocument(data)
 	if err != nil {
 		return nil, err
@@ -45,7 +42,7 @@ func ExtractModelInteractions(data []byte, fingerprint func([]byte) string) ([]c
 	}
 	var records []canonical.ModelInteraction
 	for _, raw := range document.Payload.SampleEvents {
-		interaction, ok, err := sampleModelInteraction(fingerprint, raw)
+		interaction, ok, err := sampleModelInteraction(raw)
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +53,7 @@ func ExtractModelInteractions(data []byte, fingerprint func([]byte) string) ([]c
 	return normalize.CorrelateModelInteractions(records), nil
 }
 
-func sampleModelInteraction(fingerprint func([]byte) string, raw map[string]any) (canonical.ModelInteraction, bool, error) {
+func sampleModelInteraction(raw map[string]any) (canonical.ModelInteraction, bool, error) {
 	if name, _ := raw["event_name"].(string); name != eventAPIRequest {
 		return canonical.ModelInteraction{}, false, nil
 	}
@@ -75,10 +72,10 @@ func sampleModelInteraction(fingerprint func([]byte) string, raw map[string]any)
 		return canonical.ModelInteraction{}, false, err
 	}
 
-	nativeSessionID := normalize.ProviderNativeSessionID("claude-code:", sessionID, fingerprint)
+	nativeSessionID := normalize.ProviderNativeSessionID("claude-code:", sessionID)
 	requestID := nativeSessionID + ":" + sequenceSuffix(raw, completed)
 	if rawRequest := normalize.OptionalString(raw, "request_id"); rawRequest != nil {
-		requestID = "claude-code:" + fingerprint([]byte(*rawRequest))
+		requestID = "claude-code:" + *rawRequest
 	}
 
 	duration := normalize.OptionalTokenCount(raw["duration_ms"])

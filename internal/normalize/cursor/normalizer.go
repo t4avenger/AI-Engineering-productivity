@@ -43,33 +43,26 @@ type adapterDocument struct {
 // Normalize maps a reviewed Cursor Agent fixture wrapper into one canonical
 // event for the result (or no events for a capability probe). It validates the
 // fixture through the shared fixture boundary and does not persist or log it.
-// The caller supplies an installation-scoped HMAC fingerprint function for
-// protected non-session identifiers and fallback correlation.
-func Normalize(data []byte, fingerprint func([]byte) string) ([]canonical.Event, error) {
-	if fingerprint == nil {
-		return nil, errors.New("cursor fingerprint is required")
-	}
+// Session and request identifiers are retained verbatim as provider-prefixed
+// native IDs; no ingest-time hiding is applied (epic #87).
+func Normalize(data []byte) ([]canonical.Event, error) {
 	document, capturedAt, err := decodeFixtureDocument(data)
 	if err != nil {
 		return nil, err
 	}
-	return normalizePayload(document.ToolVersion, document.Payload, capturedAt, fingerprint)
+	return normalizePayload(document.ToolVersion, document.Payload, capturedAt)
 }
 
 // NormalizeIngest maps a live Cursor Agent ingest envelope (not a committed
 // fixture wrapper) into canonical events. Unlike Normalize, it does not require
-// fixture metadata such as fixture_version or sanitisation_reviewed; the live
-// ingest path must run the shared privacy sanitiser upstream (mirroring the
-// OTLP adapters).
-func NormalizeIngest(data []byte, fingerprint func([]byte) string) ([]canonical.Event, error) {
-	if fingerprint == nil {
-		return nil, errors.New("cursor fingerprint is required")
-	}
+// fixture metadata such as fixture_version or sanitisation_reviewed. Raw
+// identifiers are captured verbatim (epic #87 — no ingest-time hiding).
+func NormalizeIngest(data []byte) ([]canonical.Event, error) {
 	document, capturedAt, err := decodeIngestDocument(data)
 	if err != nil {
 		return nil, err
 	}
-	return normalizePayload(document.ToolVersion, document.Payload, capturedAt, fingerprint)
+	return normalizePayload(document.ToolVersion, document.Payload, capturedAt)
 }
 
 type payload struct {
@@ -79,10 +72,10 @@ type payload struct {
 	Result     map[string]any `json:"result"`
 }
 
-func normalizePayload(toolVersion string, payload payload, capturedAt time.Time, fingerprint func([]byte) string) ([]canonical.Event, error) {
+func normalizePayload(toolVersion string, payload payload, capturedAt time.Time) ([]canonical.Event, error) {
 	switch payload.SourceType {
 	case sourceTypePrintJSON, sourceTypeStreamJSON:
-		event, err := normaliseResult(toolVersion, payload.SourceType, payload.Init, payload.Result, payload.Capture, capturedAt, fingerprint)
+		event, err := normaliseResult(toolVersion, payload.SourceType, payload.Init, payload.Result, payload.Capture, capturedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -124,7 +117,7 @@ func decodeAdapterDocument(data []byte, label string) (adapterDocument, time.Tim
 	return document, capturedAt.UTC(), nil
 }
 
-func normaliseResult(toolVersion, sourceType string, init, result, capture map[string]any, capturedAt time.Time, fingerprint func([]byte) string) (canonical.Event, error) {
+func normaliseResult(toolVersion, sourceType string, init, result, capture map[string]any, capturedAt time.Time) (canonical.Event, error) {
 	if result == nil {
 		return canonical.Event{}, errors.New("cursor payload.result must be present for result source_type")
 	}
@@ -132,11 +125,11 @@ func normaliseResult(toolVersion, sourceType string, init, result, capture map[s
 	if err != nil {
 		return canonical.Event{}, err
 	}
-	nativeSessionID := normalize.ProviderNativeSessionID("cursor-agent:", sessionID, fingerprint)
+	nativeSessionID := normalize.ProviderNativeSessionID("cursor-agent:", sessionID)
 
 	var eventID string
 	if requestID := normalize.OptionalString(result, "request_id"); requestID != nil {
-		eventID = "cursor-agent:" + fingerprint([]byte(*requestID))
+		eventID = "cursor-agent:" + *requestID
 	} else {
 		eventID = nativeSessionID + ":result"
 	}

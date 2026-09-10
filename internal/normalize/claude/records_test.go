@@ -10,11 +10,11 @@ import (
 
 func TestExtractModelInteractionsGolden(t *testing.T) {
 	input := readFixture(t, "claude-code-2.1.251-otlp-events.json")
-	first, err := ExtractModelInteractions(input, stubFingerprint)
+	first, err := ExtractModelInteractions(input)
 	if err != nil {
 		t.Fatalf("first extraction: %v", err)
 	}
-	second, err := ExtractModelInteractions(input, stubFingerprint)
+	second, err := ExtractModelInteractions(input)
 	if err != nil {
 		t.Fatalf("second extraction: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestExtractModelInteractionsGolden(t *testing.T) {
 }
 
 func TestExtractModelInteractionsIsHonestAboutUnknowns(t *testing.T) {
-	records, err := ExtractModelInteractions(readFixture(t, "claude-code-2.1.251-otlp-events.json"), stubFingerprint)
+	records, err := ExtractModelInteractions(readFixture(t, "claude-code-2.1.251-otlp-events.json"))
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestExtractModelInteractionsProvenanceDowngradesWithoutModel(t *testing.T) 
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	records, err := ExtractModelInteractions(data, stubFingerprint)
+	records, err := ExtractModelInteractions(data)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestExtractModelInteractionsProvenanceDowngradesWithoutModel(t *testing.T) 
 }
 
 func TestExtractModelInteractionsCapabilityProbeYieldsNoRecords(t *testing.T) {
-	records, err := ExtractModelInteractions(readFixture(t, "claude-code-2.1.251-capability-probe.json"), stubFingerprint)
+	records, err := ExtractModelInteractions(readFixture(t, "claude-code-2.1.251-capability-probe.json"))
 	if err != nil {
 		t.Fatalf("extract probe: %v", err)
 	}

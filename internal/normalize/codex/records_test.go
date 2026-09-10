@@ -15,9 +15,6 @@ import (
 // timestamps derived from receivedAt (absent record timestamps) are stable.
 var fixtureReceivedAt = time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
 
-// stubFingerprint keeps record/session IDs deterministic for golden comparison.
-func stubFingerprint([]byte) string { return "fixture" }
-
 func TestExtractLogModelInteractionsGolden(t *testing.T) {
 	t.Parallel()
 
@@ -32,12 +29,22 @@ func TestExtractLogModelInteractionsGolden(t *testing.T) {
 		t.Fatalf("unwrap payload: %v", err)
 	}
 
-	got, err := ExtractLogModelInteractions([]byte(wrapper.Payload), fixtureReceivedAt, stubFingerprint)
+	got, err := ExtractLogModelInteractions([]byte(wrapper.Payload), fixtureReceivedAt)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
 
-	goldenBytes, err := os.ReadFile(filepath.Join("..", "..", "..", "fixtures", "codex", "expected", "codex-0.145.0-logs.records.json"))
+	goldenPath := filepath.Join("..", "..", "..", "fixtures", "codex", "expected", "codex-0.145.0-logs.records.json")
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		data, err := json.MarshalIndent(got, "", "  ")
+		if err != nil {
+			t.Fatalf("marshal golden: %v", err)
+		}
+		if err := os.WriteFile(goldenPath, append(data, '\n'), 0o644); err != nil {
+			t.Fatalf("write golden: %v", err)
+		}
+	}
+	goldenBytes, err := os.ReadFile(goldenPath)
 	if err != nil {
 		t.Fatalf("read golden: %v", err)
 	}
@@ -57,13 +64,12 @@ func TestExtractLogModelInteractionsCorrelatesShuffledDuplicates(t *testing.T) {
 
 	ordered := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_cli_rs"}}]},"scopeLogs":[{"logRecords":[{"timeUnixNano":"1785059999000000000","observedTimeUnixNano":"1785059999001000000","attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"a"}},{"key":"input_token_count","value":{"stringValue":"1"}}],"severityText":"INFO"},{"timeUnixNano":"1785060000000000000","observedTimeUnixNano":"1785060000001000000","attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"b"}},{"key":"input_token_count","value":{"stringValue":"2"}}],"severityText":"INFO"}]}]}]}`)
 	shuffledDuplicate := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_cli_rs"}}]},"scopeLogs":[{"logRecords":[{"timeUnixNano":"1785060000000000000","observedTimeUnixNano":"1785060000001000000","attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"b"}},{"key":"input_token_count","value":{"stringValue":"2"}}],"severityText":"INFO"},{"timeUnixNano":"1785059999000000000","observedTimeUnixNano":"1785059999001000000","attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"a"}},{"key":"input_token_count","value":{"stringValue":"1"}}],"severityText":"INFO"},{"timeUnixNano":"1785060000000000000","observedTimeUnixNano":"1785060000001000000","attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"b"}},{"key":"input_token_count","value":{"stringValue":"2"}}],"severityText":"INFO"}]}]}]}`)
-	fingerprint := func(value []byte) string { return string(value) }
 
-	want, err := ExtractLogModelInteractions(ordered, fixtureReceivedAt, fingerprint)
+	want, err := ExtractLogModelInteractions(ordered, fixtureReceivedAt)
 	if err != nil {
 		t.Fatalf("extract ordered: %v", err)
 	}
-	got, err := ExtractLogModelInteractions(shuffledDuplicate, fixtureReceivedAt, fingerprint)
+	got, err := ExtractLogModelInteractions(shuffledDuplicate, fixtureReceivedAt)
 	if err != nil {
 		t.Fatalf("extract shuffled: %v", err)
 	}
@@ -115,7 +121,7 @@ func logPayload(t *testing.T, service string, recordAttrs map[string]any) []byte
 
 func extractOne(t *testing.T, service string, recordAttrs map[string]any) []canonical.ModelInteraction {
 	t.Helper()
-	records, err := ExtractLogModelInteractions(logPayload(t, service, recordAttrs), fixtureReceivedAt, stubFingerprint)
+	records, err := ExtractLogModelInteractions(logPayload(t, service, recordAttrs), fixtureReceivedAt)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -176,7 +182,7 @@ func TestExtractParsesNumericTokenValue(t *testing.T) {
 	// OTLP doubleValue arrives as a JSON number (float64 after decoding). An
 	// integral value parses; a non-integral one must be nil, never truncated.
 	payload := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_cli_rs"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"m"}},{"key":"input_token_count","value":{"doubleValue":42}},{"key":"output_token_count","value":{"doubleValue":7.5}}],"severityText":"INFO"}]}]}]}`)
-	records, err := ExtractLogModelInteractions(payload, fixtureReceivedAt, stubFingerprint)
+	records, err := ExtractLogModelInteractions(payload, fixtureReceivedAt)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -224,13 +230,5 @@ func TestExtractSkipsUnobservedService(t *testing.T) {
 
 	if records := extractOne(t, "some_other_service", map[string]any{"event.name": "codex.sse_event", "model": "m", "input_token_count": "5"}); len(records) != 0 {
 		t.Fatalf("unobserved service must yield no record, got %d", len(records))
-	}
-}
-
-func TestExtractRequiresFingerprint(t *testing.T) {
-	t.Parallel()
-
-	if _, err := ExtractLogModelInteractions([]byte(`{"resourceLogs":[]}`), fixtureReceivedAt, nil); err == nil {
-		t.Fatal("nil fingerprint must error")
 	}
 }

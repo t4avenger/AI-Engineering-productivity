@@ -72,17 +72,14 @@ type histogramDataPoint struct {
 // inferred skill-detection coverage only. Other metrics are ignored so
 // exporters can POST a full metrics batch without inventing unrelated insight
 // rows. Resources whose service.name is not a Codex log/exec service are skipped.
-func NormalizeMetrics(data []byte, receivedAt time.Time, fingerprint func([]byte) string) ([]canonical.Event, error) {
-	if fingerprint == nil {
-		return nil, errors.New("codex metrics fingerprint is required")
-	}
+func NormalizeMetrics(data []byte, receivedAt time.Time) ([]canonical.Event, error) {
 	var payload metricsPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
 		return nil, fmt.Errorf("decode Codex OTLP metrics: %w", err)
 	}
 	var events []canonical.Event
 	for _, resource := range payload.ResourceMetrics {
-		extracted, err := skillEventsFromResource(resource, receivedAt, fingerprint)
+		extracted, err := skillEventsFromResource(resource, receivedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -94,7 +91,7 @@ func NormalizeMetrics(data []byte, receivedAt time.Time, fingerprint func([]byte
 	return normalize.CorrelateEvents(events), nil
 }
 
-func skillEventsFromResource(resource resourceMetric, receivedAt time.Time, fingerprint func([]byte) string) ([]canonical.Event, error) {
+func skillEventsFromResource(resource resourceMetric, receivedAt time.Time) ([]canonical.Event, error) {
 	resourceAttrs := attributes(resource.Resource.Attributes)
 	if !isCodexLogService(resourceAttrs[serviceNameAttribute]) {
 		return nil, nil
@@ -103,7 +100,7 @@ func skillEventsFromResource(resource resourceMetric, receivedAt time.Time, fing
 	var events []canonical.Event
 	for _, scope := range resource.ScopeMetrics {
 		for _, item := range scope.Metrics {
-			extracted, err := skillEventsFromMetric(resourceAttrs, version, item, receivedAt, fingerprint)
+			extracted, err := skillEventsFromMetric(resourceAttrs, version, item, receivedAt)
 			if err != nil {
 				return nil, err
 			}
@@ -113,16 +110,16 @@ func skillEventsFromResource(resource resourceMetric, receivedAt time.Time, fing
 	return events, nil
 }
 
-func skillEventsFromMetric(resourceAttrs map[string]any, version string, item otlpMetric, receivedAt time.Time, fingerprint func([]byte) string) ([]canonical.Event, error) {
+func skillEventsFromMetric(resourceAttrs map[string]any, version string, item otlpMetric, receivedAt time.Time) ([]canonical.Event, error) {
 	if item.Name == skillTurnDurationMetric && item.Histogram != nil {
-		return skillTurnEventsFromHistogram(resourceAttrs, version, item.Histogram, receivedAt, fingerprint), nil
+		return skillTurnEventsFromHistogram(resourceAttrs, version, item.Histogram, receivedAt), nil
 	}
 	if item.Name != skillInjectedMetric || item.Sum == nil {
 		return nil, nil
 	}
 	var events []canonical.Event
 	for index, point := range item.Sum.DataPoints {
-		event, ok, err := skillInjectedEvent(resourceAttrs, version, point, index, receivedAt, fingerprint)
+		event, ok, err := skillInjectedEvent(resourceAttrs, version, point, index, receivedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -133,19 +130,19 @@ func skillEventsFromMetric(resourceAttrs map[string]any, version string, item ot
 	return events, nil
 }
 
-func skillTurnEventsFromHistogram(resourceAttrs map[string]any, version string, histogram *metricHistogram, receivedAt time.Time, fingerprint func([]byte) string) []canonical.Event {
+func skillTurnEventsFromHistogram(resourceAttrs map[string]any, version string, histogram *metricHistogram, receivedAt time.Time) []canonical.Event {
 	events := make([]canonical.Event, 0, len(histogram.DataPoints))
 	for index, point := range histogram.DataPoints {
-		events = append(events, skillTurnEvent(resourceAttrs, version, point, index, receivedAt, fingerprint))
+		events = append(events, skillTurnEvent(resourceAttrs, version, point, index, receivedAt))
 	}
 	return events
 }
 
-func skillTurnEvent(resource map[string]any, version string, point histogramDataPoint, index int, receivedAt time.Time, fingerprint func([]byte) string) canonical.Event {
+func skillTurnEvent(resource map[string]any, version string, point histogramDataPoint, index int, receivedAt time.Time) canonical.Event {
 	fields := attributes(point.Attributes)
 	occurredAt := metricTime(point.TimeUnixNano, receivedAt)
 	identity := fmt.Sprintf("%s|%s|%s|%d", skillTurnDurationMetric, stringValue(fields["status"], ""), point.TimeUnixNano, index)
-	eventID := "codex:skill-turn:" + fingerprint([]byte(identity))
+	eventID := contentID("codex:skill-turn:", []byte(identity))
 	extensions := map[string]any{
 		"correlation":     skillCorrelation(eventID, occurredAt),
 		"skill_detection": "inferred",
@@ -162,7 +159,7 @@ func skillTurnEvent(resource map[string]any, version string, point histogramData
 	return skillEvent(eventID, skillTurnDurationMetric, occurredAt, receivedAt, version, extensions)
 }
 
-func skillInjectedEvent(resource map[string]any, version string, point metricDataPoint, index int, receivedAt time.Time, fingerprint func([]byte) string) (canonical.Event, bool, error) {
+func skillInjectedEvent(resource map[string]any, version string, point metricDataPoint, index int, receivedAt time.Time) (canonical.Event, bool, error) {
 	fields := attributes(point.Attributes)
 	skillName := strings.TrimSpace(stringValue(fields["skill"], ""))
 	if skillName == "" {
@@ -170,7 +167,7 @@ func skillInjectedEvent(resource map[string]any, version string, point metricDat
 	}
 	occurredAt := metricTime(point.TimeUnixNano, receivedAt)
 	identity := fmt.Sprintf("%s|%s|%s|%s|%d", skillName, stringValue(fields["status"], ""), stringValue(fields["invoke_type"], ""), point.TimeUnixNano, index)
-	eventID := "codex:skill:" + fingerprint([]byte(identity))
+	eventID := contentID("codex:skill:", []byte(identity))
 
 	skill := skillPayload(fields, skillName)
 	extensions := map[string]any{

@@ -9,8 +9,6 @@ import (
 	"testing"
 )
 
-func stubFingerprint([]byte) string { return "fixture" }
-
 func updateGolden() bool { return os.Getenv("UPDATE_GOLDEN") == "1" }
 
 func writeGolden(t *testing.T, name string, value any) {

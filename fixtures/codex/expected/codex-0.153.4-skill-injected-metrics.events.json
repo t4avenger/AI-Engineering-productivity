@@ -1,7 +1,7 @@
 [
   {
     "schema_version": "0.1.0",
-    "event_id": "codex:skill:fixture-1524",
+    "event_id": "codex:skill:dee7ed4b65935dbc3a0da3b05e105573842b0b87d589145e6b1df266472ff0e3",
     "event_type": "codex.skill.injected",
     "occurred_at": "2026-09-06T14:53:41.601372612Z",
     "received_at": "2026-09-06T14:53:41Z",
@@ -11,7 +11,7 @@
     "source_version": "0.153.4",
     "actor_id": "unavailable",
     "device_id": "unavailable",
-    "session_id": "codex:skill:fixture-1524",
+    "session_id": "codex:skill:dee7ed4b65935dbc3a0da3b05e105573842b0b87d589145e6b1df266472ff0e3",
     "task_id": null,
     "repository_id": null,
     "privacy_level": "operational",
@@ -34,8 +34,8 @@
     },
     "provider_extensions": {
       "correlation": {
-        "dedup_key": "codex:skill:fixture-1524",
-        "ordering_key": "01788706421601372612:codex:skill:fixture-1524",
+        "dedup_key": "codex:skill:dee7ed4b65935dbc3a0da3b05e105573842b0b87d589145e6b1df266472ff0e3",
+        "ordering_key": "01788706421601372612:codex:skill:dee7ed4b65935dbc3a0da3b05e105573842b0b87d589145e6b1df266472ff0e3",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Codex skill metrics have no reviewed task-boundary signal"
@@ -58,7 +58,7 @@
   },
   {
     "schema_version": "0.1.0",
-    "event_id": "codex:skill:fixture-79f4",
+    "event_id": "codex:skill:f48200a61dbf2f1acce7b80e5bee55626a6ca0b64e259973a2d58859e8c7ba19",
     "event_type": "codex.skill.injected",
     "occurred_at": "2026-09-06T14:53:41.601372612Z",
     "received_at": "2026-09-06T14:53:41Z",
@@ -68,7 +68,7 @@
     "source_version": "0.153.4",
     "actor_id": "unavailable",
     "device_id": "unavailable",
-    "session_id": "codex:skill:fixture-79f4",
+    "session_id": "codex:skill:f48200a61dbf2f1acce7b80e5bee55626a6ca0b64e259973a2d58859e8c7ba19",
     "task_id": null,
     "repository_id": null,
     "privacy_level": "operational",
@@ -91,8 +91,8 @@
     },
     "provider_extensions": {
       "correlation": {
-        "dedup_key": "codex:skill:fixture-79f4",
-        "ordering_key": "01788706421601372612:codex:skill:fixture-79f4",
+        "dedup_key": "codex:skill:f48200a61dbf2f1acce7b80e5bee55626a6ca0b64e259973a2d58859e8c7ba19",
+        "ordering_key": "01788706421601372612:codex:skill:f48200a61dbf2f1acce7b80e5bee55626a6ca0b64e259973a2d58859e8c7ba19",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Codex skill metrics have no reviewed task-boundary signal"
