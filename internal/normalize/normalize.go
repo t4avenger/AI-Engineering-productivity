@@ -175,3 +175,26 @@ func modelInteractionLess(left, right canonical.ModelInteraction) bool {
 	}
 	return left.CompletedAt.Before(right.CompletedAt)
 }
+
+// CorrelateOperations returns operation records ordered by stable identifiers,
+// with duplicate operation IDs collapsed.
+func CorrelateOperations(records []canonical.Operation) []canonical.Operation {
+	ordered := append([]canonical.Operation(nil), records...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		if ordered[i].OperationID != ordered[j].OperationID {
+			return ordered[i].OperationID < ordered[j].OperationID
+		}
+		return ordered[i].SessionID < ordered[j].SessionID
+	})
+	seen := make(map[string]struct{}, len(ordered))
+	correlated := make([]canonical.Operation, 0, len(ordered))
+	for _, record := range ordered {
+		key := record.SessionID + "\x00" + record.OperationID
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		correlated = append(correlated, record)
+	}
+	return correlated
+}

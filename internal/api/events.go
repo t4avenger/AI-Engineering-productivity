@@ -23,6 +23,10 @@ type timelineEvent struct {
 	Model             *string  `json:"model"`
 	InputTokenCount   *string  `json:"input_token_count"`
 	OutputTokenCount  *string  `json:"output_token_count"`
+	OperationID       *string  `json:"operation_id"`
+	Category          *string  `json:"category"`
+	Outcome           *string  `json:"outcome"`
+	DurationMs        *string  `json:"duration_ms"`
 	UnavailableFields []string `json:"unavailable_fields"`
 }
 
@@ -117,7 +121,9 @@ func eventPage(events []canonical.Event, limit int) ([]canonical.Event, *string)
 func publicTimelineEvent(event canonical.Event) timelineEvent {
 	return timelineEvent{
 		EventID: event.EventID, EventType: event.EventType, OccurredAt: event.OccurredAt.UTC().Format(time.RFC3339Nano), ReceivedAt: event.ReceivedAt.UTC().Format(time.RFC3339Nano), Provider: event.Provider, Tool: event.Tool, SourceVersion: event.SourceVersion,
-		Model: optionalString(event.Attributes["model"]), InputTokenCount: optionalString(event.Attributes["input_token_count"]), OutputTokenCount: optionalString(event.Attributes["output_token_count"]), UnavailableFields: unavailableFields(event.Attributes["unavailable_fields"]),
+		Model: optionalString(event.Attributes["model"]), InputTokenCount: optionalString(event.Attributes["input_token_count"]), OutputTokenCount: optionalString(event.Attributes["output_token_count"]),
+		OperationID: optionalString(event.Attributes["operation_id"]), Category: optionalString(event.Attributes["category"]), Outcome: optionalString(event.Attributes["outcome"]), DurationMs: optionalString(event.Attributes["duration_ms"]),
+		UnavailableFields: unavailableFields(event.Attributes["unavailable_fields"]),
 	}
 }
 

@@ -15,6 +15,32 @@ import (
 // timestamps derived from receivedAt (absent record timestamps) are stable.
 var fixtureReceivedAt = time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
 
+func assertGoldenJSON[T any](t *testing.T, filename string, got T, label string) {
+	t.Helper()
+	goldenPath := filepath.Join("..", "..", "..", "fixtures", "codex", "expected", filename)
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		data, err := json.MarshalIndent(got, "", "  ")
+		if err != nil {
+			t.Fatalf("marshal golden: %v", err)
+		}
+		if err := os.WriteFile(goldenPath, append(data, 10), 0o644); err != nil {
+			t.Fatalf("write golden: %v", err)
+		}
+	}
+	goldenBytes, err := os.ReadFile(goldenPath)
+	if err != nil {
+		t.Fatalf("read golden: %v", err)
+	}
+	var want T
+	if err := json.Unmarshal(goldenBytes, &want); err != nil {
+		t.Fatalf("decode golden: %v", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		gotJSON, _ := json.MarshalIndent(got, "", "  ")
+		t.Fatalf("%s != golden:\n got %s\nwant %s", label, gotJSON, goldenBytes)
+	}
+}
+
 func TestExtractLogModelInteractionsGolden(t *testing.T) {
 	t.Parallel()
 
@@ -34,28 +60,49 @@ func TestExtractLogModelInteractionsGolden(t *testing.T) {
 		t.Fatalf("extract: %v", err)
 	}
 
-	goldenPath := filepath.Join("..", "..", "..", "fixtures", "codex", "expected", "codex-0.145.0-logs.records.json")
-	if os.Getenv("UPDATE_GOLDEN") == "1" {
-		data, err := json.MarshalIndent(got, "", "  ")
-		if err != nil {
-			t.Fatalf("marshal golden: %v", err)
-		}
-		if err := os.WriteFile(goldenPath, append(data, '\n'), 0o644); err != nil {
-			t.Fatalf("write golden: %v", err)
-		}
-	}
-	goldenBytes, err := os.ReadFile(goldenPath)
+	assertGoldenJSON(t, "codex-0.145.0-logs.records.json", got, "records")
+}
+
+func TestExtractLogOperationsGolden(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "fixtures", "codex", "observed-sanitised", "codex-0.153.4-outcome-contracts-otlp.json"))
 	if err != nil {
-		t.Fatalf("read golden: %v", err)
+		t.Fatalf("read fixture: %v", err)
 	}
-	var want []canonical.ModelInteraction
-	if err := json.Unmarshal(goldenBytes, &want); err != nil {
-		t.Fatalf("decode golden: %v", err)
+	var wrapper struct {
+		Payload json.RawMessage `json:"payload"`
+	}
+	if err := json.Unmarshal(raw, &wrapper); err != nil {
+		t.Fatalf("unwrap payload: %v", err)
 	}
 
-	if !reflect.DeepEqual(got, want) {
-		gotJSON, _ := json.MarshalIndent(got, "", "  ")
-		t.Fatalf("records != golden:\n got %s\nwant %s", gotJSON, goldenBytes)
+	got, err := ExtractLogOperations([]byte(wrapper.Payload), fixtureReceivedAt)
+	if err != nil {
+		t.Fatalf("extract operations: %v", err)
+	}
+
+	assertGoldenJSON(t, "codex-0.153.4-tool-result.operations.json", got, "operations")
+}
+
+func TestExtractLogOperationsMapsMCPToolResult(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.version","value":{"stringValue":"0.153.4"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.tool_result"}},{"key":"conversation.id","value":{"stringValue":"mcp-session"}},{"key":"mcp_server","value":{"stringValue":"synthetic-filesystem-server"}},{"key":"mcp_server_origin","value":{"stringValue":"config"}},{"key":"tool_name","value":{"stringValue":"read_file"}},{"key":"tool_namespace","value":{"stringValue":"mcp"}},{"key":"call_id","value":{"stringValue":"mcp-call"}},{"key":"duration_ms","value":{"stringValue":"42"}},{"key":"success","value":{"boolValue":true}}],"severityText":"INFO","timeUnixNano":"1788717763000000000","observedTimeUnixNano":"1788717763000000000"}]}]}]}`)
+	operations, err := ExtractLogOperations(data, fixtureReceivedAt)
+	if err != nil {
+		t.Fatalf("extract operations: %v", err)
+	}
+	if len(operations) != 1 {
+		t.Fatalf("operations = %d, want 1: %#v", len(operations), operations)
+	}
+	operation := operations[0]
+	if operation.OperationID != "codex:mcp-session:tool:mcp-call" || operation.Category != canonical.OperationCategoryMCPCall || operation.Outcome != "success" {
+		t.Fatalf("operation = %#v", operation)
+	}
+	mcpCall, ok := operation.ProviderExtensions["mcp_call"].(map[string]any)
+	if !ok || mcpCall["server_name"] != "synthetic-filesystem-server" || mcpCall["tool_name"] != "read_file" {
+		t.Fatalf("mcp_call = %#v", operation.ProviderExtensions["mcp_call"])
 	}
 }
 

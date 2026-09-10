@@ -1,0 +1,88 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "operation_id": "codex-log:921a17345478f43da619ff9c4ec49d97fa950a1a1623448c6df1b78f4ce3ec05:tool:synthetic-call-success",
+    "session_id": "codex-log:921a17345478f43da619ff9c4ec49d97fa950a1a1623448c6df1b78f4ce3ec05",
+    "provider": "openai",
+    "tool": "codex",
+    "category": "shell command",
+    "outcome": "success",
+    "provenance": "observed",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex-log:921a17345478f43da619ff9c4ec49d97fa950a1a1623448c6df1b78f4ce3ec05",
+        "ordering_key": "01788717763629000000:codex-log:921a17345478f43da619ff9c4ec49d97fa950a1a1623448c6df1b78f4ce3ec05",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex tool-result telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "log_attributes": {
+        "event.name": "codex.tool_result",
+        "model": "gpt-6-astra"
+      },
+      "resource_attributes": {
+        "env": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.153.4"
+      },
+      "severity": "INFO",
+      "tool_call": {
+        "call_id": "synthetic-call-success",
+        "category": "shell command",
+        "duration_ms": "92",
+        "operation_id": "codex-log:921a17345478f43da619ff9c4ec49d97fa950a1a1623448c6df1b78f4ce3ec05:tool:synthetic-call-success",
+        "outcome": "success",
+        "output_truncated": false,
+        "provenance": "observed",
+        "success": "true",
+        "tool_name": "exec_command",
+        "tool_namespace": "functions",
+        "tool_result_seq": "1"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "operation_id": "codex-log:96c412f22ea6dc193e8c2a09bca0aa90653bb27a29422de56de70f87020e644b:tool:synthetic-call-failed",
+    "session_id": "codex-log:96c412f22ea6dc193e8c2a09bca0aa90653bb27a29422de56de70f87020e644b",
+    "provider": "openai",
+    "tool": "codex",
+    "category": "filesystem write",
+    "outcome": "failed",
+    "provenance": "observed",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex-log:96c412f22ea6dc193e8c2a09bca0aa90653bb27a29422de56de70f87020e644b",
+        "ordering_key": "01788717763629000000:codex-log:96c412f22ea6dc193e8c2a09bca0aa90653bb27a29422de56de70f87020e644b",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex tool-result telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "log_attributes": {
+        "event.name": "codex.tool_result",
+        "model": "gpt-6-astra"
+      },
+      "resource_attributes": {
+        "env": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.153.4"
+      },
+      "severity": "INFO",
+      "tool_call": {
+        "call_id": "synthetic-call-failed",
+        "category": "filesystem write",
+        "duration_ms": "87",
+        "operation_id": "codex-log:96c412f22ea6dc193e8c2a09bca0aa90653bb27a29422de56de70f87020e644b:tool:synthetic-call-failed",
+        "outcome": "failed",
+        "output_truncated": false,
+        "provenance": "observed",
+        "success": "false",
+        "tool_name": "apply_patch",
+        "tool_namespace": "functions",
+        "tool_result_seq": "3"
+      }
+    }
+  }
+]

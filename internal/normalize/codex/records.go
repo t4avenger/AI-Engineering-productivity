@@ -63,6 +63,103 @@ func ExtractLogModelInteractions(data []byte, receivedAt time.Time) ([]canonical
 	return normalize.CorrelateModelInteractions(records), nil
 }
 
+// ExtractLogOperations maps observed Codex tool-result logs into stable-primitive
+// Operation records. Only codex.tool_result is eligible; other log records do
+// not prove an executed tool call and are skipped.
+func ExtractLogOperations(data []byte, receivedAt time.Time) ([]canonical.Operation, error) {
+	var payload logsPayload
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, fmt.Errorf("decode Codex OTLP logs: %w", err)
+	}
+	var records []canonical.Operation
+	for _, resourceLog := range payload.ResourceLogs {
+		extracted, err := resourceLogOperations(resourceLog, receivedAt)
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, extracted...)
+	}
+	return normalize.CorrelateOperations(records), nil
+}
+
+func resourceLogOperations(resourceLog resourceLog, receivedAt time.Time) ([]canonical.Operation, error) {
+	resource := attributes(resourceLog.Resource.Attributes)
+	if !isCodexLogService(resource["service.name"]) {
+		return nil, nil
+	}
+	var records []canonical.Operation
+	for _, scope := range resourceLog.ScopeLogs {
+		extracted, err := scopeLogOperations(resource, scope, receivedAt)
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, extracted...)
+	}
+	return records, nil
+}
+
+func scopeLogOperations(resource map[string]any, scope scopeLog, receivedAt time.Time) ([]canonical.Operation, error) {
+	var records []canonical.Operation
+	for _, record := range scope.LogRecords {
+		operation, ok, err := logRecordOperation(resource, record, receivedAt)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			records = append(records, operation)
+		}
+	}
+	return records, nil
+}
+
+func logRecordOperation(resource map[string]any, record logRecord, receivedAt time.Time) (canonical.Operation, bool, error) {
+	fields := attributes(record.Attributes)
+	if stringValue(fields[codexEventNameKey], "") != codexToolResultEvent {
+		return canonical.Operation{}, false, nil
+	}
+	recordData, err := json.Marshal(record)
+	if err != nil {
+		return canonical.Operation{}, false, fmt.Errorf("marshal Codex log record: %w", err)
+	}
+	id := contentID("codex-log:", recordData)
+	sessionID := codexLogSessionID(fields, id)
+	toolCall, _ := codexToolCall(fields, id, sessionID)
+	started := tolerantNano(record.TimeUnixNano, receivedAt)
+	return canonical.Operation{
+		SchemaVersion:      canonical.RecordSchemaVersion,
+		OperationID:        toolCall.attributes["operation_id"].(string),
+		SessionID:          sessionID,
+		Provider:           "openai",
+		Tool:               "codex",
+		Category:           codexOperationCategory(fields),
+		Outcome:            toolCall.attributes["outcome"].(string),
+		Provenance:         canonical.ProvenanceObserved,
+		ProviderExtensions: operationProviderExtensions(resource, fields, record.SeverityText, id, sessionID, started.value),
+	}, true, nil
+}
+
+func operationProviderExtensions(resource, fields map[string]any, severity, id, sessionID string, orderingTime time.Time) map[string]any {
+	toolCall, _ := codexToolCall(fields, id, sessionID)
+	extensions := map[string]any{
+		"correlation": map[string]any{
+			"dedup_key":    id,
+			"ordering_key": fmt.Sprintf("%020d:%s", orderingTime.UTC().UnixNano(), id),
+			"task_boundary": map[string]any{
+				"confidence": "unknown",
+				"reason":     "Codex tool-result telemetry has no reviewed task-boundary signal",
+			},
+		},
+		"resource_attributes": resource,
+		"log_attributes":      safeCodexLogAttributes(normalize.UnknownFields(fields, append(codexToolResultFieldKeys(), "conversation.id", "mcp_server")...)),
+		"severity":            severity,
+		"tool_call":           toolCall.providerExtension,
+	}
+	if mcpCall, ok := codexMCPCall(fields); ok {
+		extensions["mcp_call"] = mcpCall
+	}
+	return extensions
+}
+
 // logRecordModelInteraction builds one ModelInteraction from a log record,
 // returning ok=false when the record is not an eligible model interaction.
 func logRecordModelInteraction(resource map[string]any, record logRecord, receivedAt time.Time) (canonical.ModelInteraction, bool, error) {
@@ -111,7 +208,7 @@ func logRecordModelInteraction(resource map[string]any, record logRecord, receiv
 // or a token count. This prevents fabricating an all-unknown record from a
 // bare event.
 func isModelInteraction(fields map[string]any) bool {
-	name, _ := fields["event.name"].(string)
+	name, _ := fields[codexEventNameKey].(string)
 	if _, ok := modelInteractionEvents[name]; !ok {
 		return false
 	}

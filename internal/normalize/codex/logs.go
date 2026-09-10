@@ -25,6 +25,11 @@ func contentID(prefix string, data []byte) string {
 // observed Codex log shape and therefore must not be normalised by this adapter.
 var ErrUnsupportedLogs = errors.New("unsupported Codex log payload")
 
+const (
+	codexEventNameKey    = "event.name"
+	codexToolResultEvent = "codex.tool_result"
+)
+
 type logsPayload struct {
 	ResourceLogs []resourceLog `json:"resourceLogs"`
 }
@@ -97,17 +102,25 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 	id := contentID("codex-log:", recordData)
 	fields := attributes(record.Attributes)
 	sessionID := codexLogSessionID(fields, id)
-	attributes := map[string]any{"unavailable_fields": []string{"session_lifecycle", "cache_usage", "reasoning_tokens", "tool_calls", "file_operations", "command_execution", "approvals", "prompt_content", "response_content", "repository_context", "provider_cost"}}
+	eventName := stringValue(fields[codexEventNameKey], "codex.log.received")
+	attributes := map[string]any{"unavailable_fields": codexLogUnavailableFields(eventName)}
 	for _, key := range []string{"model", "input_token_count", "output_token_count"} {
 		if value, ok := fields[key]; ok {
 			attributes[key] = value
 		}
 	}
-	eventName := stringValue(fields["event.name"], "codex.log.received")
+	if toolCall, ok := codexToolCall(fields, id, sessionID); ok {
+		for key, value := range toolCall.attributes {
+			attributes[key] = value
+		}
+	}
 	if !hasCodexOutcomeContract(eventName) {
 		attributes["unavailable_fields"] = append(attributes["unavailable_fields"].([]string), "task_outcome")
 	}
 	extensions := map[string]any{"resource_attributes": resource, "log_attributes": codexLogAttributes(fields), "severity": record.SeverityText}
+	if toolCall, ok := codexToolCall(fields, id, sessionID); ok {
+		extensions["tool_call"] = toolCall.providerExtension
+	}
 	if mcpCall, ok := codexMCPCall(fields); ok {
 		attributes["category"] = string(canonical.OperationCategoryMCPCall)
 		extensions["mcp_call"] = mcpCall
@@ -124,13 +137,13 @@ func codexLogSessionID(fields map[string]any, fallback string) string {
 }
 
 func hasCodexOutcomeContract(eventName string) bool {
-	return eventName == "codex.tool_result" || eventName == "codex.api_request"
+	return eventName == codexToolResultEvent || eventName == "codex.api_request"
 }
 
 func attachCodexOutcomeContract(extensions map[string]any, fields map[string]any, eventName string) {
 	var source, status string
 	switch eventName {
-	case "codex.tool_result":
+	case codexToolResultEvent:
 		source = "tool_result"
 		status = codexSuccessStatus(fields["success"])
 	case "codex.api_request":
@@ -207,7 +220,98 @@ func codexErrorCode(fields map[string]any, status string) string {
 }
 
 func codexLogAttributes(fields map[string]any) map[string]any {
-	return normalize.UnknownFields(fields, "mcp_server", "conversation.id")
+	known := []string{"mcp_server", "conversation.id"}
+	if stringValue(fields[codexEventNameKey], "") == codexToolResultEvent {
+		known = append(known, codexToolResultFieldKeys()...)
+	}
+	return safeCodexLogAttributes(normalize.UnknownFields(fields, known...))
+}
+
+func codexLogUnavailableFields(eventName string) []string {
+	fields := []string{"session_lifecycle", "cache_usage", "reasoning_tokens", "file_operations", "command_execution", "approvals", "prompt_content", "response_content", "repository_context", "provider_cost"}
+	if eventName != codexToolResultEvent {
+		fields = append(fields, "tool_calls")
+	}
+	return fields
+}
+
+type codexToolCallSignal struct {
+	attributes        map[string]any
+	providerExtension map[string]any
+}
+
+func codexToolCall(fields map[string]any, fallbackID, sessionID string) (codexToolCallSignal, bool) {
+	if stringValue(fields[codexEventNameKey], "") != codexToolResultEvent {
+		return codexToolCallSignal{}, false
+	}
+	operationID := fallbackID
+	if callID, ok := normalize.ObservedString(fields["call_id"]); ok {
+		operationID = sessionID + ":tool:" + callID
+	}
+	category := codexOperationCategory(fields)
+	outcome := codexSuccessStatus(fields["success"])
+	if outcome == "" {
+		outcome = "unknown"
+	}
+	attributes := map[string]any{
+		"operation_id": operationID,
+		"category":     string(category),
+		"outcome":      outcome,
+	}
+	if duration := normalize.OptionalTokenCount(fields["duration_ms"]); duration != nil {
+		attributes["duration_ms"] = *duration
+	}
+	extension := map[string]any{
+		"operation_id": operationID,
+		"category":     string(category),
+		"outcome":      outcome,
+		"provenance":   string(canonical.ProvenanceObserved),
+	}
+	for _, key := range []string{"tool_name", "tool_namespace", "call_id", "duration_ms", "success", "output_truncated", "tool_result_seq", "decision"} {
+		if value, ok := fields[key]; ok {
+			extension[key] = value
+		}
+	}
+	return codexToolCallSignal{attributes: attributes, providerExtension: extension}, true
+}
+
+func codexOperationCategory(fields map[string]any) canonical.OperationCategory {
+	if _, ok := normalize.ObservedString(fields["mcp_server"]); ok {
+		return canonical.OperationCategoryMCPCall
+	}
+	name, _ := normalize.ObservedString(fields["tool_name"])
+	switch name {
+	case "exec_command":
+		return canonical.OperationCategoryShellCommand
+	case "apply_patch":
+		return canonical.OperationCategoryFilesystemWrite
+	default:
+		return canonical.OperationCategoryUnknown
+	}
+}
+
+func codexToolResultFieldKeys() []string {
+	return []string{"tool_name", "tool_namespace", "call_id", "duration_ms", "success", "output_truncated", "tool_result_seq", "decision"}
+}
+
+func safeCodexLogAttributes(fields map[string]any) map[string]any {
+	safe := make(map[string]any, len(fields))
+	for key, value := range fields {
+		if sensitiveCodexLogAttribute(key) {
+			continue
+		}
+		safe[key] = value
+	}
+	return safe
+}
+
+func sensitiveCodexLogAttribute(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "arguments", "output", "api_key", "user.email", "user.account_id", "custom_metadata", "hostname", "host.name":
+		return true
+	default:
+		return false
+	}
 }
 
 func codexMCPCall(fields map[string]any) (map[string]any, bool) {
