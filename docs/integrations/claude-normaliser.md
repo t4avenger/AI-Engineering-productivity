@@ -65,15 +65,13 @@ deduplicated by `request_id`.
 
 ## Privacy
 
-`NormalizeEvents` and `ExtractModelInteractions` retain `session_id` as a
-provider-prefixed native local correlation key (`claude-code:<session_id>`).
-They still require an installation HMAC fingerprint for protected request IDs
-and fallback redaction when a malformed session identifier looks secret-bearing. The fixture validator runs before mapping, rejecting
-prohibited field names and likely secrets without exposing their values. When the
-adapter is fed a live payload, the shared privacy pipeline (issue #23) must run
-first, exactly as the Codex ingest path does;
-`TestClaudeAdapterHonoursRedactionBoundary` proves a canary placed in a
-sanitiser-handled field never reaches canonical output.
+`NormalizeEvents` and `ExtractModelInteractions` retain `session_id` and
+`request_id` as raw provider-prefixed native correlation keys
+(`claude-code:<session_id>`) — epic #87 removed ingest-time hiding, so there is no
+HMAC fingerprint and no fallback redaction. The fixture validator runs before
+mapping, rejecting prohibited field names (prompt/response/source-code content)
+so that content is not captured by default; its configurable capture is tracked
+in #94.
 
 ## Golden fixtures
 

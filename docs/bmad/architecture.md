@@ -4,14 +4,13 @@
 
 - Evidence before scoring (PRODUCT_MAP §0)
 - Outcome contracts ≠ session state (PRODUCT_MAP §13.9)
-- Privacy: redaction before persist; no content/args
+- Privacy: no ingest-time hiding — raw IDs/paths/commands persisted and shown (epic #87); prompt/response/source-code content not captured by default (#94)
 
 ## Components
 
 ```text
 OTLP logs (Claude/Codex)
-    → privacy sanitiser
-    → provider normaliser (stamp provider_extensions.outcome_contract)
+    → provider normaliser (stamp provider_extensions.outcome_contract; no ingest-time hiding — epic #87)
     → SQLite event store
     → insights.ModelPerformanceFromEvents
     → GET /api/v1/insights/model-performance

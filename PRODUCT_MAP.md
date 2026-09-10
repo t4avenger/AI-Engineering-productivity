@@ -218,7 +218,7 @@ AI coding tool
 Local ingest gateway
     |
     v
-Privacy and redaction pipeline
+Normalisation pipeline (no ingest-time hiding; raw IDs/paths/commands retained — epic #87)
     |
     +----> Raw quarantine/debug stream (optional, disabled by default)
     |
@@ -531,11 +531,11 @@ Everything in Level 1 plus:
 - command risk category
 
 #### Level 3: Governed content
-Optional and explicit:
-- redacted prompts
-- redacted responses
-- redacted tool arguments
-- redacted file paths
+Optional and explicit (configurable capture tracked in #94):
+- prompts
+- responses
+- tool arguments
+- source code
 
 #### Level 4: Forensic
 Full authorised content for regulated or incident use.
@@ -552,8 +552,6 @@ collection:
   prompts: false
   responses: false
   source_code: false
-  file_paths: hash
-  command_arguments: redact
   tool_calls: true
   model_usage: true
 
@@ -572,12 +570,11 @@ sharing:
 - Bind the local API to loopback only.
 - Generate a local authentication token.
 - Never log captured prompt, response, source-code, or secret values.
-- Redact every raw provider payload recursively before normalisation, persistent storage, diagnostics, or logs.
-- Redact again before persistent storage as a defense-in-depth boundary.
-- Redact before diagnostics.
-- Never persist a raw file path. Persist a coarse, non-reversible path class (`dotenv`, `ssh_key`, `cert`, `credentials_file`, `project_relative`, `non_project`) plus a syntactic project boundary (`project`, `external`, `indeterminate`). The class is intentionally-retained governance signal (category of access), never the identity of the file. A bare keyed hash is rejected here: the universe of interesting secret paths is a tiny dictionary a leaked local key could match.
-- In the local-only individual developer edition, provider-native session or conversation IDs may be persisted and displayed with a stable provider prefix for namespacing (`codex:`, `claude-code:`, `cursor-agent:`). These are correlation keys the local user already sees in their tools; HMAC fingerprinting is not required for this narrow identity class. Cloud, team, or cross-device sharing must re-evaluate this decision before upload or aggregation.
-- Other stable identifiers that remain protected — including account identifiers, emails, hostnames, repository identifiers where raw identity is not explicitly retained, API keys, tokens, and any identifier derived from paths or command arguments — require a rotatable, scoped keyed HMAC (`FingerprintScoped`) when they must be persisted. `FingerprintScoped` is domain-separated per scope and re-keyable via `RotateSalt` so fingerprints are unlinkable across installations and across rotations. Rotation is forward-only; complete local deletion severs pre-existing identifiers.
+- No ingest-time hiding (epic #87, issue #88). In the local-only individual edition, raw provider payloads are passed straight to the normalisers; there is no sanitiser choke point, no HMAC fingerprinting, and no path/command tokenisation. Raw provider-native identifiers, file paths, and command lines are persisted verbatim and shown to the local user, because the operator running on their own single-user machine must see the actual data to act on it.
+- Provider-native session/conversation/request IDs and MCP server names are persisted and displayed raw with a stable provider prefix for namespacing (`codex:`, `claude-code:`, `cursor-agent:`). When a native ID is genuinely absent, a non-keyed positional/content ID is used for uniqueness only — never a keyed hash.
+- Raw file paths and command lines are retained. `privacy.ClassifyPath` / `privacy.ClassifyCommandAccess` run *over the raw stored value* to add a governance class (`dotenv`, `ssh_key`, `cert`, `credentials_file`, `project_relative`, `non_project`) and a syntactic project boundary (`project`, `external`, `indeterminate`). The class is an additional governance signal layered on the retained raw value, not a replacement for it.
+- Prompt/response/source-code content is not captured by default: the normalisers declare it unavailable and refuse it at the ingest boundary. Configurable capture of this content is tracked in #94 and gated by `collection.prompts` / `collection.responses` / `collection.source_code`.
+- Cloud, team, or cross-device sharing is a different trust boundary and must re-evaluate every field before any upload or aggregation; the no-hiding stance above applies only to the local-only single-user edition.
 - Provide field-level provenance showing why a field was retained.
 - Support complete local deletion.
 - Use synthetic secrets in tests.
@@ -616,10 +613,10 @@ All insights must be deterministic and explainable. Per section 0, the headline 
 the behaviour/efficiency/performance ones below (13.7–13.10); cost-only insights are secondary.
 
 ### 13.7 MCP inventory & context-cost insight
-Show how many MCP servers are connected from reviewed telemetry, whether explicit invocation evidence shows use, and request-level token context for sessions where MCP telemetry is present. Flag "connected but unused" only when a server fingerprint is observed and no matching invocation is observed; otherwise show usage as unavailable. Per-MCP token *allocation* is never presented as exact — request token context is labelled as session/request-level only.
+Show how many MCP servers are connected from reviewed telemetry, whether explicit invocation evidence shows use, and request-level token context for sessions where MCP telemetry is present. Flag "connected but unused" only when a raw server name is observed and no matching invocation is observed; otherwise show usage as unavailable. Per-MCP token *allocation* is never presented as exact — request token context is labelled as session/request-level only.
 
 Evidence:
-- connected MCP servers (provider-reported server name when available, plus a privacy-safe fingerprint for correlation; generated connection fingerprint only when the name is unavailable)
+- connected MCP servers (the raw provider-reported server name, which is the correlation identity; a non-keyed per-connection key only when the name is unavailable — epic #87 removed server fingerprints)
 - explicit invocation evidence where present
 - request-level tokens where MCP telemetry is present
 - usage state (`observed | not_observed | unavailable`) and context-waste state
@@ -735,7 +732,7 @@ Run detection only on content that is intentionally available to the privacy pip
 ### 14.4 Unapproved MCP server
 Compare each observed MCP server's provider-reported identity against a configured allowlist (`governance.mcp_allowlist`).
 
-Server identity is derived from the §13.x MCP inventory (issue #27), which builds it from provider-reported server names and privacy-safe fingerprints; the detector never reads raw connection detail itself. Comparison is on the provider-reported server name, matched case- and whitespace-insensitively against the allowlist. Findings carry only that server name (the same identity the MCP inventory already surfaces) and a coarse allowlist state — never a raw path, command, or secret value.
+Server identity is derived from the §13.x MCP inventory (issue #27), which builds it from the raw provider-reported server name (the correlation identity; epic #87 removed server fingerprints). Comparison is on that server name, matched case- and whitespace-insensitively against the allowlist. Findings carry the server name (the same identity the MCP inventory surfaces) and a coarse allowlist state.
 
 The policy is honest about what the telemetry supports:
 - an unset/empty allowlist means the policy is not configured, so approval cannot be judged either way → `indeterminate` (never a fabricated clean result from an absent policy);
@@ -767,7 +764,7 @@ Record when a high-risk action is observed without a corresponding approval even
 ### 14.8 Risky credential/secret file access
 Report when an agent reads a credential or secret file — `.env` (excluding template variants such as `.env.example`/`.env.sample`/`.env.template`/`.env.dist`), SSH keys, certificates, or credentials files — via a filesystem read or an equivalent shell command (e.g. `cat .env`).
 
-Detection runs entirely on the privacy-safe path/command-access tokens the sanitiser emits before storage (`path-class:<class>;boundary:<boundary>`, `command-access:<class>;boundary:<boundary>`); no raw path, command, or secret value is read by the detector. Findings carry only the coarse class, boundary, and confidence. Filesystem-read findings are high confidence; shell-command findings are medium (the command is categorised, not parsed for the exact target).
+Detection runs `privacy.ClassifyPath` / `privacy.ClassifyCommandAccess` over the raw file paths and command lines now retained in event attributes (epic #87 removed ingest-time hiding). Findings carry the coarse class and project boundary *and* the raw path/command as evidence, so the operator sees exactly which file or command tripped the policy. Filesystem-read findings are high confidence; shell-command findings are medium (the command is categorised, not parsed for the exact target).
 
 When no filesystem-read or shell-command access is observed at all, the outcome is `indeterminate` — the policy never claims a clean result from absent visibility. Surfaced at `GET /api/v1/insights/risky-access` and rendered as a `schemas/policy.schema.json` decision (`policy_id: governance.risky_access`).
 

@@ -18,15 +18,16 @@ sessions as an evidence browser: the primary row label combines tool and
 relative start time, while the provider-prefixed native session ID remains
 visible as secondary detail. A session detail is loaded only after navigation to
 `/sessions/{id}`. The detail view renders glossary-backed availability badges,
-friendly timeline event titles, token values with units, and lazy-loaded privacy
-provenance `<details>` backed by the event store. Deletion
-requires an in-app confirmation before `POST /sessions/{id}/delete`; the
-repository removes the session and all retained events transactionally.
+friendly timeline event titles, and token values with units, all backed by the
+event store. Deletion requires an in-app confirmation before
+`POST /sessions/{id}/delete`; the repository removes the session and all retained
+events transactionally.
 
-In the local-only edition, session lists and details may display provider-native
-session or conversation IDs with a stable provider prefix (`codex:`,
-`claude-code:`, `cursor-agent:`). Opaque fingerprints are reserved for protected
-identifiers outside this narrow local correlation-key exception.
+In the local-only edition, session lists and details display the raw
+provider-native session, conversation, and request IDs with a stable provider
+prefix (`codex:`, `claude-code:`, `cursor-agent:`). Epic #87 removed ingest-time
+hiding: no opaque fingerprints or class/boundary tokens are shown — the front end
+renders real data only.
 
 The dashboard never converts unavailable telemetry into zero. Examples include
 an unavailable model or completion time. Integration status is derived only
@@ -38,19 +39,20 @@ highlights) and does not surface cost labels or links. Costs remain a secondary
 page available at `/costs`, outside the primary navigation.
 
 The Insights page reads MCP inventory, skill usage, model-performance, and
-context-pressure summaries from retained canonical events. It renders
-provider-reported MCP server names when available, privacy-safe server
-fingerprints only as a fallback, glossary labels for enum states, an MCP
-"Unused connection" column for connected-but-unused servers, and request-level
-token context labelled as not exact per-MCP allocation. Context pressure rows
-link back to session detail so the retained evidence can be inspected.
+context-pressure summaries from retained canonical events. It renders the raw
+provider-reported MCP server names (the correlation identity — epic #87 removed
+server fingerprints), glossary labels for enum states, an MCP "Unused connection"
+column for connected-but-unused servers, and request-level token context labelled
+as not exact per-MCP allocation. Context pressure rows link back to session detail
+so the retained evidence can be inspected.
 
 The Costs page reads local calculation summaries, shows calculated estimates
 and cost statuses, and never represents an unknown price as zero.
 
 The Privacy page documents the enforced local-only defaults: no prompt,
-response, or source-code retention; raw file paths reduced to coarse path-class
-tokens; redacted command arguments; no sharing; and a default 30-day retention
+response, or source-code retention by default (configurable capture tracked in
+#94); raw provider-native IDs, file paths, and command lines retained and shown
+(epic #87 — no ingest-time hiding); no sharing; and a default 30-day retention
 period. These values are
 not editable in the dashboard because configuration remains file-based and is
 validated by the daemon. Bulk deletion requires typing `DELETE ALL`.
