@@ -148,6 +148,10 @@ strings.
 | `observed_events` | Observed events | Count of retained events associated with the session. | Events | Show unavailable if event count was not retained. |
 | `token_usage` | Token usage | Session-level token availability summary. | Enum | `partial` means some token categories are available; do not fill missing categories with zero. |
 | `event_type` | Event type | Canonical event type for a timeline entry. | Identifier / label | Humanize common event types in templates while preserving raw value as secondary detail. |
+| `operation_id` | Operation ID | Session-scoped provider call ID when observed, or deterministic event fallback when absent. | Identifier | Show only for timeline entries that represent executed tool calls. |
+| `category` | Category | Provider-independent operation category from the canonical operation enum. | Label | Show `Unknown` when the tool name is observed but not safely mapped. |
+| `outcome` | Outcome | Observed operation result such as `success`, `failed`, or `unknown`. | Label | Do not turn absent status into success or failure. |
+| `duration_ms` | Duration | Observed operation duration in milliseconds. | Duration | Leave unavailable when absent or unparseable; never display as zero unless the provider reported zero. |
 | `input_token_count` | Input tokens | Input tokens retained on an event. | Tokens | Show unavailable rather than `0` unless zero was explicitly observed. |
 | `output_token_count` | Output tokens | Output tokens retained on an event. | Tokens | Show unavailable rather than `0` unless zero was explicitly observed. |
 | `unavailable_fields` | Unavailable fields | Retained list of fields the provider/tool did not provide or TelemetryIQ intentionally did not retain. | Field labels | Humanize snake_case values where possible. |

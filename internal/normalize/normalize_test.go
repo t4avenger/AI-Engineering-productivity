@@ -167,3 +167,19 @@ func TestCorrelateModelInteractionsOrdersAndDedupes(t *testing.T) {
 }
 
 func int64Ptr(value int64) *int64 { return &value }
+
+func TestCorrelateOperationsOrdersAndDedupesBySessionAndOperation(t *testing.T) {
+	records := []canonical.Operation{
+		{OperationID: "b", SessionID: "session-2"},
+		{OperationID: "a", SessionID: "session-1"},
+		{OperationID: "b", SessionID: "session-2"},
+		{OperationID: "b", SessionID: "session-3"},
+	}
+	got := CorrelateOperations(records)
+	if len(got) != 3 {
+		t.Fatalf("CorrelateOperations length = %d; want 3 (deduped within session only)", len(got))
+	}
+	if got[0].OperationID != "a" || got[1].SessionID != "session-2" || got[2].SessionID != "session-3" {
+		t.Fatalf("CorrelateOperations order = %#v", got)
+	}
+}

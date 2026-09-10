@@ -39,19 +39,29 @@ exec` subcommand); the log adapter accepts both. The log adapter retains reviewe
 extensions. Local Codex 0.153.4 metadata also shows tool telemetry such as
 `codex.tool_decision`, `codex.tool_result`, `codex.sandbox_outcome`,
 `tool_name`, `tool_namespace`, `call_id`, `duration_ms`, `success`,
-`mcp_server`, and `mcp_server_origin`. When a `codex.tool_result` carries a
-non-empty `mcp_server`, the event normaliser stores an explicit MCP-use signal
-under `provider_extensions.mcp_call` with the provider-reported raw `server_name`
-(the correlation identity, `identity_state: provider_reported`) and safe
-invocation metadata; the server name is promoted out of generic log attributes to
-avoid duplicate evidence but retained in the MCP-specific record for display.
-Empty `mcp_server` means the provider did not report that tool result as an MCP
-server call, so it remains an internal Codex/tool invocation rather than MCP
-inventory evidence. When a `conversation.id` is present, logs use the raw
-provider-native session identity `codex:<conversation.id>`. Records without that
-field fall back to a non-keyed content ID for uniqueness only (epic #87 — no
-ingest-time hiding). Prompt/response/source-code content is not captured by
-default; its configurable capture is tracked in #94.
+`mcp_server`, and `mcp_server_origin`. A `codex.tool_result` now becomes a
+first-class tool-call signal: event attributes expose `operation_id`,
+`category`, `outcome`, and observed `duration_ms`, while
+`provider_extensions.tool_call` preserves the provider-reported tool name,
+namespace, call ID, status, sequence, truncation flag, and observed provenance.
+Operation IDs include the session identity plus provider call ID when present,
+so replay deduplication cannot collapse reused call IDs from different sessions.
+`tool_calls` is removed from `attributes.unavailable_fields` only for
+`codex.tool_result`; other Codex log events keep that field unavailable.
+
+When a `codex.tool_result` carries a non-empty `mcp_server`, the event normaliser
+also keeps the existing explicit MCP-use signal under
+`provider_extensions.mcp_call` with the provider-reported raw `server_name` (the
+correlation identity, `identity_state: provider_reported`) and safe invocation
+metadata; the server name is promoted out of generic log attributes to avoid
+duplicate evidence but retained in the MCP-specific record for display. Empty
+`mcp_server` means the provider did not report that tool result as an MCP server
+call, so it remains an internal Codex/tool invocation rather than MCP inventory
+evidence. When a `conversation.id` is present, logs use the raw provider-native
+session identity `codex:<conversation.id>`. Records without that field fall back
+to a non-keyed content ID for uniqueness only (epic #87 — no ingest-time
+hiding). Prompt/response/source-code content is not captured by default; its
+configurable capture is tracked in #94.
 
 ## Model-interaction records
 
@@ -70,7 +80,8 @@ Codex log shape into stable-primitive `canonical.ModelInteraction` records
   distinguishable from a real zero.
 - **Cached and reasoning tokens, task outcome** (`unknown` for typed model records) are left
   `nil`/`"unknown"`; no typed model field is fabricated from provider-extension evidence.
-- **MCP-backed tool results** (`partial` for events) are represented only when Codex reports a non-empty `mcp_server`; the provider-reported raw server name is retained under `provider_extensions.mcp_call` and is itself the correlation identity.
+- **Tool-call operations** (`supported` for `codex.tool_result`) are extracted into `canonical.Operation` by `ExtractLogOperations` and exposed on timeline events through operation ID, category, outcome, and duration. Operation ordering uses observed log timestamps when present, falling back to receive time only when absent. Known observed Codex tool names map conservatively (`exec_command` → shell command, `apply_patch` → filesystem write); unknown names stay `unknown`.
+- **MCP-backed tool results** (`partial` for MCP inventory) are represented only when Codex reports a non-empty `mcp_server`; the provider-reported raw server name is retained under `provider_extensions.mcp_call` and is itself the correlation identity.
 - **Session/request identity** uses the raw `codex:<conversation.id>` for the
   session when a conversation ID is present. Request IDs and records without a
   conversation ID use a non-keyed content ID for deterministic correlation and
