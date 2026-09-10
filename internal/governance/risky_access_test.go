@@ -14,8 +14,9 @@ import (
 	"github.com/wayne/telemetryiq/internal/privacy"
 )
 
-// eventWithAttributes builds a canonical event whose sanitiser-produced tokens
-// live under attributes, mirroring what the ingest pipeline persists.
+// eventWithAttributes builds a canonical event whose raw file paths and command
+// lines live under attributes, mirroring what the ingest pipeline now persists
+// (issue #88 removed ingest-time hiding — governance classifies raw values).
 func eventWithAttributes(attributes map[string]any) canonical.Event {
 	return canonical.Event{
 		SchemaVersion:      "0.1.0",
@@ -27,8 +28,7 @@ func eventWithAttributes(attributes map[string]any) canonical.Event {
 }
 
 func TestRiskyAccessFlagsDotenvReadViaTool(t *testing.T) {
-	token := privacy.PathToken(privacy.ClassifyPath(".env"))
-	report := RiskyAccessFromEvents([]canonical.Event{eventWithAttributes(map[string]any{"file_path": token})})
+	report := RiskyAccessFromEvents([]canonical.Event{eventWithAttributes(map[string]any{"file_path": ".env"})})
 
 	if report.Outcome != OutcomeViolation {
 		t.Fatalf("expected violation, got %q", report.Outcome)
@@ -42,8 +42,7 @@ func TestRiskyAccessFlagsDotenvReadViaTool(t *testing.T) {
 }
 
 func TestRiskyAccessFlagsDotenvReadViaShell(t *testing.T) {
-	token := privacy.CommandAccessToken(privacy.ClassifyCommandAccess("cat .env"))
-	report := RiskyAccessFromEvents([]canonical.Event{eventWithAttributes(map[string]any{"command": token})})
+	report := RiskyAccessFromEvents([]canonical.Event{eventWithAttributes(map[string]any{"command": "cat .env"})})
 
 	if report.Outcome != OutcomeViolation {
 		t.Fatalf("expected violation, got %q", report.Outcome)
@@ -54,11 +53,9 @@ func TestRiskyAccessFlagsDotenvReadViaShell(t *testing.T) {
 }
 
 func TestRiskyAccessAllowlistsEnvExample(t *testing.T) {
-	pathToken := privacy.PathToken(privacy.ClassifyPath(".env.example"))
-	commandToken := privacy.CommandAccessToken(privacy.ClassifyCommandAccess("cat .env.example"))
 	report := RiskyAccessFromEvents([]canonical.Event{eventWithAttributes(map[string]any{
-		"file_path": pathToken,
-		"command":   commandToken,
+		"file_path": ".env.example",
+		"command":   "cat .env.example",
 	})})
 
 	if report.Outcome != OutcomeNotViolation {
@@ -91,19 +88,18 @@ func TestRiskyAccessIndeterminateWhenVisibilityAbsent(t *testing.T) {
 	}
 }
 
-func TestRiskyAccessFindingsCarryNoRawEvidence(t *testing.T) {
-	// Feed a raw payload through the real sanitiser, then detect on the tokens it
-	// emits, and assert no raw path or secret survives into the report or its
-	// policy decision.
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatalf("build sanitizer: %v", err)
-	}
-	safe := sanitizer.Sanitize(map[string]any{
+func TestRiskyAccessFindingsCarryRawEvidence(t *testing.T) {
+	// Issue #88 removed ingest-time hiding: governance classifies the raw stored
+	// path/command, and the finding reference carries that raw value so an
+	// operator sees exactly which file/command tripped the policy.
+	report := RiskyAccessFromEvents([]canonical.Event{eventWithAttributes(map[string]any{
 		"file_path": "/home/dev/app/.env",
 		"command":   "cat /home/dev/app/.env --password s3cr3t-value",
-	})
-	report := RiskyAccessFromEvents([]canonical.Event{eventWithAttributes(safe.Value)})
+	})})
+
+	if report.Outcome != OutcomeViolation {
+		t.Fatalf("expected violation from raw path/command, got %q", report.Outcome)
+	}
 
 	serialized, err := json.Marshal(struct {
 		Report   RiskyAccess    `json:"report"`
@@ -112,21 +108,16 @@ func TestRiskyAccessFindingsCarryNoRawEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal report: %v", err)
 	}
-	for _, prohibited := range []string{"/home/dev/app", "s3cr3t-value", "--password", "cat "} {
-		if strings.Contains(string(serialized), prohibited) {
-			t.Fatalf("raw evidence %q reached the persisted finding", prohibited)
-		}
-	}
-	if report.Outcome != OutcomeViolation {
-		t.Fatalf("expected violation from sanitised tokens, got %q", report.Outcome)
+	if !strings.Contains(string(serialized), "/home/dev/app/.env") {
+		t.Fatalf("raw path evidence must be retained in the finding, got %s", serialized)
 	}
 }
 
 func TestRiskyAccessDecisionValidatesAgainstPolicySchema(t *testing.T) {
 	schema := compilePolicySchema(t)
 	for name, report := range map[string]RiskyAccess{
-		"violation":     RiskyAccessFromEvents([]canonical.Event{eventWithAttributes(map[string]any{"file_path": privacy.PathToken(privacy.ClassifyPath(".env"))})}),
-		"not_violation": RiskyAccessFromEvents([]canonical.Event{eventWithAttributes(map[string]any{"file_path": privacy.PathToken(privacy.ClassifyPath("main.go"))})}),
+		"violation":     RiskyAccessFromEvents([]canonical.Event{eventWithAttributes(map[string]any{"file_path": ".env"})}),
+		"not_violation": RiskyAccessFromEvents([]canonical.Event{eventWithAttributes(map[string]any{"file_path": "main.go"})}),
 		"indeterminate": RiskyAccessFromEvents([]canonical.Event{eventWithAttributes(map[string]any{"model": "x"})}),
 	} {
 		t.Run(name, func(t *testing.T) {
