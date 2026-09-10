@@ -8,7 +8,6 @@ import (
 	"github.com/wayne/telemetryiq/internal/cost"
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
-	"github.com/wayne/telemetryiq/internal/privacy"
 )
 
 // SessionFilter constrains a session query. Empty fields do not filter results.
@@ -58,12 +57,11 @@ type SessionDeleter interface {
 	DeleteAllSessions(context.Context) error
 }
 
-// EventReader exposes sanitised canonical events and their provenance.
+// EventReader exposes raw canonical events (epic #87 — no ingest-time hiding).
 // ListEvents returns at most EventFilter.Limit+1 events so callers can detect
 // whether another cursor page exists without issuing a separate count query.
 type EventReader interface {
 	ListEvents(context.Context, EventFilter) ([]canonical.Event, error)
-	EventProvenance(context.Context, string) ([]privacy.Provenance, bool, error)
 }
 
 // CostReader returns calculation provenance without exposing raw intake data.

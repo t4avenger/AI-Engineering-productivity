@@ -6,17 +6,12 @@ import (
 	"testing"
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
 func TestDeleteAllSessionsRemovesRetainedTelemetry(t *testing.T) {
 	ctx := context.Background()
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	repo, err := Open(filepath.Join(t.TempDir(), "telemetry.db"), sanitizer)
+	repo, err := Open(filepath.Join(t.TempDir(), "telemetry.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -2,9 +2,8 @@ package sqlite
 
 import "context"
 
-// DeleteAllSessions removes every retained event, its provenance, and every
-// reconstructed session atomically. Schema metadata remains for future local
-// collection.
+// DeleteAllSessions removes every retained event and every reconstructed
+// session atomically. Schema metadata remains for future local collection.
 func (r *Repository) DeleteAllSessions(ctx context.Context) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {

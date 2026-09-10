@@ -17,20 +17,15 @@ import (
 
 	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
 type Repository struct {
 	db         *sql.DB
-	sanitizer  *privacy.Sanitizer
 	calculator *cost.Calculator
 }
 
-func Open(path string, sanitizer *privacy.Sanitizer, calculators ...*cost.Calculator) (*Repository, error) {
-	if sanitizer == nil {
-		return nil, errors.New("privacy sanitizer is required")
-	}
+func Open(path string, calculators ...*cost.Calculator) (*Repository, error) {
 	if path != ":memory:" {
 		directory := filepath.Dir(path)
 		if err := os.MkdirAll(directory, 0o700); err != nil {
@@ -47,7 +42,7 @@ func Open(path string, sanitizer *privacy.Sanitizer, calculators ...*cost.Calcul
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 	db.SetMaxOpenConns(1)
-	r := &Repository{db: db, sanitizer: sanitizer}
+	r := &Repository{db: db}
 	if len(calculators) > 0 {
 		r.calculator = calculators[0]
 	}
@@ -71,8 +66,11 @@ func Open(path string, sanitizer *privacy.Sanitizer, calculators ...*cost.Calcul
 func (r *Repository) Close() error { return r.db.Close() }
 
 func (r *Repository) migrate(ctx context.Context) error {
+	// Fresh databases get the current events shape directly (no provenance_json);
+	// existing v2 databases keep their provenance-bearing table here and have it
+	// rebuilt by migration 3 below.
 	_, err := r.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY);
-CREATE TABLE IF NOT EXISTS events (event_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, occurred_at TEXT NOT NULL, event_json BLOB NOT NULL, provenance_json BLOB NOT NULL);
+CREATE TABLE IF NOT EXISTS events (event_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, occurred_at TEXT NOT NULL, event_json BLOB NOT NULL);
 CREATE INDEX IF NOT EXISTS events_session_occurred ON events(session_id, occurred_at, event_id);
 CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, session_json BLOB NOT NULL); CREATE TABLE IF NOT EXISTS cost_records (event_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, cost_json BLOB NOT NULL); CREATE INDEX IF NOT EXISTS cost_records_session ON cost_records(session_id);`)
 	if err != nil {
@@ -85,7 +83,62 @@ CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, session_json B
 	if _, err = r.db.ExecContext(ctx, "INSERT OR IGNORE INTO schema_migrations(version) VALUES (2)"); err != nil {
 		return fmt.Errorf("record migration 2: %w", err)
 	}
+	if err := r.dropEventProvenance(ctx); err != nil {
+		return err
+	}
 	return nil
+}
+
+// dropEventProvenance is migration 3: it removes the ingest-time-hiding
+// provenance surface (epic #87) by rebuilding the events table without the
+// provenance_json column on any database that still carries it. Fresh databases
+// already have the current shape, so the rebuild is skipped and only the
+// migration version is recorded.
+func (r *Repository) dropEventProvenance(ctx context.Context) error {
+	hasColumn, err := r.eventsHasProvenance(ctx)
+	if err != nil {
+		return err
+	}
+	if hasColumn {
+		if _, err := r.db.ExecContext(ctx, `CREATE TABLE events_new (event_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, occurred_at TEXT NOT NULL, event_json BLOB NOT NULL);
+INSERT INTO events_new(event_id,session_id,occurred_at,event_json) SELECT event_id,session_id,occurred_at,event_json FROM events;
+DROP TABLE events;
+ALTER TABLE events_new RENAME TO events;
+CREATE INDEX IF NOT EXISTS events_session_occurred ON events(session_id, occurred_at, event_id);`); err != nil {
+			return fmt.Errorf("rebuild events without provenance: %w", err)
+		}
+	}
+	if _, err := r.db.ExecContext(ctx, "INSERT OR IGNORE INTO schema_migrations(version) VALUES (3)"); err != nil {
+		return fmt.Errorf("record migration 3: %w", err)
+	}
+	return nil
+}
+
+// eventsHasProvenance reports whether the events table still carries the
+// removed provenance_json column.
+func (r *Repository) eventsHasProvenance(ctx context.Context) (bool, error) {
+	rows, err := r.db.QueryContext(ctx, "PRAGMA table_info(events)")
+	if err != nil {
+		return false, fmt.Errorf("inspect events schema: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var (
+			cid          int
+			name         string
+			columnType   string
+			notNull      int
+			defaultValue sql.NullString
+			primaryKey   int
+		)
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			return false, fmt.Errorf("scan events schema: %w", err)
+		}
+		if name == "provenance_json" {
+			return true, rows.Err()
+		}
+	}
+	return false, rows.Err()
 }
 
 func (r *Repository) SaveEvents(ctx context.Context, events []canonical.Event) error {
@@ -96,19 +149,14 @@ func (r *Repository) SaveEvents(ctx context.Context, events []canonical.Event) e
 	defer func() { _ = tx.Rollback() }()
 	ids := map[string]struct{}{}
 	for _, event := range events {
-		safe, provenance, err := r.safeEvent(event)
+		// Events are persisted verbatim — no ingest-time hiding is applied
+		// (epic #87); raw provider-native identifiers, paths and commands reach
+		// storage and the UI.
+		payload, err := json.Marshal(event)
 		if err != nil {
-			return err
+			return fmt.Errorf("marshal event: %w", err)
 		}
-		payload, err := json.Marshal(safe)
-		if err != nil {
-			return fmt.Errorf("marshal sanitized event: %w", err)
-		}
-		provenanceJSON, err := json.Marshal(provenance)
-		if err != nil {
-			return fmt.Errorf("marshal sanitization provenance: %w", err)
-		}
-		result, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO events(event_id,session_id,occurred_at,event_json,provenance_json) VALUES(?,?,?,?,?)", safe.EventID, safe.SessionID, safe.OccurredAt.UTC().Format(timeFormat), payload, provenanceJSON)
+		result, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO events(event_id,session_id,occurred_at,event_json) VALUES(?,?,?,?)", event.EventID, event.SessionID, event.OccurredAt.UTC().Format(timeFormat), payload)
 		if err != nil {
 			return err
 		}
@@ -118,12 +166,12 @@ func (r *Repository) SaveEvents(ctx context.Context, events []canonical.Event) e
 				return fmt.Errorf("determine event insertion: %w", err)
 			}
 			if inserted > 0 {
-				if err := r.saveCostRecord(ctx, tx, r.calculator.Calculate(safe)); err != nil {
+				if err := r.saveCostRecord(ctx, tx, r.calculator.Calculate(event)); err != nil {
 					return err
 				}
 			}
 		}
-		ids[safe.SessionID] = struct{}{}
+		ids[event.SessionID] = struct{}{}
 	}
 	for id := range ids {
 		if err := r.rebuildSession(ctx, tx, id); err != nil {
@@ -178,27 +226,6 @@ func (r *Repository) saveCostRecord(ctx context.Context, tx *sql.Tx, record cost
 }
 
 const timeFormat = "2006-01-02T15:04:05.999999999Z07:00"
-
-func (r *Repository) safeEvent(event canonical.Event) (canonical.Event, []privacy.Provenance, error) {
-	data, err := json.Marshal(event)
-	if err != nil {
-		return canonical.Event{}, nil, err
-	}
-	var raw map[string]any
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return canonical.Event{}, nil, err
-	}
-	result := r.sanitizer.Sanitize(raw)
-	data, err = json.Marshal(result.Value)
-	if err != nil {
-		return canonical.Event{}, nil, err
-	}
-	var safe canonical.Event
-	if err := json.Unmarshal(data, &safe); err != nil {
-		return canonical.Event{}, nil, err
-	}
-	return safe, result.Provenance, nil
-}
 
 func (r *Repository) rebuildSession(ctx context.Context, tx *sql.Tx, id string) error {
 	events, err := loadSessionEvents(ctx, tx, id)

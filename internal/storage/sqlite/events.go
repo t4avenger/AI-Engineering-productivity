@@ -2,14 +2,12 @@ package sqlite
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
@@ -53,21 +51,4 @@ func eventListQuery(filter storage.EventFilter) (string, []any) {
 	}
 	query := "SELECT event_json FROM events WHERE " + strings.Join(conditions, " AND ") + " ORDER BY occurred_at ASC, event_id ASC LIMIT ?"
 	return query, append(args, filter.Limit+1)
-}
-
-// EventProvenance returns the safe transformation record stored with one event.
-func (r *Repository) EventProvenance(ctx context.Context, id string) ([]privacy.Provenance, bool, error) {
-	var data []byte
-	err := r.db.QueryRowContext(ctx, "SELECT provenance_json FROM events WHERE event_id=?", id).Scan(&data)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, false, nil
-	}
-	if err != nil {
-		return nil, false, err
-	}
-	var provenance []privacy.Provenance
-	if err := json.Unmarshal(data, &provenance); err != nil {
-		return nil, false, fmt.Errorf("decode event provenance: %w", err)
-	}
-	return provenance, true, nil
 }
