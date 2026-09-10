@@ -4,29 +4,28 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
-
-	"github.com/wayne/telemetryiq/internal/privacy"
 )
 
-type sanitizedInspector struct {
-	sanitizer  *privacy.Sanitizer
-	mu         sync.RWMutex
-	value      map[string]any
-	provenance []privacy.Provenance
+// ingestInspector is a development-only view of the last received ingest
+// payload. It captures the payload verbatim — no ingest-time hiding is applied
+// (epic #87), so the inspector shows the raw data exactly as it reaches the
+// normalizers and storage.
+type ingestInspector struct {
+	mu    sync.RWMutex
+	value map[string]any
 }
 
-func newSanitizedInspector(sanitizer *privacy.Sanitizer) *sanitizedInspector {
-	return &sanitizedInspector{sanitizer: sanitizer}
+func newIngestInspector() *ingestInspector {
+	return &ingestInspector{}
 }
 
-func (i *sanitizedInspector) captureValue(raw map[string]any) {
-	result := i.sanitizer.Sanitize(raw)
+func (i *ingestInspector) captureValue(raw map[string]any) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	i.value, i.provenance = result.Value, result.Provenance
+	i.value = raw
 }
 
-func (i *sanitizedInspector) capture(payload map[string]json.RawMessage) {
+func (i *ingestInspector) capture(payload map[string]json.RawMessage) {
 	raw := make(map[string]any, len(payload))
 	for key, value := range payload {
 		var decoded any
@@ -37,9 +36,9 @@ func (i *sanitizedInspector) capture(payload map[string]json.RawMessage) {
 	i.captureValue(raw)
 }
 
-func (i *sanitizedInspector) handler(w http.ResponseWriter, _ *http.Request) {
+func (i *ingestInspector) handler(w http.ResponseWriter, _ *http.Request) {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"payload": i.value, "provenance": i.provenance})
+	_ = json.NewEncoder(w).Encode(map[string]any{"payload": i.value})
 }

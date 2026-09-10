@@ -1,8 +1,6 @@
 package conformance
 
 import (
-	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
@@ -27,7 +25,7 @@ func forEachAdapter(t *testing.T, fn func(t *testing.T, a adapter)) {
 // vacuously satisfied by an empty slice.
 func recordsFor(t *testing.T, a adapter) []canonical.ModelInteraction {
 	t.Helper()
-	records, err := a.records(a.reviewed(t), stubFingerprint)
+	records, err := a.records(a.reviewed(t))
 	if err != nil {
 		t.Fatalf("%s: extract records: %v", a.name, err)
 	}
@@ -152,51 +150,4 @@ func taskBoundaryConfidence(t *testing.T, name string, index int, extensions map
 		t.Fatalf("record %d: %s task_boundary has no confidence", index, name)
 	}
 	return confidence
-}
-
-// TestRedactionBoundaryHoldsOnEvents drives each adapter's canary payload through
-// the real privacy sanitiser and the event entry point, then asserts the canary
-// marker never reaches canonical output. It confirms the shared redaction
-// boundary holds identically across provider shapes on the event path.
-func TestRedactionBoundaryHoldsOnEvents(t *testing.T) {
-	t.Parallel()
-	forEachAdapter(t, func(t *testing.T, a adapter) {
-		events, err := a.events(sanitise(t, a.canary()), stubFingerprint)
-		if err != nil {
-			t.Fatalf("%s: normalize canary events: %v", a.name, err)
-		}
-		if len(events) == 0 {
-			t.Fatalf("%s: canary produced no events, redaction path not exercised", a.name)
-		}
-		assertNoCanary(t, a.name, "events", events)
-	})
-}
-
-// TestRedactionBoundaryHoldsOnRecords is the record-path counterpart: the canary
-// marker must not survive into any canonical.ModelInteraction either.
-func TestRedactionBoundaryHoldsOnRecords(t *testing.T) {
-	t.Parallel()
-	forEachAdapter(t, func(t *testing.T, a adapter) {
-		records, err := a.records(sanitise(t, a.canary()), stubFingerprint)
-		if err != nil {
-			t.Fatalf("%s: extract canary records: %v", a.name, err)
-		}
-		if len(records) == 0 {
-			t.Fatalf("%s: canary produced no records, redaction path not exercised", a.name)
-		}
-		assertNoCanary(t, a.name, "records", records)
-	})
-}
-
-// assertNoCanary marshals canonical output and fails if the canary marker
-// survives anywhere in it, including provider_extensions.
-func assertNoCanary(t *testing.T, name, path string, value any) {
-	t.Helper()
-	data, err := json.Marshal(value)
-	if err != nil {
-		t.Fatalf("%s: marshal %s: %v", name, path, err)
-	}
-	if strings.Contains(string(data), canaryMarker) {
-		t.Errorf("%s: canary marker %q survived redaction into %s output", name, canaryMarker, path)
-	}
 }

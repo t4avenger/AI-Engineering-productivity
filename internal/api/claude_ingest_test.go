@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
 )
@@ -70,19 +69,15 @@ func TestClaudeLogsIngestEndToEnd(t *testing.T) {
 }
 
 // newPersistentTestServer starts a live persistent daemon backed by an in-memory
-// sqlite repository and a fresh sanitizer, returning both for ingest→read gates.
+// sqlite repository, returning both for ingest→read gates.
 func newPersistentTestServer(t *testing.T) (*httptest.Server, storage.Repository) {
 	t.Helper()
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	repository, err := sqlite.Open(":memory:", sanitizer)
+	repository, err := sqlite.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = repository.Close() })
-	server := httptest.NewServer(NewPersistentHandler(slog.Default(), sanitizer, repository))
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
 	t.Cleanup(server.Close)
 	return server, repository
 }

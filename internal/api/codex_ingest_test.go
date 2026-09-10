@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
 )
 
@@ -35,16 +34,12 @@ const rawCodexOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
 // POST a raw OTLP log payload to /v1/logs, then prove the HTTP read API serves
 // the resulting session (tool, model) without leaking identity or secrets.
 func TestCodexLogsIngestEndToEnd(t *testing.T) {
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	repository, err := sqlite.Open(":memory:", sanitizer)
+	repository, err := sqlite.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = repository.Close() })
-	server := httptest.NewServer(NewPersistentHandler(slog.Default(), sanitizer, repository))
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
 	t.Cleanup(server.Close)
 
 	response := postOTLPToPath(t, server.URL, "/v1/logs", []byte(rawCodexOTLPLogs), "application/json")

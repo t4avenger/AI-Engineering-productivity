@@ -9,7 +9,6 @@ import (
 
 	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
@@ -42,10 +41,6 @@ type eventCursor struct {
 	EventID    string `json:"event_id"`
 }
 
-type eventProvenanceResponse struct {
-	Data []privacy.Provenance `json:"data"`
-}
-
 func (a sessionAPI) events(w http.ResponseWriter, r *http.Request) {
 	if a.sessions == nil || a.eventReader == nil {
 		writeSessionError(w, http.StatusServiceUnavailable, "sessions_unavailable", sessionUnavailable)
@@ -75,23 +70,6 @@ func (a sessionAPI) events(w http.ResponseWriter, r *http.Request) {
 		response.Data[index] = publicTimelineEvent(event)
 	}
 	writeSessionJSON(w, http.StatusOK, response)
-}
-
-func (a sessionAPI) provenance(w http.ResponseWriter, r *http.Request) {
-	if a.eventReader == nil {
-		writeSessionError(w, http.StatusServiceUnavailable, "sessions_unavailable", sessionUnavailable)
-		return
-	}
-	provenance, found, err := a.eventReader.EventProvenance(r.Context(), r.PathValue("id"))
-	if err != nil {
-		writeSessionError(w, http.StatusInternalServerError, "event_query_failed", "unable to query event provenance")
-		return
-	}
-	if !found {
-		writeSessionError(w, http.StatusNotFound, "event_not_found", "event was not found")
-		return
-	}
-	writeSessionJSON(w, http.StatusOK, eventProvenanceResponse{Data: provenance})
 }
 
 func parseEventListQuery(r *http.Request) (int, *eventCursor, error) {

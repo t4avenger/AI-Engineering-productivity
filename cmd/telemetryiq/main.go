@@ -16,7 +16,6 @@ import (
 	"github.com/wayne/telemetryiq/internal/config"
 	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/insights"
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
 )
 
@@ -42,22 +41,12 @@ func main() {
 		logger.Error("load local API authentication token", "error", err)
 		os.Exit(1)
 	}
-	salt, err := privacy.LoadOrCreateSalt(telemetryDir)
-	if err != nil {
-		logger.Error("load privacy salt", "error", err)
-		os.Exit(1)
-	}
-	sanitizer, err := privacy.New(salt)
-	if err != nil {
-		logger.Error("create privacy sanitizer", "error", err)
-		os.Exit(1)
-	}
 	calculator, err := cost.LoadDefault(cfg.Pricing.OverridePath)
 	if err != nil {
 		logger.Error("load local price catalog", "error", err)
 		os.Exit(1)
 	}
-	repository, err := sqlite.Open(filepath.Join(telemetryDir, "telemetryiq.db"), sanitizer, calculator)
+	repository, err := sqlite.Open(filepath.Join(telemetryDir, "telemetryiq.db"), calculator)
 	if err != nil {
 		logger.Error("open local session storage", "error", err)
 		os.Exit(1)
@@ -72,9 +61,9 @@ func main() {
 		MCPAllowlist: cfg.Governance.MCPAllowlist,
 	}
 
-	handler := api.NewAuthenticatedPersistentHandler(logger, sanitizer, repository, token, thresholds)
+	handler := api.NewAuthenticatedPersistentHandler(logger, repository, token, thresholds)
 	if os.Getenv("TELEMETRYIQ_DEVELOPMENT_INSPECTOR") == "1" {
-		handler = api.NewAuthenticatedPersistentDevelopmentHandler(logger, sanitizer, repository, token, thresholds)
+		handler = api.NewAuthenticatedPersistentDevelopmentHandler(logger, repository, token, thresholds)
 	}
 	server := &http.Server{
 		Addr:              cfg.Addr(),

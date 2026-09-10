@@ -5,7 +5,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/wayne/telemetryiq/internal/privacy"
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
 )
 
@@ -15,11 +14,7 @@ import (
 // configured allowlist threaded end-to-end and operator/machine identifiers
 // absent from the response.
 func TestUnapprovedMCPInsightIngestEndToEnd(t *testing.T) {
-	sanitizer, err := privacy.New(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	repository, err := sqlite.Open(":memory:", sanitizer)
+	repository, err := sqlite.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +24,7 @@ func TestUnapprovedMCPInsightIngestEndToEnd(t *testing.T) {
 	// from InsightThresholds through the live read path.
 	thresholds := DefaultInsightThresholds()
 	thresholds.MCPAllowlist = []string{"approved-filesystem-server"}
-	server := httptest.NewServer(newHandler(slog.Default(), nil, repository, sanitizer, repository, thresholds))
+	server := httptest.NewServer(newHandler(slog.Default(), nil, repository, repository, thresholds))
 	t.Cleanup(server.Close)
 
 	postAcceptedOTLP(t, server.URL, "/v1/logs", rawClaudeUnapprovedMCPOTLP(t))
