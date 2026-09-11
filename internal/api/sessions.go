@@ -296,7 +296,7 @@ func modelAvailability(session canonical.Session) string {
 }
 
 func tokenUsageAvailability(session canonical.Session) string {
-	for _, key := range []string{"input_token_count", "output_token_count", "cached_input_tokens"} {
+	for _, key := range []string{"input_token_count", "output_token_count", "cached_input_tokens", "cached_input_token_count"} {
 		if numericAttribute(session.Attributes, key) {
 			return "observed"
 		}

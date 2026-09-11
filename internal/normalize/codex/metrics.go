@@ -20,6 +20,7 @@ var ErrUnsupportedMetrics = errors.New("unsupported Codex metrics payload")
 const (
 	skillInjectedMetric     = "codex.skill.injected"
 	skillTurnDurationMetric = "codex.skill.turn.duration_seconds"
+	turnTokenUsageMetric    = "codex.turn.token_usage"
 	serviceNameAttribute    = "service.name"
 	serviceVersionAttribute = "service.version"
 )
@@ -36,6 +37,10 @@ type resourceMetric struct {
 }
 
 type scopeMetric struct {
+	Scope struct {
+		Name       string      `json:"name"`
+		Attributes []attribute `json:"attributes"`
+	} `json:"scope"`
 	Metrics []otlpMetric `json:"metrics"`
 }
 
@@ -63,15 +68,17 @@ type metricHistogram struct {
 type histogramDataPoint struct {
 	Attributes   []attribute `json:"attributes"`
 	Count        any         `json:"count"`
+	Sum          any         `json:"sum"`
 	TimeUnixNano string      `json:"timeUnixNano"`
 }
 
-// NormalizeMetrics maps reviewed Codex OTLP skill metrics into canonical events.
+// NormalizeMetrics maps reviewed Codex OTLP metrics into canonical events.
 // codex.skill.injected datapoints with a skill name become explicit skill
 // records; codex.skill.turn.duration_seconds histogram datapoints become
-// inferred skill-detection coverage only. Other metrics are ignored so
-// exporters can POST a full metrics batch without inventing unrelated insight
-// rows. Resources whose service.name is not a Codex log/exec service are skipped.
+// inferred skill-detection coverage only; codex.turn.token_usage histogram
+// datapoints become token-usage events. Other metrics are ignored so exporters
+// can POST a full metrics batch without inventing unrelated insight rows.
+// Resources whose service.name is not a Codex log/exec service are skipped.
 func NormalizeMetrics(data []byte, receivedAt time.Time) ([]canonical.Event, error) {
 	var payload metricsPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
@@ -99,8 +106,9 @@ func skillEventsFromResource(resource resourceMetric, receivedAt time.Time) ([]c
 	version := stringValue(resourceAttrs[serviceVersionAttribute], unavailable)
 	var events []canonical.Event
 	for _, scope := range resource.ScopeMetrics {
+		scopeID := metricScopeIdentity(scope)
 		for _, item := range scope.Metrics {
-			extracted, err := skillEventsFromMetric(resourceAttrs, version, item, receivedAt)
+			extracted, err := skillEventsFromMetric(resourceAttrs, scopeID, version, item, receivedAt)
 			if err != nil {
 				return nil, err
 			}
@@ -110,9 +118,12 @@ func skillEventsFromResource(resource resourceMetric, receivedAt time.Time) ([]c
 	return events, nil
 }
 
-func skillEventsFromMetric(resourceAttrs map[string]any, version string, item otlpMetric, receivedAt time.Time) ([]canonical.Event, error) {
+func skillEventsFromMetric(resourceAttrs map[string]any, scopeID string, version string, item otlpMetric, receivedAt time.Time) ([]canonical.Event, error) {
 	if item.Name == skillTurnDurationMetric && item.Histogram != nil {
 		return skillTurnEventsFromHistogram(resourceAttrs, version, item.Histogram, receivedAt), nil
+	}
+	if item.Name == turnTokenUsageMetric && item.Histogram != nil {
+		return tokenUsageEventsFromHistogram(resourceAttrs, scopeID, version, item.Histogram, receivedAt), nil
 	}
 	if item.Name != skillInjectedMetric || item.Sum == nil {
 		return nil, nil
@@ -128,6 +139,146 @@ func skillEventsFromMetric(resourceAttrs map[string]any, version string, item ot
 		}
 	}
 	return events, nil
+}
+
+func tokenUsageEventsFromHistogram(resourceAttrs map[string]any, scopeID string, version string, histogram *metricHistogram, receivedAt time.Time) []canonical.Event {
+	events := make([]canonical.Event, 0, len(histogram.DataPoints))
+	for index, point := range histogram.DataPoints {
+		if event, ok := tokenUsageEvent(resourceAttrs, scopeID, version, point, index, receivedAt); ok {
+			events = append(events, event)
+		}
+	}
+	return events
+}
+
+func tokenUsageEvent(resource map[string]any, scopeID string, version string, point histogramDataPoint, index int, receivedAt time.Time) (canonical.Event, bool) {
+	fields := attributes(point.Attributes)
+	tokenType := strings.TrimSpace(stringValue(fields["token_type"], ""))
+	attributeKey, ok := tokenUsageAttribute(tokenType)
+	if !ok {
+		return canonical.Event{}, false
+	}
+	tokens := normalize.OptionalTokenCount(point.Sum)
+	if tokens == nil {
+		return canonical.Event{}, false
+	}
+	occurredAt := metricTime(point.TimeUnixNano, receivedAt)
+	model, modelObserved := normalize.ObservedString(fields["model"])
+	safeResource := safeCodexMetricAttributes(normalize.UnknownFields(resource, serviceNameAttribute, serviceVersionAttribute))
+	safeFields := safeCodexMetricAttributes(normalize.UnknownFields(fields, "model", "token_type"))
+	identity := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d", turnTokenUsageMetric, model, tokenType, point.TimeUnixNano, metricResourceIdentity(resource, safeResource), scopeID, index, *tokens)
+	identity += "|" + stableJSON(safeFields)
+	eventID := contentID("codex:token:", []byte(identity))
+
+	attributes := map[string]any{
+		"unavailable_fields": []string{"tool_calls", "file_operations", "command_execution", "approvals", "prompt_content", "response_content", "repository_context", "task_outcome", "provider_cost", "session_lifecycle"},
+		attributeKey:         *tokens,
+	}
+	if modelObserved {
+		attributes["model"] = model
+	}
+	extensions := map[string]any{
+		"correlation": tokenCorrelation(eventID, occurredAt),
+		"metric": map[string]any{
+			"name":       turnTokenUsageMetric,
+			"token_type": tokenType,
+			"count":      metricCount(point.Count),
+		},
+		"resource":          safeResource,
+		"metric_attributes": safeFields,
+	}
+	return tokenEvent(eventID, occurredAt, receivedAt, version, attributes, extensions), true
+}
+
+func metricScopeIdentity(scope scopeMetric) string {
+	return stableJSON(map[string]any{
+		"name":       scope.Scope.Name,
+		"attributes": safeCodexMetricAttributes(attributes(scope.Scope.Attributes)),
+	})
+}
+
+func metricResourceIdentity(resource map[string]any, safeResource map[string]any) string {
+	return stableJSON(map[string]any{
+		"service.name":    stringValue(resource[serviceNameAttribute], ""),
+		"service.version": stringValue(resource[serviceVersionAttribute], ""),
+		"resource":        safeResource,
+	})
+}
+
+func stableJSON(value any) string {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func safeCodexMetricAttributes(fields map[string]any) map[string]any {
+	allowed := map[string]struct{}{
+		"app.version":            {},
+		"auth_mode":              {},
+		"deployment.environment": {},
+		"originator":             {},
+		"session_source":         {},
+		"tmp_mem_enabled":        {},
+	}
+	safe := make(map[string]any)
+	for key, value := range fields {
+		if _, ok := allowed[strings.ToLower(strings.TrimSpace(key))]; ok {
+			safe[key] = value
+		}
+	}
+	return safe
+}
+
+func tokenUsageAttribute(tokenType string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(tokenType)) {
+	case "input":
+		return "input_token_count", true
+	case "output":
+		return "output_token_count", true
+	case "cached_input":
+		return "cached_input_token_count", true
+	case "cache_write_input":
+		return "cache_write_input_token_count", true
+	case "reasoning_output":
+		return "reasoning_token_count", true
+	case "total":
+		return "total_token_count", true
+	default:
+		return "", false
+	}
+}
+
+func tokenEvent(eventID string, occurredAt, receivedAt time.Time, version string, attributes, extensions map[string]any) canonical.Event {
+	return canonical.Event{
+		SchemaVersion:      canonicalSchemaVersion,
+		EventID:            eventID,
+		EventType:          turnTokenUsageMetric,
+		OccurredAt:         occurredAt,
+		ReceivedAt:         receivedAt.UTC(),
+		Provider:           "openai",
+		Tool:               "codex",
+		SourceSchema:       sourceSchema,
+		SourceVersion:      version,
+		ActorID:            unavailable,
+		DeviceID:           unavailable,
+		SessionID:          eventID,
+		PrivacyLevel:       "operational",
+		Attributes:         attributes,
+		ProviderExtensions: extensions,
+	}
+}
+
+func tokenCorrelation(eventID string, occurredAt time.Time) map[string]any {
+	return map[string]any{
+		"dedup_key":    eventID,
+		"ordering_key": fmt.Sprintf("%020d:%s", occurredAt.UnixNano(), eventID),
+		"task_boundary": map[string]any{
+			"confidence": "unknown",
+			"reason":     "Codex token metrics have no reviewed task-boundary signal",
+		},
+	}
 }
 
 func skillTurnEventsFromHistogram(resourceAttrs map[string]any, version string, histogram *metricHistogram, receivedAt time.Time) []canonical.Event {

@@ -246,7 +246,7 @@ func inputTokenGrowth(samples int, first *int64, max *int64) (*float64, bool) {
 
 func tokenSignals(event canonical.Event) (input *int64, cached *int64, ok bool) {
 	input = optionalInt64(event.Attributes["input_token_count"])
-	cached = optionalInt64(event.Attributes["cached_input_tokens"])
+	cached = firstOptionalInt64(optionalInt64(event.Attributes["cached_input_tokens"]), optionalInt64(event.Attributes["cached_input_token_count"]))
 
 	if rawEvent, ok := event.ProviderExtensions["event"].(map[string]any); ok {
 		input = firstOptionalInt64(input, optionalInt64(rawEvent["input_tokens"]))

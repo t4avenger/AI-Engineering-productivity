@@ -281,7 +281,7 @@ func requestTokenContext(event canonical.Event) (tokenContext, bool) {
 	context := tokenContext{
 		input:       intValue(event.Attributes["input_token_count"]),
 		output:      intValue(event.Attributes["output_token_count"]),
-		cachedInput: intValue(event.Attributes["cached_input_tokens"]),
+		cachedInput: firstInt(intValue(event.Attributes["cached_input_tokens"]), intValue(event.Attributes["cached_input_token_count"])),
 	}
 	if rawEvent, ok := event.ProviderExtensions["event"].(map[string]any); ok {
 		context.input = firstInt(context.input, intValue(rawEvent["input_tokens"]))

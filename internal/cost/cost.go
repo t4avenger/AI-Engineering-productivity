@@ -146,6 +146,9 @@ func merge(base, override Catalog) Catalog {
 
 func (c *Calculator) Calculate(event canonical.Event) Record {
 	r := Record{EventID: event.EventID, SessionID: event.SessionID, CalculatedAt: event.ReceivedAt.UTC(), CalculationVersion: "1", CatalogVersion: c.catalog.CatalogVersion, Currency: c.catalog.Currency, Status: "not_applicable", ObservedTokens: map[string]int64{}}
+	if event.EventType == "codex.turn.token_usage" {
+		return r
+	}
 	model, _ := event.Attributes["model"].(string)
 	for input, category := range map[string]string{"input_token_count": "input", "cached_input_token_count": "cached_input", "output_token_count": "output", "reasoning_token_count": "reasoning"} {
 		if value, ok := token(event.Attributes[input]); ok {

@@ -1,0 +1,174 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "synthetic",
+  "provider": "openai",
+  "tool": "codex",
+  "tool_version": "0.153.4",
+  "captured_at": "2026-09-10T20:09:20Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "resourceMetrics": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.153.4"
+              }
+            },
+            {
+              "key": "deployment.environment",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        },
+        "scopeMetrics": [
+          {
+            "scope": {
+              "name": "codex"
+            },
+            "metrics": [
+              {
+                "name": "codex.turn.token_usage",
+                "histogram": {
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        {
+                          "key": "model",
+                          "value": {
+                            "stringValue": "gpt-5-codex-synthetic"
+                          }
+                        },
+                        {
+                          "key": "token_type",
+                          "value": {
+                            "stringValue": "input"
+                          }
+                        },
+                        {
+                          "key": "originator",
+                          "value": {
+                            "stringValue": "codex_exec"
+                          }
+                        }
+                      ],
+                      "count": "1",
+                      "sum": "1200",
+                      "timeUnixNano": "1789042160000000000"
+                    },
+                    {
+                      "attributes": [
+                        {
+                          "key": "model",
+                          "value": {
+                            "stringValue": "gpt-5-codex-synthetic"
+                          }
+                        },
+                        {
+                          "key": "token_type",
+                          "value": {
+                            "stringValue": "cached_input"
+                          }
+                        }
+                      ],
+                      "count": "1",
+                      "sum": "300",
+                      "timeUnixNano": "1789042160000000001"
+                    },
+                    {
+                      "attributes": [
+                        {
+                          "key": "model",
+                          "value": {
+                            "stringValue": "gpt-5-codex-synthetic"
+                          }
+                        },
+                        {
+                          "key": "token_type",
+                          "value": {
+                            "stringValue": "cache_write_input"
+                          }
+                        }
+                      ],
+                      "count": "1",
+                      "sum": "75",
+                      "timeUnixNano": "1789042160000000002"
+                    },
+                    {
+                      "attributes": [
+                        {
+                          "key": "model",
+                          "value": {
+                            "stringValue": "gpt-5-codex-synthetic"
+                          }
+                        },
+                        {
+                          "key": "token_type",
+                          "value": {
+                            "stringValue": "output"
+                          }
+                        }
+                      ],
+                      "count": "1",
+                      "sum": "144",
+                      "timeUnixNano": "1789042160000000003"
+                    },
+                    {
+                      "attributes": [
+                        {
+                          "key": "model",
+                          "value": {
+                            "stringValue": "gpt-5-codex-synthetic"
+                          }
+                        },
+                        {
+                          "key": "token_type",
+                          "value": {
+                            "stringValue": "reasoning_output"
+                          }
+                        }
+                      ],
+                      "count": "1",
+                      "sum": "55",
+                      "timeUnixNano": "1789042160000000004"
+                    },
+                    {
+                      "attributes": [
+                        {
+                          "key": "model",
+                          "value": {
+                            "stringValue": "gpt-5-codex-synthetic"
+                          }
+                        },
+                        {
+                          "key": "token_type",
+                          "value": {
+                            "stringValue": "total"
+                          }
+                        }
+                      ],
+                      "count": "1",
+                      "sum": "1774",
+                      "timeUnixNano": "1789042160000000005"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "evidence": "Replayable synthetic values for the codex.turn.token_usage surface confirmed by fixtures/codex/observed-sanitised/current-0.153.4-surface/codex-0.153.4-metric-codex-turn-token-usage.json"
+}
