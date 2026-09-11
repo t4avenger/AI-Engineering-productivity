@@ -98,21 +98,54 @@ resource and log attributes plus the severity are preserved verbatim under
 `provider_extensions`. `fixtures/codex/expected/codex-0.145.0-logs.records.json`
 is the golden output for the checked-in observed-sanitised input.
 
-## Skill injection metrics
+## Codex OTLP metrics
 
 `NormalizeMetrics` maps OTLP `resourceMetrics` from Codex (`codex_cli_rs` /
-`codex_exec`) for two reviewed skill surfaces. `codex.skill.injected` datapoints
-with a non-empty `skill` attribute become explicit named skill events with
-`provider_extensions.skill_detection = "explicit"` and
-`provider_extensions.skill.{name,outcome,invoke_type}`. A live Codex CLI 0.153.4
-trigger-style `bmad:brainstorm` probe emitted `codex.skill.turn.duration_seconds` as a histogram
-with `status` and `plugin_id=unattributed`, but no skill name; those datapoints
-become inferred coverage events with `provider_extensions.skill_detection =
-"inferred"` and no `provider_extensions.skill` record. Other metrics are
-ignored after HTTP accept so exporters can flush without inventing insight rows.
+`codex_exec`) only where a committed fixture proves a product-facing signal and
+the canonical event can preserve absent-vs-zero semantics. Metrics outside the
+mapped set remain HTTP-accepted but intentionally ignored, so Codex exporters can
+flush without TelemetryIQ inventing rows for internal timings, startup counters,
+SQLite/cache internals, or app/plugin inventory signals.
+
+### Skill metrics
+
+`codex.skill.injected` datapoints with a non-empty `skill` attribute become
+explicit named skill events with `provider_extensions.skill_detection =
+"explicit"` and `provider_extensions.skill.{name,outcome,invoke_type}`. A live
+Codex CLI 0.153.4 trigger-style `bmad:brainstorm` probe emitted
+`codex.skill.turn.duration_seconds` as a histogram with `status` and
+`plugin_id=unattributed`, but no skill name; those datapoints become inferred
+coverage events with `provider_extensions.skill_detection = "inferred"` and no
+`provider_extensions.skill` record.
 
 Golden: `fixtures/codex/expected/codex-0.153.4-skill-injected-metrics.events.json`
 for `fixtures/codex/observed-sanitised/codex-0.153.4-skill-injected-metrics.json`.
+
+### Token-usage metrics
+
+`codex.turn.token_usage` was observed in the Codex 0.153.4 metric inventory at
+`fixtures/codex/observed-sanitised/current-0.153.4-surface/codex-0.153.4-metric-codex-turn-token-usage.json`.
+The committed replay fixture
+`fixtures/codex/observed-sanitised/codex-0.153.4-turn-token-usage-metrics.json`
+uses synthetic counts for the observed `token_type` values and normalises each
+valid histogram datapoint into a `codex.turn.token_usage` canonical event:
+
+- `input` -> `attributes.input_token_count`
+- `output` -> `attributes.output_token_count`
+- `cached_input` -> `attributes.cached_input_token_count`
+- `cache_write_input` -> `attributes.cache_write_input_token_count`
+- `reasoning_output` -> `attributes.reasoning_token_count`
+- `total` -> `attributes.total_token_count`
+
+The token count comes from the histogram datapoint `sum`. Missing, malformed, or
+negative sums produce no event rather than a fabricated zero. The datapoint
+`count` is preserved only as metric evidence under `provider_extensions.metric`,
+and safe non-promoted datapoint attributes are kept under
+`provider_extensions.metric_attributes` after the same sensitive-key filter used
+for Codex logs.
+
+Golden: `fixtures/codex/expected/codex-0.153.4-turn-token-usage-metrics.events.json`
+for `fixtures/codex/observed-sanitised/codex-0.153.4-turn-token-usage-metrics.json`.
 
 The static-analysis gate enforces cyclomatic complexity of 15 or lower for
 each Go function. The normaliser separates fixture, resource, scope, and span

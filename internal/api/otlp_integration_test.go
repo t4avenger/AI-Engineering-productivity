@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wayne/telemetryiq/internal/normalize/canonical"
+
 	"github.com/wayne/telemetryiq/internal/storage"
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
 )
@@ -118,6 +120,81 @@ func TestCodexLogsPersistWithRawConversationIdentity(t *testing.T) {
 	if sessions[0].SessionID != "codex:synthetic-conversation" {
 		t.Fatalf("session id = %q, want raw provider-native conversation ID", sessions[0].SessionID)
 	}
+}
+
+func TestCodexTokenUsageMetricsPersistThroughMetricsReceiver(t *testing.T) {
+	repository, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = repository.Close() })
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
+	t.Cleanup(server.Close)
+
+	data, err := os.ReadFile(filepath.Join("..", "..", "fixtures", "codex", "observed-sanitised", "codex-0.153.4-turn-token-usage-metrics.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Payload json.RawMessage `json:"payload"`
+	}
+	if err := json.Unmarshal(data, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	response := postOTLPToPath(t, server.URL, "/v1/metrics", fixture.Payload, "application/json")
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("token metrics status = %d", response.StatusCode)
+	}
+	closeBody(t, response)
+
+	sessions, err := repository.ListSessions(context.Background(), storage.SessionFilter{Limit: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	events := tokenUsageMetricEvents(t, repository, sessions)
+	assertPersistedInputTokenMetric(t, events)
+}
+
+func tokenUsageMetricEvents(t *testing.T, repository storage.Repository, sessions []canonical.Session) []canonical.Event {
+	t.Helper()
+	if len(sessions) != 6 {
+		t.Fatalf("sessions = %d, want one per token category event", len(sessions))
+	}
+	var events []canonical.Event
+	for _, session := range sessions {
+		events = append(events, tokenUsageMetricEvent(t, repository, session.SessionID))
+	}
+	return events
+}
+
+func tokenUsageMetricEvent(t *testing.T, repository storage.Repository, sessionID string) canonical.Event {
+	t.Helper()
+	events, err := repository.ListEvents(context.Background(), storage.EventFilter{SessionID: sessionID, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("events for %s = %d, want 1", sessionID, len(events))
+	}
+	if events[0].EventType != "codex.turn.token_usage" {
+		t.Fatalf("event type = %q", events[0].EventType)
+	}
+	encoded, err := json.Marshal(events[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNoRawIdentifiers(t, []string{"tiq-canary-api-key", "synthetic@example.test"}, encoded)
+	return events[0]
+}
+
+func assertPersistedInputTokenMetric(t *testing.T, events []canonical.Event) {
+	t.Helper()
+	for _, event := range events {
+		if event.Attributes["input_token_count"] == float64(1200) || event.Attributes["input_token_count"] == int64(1200) {
+			return
+		}
+	}
+	t.Fatalf("expected one persisted input token event, got %#v", events)
 }
 
 func TestObservedSanitisedFixtureReplaysToLogsReceiver(t *testing.T) {

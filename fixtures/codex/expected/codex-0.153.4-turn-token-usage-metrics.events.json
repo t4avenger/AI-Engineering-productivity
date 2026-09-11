@@ -1,0 +1,316 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:token:b2315a67b3b94033ef204e64e6281a19ef007a98e263b2eb53e804175da1e2b5",
+    "event_type": "codex.turn.token_usage",
+    "occurred_at": "2026-09-10T12:09:20Z",
+    "received_at": "2026-09-10T20:09:21Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.153.4",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:token:b2315a67b3b94033ef204e64e6281a19ef007a98e263b2eb53e804175da1e2b5",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "input_token_count": 1200,
+      "model": "gpt-5-codex-synthetic",
+      "unavailable_fields": [
+        "tool_calls",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:token:b2315a67b3b94033ef204e64e6281a19ef007a98e263b2eb53e804175da1e2b5",
+        "ordering_key": "01789042160000000000:codex:token:b2315a67b3b94033ef204e64e6281a19ef007a98e263b2eb53e804175da1e2b5",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex token metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "count": 1,
+        "name": "codex.turn.token_usage",
+        "token_type": "input"
+      },
+      "metric_attributes": {
+        "originator": "codex_exec"
+      },
+      "resource": {
+        "deployment.environment": "telemetryiq-synthetic"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:token:6bdc468aa9589eac25f3e9f79cc7339b46757554ff240b6cb1f9e71175a23218",
+    "event_type": "codex.turn.token_usage",
+    "occurred_at": "2026-09-10T12:09:20.000000001Z",
+    "received_at": "2026-09-10T20:09:21Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.153.4",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:token:6bdc468aa9589eac25f3e9f79cc7339b46757554ff240b6cb1f9e71175a23218",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cached_input_token_count": 300,
+      "model": "gpt-5-codex-synthetic",
+      "unavailable_fields": [
+        "tool_calls",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:token:6bdc468aa9589eac25f3e9f79cc7339b46757554ff240b6cb1f9e71175a23218",
+        "ordering_key": "01789042160000000001:codex:token:6bdc468aa9589eac25f3e9f79cc7339b46757554ff240b6cb1f9e71175a23218",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex token metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "count": 1,
+        "name": "codex.turn.token_usage",
+        "token_type": "cached_input"
+      },
+      "metric_attributes": {},
+      "resource": {
+        "deployment.environment": "telemetryiq-synthetic"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:token:ff201d7472fa7fceb6d44fda610866374cea8509e1d62f3df65d951eb0c4496a",
+    "event_type": "codex.turn.token_usage",
+    "occurred_at": "2026-09-10T12:09:20.000000002Z",
+    "received_at": "2026-09-10T20:09:21Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.153.4",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:token:ff201d7472fa7fceb6d44fda610866374cea8509e1d62f3df65d951eb0c4496a",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cache_write_input_token_count": 75,
+      "model": "gpt-5-codex-synthetic",
+      "unavailable_fields": [
+        "tool_calls",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:token:ff201d7472fa7fceb6d44fda610866374cea8509e1d62f3df65d951eb0c4496a",
+        "ordering_key": "01789042160000000002:codex:token:ff201d7472fa7fceb6d44fda610866374cea8509e1d62f3df65d951eb0c4496a",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex token metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "count": 1,
+        "name": "codex.turn.token_usage",
+        "token_type": "cache_write_input"
+      },
+      "metric_attributes": {},
+      "resource": {
+        "deployment.environment": "telemetryiq-synthetic"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:token:1aa424161b996cc3ea8f5ead3ce5f9c4914af8a2268b04d13f2395ec7a037452",
+    "event_type": "codex.turn.token_usage",
+    "occurred_at": "2026-09-10T12:09:20.000000003Z",
+    "received_at": "2026-09-10T20:09:21Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.153.4",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:token:1aa424161b996cc3ea8f5ead3ce5f9c4914af8a2268b04d13f2395ec7a037452",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "model": "gpt-5-codex-synthetic",
+      "output_token_count": 144,
+      "unavailable_fields": [
+        "tool_calls",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:token:1aa424161b996cc3ea8f5ead3ce5f9c4914af8a2268b04d13f2395ec7a037452",
+        "ordering_key": "01789042160000000003:codex:token:1aa424161b996cc3ea8f5ead3ce5f9c4914af8a2268b04d13f2395ec7a037452",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex token metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "count": 1,
+        "name": "codex.turn.token_usage",
+        "token_type": "output"
+      },
+      "metric_attributes": {},
+      "resource": {
+        "deployment.environment": "telemetryiq-synthetic"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:token:93554b2eade41354cb377c632143ad2ec5bfe6fb0c656d001bf80e79a782d79f",
+    "event_type": "codex.turn.token_usage",
+    "occurred_at": "2026-09-10T12:09:20.000000004Z",
+    "received_at": "2026-09-10T20:09:21Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.153.4",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:token:93554b2eade41354cb377c632143ad2ec5bfe6fb0c656d001bf80e79a782d79f",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "model": "gpt-5-codex-synthetic",
+      "reasoning_token_count": 55,
+      "unavailable_fields": [
+        "tool_calls",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:token:93554b2eade41354cb377c632143ad2ec5bfe6fb0c656d001bf80e79a782d79f",
+        "ordering_key": "01789042160000000004:codex:token:93554b2eade41354cb377c632143ad2ec5bfe6fb0c656d001bf80e79a782d79f",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex token metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "count": 1,
+        "name": "codex.turn.token_usage",
+        "token_type": "reasoning_output"
+      },
+      "metric_attributes": {},
+      "resource": {
+        "deployment.environment": "telemetryiq-synthetic"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:token:aa4b04f817d1e54599899b66a2d3da34d748eb1d38053a1fe10961263669c82b",
+    "event_type": "codex.turn.token_usage",
+    "occurred_at": "2026-09-10T12:09:20.000000005Z",
+    "received_at": "2026-09-10T20:09:21Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.153.4",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:token:aa4b04f817d1e54599899b66a2d3da34d748eb1d38053a1fe10961263669c82b",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "model": "gpt-5-codex-synthetic",
+      "total_token_count": 1774,
+      "unavailable_fields": [
+        "tool_calls",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:token:aa4b04f817d1e54599899b66a2d3da34d748eb1d38053a1fe10961263669c82b",
+        "ordering_key": "01789042160000000005:codex:token:aa4b04f817d1e54599899b66a2d3da34d748eb1d38053a1fe10961263669c82b",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex token metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "count": 1,
+        "name": "codex.turn.token_usage",
+        "token_type": "total"
+      },
+      "metric_attributes": {},
+      "resource": {
+        "deployment.environment": "telemetryiq-synthetic"
+      }
+    }
+  }
+]
