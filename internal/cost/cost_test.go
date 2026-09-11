@@ -44,6 +44,19 @@ func TestCalculateSkipsCodexMetricTokenUsage(t *testing.T) {
 	}
 }
 
+// TestCalculateSkipsClaudeMetricTokenUsage pins the #89 non-goal: the Claude
+// token.usage metric is a per-interval delta sample, not an authoritative
+// per-request total, so it must not be priced (that would double-count against
+// request-level cost and add cost support this issue explicitly defers to #97).
+func TestCalculateSkipsClaudeMetricTokenUsage(t *testing.T) {
+	calculator := &Calculator{catalog: Catalog{SchemaVersion: schemaVersion, CatalogVersion: "test", Currency: "USD", Records: []PriceRecord{{ID: "anthropic", Provider: "anthropic", ModelMatcher: "claude-*", EffectiveAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Source: "test", RatesMicrousdPM: map[string]int64{"input": 1000000}}}}}
+	event := canonical.Event{EventID: "metric", EventType: "claude_code.token.usage", SessionID: "claude-code:s", Provider: "anthropic", OccurredAt: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC), ReceivedAt: time.Now(), Attributes: map[string]any{"model": "claude-haiku-4-5-20251001", "input_token_count": int64(100)}}
+	r := calculator.Calculate(event)
+	if r.Status != "not_applicable" || len(r.ObservedTokens) != 0 || r.AmountMicrousd != nil {
+		t.Fatalf("record=%#v", r)
+	}
+}
+
 func TestLoadDefaultCatalog(t *testing.T) {
 	calculator, err := LoadDefault("")
 	if err != nil {

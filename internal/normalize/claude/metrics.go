@@ -26,6 +26,12 @@ var ErrUnsupportedMetrics = errors.New("unsupported Claude Code metrics payload"
 // their per-metric canonical mapping is owned by the M-phase issues (#97–#99).
 const tokenUsageMetric = "claude_code.token.usage"
 
+// OTLP resource attribute keys read from a Claude Code metrics payload.
+const (
+	attrServiceName    = "service.name"
+	attrServiceVersion = "service.version"
+)
+
 // safeMetricAttributeKeys is the allow-list of datapoint/resource attribute keys
 // carried into provider_extensions. Ingest-time storage sanitising was removed
 // in #88, so this adapter is now the only guard: an allow-list (not a deny-list)
@@ -119,21 +125,36 @@ func NormalizeMetrics(data []byte, receivedAt time.Time) ([]canonical.Event, err
 	return normalize.CorrelateEvents(events), nil
 }
 
+// metricContext carries the resource- and scope-derived values shared by every
+// datapoint of a metric, so the per-datapoint helpers stay within the argument
+// limit rather than threading each field separately.
+type metricContext struct {
+	scopeName        string
+	resourceIdentity string
+	safeResource     map[string]any
+	version          string
+	receivedAt       time.Time
+}
+
 // tokenEventsFromResource normalises a single resourceMetrics entry, returning
 // events only when its service.name is claude-code (nil otherwise, so a mixed
 // payload is safe).
 func tokenEventsFromResource(resource resourceMetric, receivedAt time.Time) ([]canonical.Event, error) {
 	resourceAttrs := attributeValues(resource.Resource.Attributes)
-	if service, _ := resourceAttrs["service.name"].(string); service != claudeLogService {
+	if service, _ := resourceAttrs[attrServiceName].(string); service != claudeLogService {
 		return nil, nil
 	}
-	version := fallbackString(stringAttr(resourceAttrs, "service.version"), unavailable)
-	safeResource := safeMetricAttributes(resourceAttrs)
-	resourceIdentity := resourceIdentityKey(resourceAttrs)
+	ctx := metricContext{
+		resourceIdentity: resourceIdentityKey(resourceAttrs),
+		safeResource:     safeMetricAttributes(resourceAttrs),
+		version:          fallbackString(stringAttr(resourceAttrs, attrServiceVersion), unavailable),
+		receivedAt:       receivedAt,
+	}
 	var events []canonical.Event
 	for _, scope := range resource.ScopeMetrics {
+		ctx.scopeName = scope.Scope.Name
 		for _, item := range scope.Metrics {
-			metricEvents, err := tokenEventsFromMetric(item, scope.Scope.Name, resourceIdentity, safeResource, version, receivedAt)
+			metricEvents, err := tokenEventsFromMetric(item, ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -147,7 +168,7 @@ func tokenEventsFromResource(resource resourceMetric, receivedAt time.Time) ([]c
 // metric into events; any other metric yields none (route-tolerated). The value
 // points are read from the sum envelope (the observed instrument), falling back
 // to gauge so a future exporter variant still parses.
-func tokenEventsFromMetric(item otlpMetric, scopeName, resourceIdentity string, safeResource map[string]any, version string, receivedAt time.Time) ([]canonical.Event, error) {
+func tokenEventsFromMetric(item otlpMetric, ctx metricContext) ([]canonical.Event, error) {
 	if item.Name != tokenUsageMetric {
 		return nil, nil
 	}
@@ -160,7 +181,7 @@ func tokenEventsFromMetric(item otlpMetric, scopeName, resourceIdentity string, 
 	}
 	var events []canonical.Event
 	for index, point := range points.DataPoints {
-		event, ok, err := tokenUsageEvent(point, index, scopeName, resourceIdentity, safeResource, version, item.Unit, receivedAt)
+		event, ok, err := tokenUsageEvent(point, index, ctx, item.Unit)
 		if err != nil {
 			return nil, err
 		}
@@ -175,7 +196,7 @@ func tokenEventsFromMetric(item otlpMetric, scopeName, resourceIdentity string, 
 // event. An unrecognised token type is skipped (ok=false) so a future Claude
 // token category does not fail the whole batch; a recognised token type whose
 // value cannot be parsed is a hard error per the #89 routing contract.
-func tokenUsageEvent(point metricDataPoint, index int, scopeName, resourceIdentity string, safeResource map[string]any, version, unit string, receivedAt time.Time) (canonical.Event, bool, error) {
+func tokenUsageEvent(point metricDataPoint, index int, ctx metricContext, unit string) (canonical.Event, bool, error) {
 	fields := attributeValues(point.Attributes)
 	tokenType := strings.TrimSpace(stringAttr(fields, "type"))
 	attributeKey, ok := tokenUsageAttribute(tokenType)
@@ -187,12 +208,17 @@ func tokenUsageEvent(point metricDataPoint, index int, scopeName, resourceIdenti
 		return canonical.Event{}, false, fmt.Errorf("claude token.usage %q datapoint has no parseable value", tokenType)
 	}
 
-	occurredAt := metricTime(point.TimeUnixNano, receivedAt)
+	occurredAt := metricTime(point.TimeUnixNano, ctx.receivedAt)
 	model, modelObserved := normalize.ObservedString(fields["model"])
 	sessionID := normalize.ProviderNativeSessionID("claude-code:", stringAttr(fields, "session.id"))
 	safeFields := safeMetricAttributes(fields)
 
-	identity := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d", tokenUsageMetric, model, tokenType, point.TimeUnixNano, resourceIdentity, scopeName, index, *tokens)
+	// session.id is part of the event's semantic identity but is not in the
+	// safe-attribute allow-list, so it is added to the hash input explicitly:
+	// two concurrent sessions emitting the same metric/type/model/timestamp must
+	// not collide on one event ID and have one silently dropped by CorrelateEvents
+	// (or the global event_id primary key in storage).
+	identity := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%d|%d", tokenUsageMetric, sessionID, model, tokenType, point.TimeUnixNano, ctx.resourceIdentity, ctx.scopeName, index, *tokens)
 	identity += "|" + stableJSON(safeFields)
 	eventID := contentID("claude-code:token:", []byte(identity))
 
@@ -210,7 +236,7 @@ func tokenUsageEvent(point metricDataPoint, index int, scopeName, resourceIdenti
 			"token_type": tokenType,
 			"unit":       unit,
 		},
-		"resource":          safeResource,
+		"resource":          ctx.safeResource,
 		"metric_attributes": safeFields,
 	}
 	return canonical.Event{
@@ -218,11 +244,11 @@ func tokenUsageEvent(point metricDataPoint, index int, scopeName, resourceIdenti
 		EventID:            eventID,
 		EventType:          tokenUsageMetric,
 		OccurredAt:         occurredAt,
-		ReceivedAt:         receivedAt.UTC(),
+		ReceivedAt:         ctx.receivedAt.UTC(),
 		Provider:           provider,
 		Tool:               tool,
 		SourceSchema:       sourceSchema,
-		SourceVersion:      version,
+		SourceVersion:      ctx.version,
 		ActorID:            unavailable,
 		DeviceID:           unavailable,
 		SessionID:          sessionID,
@@ -276,9 +302,9 @@ func safeMetricAttributes(fields map[string]any) map[string]any {
 
 func resourceIdentityKey(resourceAttrs map[string]any) string {
 	return stableJSON(map[string]any{
-		"service.name":    stringAttr(resourceAttrs, "service.name"),
-		"service.version": stringAttr(resourceAttrs, "service.version"),
-		"resource":        safeMetricAttributes(resourceAttrs),
+		attrServiceName:    stringAttr(resourceAttrs, attrServiceName),
+		attrServiceVersion: stringAttr(resourceAttrs, attrServiceVersion),
+		"resource":         safeMetricAttributes(resourceAttrs),
 	})
 }
 

@@ -146,7 +146,12 @@ func merge(base, override Catalog) Catalog {
 
 func (c *Calculator) Calculate(event canonical.Event) Record {
 	r := Record{EventID: event.EventID, SessionID: event.SessionID, CalculatedAt: event.ReceivedAt.UTC(), CalculationVersion: "1", CatalogVersion: c.catalog.CatalogVersion, Currency: c.catalog.Currency, Status: "not_applicable", ObservedTokens: map[string]int64{}}
-	if event.EventType == "codex.turn.token_usage" {
+	// Metric-derived token events are not priced here: they are per-interval
+	// delta samples (Codex codex.turn.token_usage; Claude claude_code.token.usage),
+	// not authoritative per-request totals, so pricing them would double-count
+	// against the request-level cost derived from api_request/ModelInteraction
+	// events. Claude cost support remains out of scope until #97.
+	if event.EventType == "codex.turn.token_usage" || event.EventType == "claude_code.token.usage" {
 		return r
 	}
 	model, _ := event.Attributes["model"].(string)
