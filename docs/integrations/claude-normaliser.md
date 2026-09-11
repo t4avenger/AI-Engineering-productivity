@@ -63,6 +63,52 @@ Only signals the P2 Claude Code matrix marks `supported`/`partial` are extracted
 Records are sorted by `started_at`, `request_id`, and `completed_at`, then
 deduplicated by `request_id`.
 
+## Metrics path — `NormalizeMetrics`
+
+Issue #89 routes Claude Code's OTLP **metrics** (`POST /v1/metrics`) into the
+adapter, mirroring the dual-adapter routing already used for `/v1/logs`.
+`persistMetrics` (`internal/api/otlp.go`) invokes `codex.NormalizeMetrics` then
+`claude.NormalizeMetrics` and persists the union; each adapter normalises only
+the resources whose `service.name` it recognises (Claude Code: `claude-code`)
+and returns `ErrUnsupportedMetrics` for a payload with none of its own, so a
+mixed-tool batch is safe. A non-sentinel error from either adapter aborts the
+whole batch — a malformed resource never lets half a mixed batch persist.
+
+The capture shows `claude_code.token.usage` is a monotonic **sum** whose
+datapoints encode the count as `asDouble`, carry the token category in a
+camelCase `type` attribute (`input`/`output`/`cacheRead`/`cacheCreation`), and
+stamp `session.id`, `model`, and `query_source` per datapoint
+(`fixtures/claude/observed-sanitised/claude-code-2.1.268-token-usage-metrics.json`,
+tool 2.1.268). Each datapoint becomes one `canonical.Event`
+(`event_type = claude_code.token.usage`, `provider = anthropic`,
+`tool = claude-code`) whose `session_id` is the raw `claude-code:<session.id>`
+(epic #87 — no hiding) shared across the session's token categories. The token
+category maps onto the canonical keys shared with the Codex adapter:
+`input → input_token_count`, `output → output_token_count`,
+`cacheRead → cached_input_token_count`,
+`cacheCreation → cache_write_input_token_count`. A genuine `0` is kept (never a
+fabricated absence); an unrecognised `type` is skipped so a future Claude token
+category does not fail the batch, while a recognised type with an unparseable
+value is a hard normalisation error rather than a silently dropped 202.
+
+Only `claude_code.token.usage` is mapped in #89. The other seven exported
+metrics (cost/session/active-time/lines-of-code/commits/PRs/edit-decisions) are
+route-tolerated — accepted without error but not yet mapped; their per-metric
+canonical mapping is owned by the M-phase issues (#97–#99). In particular this
+does **not** add cost support: `internal/cost/cost.go` keys on
+`codex.turn.token_usage`, so the new `claude_code.token.usage` event only
+preserves token evidence until #97 extends the cost logic.
+
+Because #88 removed storage-side sanitising, the adapter is the sole guard for
+metric attributes: it carries only an **allow-list** of safe keys
+(`query_source`, `host.arch`, `os.type`) into
+`provider_extensions.metric_attributes`/`resource`, dropping operator/identity
+and any unforeseen attribute (`user.*`, `organization.*`, `terminal.*`,
+secrets, paths) by default. Event IDs are a content hash over the metric name,
+token type, model, timestamp, resource/scope identity, datapoint index, and
+value, so same-timestamp datapoints in one session stay distinct under
+`CorrelateEvents`.
+
 ## Privacy
 
 `NormalizeEvents` and `ExtractModelInteractions` retain `session_id` and
@@ -79,6 +125,8 @@ in #94.
   events for the committed OTLP-events fixture.
 - `fixtures/claude/expected/claude-code-2.1.251-otlp-events.records.json` — canonical
   model-interaction records for the same input.
+- `fixtures/claude/expected/claude-code-2.1.268-token-usage-metrics.events.json` —
+  canonical token-usage events for the committed `/v1/metrics` fixture.
 
 Regenerate them with `UPDATE_GOLDEN=1 go test ./internal/normalize/claude/ -run Golden`
 after a reviewed change, then inspect the diff.

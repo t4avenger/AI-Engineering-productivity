@@ -48,6 +48,39 @@ Committed evidence:
 - `fixtures/claude/observed-sanitised/claude-code-2.1.263-skill-activated-otlp.json`
   (sanitised OTLP `resourceLogs` for live ingest)
 
+## Metrics capture
+
+To capture the Claude Code OTLP **metrics** surface (`POST /v1/metrics`), run a
+synthetic turn against a loopback sink with the metrics exporter enabled. Do not
+set `OTEL_SERVICE_NAME` or force resource attributes — the point is to observe
+what Claude Code emits by default (it stamps `service.name = claude-code`):
+
+```bash
+export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318
+export OTEL_METRIC_EXPORT_INTERVAL=2000
+```
+
+Run a synthetic prompt (`claude -p 'Reply with exactly the word: pong'`) so a real
+model request produces `claude_code.token.usage`, then let the exporter flush
+before exit. The observed shape (tool 2.1.268): `claude_code.token.usage` is a
+monotonic **sum** whose datapoints encode the value as `asDouble` and carry the
+token category in a camelCase `type` attribute
+(`input`/`output`/`cacheRead`/`cacheCreation`), with `session.id`, `model`, and
+`query_source` stamped per datapoint. Sanitise per the rules above — replace
+`user.id`, `session.id`, `organization.id`, `user.email`, `user.account_*`, and
+host identifiers with synthetic values (the raw 64-char `user.id` hash trips the
+validator's entropy check), keeping the instrument/datapoint shape intact.
+
+Committed evidence:
+
+- `fixtures/claude/observed-sanitised/claude-code-2.1.268-token-usage-metrics.json`
+  (sanitised OTLP `resourceMetrics` for live `/v1/metrics` ingest)
+- `fixtures/claude/expected/claude-code-2.1.268-token-usage-metrics.events.json`
+  (golden canonical token-usage events)
+
 ## Outcome-contract capture
 
 To raise Task outcome above `unknown`, capture provider-completion signals without

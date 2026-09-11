@@ -197,6 +197,171 @@ func assertPersistedInputTokenMetric(t *testing.T, events []canonical.Event) {
 	t.Fatalf("expected one persisted input token event, got %#v", events)
 }
 
+func TestClaudeTokenUsageMetricsPersistThroughMetricsReceiver(t *testing.T) {
+	repository, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = repository.Close() })
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
+	t.Cleanup(server.Close)
+
+	response := postOTLPToPath(t, server.URL, "/v1/metrics", metricsFixturePayloadBytes(t, "claude-code-2.1.268-token-usage-metrics.json"), "application/json")
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("claude token metrics status = %d", response.StatusCode)
+	}
+	closeBody(t, response)
+
+	// Claude Code stamps a real per-datapoint session.id, so every token category
+	// shares one session (unlike Codex, which keys the session on the event ID).
+	sessions, err := repository.ListSessions(context.Background(), storage.SessionFilter{Limit: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sessions) != 1 || sessions[0].SessionID != "claude-code:00000000-0000-4000-8000-000000000001" {
+		t.Fatalf("sessions = %#v, want one raw provider-native Claude session", sessions)
+	}
+	events, err := repository.ListEvents(context.Background(), storage.EventFilter{SessionID: sessions[0].SessionID, Limit: 20})
+	if err != nil || len(events) != 4 {
+		t.Fatalf("events = %#v, %v, want 4 token categories", events, err)
+	}
+	encoded, err := json.Marshal(events)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNoRawIdentifiers(t, []string{"microrutter2514@gmail.com", "synthetic@example.test", "user_synthetic"}, encoded)
+	var sawInput bool
+	for _, event := range events {
+		if event.EventType != "claude_code.token.usage" {
+			t.Fatalf("event type = %q", event.EventType)
+		}
+		if event.Attributes["input_token_count"] == float64(10) || event.Attributes["input_token_count"] == int64(10) {
+			sawInput = true
+		}
+	}
+	if !sawInput {
+		t.Fatalf("expected a persisted input token count of 10, got %s", encoded)
+	}
+}
+
+// TestMixedToolMetricsBatchPersistsBothTools proves the dual-adapter accumulator:
+// a single /v1/metrics payload carrying both a Codex and a Claude resource
+// persists both tools' token events (the negative sentinel tests alone do not
+// exercise accumulation).
+func TestMixedToolMetricsBatchPersistsBothTools(t *testing.T) {
+	repository, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = repository.Close() })
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
+	t.Cleanup(server.Close)
+
+	payload := mergeMetricsPayloads(t,
+		metricsFixturePayloadBytes(t, "codex-0.153.4-turn-token-usage-metrics.json"),
+		metricsFixturePayloadBytes(t, "claude-code-2.1.268-token-usage-metrics.json"),
+	)
+	response := postOTLPToPath(t, server.URL, "/v1/metrics", payload, "application/json")
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("mixed metrics status = %d", response.StatusCode)
+	}
+	closeBody(t, response)
+
+	sessions, err := repository.ListSessions(context.Background(), storage.SessionFilter{Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawCodex, sawClaude bool
+	for _, session := range sessions {
+		events, err := repository.ListEvents(context.Background(), storage.EventFilter{SessionID: session.SessionID, Limit: 50})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, event := range events {
+			switch event.Tool {
+			case "codex":
+				sawCodex = true
+			case "claude-code":
+				sawClaude = true
+			}
+		}
+	}
+	if !sawCodex || !sawClaude {
+		t.Fatalf("mixed batch must persist both tools: codex=%v claude=%v", sawCodex, sawClaude)
+	}
+}
+
+// TestMixedMetricsBatchMalformedClaudeRejectsWholeBatch proves the
+// no-partial-persistence contract: a payload with a valid Codex resource and a
+// malformed Claude token.usage resource is rejected whole, persisting nothing.
+func TestMixedMetricsBatchMalformedClaudeRejectsWholeBatch(t *testing.T) {
+	repository, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = repository.Close() })
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
+	t.Cleanup(server.Close)
+
+	malformedClaude := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeMetrics":[{"metrics":[{"name":"claude_code.token.usage","sum":{"dataPoints":[{"attributes":[{"key":"type","value":{"stringValue":"input"}}],"asDouble":-1,"timeUnixNano":"1789042160000000000"}]}}]}]}]}`)
+	payload := mergeMetricsPayloads(t,
+		metricsFixturePayloadBytes(t, "codex-0.153.4-turn-token-usage-metrics.json"),
+		malformedClaude,
+	)
+	response := postOTLPToPath(t, server.URL, "/v1/metrics", payload, "application/json")
+	assertIngestError(t, response, http.StatusUnprocessableEntity, "normalization_failed")
+
+	sessions, err := repository.ListSessions(context.Background(), storage.SessionFilter{Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sessions) != 0 {
+		t.Fatalf("a rejected batch must persist nothing, got %#v", sessions)
+	}
+}
+
+// metricsFixturePayloadBytes reads a fixture wrapper and returns its OTLP payload.
+func metricsFixturePayloadBytes(t *testing.T, name string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "..", "fixtures", "claude", "observed-sanitised", name))
+	if os.IsNotExist(err) {
+		data, err = os.ReadFile(filepath.Join("..", "..", "fixtures", "codex", "observed-sanitised", name))
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Payload json.RawMessage `json:"payload"`
+	}
+	if err := json.Unmarshal(data, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	return fixture.Payload
+}
+
+// mergeMetricsPayloads concatenates the resourceMetrics arrays of two OTLP
+// payloads into a single batch, so one POST carries multiple tools' resources.
+func mergeMetricsPayloads(t *testing.T, payloads ...[]byte) []byte {
+	t.Helper()
+	var merged []json.RawMessage
+	for _, payload := range payloads {
+		var decoded struct {
+			ResourceMetrics []json.RawMessage `json:"resourceMetrics"`
+		}
+		if err := json.Unmarshal(payload, &decoded); err != nil {
+			t.Fatal(err)
+		}
+		merged = append(merged, decoded.ResourceMetrics...)
+	}
+	out, err := json.Marshal(struct {
+		ResourceMetrics []json.RawMessage `json:"resourceMetrics"`
+	}{ResourceMetrics: merged})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
 func TestObservedSanitisedFixtureReplaysToLogsReceiver(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "..", "fixtures", "codex", "observed-sanitised", "codex-0.145.0-logs.json"))
 	if err != nil {

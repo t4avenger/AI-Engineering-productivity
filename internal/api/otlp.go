@@ -186,10 +186,16 @@ func (i *otlpHTTPIngest) persistLogs(request *http.Request, payload map[string]j
 	return nil
 }
 
-// persistMetrics normalises a raw OTLP metrics payload and persists only
-// reviewed Codex skill-injection datapoints as canonical events. Non-skill
-// metrics are accepted at the HTTP layer (so exporters do not retry) but produce
-// no events.
+// persistMetrics routes a raw OTLP metrics payload through every per-tool metrics
+// adapter. Each adapter normalises only the resources whose service.name it
+// recognises (Codex: codex_cli_rs/codex_exec; Claude Code: claude-code) and
+// returns ErrUnsupportedMetrics for a payload with none of its own, so a payload
+// from an unknown tool — or one mixing tools — is handled safely rather than
+// misattributed. A non-sentinel error from either adapter aborts the whole batch:
+// a malformed resource never lets half a mixed batch persist. Metrics the
+// adapters do not map are accepted at the HTTP layer (so exporters do not retry)
+// but produce no events. The payload is normalised verbatim — no ingest-time
+// hiding is applied (epic #87).
 func (i *otlpHTTPIngest) persistMetrics(request *http.Request, payload map[string]json.RawMessage) error {
 	if i.repository == nil {
 		return nil
@@ -200,10 +206,19 @@ func (i *otlpHTTPIngest) persistMetrics(request *http.Request, payload map[strin
 	}
 	receivedAt := time.Now().UTC()
 
-	events, err := codex.NormalizeMetrics(rawBytes, receivedAt)
+	var events []canonical.Event
+	codexEvents, err := codex.NormalizeMetrics(rawBytes, receivedAt)
 	if err != nil && !errors.Is(err, codex.ErrUnsupportedMetrics) {
 		return fmt.Errorf("normalise: %w", err)
 	}
+	events = append(events, codexEvents...)
+
+	claudeEvents, err := claude.NormalizeMetrics(rawBytes, receivedAt)
+	if err != nil && !errors.Is(err, claude.ErrUnsupportedMetrics) {
+		return fmt.Errorf("normalise: %w", err)
+	}
+	events = append(events, claudeEvents...)
+
 	if len(events) == 0 {
 		return nil
 	}

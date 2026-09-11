@@ -1,0 +1,222 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:token:139f95e884e95b0a467fce407d24179e9dee5571a1ed52e60c89160dc1b719a8",
+    "event_type": "claude_code.token.usage",
+    "occurred_at": "2026-09-11T07:50:30.911Z",
+    "received_at": "2026-09-11T08:50:31Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.268",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "input_token_count": 10,
+      "model": "claude-haiku-4-5-20251001",
+      "unavailable_fields": [
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "command_execution",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "trace_span_correlation"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:token:139f95e884e95b0a467fce407d24179e9dee5571a1ed52e60c89160dc1b719a8",
+        "ordering_key": "01789113030911000000:claude-code:token:139f95e884e95b0a467fce407d24179e9dee5571a1ed52e60c89160dc1b719a8",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code token metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "name": "claude_code.token.usage",
+        "token_type": "input",
+        "unit": "tokens"
+      },
+      "metric_attributes": {
+        "query_source": "main"
+      },
+      "resource": {
+        "host.arch": "amd64",
+        "os.type": "linux"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:token:1a1dacb1207e5a5ba6bd16140c6b161be2c29bd2a854059a54b2ea6272b87cc5",
+    "event_type": "claude_code.token.usage",
+    "occurred_at": "2026-09-11T07:50:30.911Z",
+    "received_at": "2026-09-11T08:50:31Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.268",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cache_write_input_token_count": 18856,
+      "model": "claude-haiku-4-5-20251001",
+      "unavailable_fields": [
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "command_execution",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "trace_span_correlation"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:token:1a1dacb1207e5a5ba6bd16140c6b161be2c29bd2a854059a54b2ea6272b87cc5",
+        "ordering_key": "01789113030911000000:claude-code:token:1a1dacb1207e5a5ba6bd16140c6b161be2c29bd2a854059a54b2ea6272b87cc5",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code token metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "name": "claude_code.token.usage",
+        "token_type": "cacheCreation",
+        "unit": "tokens"
+      },
+      "metric_attributes": {
+        "query_source": "main"
+      },
+      "resource": {
+        "host.arch": "amd64",
+        "os.type": "linux"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:token:c5cd944a856600c75b483770aab67f086873855e9e4e484b5a0b0a9494c0fde0",
+    "event_type": "claude_code.token.usage",
+    "occurred_at": "2026-09-11T07:50:30.911Z",
+    "received_at": "2026-09-11T08:50:31Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.268",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "model": "claude-haiku-4-5-20251001",
+      "output_token_count": 42,
+      "unavailable_fields": [
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "command_execution",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "trace_span_correlation"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:token:c5cd944a856600c75b483770aab67f086873855e9e4e484b5a0b0a9494c0fde0",
+        "ordering_key": "01789113030911000000:claude-code:token:c5cd944a856600c75b483770aab67f086873855e9e4e484b5a0b0a9494c0fde0",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code token metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "name": "claude_code.token.usage",
+        "token_type": "output",
+        "unit": "tokens"
+      },
+      "metric_attributes": {
+        "query_source": "main"
+      },
+      "resource": {
+        "host.arch": "amd64",
+        "os.type": "linux"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:token:eea611a235d55e8d02cd70bd625adde85ce0be52e2a5bdec043e752de9bb6cbc",
+    "event_type": "claude_code.token.usage",
+    "occurred_at": "2026-09-11T07:50:30.911Z",
+    "received_at": "2026-09-11T08:50:31Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.268",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cached_input_token_count": 0,
+      "model": "claude-haiku-4-5-20251001",
+      "unavailable_fields": [
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "command_execution",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "trace_span_correlation"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:token:eea611a235d55e8d02cd70bd625adde85ce0be52e2a5bdec043e752de9bb6cbc",
+        "ordering_key": "01789113030911000000:claude-code:token:eea611a235d55e8d02cd70bd625adde85ce0be52e2a5bdec043e752de9bb6cbc",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code token metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "name": "claude_code.token.usage",
+        "token_type": "cacheRead",
+        "unit": "tokens"
+      },
+      "metric_attributes": {
+        "query_source": "main"
+      },
+      "resource": {
+        "host.arch": "amd64",
+        "os.type": "linux"
+      }
+    }
+  }
+]
