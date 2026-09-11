@@ -138,11 +138,21 @@ valid histogram datapoint into a `codex.turn.token_usage` canonical event:
 - `total` -> `attributes.total_token_count`
 
 The token count comes from the histogram datapoint `sum`. Missing, malformed, or
-negative sums produce no event rather than a fabricated zero. The datapoint
-`count` is preserved only as metric evidence under `provider_extensions.metric`,
-and safe non-promoted datapoint attributes are kept under
-`provider_extensions.metric_attributes` after the same sensitive-key filter used
-for Codex logs.
+negative sums produce no event rather than a fabricated zero. Token metric event
+IDs include service/resource, scope, token type, model, timestamp, series
+attributes, and token sum so distinct resource or series datapoints do not
+collapse during replay deduplication. The datapoint `count` is preserved only as
+metric evidence under `provider_extensions.metric`. Non-promoted metric and
+resource attributes are retained only from a reviewed allowlist
+(`app.version`, `auth_mode`, `deployment.environment`, `originator`,
+`session_source`, `tmp_mem_enabled`); other fields are discarded before
+persistence rather than filtered by denylist.
+
+Metric token events are deliberately non-priceable in the cost calculator to
+avoid double-counting normal Codex exports where `codex.sse_event` logs and
+`codex.turn.token_usage` metrics can describe the same turn. Cost attribution for
+the full metric token surface remains gated on #118, where an authoritative
+source/dedup policy will be chosen.
 
 Golden: `fixtures/codex/expected/codex-0.153.4-turn-token-usage-metrics.events.json`
 for `fixtures/codex/observed-sanitised/codex-0.153.4-turn-token-usage-metrics.json`.

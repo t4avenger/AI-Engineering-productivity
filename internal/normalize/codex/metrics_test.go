@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -135,21 +136,42 @@ func TestNormalizeMetricsUnknownInstrumentIsIgnored(t *testing.T) {
 	}
 }
 
-func TestNormalizeMetricsTokenUsageFiltersSensitiveMetricAttributes(t *testing.T) {
-	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.turn.token_usage","histogram":{"dataPoints":[{"attributes":[{"key":"token_type","value":{"stringValue":"input"}},{"key":"api_key","value":{"stringValue":"tiq-canary-api-key"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"originator","value":{"stringValue":"codex_exec"}}],"count":"1","sum":"12","timeUnixNano":"1789042160000000000"}]}}]}]}]}`)
+func TestNormalizeMetricsTokenUsageFiltersSensitiveAttributes(t *testing.T) {
+	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"api_key","value":{"stringValue":"tiq-canary-resource-key"}},{"key":"user.email","value":{"stringValue":"resource@example.test"}},{"key":"deployment.environment","value":{"stringValue":"telemetryiq-synthetic"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.turn.token_usage","histogram":{"dataPoints":[{"attributes":[{"key":"token_type","value":{"stringValue":"input"}},{"key":"api_key","value":{"stringValue":"tiq-canary-api-key"}},{"key":"authorization","value":{"stringValue":"Bearer tiq-canary-token"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"originator","value":{"stringValue":"codex_exec"}}],"count":"1","sum":"12","timeUnixNano":"1789042160000000000"}]}}]}]}]}`)
 	events, err := NormalizeMetrics(payload, time.Date(2026, 9, 10, 20, 9, 21, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("NormalizeMetrics: %v", err)
 	}
+	encoded, err := json.Marshal(events)
+	if err != nil {
+		t.Fatalf("marshal events: %v", err)
+	}
+	for _, leaked := range []string{"tiq-canary-resource-key", "resource@example.test", "tiq-canary-api-key", "Bearer tiq-canary-token", "synthetic@example.test"} {
+		if strings.Contains(string(encoded), leaked) {
+			t.Fatalf("sensitive value %q leaked in %s", leaked, encoded)
+		}
+	}
 	metricAttributes := events[0].ProviderExtensions["metric_attributes"].(map[string]any)
-	if _, ok := metricAttributes["api_key"]; ok {
-		t.Fatalf("api_key leaked into metric attributes: %#v", metricAttributes)
-	}
-	if _, ok := metricAttributes["user.email"]; ok {
-		t.Fatalf("user.email leaked into metric attributes: %#v", metricAttributes)
-	}
 	if metricAttributes["originator"] != "codex_exec" {
 		t.Fatalf("safe metric attributes not preserved: %#v", metricAttributes)
+	}
+	resource := events[0].ProviderExtensions["resource"].(map[string]any)
+	if resource["deployment.environment"] != "telemetryiq-synthetic" {
+		t.Fatalf("safe resource attributes not preserved: %#v", resource)
+	}
+}
+
+func TestNormalizeMetricsTokenUsageIdentityIncludesSeries(t *testing.T) {
+	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"deployment.environment","value":{"stringValue":"one"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.turn.token_usage","histogram":{"dataPoints":[{"attributes":[{"key":"token_type","value":{"stringValue":"input"}},{"key":"originator","value":{"stringValue":"codex_exec"}}],"count":"1","sum":"12","timeUnixNano":"1789042160000000000"}]}}]}]},{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"deployment.environment","value":{"stringValue":"two"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.turn.token_usage","histogram":{"dataPoints":[{"attributes":[{"key":"token_type","value":{"stringValue":"input"}},{"key":"originator","value":{"stringValue":"codex_exec"}}],"count":"1","sum":"12","timeUnixNano":"1789042160000000000"}]}}]}]}]}`)
+	events, err := NormalizeMetrics(payload, time.Date(2026, 9, 10, 20, 9, 21, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("NormalizeMetrics: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("event count = %d, want 2 distinct resource series", len(events))
+	}
+	if events[0].EventID == events[1].EventID {
+		t.Fatalf("event IDs must include resource/series identity: %#v", events)
 	}
 }
 

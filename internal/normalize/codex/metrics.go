@@ -37,6 +37,10 @@ type resourceMetric struct {
 }
 
 type scopeMetric struct {
+	Scope struct {
+		Name       string      `json:"name"`
+		Attributes []attribute `json:"attributes"`
+	} `json:"scope"`
 	Metrics []otlpMetric `json:"metrics"`
 }
 
@@ -102,8 +106,9 @@ func skillEventsFromResource(resource resourceMetric, receivedAt time.Time) ([]c
 	version := stringValue(resourceAttrs[serviceVersionAttribute], unavailable)
 	var events []canonical.Event
 	for _, scope := range resource.ScopeMetrics {
+		scopeID := metricScopeIdentity(scope)
 		for _, item := range scope.Metrics {
-			extracted, err := skillEventsFromMetric(resourceAttrs, version, item, receivedAt)
+			extracted, err := skillEventsFromMetric(resourceAttrs, scopeID, version, item, receivedAt)
 			if err != nil {
 				return nil, err
 			}
@@ -113,12 +118,12 @@ func skillEventsFromResource(resource resourceMetric, receivedAt time.Time) ([]c
 	return events, nil
 }
 
-func skillEventsFromMetric(resourceAttrs map[string]any, version string, item otlpMetric, receivedAt time.Time) ([]canonical.Event, error) {
+func skillEventsFromMetric(resourceAttrs map[string]any, scopeID string, version string, item otlpMetric, receivedAt time.Time) ([]canonical.Event, error) {
 	if item.Name == skillTurnDurationMetric && item.Histogram != nil {
 		return skillTurnEventsFromHistogram(resourceAttrs, version, item.Histogram, receivedAt), nil
 	}
 	if item.Name == turnTokenUsageMetric && item.Histogram != nil {
-		return tokenUsageEventsFromHistogram(resourceAttrs, version, item.Histogram, receivedAt), nil
+		return tokenUsageEventsFromHistogram(resourceAttrs, scopeID, version, item.Histogram, receivedAt), nil
 	}
 	if item.Name != skillInjectedMetric || item.Sum == nil {
 		return nil, nil
@@ -136,17 +141,17 @@ func skillEventsFromMetric(resourceAttrs map[string]any, version string, item ot
 	return events, nil
 }
 
-func tokenUsageEventsFromHistogram(resourceAttrs map[string]any, version string, histogram *metricHistogram, receivedAt time.Time) []canonical.Event {
+func tokenUsageEventsFromHistogram(resourceAttrs map[string]any, scopeID string, version string, histogram *metricHistogram, receivedAt time.Time) []canonical.Event {
 	events := make([]canonical.Event, 0, len(histogram.DataPoints))
 	for index, point := range histogram.DataPoints {
-		if event, ok := tokenUsageEvent(resourceAttrs, version, point, index, receivedAt); ok {
+		if event, ok := tokenUsageEvent(resourceAttrs, scopeID, version, point, index, receivedAt); ok {
 			events = append(events, event)
 		}
 	}
 	return events
 }
 
-func tokenUsageEvent(resource map[string]any, version string, point histogramDataPoint, index int, receivedAt time.Time) (canonical.Event, bool) {
+func tokenUsageEvent(resource map[string]any, scopeID string, version string, point histogramDataPoint, index int, receivedAt time.Time) (canonical.Event, bool) {
 	fields := attributes(point.Attributes)
 	tokenType := strings.TrimSpace(stringValue(fields["token_type"], ""))
 	attributeKey, ok := tokenUsageAttribute(tokenType)
@@ -159,7 +164,10 @@ func tokenUsageEvent(resource map[string]any, version string, point histogramDat
 	}
 	occurredAt := metricTime(point.TimeUnixNano, receivedAt)
 	model, modelObserved := normalize.ObservedString(fields["model"])
-	identity := fmt.Sprintf("%s|%s|%s|%s|%d|%d", turnTokenUsageMetric, model, tokenType, point.TimeUnixNano, index, *tokens)
+	safeResource := safeCodexMetricAttributes(normalize.UnknownFields(resource, serviceNameAttribute, serviceVersionAttribute))
+	safeFields := safeCodexMetricAttributes(normalize.UnknownFields(fields, "model", "token_type"))
+	identity := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d", turnTokenUsageMetric, model, tokenType, point.TimeUnixNano, metricResourceIdentity(resource, safeResource), scopeID, index, *tokens)
+	identity += "|" + stableJSON(safeFields)
 	eventID := contentID("codex:token:", []byte(identity))
 
 	attributes := map[string]any{
@@ -176,10 +184,51 @@ func tokenUsageEvent(resource map[string]any, version string, point histogramDat
 			"token_type": tokenType,
 			"count":      metricCount(point.Count),
 		},
-		"resource":          normalize.UnknownFields(resource, serviceNameAttribute, serviceVersionAttribute),
-		"metric_attributes": safeCodexLogAttributes(normalize.UnknownFields(fields, "model", "token_type")),
+		"resource":          safeResource,
+		"metric_attributes": safeFields,
 	}
 	return tokenEvent(eventID, occurredAt, receivedAt, version, attributes, extensions), true
+}
+
+func metricScopeIdentity(scope scopeMetric) string {
+	return stableJSON(map[string]any{
+		"name":       scope.Scope.Name,
+		"attributes": safeCodexMetricAttributes(attributes(scope.Scope.Attributes)),
+	})
+}
+
+func metricResourceIdentity(resource map[string]any, safeResource map[string]any) string {
+	return stableJSON(map[string]any{
+		"service.name":    stringValue(resource[serviceNameAttribute], ""),
+		"service.version": stringValue(resource[serviceVersionAttribute], ""),
+		"resource":        safeResource,
+	})
+}
+
+func stableJSON(value any) string {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func safeCodexMetricAttributes(fields map[string]any) map[string]any {
+	allowed := map[string]struct{}{
+		"app.version":            {},
+		"auth_mode":              {},
+		"deployment.environment": {},
+		"originator":             {},
+		"session_source":         {},
+		"tmp_mem_enabled":        {},
+	}
+	safe := make(map[string]any)
+	for key, value := range fields {
+		if _, ok := allowed[strings.ToLower(strings.TrimSpace(key))]; ok {
+			safe[key] = value
+		}
+	}
+	return safe
 }
 
 func tokenUsageAttribute(tokenType string) (string, bool) {

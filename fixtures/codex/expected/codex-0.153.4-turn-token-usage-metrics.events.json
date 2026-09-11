@@ -1,7 +1,7 @@
 [
   {
     "schema_version": "0.1.0",
-    "event_id": "codex:token:b2315a67b3b94033ef204e64e6281a19ef007a98e263b2eb53e804175da1e2b5",
+    "event_id": "codex:token:1d3cc8a202ac7483f750cd2a1fa296a8aab6fdfc47767b587071f35fe1de9374",
     "event_type": "codex.turn.token_usage",
     "occurred_at": "2026-09-10T12:09:20Z",
     "received_at": "2026-09-10T20:09:21Z",
@@ -11,7 +11,7 @@
     "source_version": "0.153.4",
     "actor_id": "unavailable",
     "device_id": "unavailable",
-    "session_id": "codex:token:b2315a67b3b94033ef204e64e6281a19ef007a98e263b2eb53e804175da1e2b5",
+    "session_id": "codex:token:1d3cc8a202ac7483f750cd2a1fa296a8aab6fdfc47767b587071f35fe1de9374",
     "task_id": null,
     "repository_id": null,
     "privacy_level": "operational",
@@ -33,8 +33,8 @@
     },
     "provider_extensions": {
       "correlation": {
-        "dedup_key": "codex:token:b2315a67b3b94033ef204e64e6281a19ef007a98e263b2eb53e804175da1e2b5",
-        "ordering_key": "01789042160000000000:codex:token:b2315a67b3b94033ef204e64e6281a19ef007a98e263b2eb53e804175da1e2b5",
+        "dedup_key": "codex:token:1d3cc8a202ac7483f750cd2a1fa296a8aab6fdfc47767b587071f35fe1de9374",
+        "ordering_key": "01789042160000000000:codex:token:1d3cc8a202ac7483f750cd2a1fa296a8aab6fdfc47767b587071f35fe1de9374",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Codex token metrics have no reviewed task-boundary signal"
@@ -55,7 +55,7 @@
   },
   {
     "schema_version": "0.1.0",
-    "event_id": "codex:token:6bdc468aa9589eac25f3e9f79cc7339b46757554ff240b6cb1f9e71175a23218",
+    "event_id": "codex:token:2fe9166bf3acb29c2f44dbf41d66dde2b45477bd0d21458dd2e8188543216a34",
     "event_type": "codex.turn.token_usage",
     "occurred_at": "2026-09-10T12:09:20.000000001Z",
     "received_at": "2026-09-10T20:09:21Z",
@@ -65,7 +65,7 @@
     "source_version": "0.153.4",
     "actor_id": "unavailable",
     "device_id": "unavailable",
-    "session_id": "codex:token:6bdc468aa9589eac25f3e9f79cc7339b46757554ff240b6cb1f9e71175a23218",
+    "session_id": "codex:token:2fe9166bf3acb29c2f44dbf41d66dde2b45477bd0d21458dd2e8188543216a34",
     "task_id": null,
     "repository_id": null,
     "privacy_level": "operational",
@@ -87,8 +87,8 @@
     },
     "provider_extensions": {
       "correlation": {
-        "dedup_key": "codex:token:6bdc468aa9589eac25f3e9f79cc7339b46757554ff240b6cb1f9e71175a23218",
-        "ordering_key": "01789042160000000001:codex:token:6bdc468aa9589eac25f3e9f79cc7339b46757554ff240b6cb1f9e71175a23218",
+        "dedup_key": "codex:token:2fe9166bf3acb29c2f44dbf41d66dde2b45477bd0d21458dd2e8188543216a34",
+        "ordering_key": "01789042160000000001:codex:token:2fe9166bf3acb29c2f44dbf41d66dde2b45477bd0d21458dd2e8188543216a34",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Codex token metrics have no reviewed task-boundary signal"
@@ -107,7 +107,7 @@
   },
   {
     "schema_version": "0.1.0",
-    "event_id": "codex:token:ff201d7472fa7fceb6d44fda610866374cea8509e1d62f3df65d951eb0c4496a",
+    "event_id": "codex:token:936d2460ea088175864bfcf5748e2a2179bfd99ec24d1194d0d59ac58fb95ab9",
     "event_type": "codex.turn.token_usage",
     "occurred_at": "2026-09-10T12:09:20.000000002Z",
     "received_at": "2026-09-10T20:09:21Z",
@@ -117,7 +117,7 @@
     "source_version": "0.153.4",
     "actor_id": "unavailable",
     "device_id": "unavailable",
-    "session_id": "codex:token:ff201d7472fa7fceb6d44fda610866374cea8509e1d62f3df65d951eb0c4496a",
+    "session_id": "codex:token:936d2460ea088175864bfcf5748e2a2179bfd99ec24d1194d0d59ac58fb95ab9",
     "task_id": null,
     "repository_id": null,
     "privacy_level": "operational",
@@ -139,8 +139,8 @@
     },
     "provider_extensions": {
       "correlation": {
-        "dedup_key": "codex:token:ff201d7472fa7fceb6d44fda610866374cea8509e1d62f3df65d951eb0c4496a",
-        "ordering_key": "01789042160000000002:codex:token:ff201d7472fa7fceb6d44fda610866374cea8509e1d62f3df65d951eb0c4496a",
+        "dedup_key": "codex:token:936d2460ea088175864bfcf5748e2a2179bfd99ec24d1194d0d59ac58fb95ab9",
+        "ordering_key": "01789042160000000002:codex:token:936d2460ea088175864bfcf5748e2a2179bfd99ec24d1194d0d59ac58fb95ab9",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Codex token metrics have no reviewed task-boundary signal"
@@ -159,7 +159,7 @@
   },
   {
     "schema_version": "0.1.0",
-    "event_id": "codex:token:1aa424161b996cc3ea8f5ead3ce5f9c4914af8a2268b04d13f2395ec7a037452",
+    "event_id": "codex:token:c2f9269f885a63462ea1be964a9e0d0f8b89c1c65396cdbb08ef79f6850e7a17",
     "event_type": "codex.turn.token_usage",
     "occurred_at": "2026-09-10T12:09:20.000000003Z",
     "received_at": "2026-09-10T20:09:21Z",
@@ -169,7 +169,7 @@
     "source_version": "0.153.4",
     "actor_id": "unavailable",
     "device_id": "unavailable",
-    "session_id": "codex:token:1aa424161b996cc3ea8f5ead3ce5f9c4914af8a2268b04d13f2395ec7a037452",
+    "session_id": "codex:token:c2f9269f885a63462ea1be964a9e0d0f8b89c1c65396cdbb08ef79f6850e7a17",
     "task_id": null,
     "repository_id": null,
     "privacy_level": "operational",
@@ -191,8 +191,8 @@
     },
     "provider_extensions": {
       "correlation": {
-        "dedup_key": "codex:token:1aa424161b996cc3ea8f5ead3ce5f9c4914af8a2268b04d13f2395ec7a037452",
-        "ordering_key": "01789042160000000003:codex:token:1aa424161b996cc3ea8f5ead3ce5f9c4914af8a2268b04d13f2395ec7a037452",
+        "dedup_key": "codex:token:c2f9269f885a63462ea1be964a9e0d0f8b89c1c65396cdbb08ef79f6850e7a17",
+        "ordering_key": "01789042160000000003:codex:token:c2f9269f885a63462ea1be964a9e0d0f8b89c1c65396cdbb08ef79f6850e7a17",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Codex token metrics have no reviewed task-boundary signal"
@@ -211,7 +211,7 @@
   },
   {
     "schema_version": "0.1.0",
-    "event_id": "codex:token:93554b2eade41354cb377c632143ad2ec5bfe6fb0c656d001bf80e79a782d79f",
+    "event_id": "codex:token:4faaeb6abe44781565c72ea616ccc5b1502c886e5beeb9c648c2fa980d9a3a7f",
     "event_type": "codex.turn.token_usage",
     "occurred_at": "2026-09-10T12:09:20.000000004Z",
     "received_at": "2026-09-10T20:09:21Z",
@@ -221,7 +221,7 @@
     "source_version": "0.153.4",
     "actor_id": "unavailable",
     "device_id": "unavailable",
-    "session_id": "codex:token:93554b2eade41354cb377c632143ad2ec5bfe6fb0c656d001bf80e79a782d79f",
+    "session_id": "codex:token:4faaeb6abe44781565c72ea616ccc5b1502c886e5beeb9c648c2fa980d9a3a7f",
     "task_id": null,
     "repository_id": null,
     "privacy_level": "operational",
@@ -243,8 +243,8 @@
     },
     "provider_extensions": {
       "correlation": {
-        "dedup_key": "codex:token:93554b2eade41354cb377c632143ad2ec5bfe6fb0c656d001bf80e79a782d79f",
-        "ordering_key": "01789042160000000004:codex:token:93554b2eade41354cb377c632143ad2ec5bfe6fb0c656d001bf80e79a782d79f",
+        "dedup_key": "codex:token:4faaeb6abe44781565c72ea616ccc5b1502c886e5beeb9c648c2fa980d9a3a7f",
+        "ordering_key": "01789042160000000004:codex:token:4faaeb6abe44781565c72ea616ccc5b1502c886e5beeb9c648c2fa980d9a3a7f",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Codex token metrics have no reviewed task-boundary signal"
@@ -263,7 +263,7 @@
   },
   {
     "schema_version": "0.1.0",
-    "event_id": "codex:token:aa4b04f817d1e54599899b66a2d3da34d748eb1d38053a1fe10961263669c82b",
+    "event_id": "codex:token:fe4397b5e836ab2fd2f1ce0af17e9012feb11199860ad6fb7eacc26e3cee3892",
     "event_type": "codex.turn.token_usage",
     "occurred_at": "2026-09-10T12:09:20.000000005Z",
     "received_at": "2026-09-10T20:09:21Z",
@@ -273,7 +273,7 @@
     "source_version": "0.153.4",
     "actor_id": "unavailable",
     "device_id": "unavailable",
-    "session_id": "codex:token:aa4b04f817d1e54599899b66a2d3da34d748eb1d38053a1fe10961263669c82b",
+    "session_id": "codex:token:fe4397b5e836ab2fd2f1ce0af17e9012feb11199860ad6fb7eacc26e3cee3892",
     "task_id": null,
     "repository_id": null,
     "privacy_level": "operational",
@@ -295,8 +295,8 @@
     },
     "provider_extensions": {
       "correlation": {
-        "dedup_key": "codex:token:aa4b04f817d1e54599899b66a2d3da34d748eb1d38053a1fe10961263669c82b",
-        "ordering_key": "01789042160000000005:codex:token:aa4b04f817d1e54599899b66a2d3da34d748eb1d38053a1fe10961263669c82b",
+        "dedup_key": "codex:token:fe4397b5e836ab2fd2f1ce0af17e9012feb11199860ad6fb7eacc26e3cee3892",
+        "ordering_key": "01789042160000000005:codex:token:fe4397b5e836ab2fd2f1ce0af17e9012feb11199860ad6fb7eacc26e3cee3892",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Codex token metrics have no reviewed task-boundary signal"
