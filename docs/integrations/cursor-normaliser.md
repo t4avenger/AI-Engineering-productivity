@@ -80,11 +80,19 @@ explicitly unavailable/unknown and are never fabricated):
   fields at the ingest boundary, so prompt/response content is not captured by
   default; its configurable capture is tracked in #94.
 
-## Live ingest into the daemon (local-only)
+## Org/SaaS ingest (Enterprise OpenTelemetry Export)
 
-Cursor Agent does **not** currently emit OTLP logs to `POST /v1/logs` in this
-repository’s reviewed captures. To still include Cursor runs in the local
-daemon, TelemetryIQ supports a dedicated local-only ingest path:
+For organisation fleets, the supported path is **Cursor Enterprise OpenTelemetry
+Export** (server-side OTLP/HTTP binary protobuf to `/v1/logs` and `/v1/metrics`).
+See [cursor-enterprise-otel.md](cursor-enterprise-otel.md). Field normalisation
+of `cursor.telemetry` signals is tracked under epic #128; protobuf acceptance
+on the ingest routes is issue #129.
+
+## Live ingest into the daemon (local-dev only)
+
+Cursor Agent does **not** currently emit local OTLP logs to `POST /v1/logs` in
+this repository’s reviewed captures. For local developer experiments only,
+TelemetryIQ supports a dedicated local-only ingest path (not MDM/org setup):
 
 - `POST /v1/cursor-agent`
 

@@ -38,24 +38,26 @@ Secure cookie over local HTTP). The daemon exposes HTML dashboard routes plus
 ## OTLP/HTTP ingest
 
 `POST /v1/logs` is the supported live ingest path for provider log events. It
-accepts one JSON OTLP payload with a non-empty `resourceLogs` array, requires
-`application/json`, and is limited to 1 MiB. Accepted payloads return
-`202 Accepted`. Validation failures return JSON errors with a stable
-`error.code` (`malformed_payload`, `invalid_payload`, `unsupported_media_type`,
-`payload_too_large`).
+accepts one OTLP payload with a non-empty `resourceLogs` array as either
+`application/json` or `application/x-protobuf` (OTLP ExportLogsServiceRequest),
+optionally with `Content-Encoding: gzip`, and is limited to 1 MiB (compressed
+and decompressed). Accepted payloads return `202 Accepted`. Validation
+failures return JSON errors with a stable `error.code` (`malformed_payload`,
+`invalid_payload`, `unsupported_media_type`, `payload_too_large`).
 
-`POST /v1/metrics` accepts OTLP JSON `resourceMetrics` the same way. Only
+`POST /v1/metrics` accepts the same content types with a non-empty
+`resourceMetrics` array (JSON or ExportMetricsServiceRequest protobuf). Only
 reviewed Codex `codex.skill.injected` datapoints and Claude Code
 `claude_code.token.usage` datapoints are persisted as canonical events; other
 metrics are accepted so exporters can flush, but are not turned into insight
 rows.
 
-`POST /v1/traces` accepts OTLP JSON `resourceSpans` and persists Claude Code's
-enhanced-telemetry beta span tree (`claude_code.interaction` →
-`claude_code.llm_request`) as canonical span events, resolving the former
-`501`. As with metrics, a payload from a tool without a traces adapter yet
-(e.g. Codex, tracked in #112) is accepted so exporters can flush, but is not
-persisted.
+`POST /v1/traces` accepts OTLP JSON `resourceSpans` (JSON-only today) and
+persists Claude Code's enhanced-telemetry beta span tree
+(`claude_code.interaction` → `claude_code.llm_request`) as canonical span
+events, resolving the former `501`. As with metrics, a payload from a tool
+without a traces adapter yet (e.g. Codex, tracked in #112) is accepted so
+exporters can flush, but is not persisted.
 
 The raw OTLP envelope is never logged or persisted verbatim. The supported,
 observed Codex and Claude Code OTLP shapes are normalised into canonical events
@@ -73,20 +75,20 @@ response, or tool content bodies. See
 `docs/integrations/claude-normaliser.md` and
 `docs/integrations/claude-transcript-deployment.md`.
 
-## Cursor Agent live ingest
+## Cursor ingest
 
-Cursor Agent stream-json output does not currently arrive via OTLP logs in this
-repository’s reviewed captures. To include Cursor runs in the local daemon,
-TelemetryIQ supports:
+**Org/SaaS path (supported):** Cursor Enterprise **OpenTelemetry Export** pushes
+OTLP/HTTP **binary protobuf** to `/v1/logs` and `/v1/metrics`. See
+`docs/integrations/cursor-enterprise-otel.md`. MDM does not ship per-laptop
+Cursor usage telemetry; Enterprise plan + admin Team Settings are required.
 
-- `POST /v1/cursor-agent`
+`POST /v1/logs` and `POST /v1/metrics` accept both `application/json` and
+`application/x-protobuf`.
 
-The helper script `scripts/ingest-cursor-agent-stream-json.py` reads Cursor
-Agent `--output-format stream-json` from stdin, extracts only the privacy-safe
-`init` + `result` records, and posts them to the daemon.
-
-For convenience, the wrapper `scripts/cursor-agent-tiq` runs Cursor Agent and
-automatically ingests the safe subset into the daemon:
+**Local-dev only (not org setup):** Cursor Agent stream-json can be posted to
+`POST /v1/cursor-agent` via `scripts/ingest-cursor-agent-stream-json.py` or
+`scripts/cursor-agent-tiq`. See
+`docs/integrations/cursor-agent-auto-reporting.md`.
 
 ```bash
 TELEMETRYIQ_DAEMON=http://localhost:8080 scripts/cursor-agent-tiq "say ok"
