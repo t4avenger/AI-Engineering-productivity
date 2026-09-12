@@ -46,3 +46,8 @@ tree (`claude_code.interaction` → `claude_code.llm_request`) as canonical span
 events. Other metrics and spans — including a tool without an adapter yet (e.g.
 Codex traces, tracked in #112) — are accepted with HTTP 202 so exporters flush,
 but are not turned into insight rows.
+
+`POST /v1/claude/transcript` accepts Claude Code session JSONL (`application/x-ndjson`
+or `application/jsonl`, 32 MiB cap) and persists normalised `assistant_message`
+events correlated to the same provider-native session id as OTLP. Prompt/response
+and tool content bodies are not retained on this path.

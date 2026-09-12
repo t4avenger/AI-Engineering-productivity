@@ -48,7 +48,10 @@ semantically equivalent data. Separate immutable **observations** from versioned
   records (model interaction; generic operation/invocation). Make the Codex normaliser
   extract real model/token/tool data. Make correlation (dedup keys, ordering, task
   boundaries) first-class. Redaction lands here, proven by canary-string leakage tests.
-- **P2 — Claude Code adapter + capability-driven conformance suite.** OTLP + session JSONL.
+- **P2 — Claude Code adapter + capability-driven conformance suite.** OTLP + session JSONL
+  (the JSONL half is now implemented: `claude.NormalizeTranscript` via `POST /v1/claude/transcript`
+  emits `assistant_message` events with model + full token usage, correlated to the same
+  session as OTLP; content bodies deferred to E7/#94, J17/#104, and J18/#105 — #91).
   Skill detection marked `explicit | inferred | unavailable`. Cross-tool session view with
   honest "unavailable" cells.
 - **P3 — Behaviour, efficiency & model-performance insights.** MCP inventory & context cost

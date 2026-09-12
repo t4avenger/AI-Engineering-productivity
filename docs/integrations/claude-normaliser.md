@@ -169,15 +169,69 @@ in #94.
   canonical token-usage events for the committed `/v1/metrics` fixture.
 - `fixtures/claude/expected/claude-code-2.1.268-trace-spans.events.json` —
   canonical span events for the committed `/v1/traces` fixture.
+- `fixtures/claude/expected/claude-code-2.1.269-session-transcript.events.json` —
+  canonical `assistant_message` events for the committed session JSONL transcript
+  fixture (`claude-code-2.1.269-session-transcript.json`).
 
 Regenerate them with `UPDATE_GOLDEN=1 go test ./internal/normalize/claude/ -run Golden`
 after a reviewed change, then inspect the diff.
 
+## Transcript path — `NormalizeTranscript`
+
+The Claude Code session JSONL transcript (`~/.claude/projects/**/<session>.jsonl`)
+is the richest Claude data source: newline-delimited JSON, one object per line,
+discriminated by a top-level `type`. `NormalizeTranscript(data, receivedAt)` maps
+it to canonical events and is served live at `POST /v1/claude/transcript`
+(Content-Type `application/x-ndjson` or `application/jsonl`).
+
+- **One record type end-to-end: the `assistant` record.** It is the only line
+  carrying the model and full token usage, mirroring the OTLP `api_request`
+  slice. Each `assistant` record becomes one `assistant_message` event
+  (`source_schema = session_jsonl`). `user`, `system`, and the ~12 auxiliary
+  metadata types are decoded only far enough to read `.type` and then skipped —
+  the type set is treated as open, so an unrecognised or content-heavy
+  out-of-scope record can never fail the import.
+- **Correlation.** `session_id` is read from the in-record `sessionId` field (not
+  the filename) and mapped through `ProviderNativeSessionID("claude-code:", …)`,
+  so transcript events land in the *same* session row as the OTLP
+  logs/metrics/traces for that session. `event_id = claude-code:<sessionId>:<uuid>`
+  is deterministic, so a `SessionEnd` hook re-shipping a now-complete transcript
+  fills in earlier gaps idempotently (`INSERT OR IGNORE`) rather than duplicating.
+  The DAG linkage (`uuid`/`parent_uuid`) is carried in `provider_extensions.correlation`.
+- **Numeric token capture (in scope).** `message.usage` is decoded via a typed
+  struct using `json.Number` (no lossy float coercion) and stamped under the same
+  canonical attribute keys the metrics adapter uses: `input_token_count`,
+  `output_token_count`, `cached_input_token_count`, `cache_write_input_token_count`,
+  and `reasoning_token_count` (from `output_tokens_details.thinking_tokens`). The
+  ephemeral cache-window counts (`cache_creation.ephemeral_*`), which have no
+  canonical key, are carried under `provider_extensions.cache_usage_extra`.
+- **Content deferred, not silently dropped.** Prompt/response text, tool
+  `input`/results, and file diffs are never read into an event; they are listed in
+  `attributes.unavailable_fields`. Ownership: prompts/responses → E7 (#94);
+  MCP calls → J17 (#104); tool IO / diffs / sub-agents → J18 (#105). The
+  per-adapter allow-list is the sole guard (epic #88 removed ingest-time hiding):
+  only safe scalar envelope fields (`git_branch`, `entrypoint`, `user_type`,
+  `request_id`, `effort`, `api_block_index`, `is_sidechain`) reach
+  `provider_extensions.transcript` — `cwd` and every content body are excluded.
+- **Contract.** An `assistant` record missing a structural field (`uuid`,
+  `sessionId`, `timestamp`) — including whitespace-only values — is a hard error
+  that aborts the whole import (matching the traces adapter — supported data is
+  never silently dropped or half-persisted); invalid JSON lines surface as
+  `ErrMalformedTranscript` (HTTP 400); a missing `version` becomes
+  `source_version = "unavailable"`, not an error; a transcript with no
+  `assistant` records yields zero events and no error.
+- **Size cap and inspector.** The route caps the body at 32 MiB (real transcripts
+  reach a few MB), larger than the 1 MiB OTLP cap. It deliberately does **not**
+  wire the dev ingest inspector: the inspector echoes the raw captured payload, so
+  echoing a raw transcript would re-expose exactly the content this path refuses
+  to persist.   Accepted/rejected counters are shared with the OTLP routes. Org-admin rollout
+  for SaaS fleets is covered in
+  [claude-transcript-deployment.md](claude-transcript-deployment.md).
+
 ## Out of scope
 
-Session JSONL is not parsed: no reviewed, sanitised JSONL fixture is committed, so
-that source stays `unknown`. Live HTTP ingest for Claude Code OTLP logs, metrics,
-and traces is supported via `NormalizeLogs`, `NormalizeMetrics`, and
-`NormalizeTraces`; the sample-event fixture shape remains the reviewed golden path
+Sub-agent/sidechain transcripts (sibling `<session>/subagents/agent-*.jsonl`
+files) and the transcript content bodies above are out of scope here (owned by the
+J-phase and E7). The sample-event fixture shape remains the reviewed golden path
 for `NormalizeEvents`.
 

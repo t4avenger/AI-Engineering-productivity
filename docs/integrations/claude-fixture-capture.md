@@ -132,6 +132,37 @@ Committed evidence:
 - `fixtures/claude/observed-sanitised/claude-code-2.1.263-api-error-outcome.json`
 - `fixtures/claude/observed-sanitised/claude-code-2.1.263-api-error-outcome-otlp.json`
 
+## Session JSONL transcript capture
+
+To capture a session JSONL transcript fixture for `NormalizeTranscript` (F4, #91),
+sanitise a real transcript from `~/.claude/projects/**/<session>.jsonl`:
+
+1. The wrapper is the standard fixture envelope; put the sanitised records under
+   `payload.source_type = "session_jsonl_transcript"` and
+   `payload.transcript_lines[]` (one JSON object per element, mirroring one line of
+   the on-disk NDJSON). The golden test re-serialises them to NDJSON before
+   feeding `NormalizeTranscript`, so the fixture replays the real on-disk shape.
+2. Keep the shared envelope keys (`type`, `uuid`, `parentUuid`, `sessionId`,
+   `timestamp`, `version`, …) and, on assistant records, `message.model` and the
+   full `message.usage` block (including `output_tokens_details.thinking_tokens`
+   and `cache_creation.ephemeral_*`) — these are the numeric behaviour signals F4
+   captures.
+3. Replace every content body with innocuous synthetic text: prompt/response
+   text, thinking, tool `input`, and `toolUseResult`. The fixture validator
+   prohibits the *flat* field names `command`, `file_path`/`filename`, `prompt`,
+   `response`, `token`, `secret`, etc., so a fixture cannot legally carry those
+   tool-content keys — which is why the content drop-guarantee is proven by a
+   direct-NDJSON canary test in `jsonl_test.go`, not by the committed fixture.
+4. Include ≥2 auxiliary record types (e.g. `ai-title`, `cost-state`) and a
+   `system` record to prove the skip-unknown behaviour, plus a `user` record.
+
+Committed evidence:
+
+- `fixtures/claude/observed-sanitised/claude-code-2.1.269-session-transcript.json`
+  (sanitised transcript records for live `/v1/claude/transcript` import)
+- `fixtures/claude/expected/claude-code-2.1.269-session-transcript.events.json`
+  (golden canonical `assistant_message` events)
+
 ## Validation
 
 The validator rejects missing origin or tool-version metadata, prohibited field
