@@ -32,7 +32,8 @@ browser session on loopback (use the `localhost` hostname so browsers accept the
 Secure cookie over local HTTP). The daemon exposes HTML dashboard routes plus
 `GET /api/v1/health`, `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}`,
 `DELETE /api/v1/sessions/{id}`, `DELETE /api/v1/sessions`, `POST /v1/logs`,
-`POST /v1/traces`, `POST /v1/metrics`, `POST /v1/cursor-agent`, and `GET /api/v1/ingest/counters`.
+`POST /v1/traces`, `POST /v1/metrics`, `POST /v1/claude/transcript`,
+`POST /v1/cursor-agent`, and `GET /api/v1/ingest/counters`.
 
 ## OTLP/HTTP ingest
 
@@ -60,6 +61,17 @@ The raw OTLP envelope is never logged or persisted verbatim. The supported,
 observed Codex and Claude Code OTLP shapes are normalised into canonical events
 before being saved locally; epic #87 removed ingest-time hiding, so raw
 provider-native IDs, paths, and commands are retained inside those events.
+
+## Claude Code session transcript ingest
+
+`POST /v1/claude/transcript` accepts a Claude Code session JSONL transcript
+(newline-delimited JSON, Content-Type `application/x-ndjson` or
+`application/jsonl`, up to 32 MiB). It normalises `assistant` records into
+`assistant_message` events (model + token usage, correlated to the same
+`claude-code:<sessionId>` as OTLP) and deliberately does not persist prompt,
+response, or tool content bodies. See
+`docs/integrations/claude-normaliser.md` and
+`docs/integrations/claude-transcript-deployment.md`.
 
 ## Cursor Agent live ingest
 

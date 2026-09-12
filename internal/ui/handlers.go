@@ -656,6 +656,8 @@ func eventTitle(eventType string) string {
 		return "MCP server connection"
 	case "skill_invocation":
 		return "Skill invocation"
+	case "assistant_message":
+		return "Assistant message"
 	case "session.active":
 		return "Session active"
 	case "session.completed":

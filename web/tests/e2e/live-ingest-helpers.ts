@@ -98,6 +98,68 @@ export async function ingestOTLPMetrics(body: string): Promise<void> {
   expect(ingest.status).toBe(202);
 }
 
+// ingestClaudeTranscript POSTs a session JSONL transcript to /v1/claude/transcript
+// (F4, #91). Content-Type must be application/x-ndjson — the route rejects JSON.
+export async function ingestClaudeTranscript(body: string): Promise<void> {
+  const ingest = await fetch(`${daemonBase}/v1/claude/transcript`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-ndjson' },
+    body,
+  });
+  expect(ingest.status).toBe(202);
+}
+
+/**
+ * Synthetic Claude Code session JSONL for the live transcript UI gate. Content
+ * bodies carry canaries that must never appear in the dashboard; model + token
+ * counts must surface.
+ */
+export function claudeTranscriptNDJSON(model: string): string {
+  const session = 'tiq-live-e2e-transcript-session';
+  return [
+    JSON.stringify({
+      type: 'user',
+      uuid: 'tiq-live-user-1',
+      sessionId: session,
+      timestamp: '2026-09-12T12:00:00.000Z',
+      version: '2.1.269',
+      message: { role: 'user', content: 'tiq-canary-live-user-prompt' },
+    }),
+    JSON.stringify({
+      type: 'assistant',
+      uuid: 'tiq-live-assistant-1',
+      parentUuid: 'tiq-live-user-1',
+      sessionId: session,
+      timestamp: '2026-09-12T12:00:02.500Z',
+      version: '2.1.269',
+      cwd: '/home/tiq-canary-live-cwd/project',
+      gitBranch: 'main',
+      requestId: 'req_live_e2e_1',
+      message: {
+        role: 'assistant',
+        model,
+        stop_reason: 'end_turn',
+        content: [
+          { type: 'text', text: 'tiq-canary-live-response' },
+          {
+            type: 'tool_use',
+            name: 'Bash',
+            input: { command: 'tiq-canary-live-command' },
+          },
+        ],
+        usage: {
+          input_tokens: 2048,
+          output_tokens: 256,
+          cache_read_input_tokens: 4096,
+          cache_creation_input_tokens: 64,
+          output_tokens_details: { thinking_tokens: 32 },
+        },
+      },
+      toolUseResult: { stdout: 'tiq-canary-live-stdout' },
+    }),
+  ].join('\n');
+}
+
 type OTLPAttributeValue =
   | { stringValue: string }
   | { intValue: string }

@@ -1,0 +1,115 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:11111111-1111-4111-8111-111111111111:bbbbbbbb-0000-4000-8000-000000000002",
+    "event_type": "assistant_message",
+    "occurred_at": "2026-09-12T09:14:00.457Z",
+    "received_at": "2026-09-12T09:14:03Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:11111111-1111-4111-8111-111111111111",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cache_write_input_token_count": 96,
+      "cached_input_token_count": 12480,
+      "input_token_count": 1820,
+      "model": "claude-opus-4-8",
+      "output_token_count": 254,
+      "reasoning_token_count": 71,
+      "unavailable_fields": [
+        "prompt_content",
+        "response_content",
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "cache_usage_extra": {
+        "cache_creation.ephemeral_1h_input_tokens": 32,
+        "cache_creation.ephemeral_5m_input_tokens": 64
+      },
+      "correlation": {
+        "dedup_key": "claude-code:11111111-1111-4111-8111-111111111111:bbbbbbbb-0000-4000-8000-000000000002",
+        "ordering_key": "01789204440457000000:claude-code:11111111-1111-4111-8111-111111111111:bbbbbbbb-0000-4000-8000-000000000002",
+        "parent_uuid": "aaaaaaaa-0000-4000-8000-000000000001",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript assistant records have no reviewed task-boundary signal"
+        },
+        "uuid": "bbbbbbbb-0000-4000-8000-000000000002"
+      },
+      "transcript": {
+        "api_block_index": 0,
+        "effort": "high",
+        "entrypoint": "cli",
+        "git_branch": "main",
+        "is_sidechain": false,
+        "request_id": "claude-code:req_synthetic_0001",
+        "user_type": "external"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:11111111-1111-4111-8111-111111111111:dddddddd-0000-4000-8000-000000000004",
+    "event_type": "assistant_message",
+    "occurred_at": "2026-09-12T09:14:01.64Z",
+    "received_at": "2026-09-12T09:14:03Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:11111111-1111-4111-8111-111111111111",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cache_write_input_token_count": 0,
+      "cached_input_token_count": 14300,
+      "input_token_count": 2075,
+      "model": "claude-opus-4-8",
+      "output_token_count": 118,
+      "unavailable_fields": [
+        "prompt_content",
+        "response_content",
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:11111111-1111-4111-8111-111111111111:dddddddd-0000-4000-8000-000000000004",
+        "ordering_key": "01789204441640000000:claude-code:11111111-1111-4111-8111-111111111111:dddddddd-0000-4000-8000-000000000004",
+        "parent_uuid": "cccccccc-0000-4000-8000-000000000003",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript assistant records have no reviewed task-boundary signal"
+        },
+        "uuid": "dddddddd-0000-4000-8000-000000000004"
+      },
+      "transcript": {
+        "api_block_index": 1,
+        "effort": "high",
+        "entrypoint": "cli",
+        "git_branch": "main",
+        "is_sidechain": false,
+        "request_id": "claude-code:req_synthetic_0002",
+        "user_type": "external"
+      }
+    }
+  }
+]
