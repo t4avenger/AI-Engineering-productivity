@@ -38,10 +38,11 @@ The daemon opens the existing local SQLite repository at the platform
 configuration directory and reuses its installation-specific privacy salt.
 The API never reads raw intake payloads. Session endpoints require a bearer token; the auth-token CLI command deliberately prints the protected local token for dashboard setup. Health and OTLP intake remain unauthenticated, and the daemon remains loopback-only by default.
 
-Live OTLP persistence accepts `POST /v1/logs` (provider log events) and a
-narrow `POST /v1/metrics` path that persists only reviewed Codex
-`codex.skill.injected` datapoints as canonical skill events. Other metrics are
-accepted with HTTP 202 so exporters flush, but are not turned into insight rows.
-`POST /v1/traces` remains an honest refusal endpoint (`501`,
-`error.code=not_implemented`) so exporters are never told a dropped payload was
-accepted.
+Live OTLP persistence accepts `POST /v1/logs` (provider log events), a
+`POST /v1/metrics` path that persists reviewed Codex `codex.skill.injected` and
+Claude Code `claude_code.token.usage` datapoints as canonical events, and a
+`POST /v1/traces` path that persists Claude Code's enhanced-telemetry beta span
+tree (`claude_code.interaction` → `claude_code.llm_request`) as canonical span
+events. Other metrics and spans — including a tool without an adapter yet (e.g.
+Codex traces, tracked in #112) — are accepted with HTTP 202 so exporters flush,
+but are not turned into insight rows.

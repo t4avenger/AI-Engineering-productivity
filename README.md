@@ -44,11 +44,17 @@ accepts one JSON OTLP payload with a non-empty `resourceLogs` array, requires
 `payload_too_large`).
 
 `POST /v1/metrics` accepts OTLP JSON `resourceMetrics` the same way. Only
-reviewed Codex `codex.skill.injected` datapoints are persisted as canonical
-skill events; other metrics are accepted so exporters can flush, but are not
-turned into insight rows. `POST /v1/traces` remains `501 Not Implemented` with
-`error.code` `not_implemented` so exporters are never told a dropped payload
-was accepted.
+reviewed Codex `codex.skill.injected` datapoints and Claude Code
+`claude_code.token.usage` datapoints are persisted as canonical events; other
+metrics are accepted so exporters can flush, but are not turned into insight
+rows.
+
+`POST /v1/traces` accepts OTLP JSON `resourceSpans` and persists Claude Code's
+enhanced-telemetry beta span tree (`claude_code.interaction` →
+`claude_code.llm_request`) as canonical span events, resolving the former
+`501`. As with metrics, a payload from a tool without a traces adapter yet
+(e.g. Codex, tracked in #112) is accepted so exporters can flush, but is not
+persisted.
 
 The raw OTLP envelope is never logged or persisted verbatim. The supported,
 observed Codex and Claude Code OTLP shapes are normalised into canonical events

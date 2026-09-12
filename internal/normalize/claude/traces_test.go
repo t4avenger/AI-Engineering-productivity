@@ -109,13 +109,66 @@ func TestNormalizeTracesRejectsNonClaudeService(t *testing.T) {
 }
 
 // TestNormalizeTracesMalformedSpanIsError proves the routing contract: a
-// claude-code span missing its span id is a real error, NOT the skip sentinel,
-// so the route does not silently 202-accept and drop supported Claude data.
+// claude-code span missing a required structural field (span id, name, or start
+// time) is a real error, NOT the skip sentinel, so the route does not silently
+// 202-accept and drop — or persist a schema-invalid — supported Claude span. An
+// empty name would otherwise become an empty event_type, which the canonical
+// event schema forbids; a missing start time would fabricate chronology.
 func TestNormalizeTracesMalformedSpanIsError(t *testing.T) {
-	payload := []byte(`{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef","name":"claude_code.interaction"}]}]}]}`)
-	_, err := NormalizeTraces(payload, time.Now().UTC())
-	if err == nil || errors.Is(err, ErrUnsupportedTraces) {
-		t.Fatalf("got %v, want a hard normalisation error for a span missing its id", err)
+	cases := map[string]string{
+		"missing span id":    `{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef","name":"claude_code.interaction","startTimeUnixNano":"1789117549920000000"}]}]}]}`,
+		"empty name":         `{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","name":"","startTimeUnixNano":"1789117549920000000"}]}]}]}`,
+		"missing start time": `{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","name":"claude_code.interaction"}]}]}]}`,
+		"non-positive time":  `{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","name":"claude_code.interaction","startTimeUnixNano":"0"}]}]}]}`,
+	}
+	for name, payload := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := NormalizeTraces([]byte(payload), time.Now().UTC())
+			if err == nil || errors.Is(err, ErrUnsupportedTraces) {
+				t.Fatalf("got %v, want a hard normalisation error", err)
+			}
+		})
+	}
+}
+
+// TestNormalizeTracesRootSpanParentIsNull proves a root span's absent parent is
+// preserved as null, not an empty string, so consumers can distinguish a genuine
+// root from a literal empty parent (correlation contract: unknowns are never
+// empty strings).
+func TestNormalizeTracesRootSpanParentIsNull(t *testing.T) {
+	payload := []byte(`{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","name":"claude_code.interaction","startTimeUnixNano":"1789117549920000000"}]}]}]}`)
+	events, err := NormalizeTraces(payload, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("NormalizeTraces: %v", err)
+	}
+	span := events[0].ProviderExtensions["span"].(map[string]any)
+	if span["parent_span_id"] != nil {
+		t.Fatalf("root span parent_span_id = %#v, want nil", span["parent_span_id"])
+	}
+	correlation := events[0].ProviderExtensions["correlation"].(map[string]any)
+	if correlation["parent_span_id"] != nil {
+		t.Fatalf("root correlation parent_span_id = %#v, want nil", correlation["parent_span_id"])
+	}
+}
+
+// TestNormalizeTracesSessionFallbackIsTraceScoped proves that when a span carries
+// no session.id the session identity falls back to the trace id, so spans from
+// different traces are not merged into one synthetic "unknown" session.
+func TestNormalizeTracesSessionFallbackIsTraceScoped(t *testing.T) {
+	payload := []byte(`{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeSpans":[{"spans":[{"traceId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","spanId":"0123456789abcdef","name":"claude_code.interaction","startTimeUnixNano":"1789117549920000000"},{"traceId":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","spanId":"fedcba9876543210","name":"claude_code.interaction","startTimeUnixNano":"1789117549920000000"}]}]}]}`)
+	events, err := NormalizeTraces(payload, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("NormalizeTraces: %v", err)
+	}
+	sessions := map[string]struct{}{}
+	for _, event := range events {
+		if event.SessionID == "claude-code:unknown" {
+			t.Fatalf("session id collapsed to the shared unknown sentinel: %#v", event)
+		}
+		sessions[event.SessionID] = struct{}{}
+	}
+	if len(sessions) != 2 {
+		t.Fatalf("distinct traces merged into %d session(s), want 2: %#v", len(sessions), sessions)
 	}
 }
 

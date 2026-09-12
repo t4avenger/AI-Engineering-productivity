@@ -32,7 +32,7 @@
       "correlation": {
         "dedup_key": "claude-code:span:1d47ed330e0218fe88f1a30a661cb95c939e1b86ec7765fc27e7721da9417d4a",
         "ordering_key": "01789117549920000000:claude-code:span:1d47ed330e0218fe88f1a30a661cb95c939e1b86ec7765fc27e7721da9417d4a",
-        "parent_span_id": "",
+        "parent_span_id": null,
         "span_id": "0000000000000002",
         "task_boundary": {
           "confidence": "unknown",
@@ -48,7 +48,7 @@
         "end_unix_nano": "1789117552520201650",
         "kind": 1,
         "name": "claude_code.interaction",
-        "parent_span_id": "",
+        "parent_span_id": null,
         "scope": "com.anthropic.claude_code.tracing",
         "span_id": "0000000000000002",
         "start_unix_nano": "1789117549920000000",

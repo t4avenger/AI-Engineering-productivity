@@ -125,12 +125,19 @@ The enhanced-telemetry beta exports the span tree that logs do not carry:
 `claude_code.interaction` (root) → `claude_code.llm_request` (child), confirmed by
 a live capture (tool 2.1.268,
 `fixtures/claude/observed-sanitised/claude-code-2.1.268-trace-spans-otlp.json`).
-Each span becomes one `canonical.Event`. The raw span identity
-(`traceId`/`spanId`/`parentSpanId`), span `name`, `kind`, start/end nanos, status,
-scope, and the raw `session.id` (`claude-code:<session.id>`) are retained verbatim
-under `provider_extensions.span`/`correlation` (epic #87). The event ID is a
-content hash over `traceId`+`spanId`+resource identity, so two resources cannot
-collide on one event ID and be silently dropped by `CorrelateEvents`.
+Each span becomes one `canonical.Event`. The raw `session.id` is promoted to the
+canonical `session_id` (`claude-code:<session.id>`); when a span carries no
+`session.id` the identity falls back to the trace id (`claude-code:trace:<traceId>`)
+so spans from different traces are not merged into one synthetic session. The raw
+span identity (`traceId`/`spanId`/`parentSpanId`), span `name`, `kind`, start/end
+nanos, status, and scope are retained verbatim under
+`provider_extensions.span`/`correlation` (epic #87); a root span's absent parent
+is kept as `null`, not an empty string, so a genuine root is distinguishable from
+an empty parent. The event ID is a content hash over `traceId`+`spanId`+resource
+identity, so two resources cannot collide on one event ID and be silently dropped
+by `CorrelateEvents`. A supported claude-code span missing a required structural
+field (`traceId`, `spanId`, `name`, or a positive `startTimeUnixNano`) is a hard
+normalisation error, never a silently dropped or schema-invalid event.
 
 Per-span-type field mapping (interaction/llm_request/tool/hook/sub-agent) is
 deliberately **out of scope** for F3 — it is owned by the T-phase issues

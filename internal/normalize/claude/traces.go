@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,31 +29,35 @@ var ErrUnsupportedTraces = errors.New("unsupported Claude Code traces payload")
 // are deliberately absent so they never reach provider_extensions. Detailed
 // per-span-type field mapping is owned by the T-phase issues (#100–#103); this
 // list carries the low-risk behaviour signals proven by the F3 fixture.
+// gen_ai.response.finish_reasons is deliberately absent: Claude Code emits it as
+// an OTLP arrayValue, which the shared scalar attributeValue decoder does not
+// read, so allow-listing it would silently drop it. Its structured mapping is
+// owned by the T-phase (#100–#103) alongside array-value decoding; carrying the
+// scalar stop_reason here keeps the F3 skeleton honest about what it captures.
 var safeSpanAttributeKeys = map[string]struct{}{
-	"span.type":                      {},
-	"gen_ai.system":                  {},
-	"gen_ai.request.model":           {},
-	"gen_ai.response.id":             {},
-	"gen_ai.response.finish_reasons": {},
-	"llm_request.context":            {},
-	"query_source_safe":              {},
-	"speed":                          {},
-	"success":                        {},
-	"attempt":                        {},
-	"stop_reason":                    {},
-	"duration_ms":                    {},
-	"ttft_ms":                        {},
-	"first_content_ms":               {},
-	"input_tokens":                   {},
-	"output_tokens":                  {},
-	"cache_read_tokens":              {},
-	"cache_creation_tokens":          {},
-	"request_id":                     {},
-	"interaction.sequence":           {},
-	"interaction.duration_ms":        {},
-	"parent.source":                  {},
-	"queued_sends":                   {},
-	"user_prompt_length":             {},
+	"span.type":               {},
+	"gen_ai.system":           {},
+	"gen_ai.request.model":    {},
+	"gen_ai.response.id":      {},
+	"llm_request.context":     {},
+	"query_source_safe":       {},
+	"speed":                   {},
+	"success":                 {},
+	"attempt":                 {},
+	"stop_reason":             {},
+	"duration_ms":             {},
+	"ttft_ms":                 {},
+	"first_content_ms":        {},
+	"input_tokens":            {},
+	"output_tokens":           {},
+	"cache_read_tokens":       {},
+	"cache_creation_tokens":   {},
+	"request_id":              {},
+	"interaction.sequence":    {},
+	"interaction.duration_ms": {},
+	"parent.source":           {},
+	"queued_sends":            {},
+	"user_prompt_length":      {},
 }
 
 type tracesPayload struct {
@@ -170,14 +175,31 @@ func spanEventsFromResource(resource resourceSpan, receivedAt time.Time) ([]cano
 func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 	traceID := strings.TrimSpace(span.TraceID)
 	spanID := strings.TrimSpace(span.SpanID)
-	if traceID == "" || spanID == "" {
-		return canonical.Event{}, fmt.Errorf("claude trace span %q missing trace or span id", span.Name)
+	name := strings.TrimSpace(span.Name)
+	// name becomes the canonical event_type, which the schema requires to be
+	// non-empty; like the trace/span ids it is a structural field, so a supported
+	// claude-code span missing it is a hard error, never a silently dropped or
+	// schema-invalid event.
+	if traceID == "" || spanID == "" || name == "" {
+		return canonical.Event{}, fmt.Errorf("claude trace span %q missing trace id, span id, or name", span.Name)
 	}
-	parentSpanID := strings.TrimSpace(span.ParentSpanID)
+	// A span's chronology orders the session timeline, so start time is a required
+	// structural field: a missing or malformed value is a hard error rather than a
+	// fabricated receivedAt stamp (mirrors the Codex trace normaliser).
+	occurredAt, err := spanStartTime(span.StartTimeUnixNano)
+	if err != nil {
+		return canonical.Event{}, fmt.Errorf("claude trace span %q: %w", name, err)
+	}
+	// A root span has no parent; keep it nil so consumers can distinguish a
+	// genuine root from a literal empty parent (mirrors the Codex trace
+	// normaliser and the correlation contract that unknowns are never empty).
+	var parentSpanID any
+	if trimmed := strings.TrimSpace(span.ParentSpanID); trimmed != "" {
+		parentSpanID = trimmed
+	}
 
 	fields := attributeValues(span.Attributes)
-	occurredAt := metricTime(span.StartTimeUnixNano, ctx.receivedAt)
-	sessionID := normalize.ProviderNativeSessionID("claude-code:", stringAttr(fields, "session.id"))
+	sessionID := spanSessionID(fields, traceID)
 	model, modelObserved := normalize.ObservedString(fields["model"])
 
 	// trace_id + span_id is globally unique; the resource identity is folded in
@@ -199,7 +221,7 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 			"trace_id":        traceID,
 			"span_id":         spanID,
 			"parent_span_id":  parentSpanID,
-			"name":            span.Name,
+			"name":            name,
 			"kind":            span.Kind,
 			"scope":           ctx.scopeName,
 			"start_unix_nano": strings.TrimSpace(span.StartTimeUnixNano),
@@ -212,7 +234,7 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 	return canonical.Event{
 		SchemaVersion:      canonicalSchemaVersion,
 		EventID:            eventID,
-		EventType:          span.Name,
+		EventType:          name,
 		OccurredAt:         occurredAt,
 		ReceivedAt:         ctx.receivedAt.UTC(),
 		Provider:           provider,
@@ -231,7 +253,7 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 // spanCorrelation carries the span-tree linkage (trace/span/parent) alongside
 // the dedup/ordering keys, so downstream consumers can rebuild the interaction
 // → llm_request/tool/hook hierarchy that spans expose and logs do not.
-func spanCorrelation(eventID string, occurredAt time.Time, traceID, spanID, parentSpanID string) map[string]any {
+func spanCorrelation(eventID string, occurredAt time.Time, traceID, spanID string, parentSpanID any) map[string]any {
 	return map[string]any{
 		"dedup_key":      eventID,
 		"ordering_key":   fmt.Sprintf("%020d:%s", occurredAt.UnixNano(), eventID),
@@ -243,6 +265,33 @@ func spanCorrelation(eventID string, occurredAt time.Time, traceID, spanID, pare
 			"reason":     "Claude Code trace spans: per-span task-boundary mapping deferred to T-phase (#100–#103)",
 		},
 	}
+}
+
+// spanStartTime requires a positive Unix-nanoseconds start time. A span's
+// chronology is structural — it orders the session timeline — so a missing or
+// malformed value is a hard normalisation error rather than a fabricated
+// receivedAt stamp (mirrors the Codex trace normaliser's unixNanoTime).
+func spanStartTime(nano string) (time.Time, error) {
+	raw := strings.TrimSpace(nano)
+	if raw == "" {
+		return time.Time{}, errors.New("startTimeUnixNano is required")
+	}
+	nanoseconds, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || nanoseconds <= 0 {
+		return time.Time{}, errors.New("startTimeUnixNano must be a positive Unix-nanoseconds string")
+	}
+	return time.Unix(0, nanoseconds).UTC(), nil
+}
+
+// spanSessionID uses the raw provider-native session id when present, otherwise
+// falls back to the trace id so spans from different traces are not merged into
+// one synthetic "unknown" session (mirrors the Codex trace normaliser's
+// trace-scoped session identity). Raw identifiers are kept verbatim (epic #87).
+func spanSessionID(fields map[string]any, traceID string) string {
+	if raw := strings.TrimSpace(stringAttr(fields, "session.id")); raw != "" {
+		return normalize.ProviderNativeSessionID("claude-code:", raw)
+	}
+	return "claude-code:trace:" + traceID
 }
 
 // safeSpanAttributes reduces span attributes to the allow-listed safe keys,
