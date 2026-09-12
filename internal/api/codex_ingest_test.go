@@ -151,6 +151,78 @@ func TestCodexToolResultIngestExposesToolCallSignal(t *testing.T) {
 	assertNoRawIdentifiers(t, canaries, marshalJSON(t, stored))
 }
 
+const rawCodexSandboxOutcomeOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
+  {"key":"service.name","value":{"stringValue":"codex_exec"}},
+  {"key":"service.version","value":{"stringValue":"0.153.4"}}]},
+ "scopeLogs":[{"logRecords":[
+   {"attributes":[
+     {"key":"event.name","value":{"stringValue":"codex.sandbox_outcome"}},
+     {"key":"conversation.id","value":{"stringValue":"synthetic-sandbox-session"}},
+     {"key":"call_id","value":{"stringValue":"synthetic-sandbox-call-success"}},
+     {"key":"tool_name","value":{"stringValue":"exec_command"}},
+     {"key":"initial_duration_ms","value":{"stringValue":"123"}},
+     {"key":"outcome","value":{"stringValue":"success"}},
+     {"key":"model","value":{"stringValue":"gpt-6-astra"}},
+     {"key":"arguments","value":{"stringValue":"--token=tiq-canary-sandbox-argument"}},
+     {"key":"output","value":{"stringValue":"tiq-canary-sandbox-output"}},
+     {"key":"api_key","value":{"stringValue":"tiq-canary-sandbox-api-key"}},
+     {"key":"user.email","value":{"stringValue":"sandbox-user@example.test"}}],
+    "body":{"stringValue":"tiq-canary-sandbox-body"}}]}]}]}`
+
+func TestCodexSandboxOutcomeIngestExposesCommandExecutionSignal(t *testing.T) {
+	repository, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = repository.Close() })
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
+	t.Cleanup(server.Close)
+
+	response := postOTLPToPath(t, server.URL, "/v1/logs", []byte(rawCodexSandboxOutcomeOTLPLogs), "application/json")
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("ingest status = %d", response.StatusCode)
+	}
+	closeBody(t, response)
+
+	events := timelinePage(t, server.URL+"/api/v1/sessions/codex:synthetic-sandbox-session/events?limit=10")
+	if len(events.Data) != 1 {
+		t.Fatalf("timeline events = %d, want 1: %#v", len(events.Data), events.Data)
+	}
+	event := events.Data[0]
+	assertCodexSandboxTimelineEvent(t, event)
+
+	canaries := []string{
+		"tiq-canary-sandbox-argument",
+		"tiq-canary-sandbox-output",
+		"tiq-canary-sandbox-api-key",
+		"sandbox-user@example.test",
+		"tiq-canary-sandbox-body",
+	}
+	assertNoRawIdentifiers(t, canaries, marshalJSON(t, events))
+
+	stored, err := repository.ListEvents(t.Context(), storage.EventFilter{SessionID: "codex:synthetic-sandbox-session", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNoRawIdentifiers(t, canaries, marshalJSON(t, stored))
+}
+
+func assertCodexSandboxTimelineEvent(t *testing.T, event timelineEvent) {
+	t.Helper()
+	if event.EventType != "codex.sandbox_outcome" || event.OperationID == nil || *event.OperationID != "codex:synthetic-sandbox-session:sandbox:synthetic-sandbox-call-success" {
+		t.Fatalf("operation identity = %#v", event)
+	}
+	if event.Category == nil || *event.Category != "shell command" || event.Outcome == nil || *event.Outcome != "success" || event.DurationMs == nil || *event.DurationMs != "123" {
+		t.Fatalf("operation fields = %#v", event)
+	}
+	if slices.Contains(event.UnavailableFields, "command_execution") {
+		t.Fatalf("command_execution must be available for codex.sandbox_outcome: %#v", event.UnavailableFields)
+	}
+	if !slices.Contains(event.UnavailableFields, "file_operations") {
+		t.Fatalf("file_operations must remain unavailable until evidenced: %#v", event.UnavailableFields)
+	}
+}
+
 func fetchSessionList(t *testing.T, url string) sessionListResponse {
 	t.Helper()
 	response, err := http.Get(url)

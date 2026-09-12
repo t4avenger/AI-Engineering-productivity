@@ -63,6 +63,20 @@ Committed evidence:
 - `fixtures/codex/observed-sanitised/codex-0.153.4-outcome-contracts.json`
 - `fixtures/codex/observed-sanitised/codex-0.153.4-outcome-contracts-otlp.json`
 
+## Sandbox outcome capture
+
+Issue #115 uses the reviewed current-surface evidence for `codex.sandbox_outcome`
+from Codex CLI 0.153.4 and a sanitised replay fixture that preserves only safe
+operational values: provider call ID, outcome, initial duration, tool name,
+model, and terminal type. Raw command arguments, output, paths, account
+identifiers, hostnames, credentials, prompts, responses, and source content are
+not retained.
+
+Committed evidence:
+
+- `fixtures/codex/observed-sanitised/codex-0.153.4-sandbox-outcome-otlp.json`
+- `fixtures/codex/expected/codex-0.153.4-sandbox-outcome.operations.json`
+
 ## Current OTLP surface inventory
 
 Issue #110 captured Codex CLI 0.153.4 on 2026-09-10 with the same isolated `CODEX_HOME` rules and a raw loopback OTLP HTTP/JSON receiver. The committed inventory is one reviewed fixture per observed log event and metric instrument under:

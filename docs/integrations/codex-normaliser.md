@@ -44,10 +44,15 @@ first-class tool-call signal: event attributes expose `operation_id`,
 `category`, `outcome`, and observed `duration_ms`, while
 `provider_extensions.tool_call` preserves the provider-reported tool name,
 namespace, call ID, status, sequence, truncation flag, and observed provenance.
-Operation IDs include the session identity plus provider call ID when present,
-so replay deduplication cannot collapse reused call IDs from different sessions.
-`tool_calls` is removed from `attributes.unavailable_fields` only for
-`codex.tool_result`; other Codex log events keep that field unavailable.
+`codex.sandbox_outcome` becomes a command-execution signal with the same public
+timeline operation fields; safe provider details are kept under
+`provider_extensions.sandbox_outcome`, using `initial_duration_ms` as the
+operation duration when present. Operation IDs include the session identity plus
+provider call ID when present, so replay deduplication cannot collapse reused
+call IDs from different sessions. `tool_calls` is removed from
+`attributes.unavailable_fields` only for `codex.tool_result`;
+`command_execution` is removed only for `codex.sandbox_outcome`. Other Codex
+log events keep those fields unavailable.
 
 When a `codex.tool_result` carries a non-empty `mcp_server`, the event normaliser
 also keeps the existing explicit MCP-use signal under
@@ -80,7 +85,7 @@ Codex log shape into stable-primitive `canonical.ModelInteraction` records
   distinguishable from a real zero.
 - **Cached and reasoning tokens, task outcome** (`unknown` for typed model records) are left
   `nil`/`"unknown"`; no typed model field is fabricated from provider-extension evidence.
-- **Tool-call operations** (`supported` for `codex.tool_result`) are extracted into `canonical.Operation` by `ExtractLogOperations` and exposed on timeline events through operation ID, category, outcome, and duration. Operation ordering uses observed log timestamps when present, falling back to receive time only when absent. Known observed Codex tool names map conservatively (`exec_command` → shell command, `apply_patch` → filesystem write); unknown names stay `unknown`.
+- **Tool-call operations** (`supported` for `codex.tool_result`) and **command-execution operations** (`supported` for `codex.sandbox_outcome`) are extracted into `canonical.Operation` by `ExtractLogOperations` and exposed on timeline events through operation ID, category, outcome, and duration. Operation ordering uses observed log timestamps when present, falling back to receive time only when absent. Known observed Codex tool names map conservatively (`exec_command` → shell command, `apply_patch` → filesystem write); sandbox outcomes are categorised as shell commands because the reviewed event proves sandboxed command execution but does not retain raw command arguments. Unknown tool-result names stay `unknown`.
 - **MCP-backed tool results** (`partial` for MCP inventory) are represented only when Codex reports a non-empty `mcp_server`; the provider-reported raw server name is retained under `provider_extensions.mcp_call` and is itself the correlation identity.
 - **Session/request identity** uses the raw `codex:<conversation.id>` for the
   session when a conversation ID is present. Request IDs and records without a

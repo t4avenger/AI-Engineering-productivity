@@ -65,8 +65,17 @@ func TestExtractLogModelInteractionsGolden(t *testing.T) {
 
 func TestExtractLogOperationsGolden(t *testing.T) {
 	t.Parallel()
+	assertOperationsGolden(t, "codex-0.153.4-outcome-contracts-otlp.json", "codex-0.153.4-tool-result.operations.json", "operations")
+}
 
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "fixtures", "codex", "observed-sanitised", "codex-0.153.4-outcome-contracts-otlp.json"))
+func TestExtractLogSandboxOutcomeOperationsGolden(t *testing.T) {
+	t.Parallel()
+	assertOperationsGolden(t, "codex-0.153.4-sandbox-outcome-otlp.json", "codex-0.153.4-sandbox-outcome.operations.json", "sandbox operations")
+}
+
+func assertOperationsGolden(t *testing.T, fixture, golden, label string) {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "fixtures", "codex", "observed-sanitised", fixture))
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)
 	}
@@ -76,13 +85,11 @@ func TestExtractLogOperationsGolden(t *testing.T) {
 	if err := json.Unmarshal(raw, &wrapper); err != nil {
 		t.Fatalf("unwrap payload: %v", err)
 	}
-
 	got, err := ExtractLogOperations([]byte(wrapper.Payload), fixtureReceivedAt)
 	if err != nil {
 		t.Fatalf("extract operations: %v", err)
 	}
-
-	assertGoldenJSON(t, "codex-0.153.4-tool-result.operations.json", got, "operations")
+	assertGoldenJSON(t, golden, got, label)
 }
 
 func TestExtractLogOperationsMapsMCPToolResult(t *testing.T) {
