@@ -151,6 +151,89 @@ func TestCodexToolResultIngestExposesToolCallSignal(t *testing.T) {
 	assertNoRawIdentifiers(t, canaries, marshalJSON(t, stored))
 }
 
+const rawCodexToolDecisionOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
+  {"key":"service.name","value":{"stringValue":"codex_exec"}},
+  {"key":"service.version","value":{"stringValue":"0.153.4"}},
+  {"key":"host.name","value":{"stringValue":"decision-host.example.test"}},
+  {"key":"user.account_id","value":{"stringValue":"decision-account-123"}}]},
+ "scopeLogs":[{"logRecords":[
+   {"attributes":[
+     {"key":"event.name","value":{"stringValue":"codex.tool_decision"}},
+     {"key":"conversation.id","value":{"stringValue":"synthetic-decision-session"}},
+     {"key":"call_id","value":{"stringValue":"synthetic-decision-call"}},
+     {"key":"decision","value":{"stringValue":"allow"}},
+     {"key":"source","value":{"stringValue":"policy"}},
+     {"key":"tool_name","value":{"stringValue":"exec_command"}},
+     {"key":"tool_namespace","value":{"stringValue":"functions"}},
+     {"key":"model","value":{"stringValue":"gpt-6-astra"}},
+     {"key":"slug","value":{"stringValue":"tiq-canary-decision-slug"}},
+     {"key":"arguments","value":{"stringValue":"--token=tiq-canary-decision-argument"}},
+     {"key":"output","value":{"stringValue":"tiq-canary-decision-output"}},
+     {"key":"api_key","value":{"stringValue":"tiq-canary-decision-api-key"}},
+     {"key":"user.email","value":{"stringValue":"decision-user@example.test"}}],
+    "body":{"stringValue":"tiq-canary-decision-body"}}]}]}]}`
+
+func TestCodexToolDecisionIngestExposesApprovalSignal(t *testing.T) {
+	repository, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = repository.Close() })
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
+	t.Cleanup(server.Close)
+
+	response := postOTLPToPath(t, server.URL, "/v1/logs", []byte(rawCodexToolDecisionOTLPLogs), "application/json")
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("ingest status = %d", response.StatusCode)
+	}
+	closeBody(t, response)
+
+	events := timelinePage(t, server.URL+"/api/v1/sessions/codex:synthetic-decision-session/events?limit=10")
+	if len(events.Data) != 1 {
+		t.Fatalf("timeline events = %d, want 1: %#v", len(events.Data), events.Data)
+	}
+	assertCodexToolDecisionTimelineEvent(t, events.Data[0])
+	assertNoRawIdentifiers(t, codexToolDecisionCanaries(), marshalJSON(t, events))
+
+	stored, err := repository.ListEvents(t.Context(), storage.EventFilter{SessionID: "codex:synthetic-decision-session", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNoRawIdentifiers(t, codexToolDecisionCanaries(), marshalJSON(t, stored))
+}
+
+func assertCodexToolDecisionTimelineEvent(t *testing.T, event timelineEvent) {
+	t.Helper()
+	if event.EventType != "codex.tool_decision" || event.ApprovalID == nil || *event.ApprovalID != "codex:synthetic-decision-session:approval:synthetic-decision-call" {
+		t.Fatalf("approval identity = %#v", event)
+	}
+	if event.ApprovalDecision == nil || *event.ApprovalDecision != "approved" || event.ApprovalReasonClass == nil || *event.ApprovalReasonClass != "policy" {
+		t.Fatalf("approval fields = %#v", event)
+	}
+	if event.ToolName == nil || *event.ToolName != "exec_command" || event.ToolNamespace == nil || *event.ToolNamespace != "functions" {
+		t.Fatalf("tool identity = %#v", event)
+	}
+	if slices.Contains(event.UnavailableFields, "approvals") {
+		t.Fatalf("approvals must be available for codex.tool_decision: %#v", event.UnavailableFields)
+	}
+	if !slices.Contains(event.UnavailableFields, "tool_calls") {
+		t.Fatalf("tool_calls must remain unavailable for codex.tool_decision: %#v", event.UnavailableFields)
+	}
+}
+
+func codexToolDecisionCanaries() []string {
+	return []string{
+		"tiq-canary-decision-argument",
+		"tiq-canary-decision-output",
+		"tiq-canary-decision-api-key",
+		"decision-user@example.test",
+		"tiq-canary-decision-body",
+		"decision-host.example.test",
+		"decision-account-123",
+		"tiq-canary-decision-slug",
+	}
+}
+
 const rawCodexSandboxOutcomeOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
   {"key":"service.name","value":{"stringValue":"codex_exec"}},
   {"key":"service.version","value":{"stringValue":"0.153.4"}},

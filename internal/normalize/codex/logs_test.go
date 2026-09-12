@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
 func TestNormalizeLogsObservedShape(t *testing.T) {
@@ -92,6 +94,64 @@ func TestNormalizeLogsMapsCodexToolResultSignal(t *testing.T) {
 	second := events[1]
 	if second.Attributes["operation_id"] != "codex:tool-signal-session:tool:synthetic-call-failed" || second.Attributes["category"] != "filesystem write" || second.Attributes["outcome"] != "failed" {
 		t.Fatalf("second tool-call attributes = %#v", second.Attributes)
+	}
+}
+
+func TestNormalizeLogsMapsCodexToolDecisionSignal(t *testing.T) {
+	data := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.version","value":{"stringValue":"0.153.4"}},{"key":"host.name","value":{"stringValue":"decision-host.example.test"}},{"key":"user.account_id","value":{"stringValue":"decision-account-123"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.tool_decision"}},{"key":"conversation.id","value":{"stringValue":"decision-session"}},{"key":"call_id","value":{"stringValue":"decision-call-approved"}},{"key":"decision","value":{"stringValue":"allow"}},{"key":"source","value":{"stringValue":"policy"}},{"key":"tool_name","value":{"stringValue":"exec_command"}},{"key":"tool_namespace","value":{"stringValue":"functions"}},{"key":"model","value":{"stringValue":"gpt-6-astra"}},{"key":"slug","value":{"stringValue":"tiq-canary-decision-slug"}},{"key":"arguments","value":{"stringValue":"--token=tiq-canary-decision-argument"}},{"key":"output","value":{"stringValue":"tiq-canary-decision-output"}},{"key":"api_key","value":{"stringValue":"tiq-canary-decision-api-key"}},{"key":"user.email","value":{"stringValue":"decision-user@example.test"}}],"body":{"stringValue":"tiq-canary-decision-body"},"severityText":"INFO"},{"attributes":[{"key":"event.name","value":{"stringValue":"codex.tool_decision"}},{"key":"conversation.id","value":{"stringValue":"decision-session"}},{"key":"call_id","value":{"stringValue":"decision-call-denied"}},{"key":"decision","value":{"stringValue":"deny"}},{"key":"source","value":{"stringValue":"sandbox"}},{"key":"tool_name","value":{"stringValue":"apply_patch"}},{"key":"tool_namespace","value":{"stringValue":"functions"}}],"severityText":"INFO"}]}]}]}`)
+	events, err := NormalizeLogs(data, time.Date(2026, 9, 10, 20, 9, 20, 0, time.UTC))
+	if err != nil || len(events) != 2 {
+		t.Fatalf("events = %#v, %v", events, err)
+	}
+	assertApprovedToolDecisionEvent(t, events[0])
+	assertDeniedToolDecisionEvent(t, events[1])
+	encoded, _ := json.Marshal(events)
+	assertNoStringCanaries(t, string(encoded), []string{"tiq-canary-decision-argument", "tiq-canary-decision-output", "tiq-canary-decision-api-key", "decision-user@example.test", "tiq-canary-decision-body", "decision-host.example.test", "decision-account-123", "tiq-canary-decision-slug"})
+}
+
+func assertApprovedToolDecisionEvent(t *testing.T, event canonical.Event) {
+	t.Helper()
+	if event.EventType != codexToolDecisionEvent || event.Attributes["approval_id"] != "codex:decision-session:approval:decision-call-approved" {
+		t.Fatalf("approval identity = %#v", event)
+	}
+	if event.Attributes["approval_decision"] != "approved" || event.Attributes["approval_reason_class"] != "policy" || event.Attributes["tool_name"] != "exec_command" || event.Attributes["tool_namespace"] != "functions" {
+		t.Fatalf("approval fields = %#v", event.Attributes)
+	}
+	assertToolDecisionUnavailableFields(t, event.Attributes["unavailable_fields"].([]string))
+	decision := event.ProviderExtensions["tool_decision"].(map[string]any)
+	if decision["decision"] != "approved" || decision["raw_decision"] != "allow" || decision["source"] != "policy" || decision["provenance"] != "observed" {
+		t.Fatalf("tool_decision extension = %#v", decision)
+	}
+	if logAttributes := event.ProviderExtensions["log_attributes"].(map[string]any); logAttributes[codexEventNameKey] != codexToolDecisionEvent || logAttributes["model"] != "gpt-6-astra" {
+		t.Fatalf("tool-decision log attributes should preserve only safe source evidence: %#v", logAttributes)
+	}
+}
+
+func assertDeniedToolDecisionEvent(t *testing.T, event canonical.Event) {
+	t.Helper()
+	if event.Attributes["approval_id"] != "codex:decision-session:approval:decision-call-denied" || event.Attributes["approval_decision"] != "denied" || event.Attributes["approval_reason_class"] != "sandbox" {
+		t.Fatalf("denied approval fields = %#v", event.Attributes)
+	}
+}
+
+func assertToolDecisionUnavailableFields(t *testing.T, unavailable []string) {
+	t.Helper()
+	if slices.Contains(unavailable, "approvals") {
+		t.Fatalf("approvals must be available for tool_decision: %#v", unavailable)
+	}
+	if !slices.Contains(unavailable, "tool_calls") {
+		t.Fatalf("tool_calls must remain unavailable for tool_decision: %#v", unavailable)
+	}
+}
+
+func TestNormalizeLogsToolDecisionUnknownDecisionIsExplicit(t *testing.T) {
+	data := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.tool_decision"}},{"key":"call_id","value":{"stringValue":"decision-call"}}],"severityText":"INFO"}]}]}]}`)
+	events, err := NormalizeLogs(data, time.Date(2026, 9, 10, 20, 9, 20, 0, time.UTC))
+	if err != nil || len(events) != 1 {
+		t.Fatalf("events = %#v, %v", events, err)
+	}
+	if events[0].Attributes["approval_decision"] != "unknown" {
+		t.Fatalf("missing decision must be explicit unknown, got %#v", events[0].Attributes["approval_decision"])
 	}
 }
 

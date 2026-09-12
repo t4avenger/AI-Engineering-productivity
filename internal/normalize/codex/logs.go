@@ -29,6 +29,7 @@ const (
 	codexEventNameKey        = "event.name"
 	codexToolResultEvent     = "codex.tool_result"
 	codexSandboxOutcomeEvent = "codex.sandbox_outcome"
+	codexToolDecisionEvent   = "codex.tool_decision"
 )
 
 type logsPayload struct {
@@ -110,26 +111,11 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 			attributes[key] = value
 		}
 	}
-	if toolCall, ok := codexToolCall(fields, id, sessionID); ok {
-		for key, value := range toolCall.attributes {
-			attributes[key] = value
-		}
-	}
-	if sandboxOutcome, ok := codexSandboxOutcome(fields, id, sessionID); ok {
-		for key, value := range sandboxOutcome.attributes {
-			attributes[key] = value
-		}
-	}
 	if !hasCodexOutcomeContract(eventName) {
 		attributes["unavailable_fields"] = append(attributes["unavailable_fields"].([]string), "task_outcome")
 	}
 	extensions := map[string]any{"resource_attributes": codexLogResourceAttributes(eventName, resource), "log_attributes": codexLogAttributes(fields), "severity": record.SeverityText}
-	if toolCall, ok := codexToolCall(fields, id, sessionID); ok {
-		extensions["tool_call"] = toolCall.providerExtension
-	}
-	if sandboxOutcome, ok := codexSandboxOutcome(fields, id, sessionID); ok {
-		extensions["sandbox_outcome"] = sandboxOutcome.providerExtension
-	}
+	attachCodexLogSignals(attributes, extensions, fields, id, sessionID)
 	if mcpCall, ok := codexMCPCall(fields); ok {
 		attributes["category"] = string(canonical.OperationCategoryMCPCall)
 		extensions["mcp_call"] = mcpCall
@@ -143,6 +129,45 @@ func codexLogSessionID(fields map[string]any, fallback string) string {
 		return normalize.ProviderNativeSessionID("codex:", conversationID)
 	}
 	return fallback
+}
+
+func attachCodexLogSignals(attributes, extensions map[string]any, fields map[string]any, id, sessionID string) {
+	attachCodexToolCallSignal(attributes, extensions, fields, id, sessionID)
+	attachCodexSandboxOutcomeSignal(attributes, extensions, fields, id, sessionID)
+	attachCodexToolDecisionSignal(attributes, extensions, fields, id, sessionID)
+}
+
+func attachCodexToolCallSignal(attributes, extensions map[string]any, fields map[string]any, id, sessionID string) {
+	toolCall, ok := codexToolCall(fields, id, sessionID)
+	if !ok {
+		return
+	}
+	mergeSignalAttributes(attributes, toolCall.attributes)
+	extensions["tool_call"] = toolCall.providerExtension
+}
+
+func attachCodexSandboxOutcomeSignal(attributes, extensions map[string]any, fields map[string]any, id, sessionID string) {
+	sandboxOutcome, ok := codexSandboxOutcome(fields, id, sessionID)
+	if !ok {
+		return
+	}
+	mergeSignalAttributes(attributes, sandboxOutcome.attributes)
+	extensions["sandbox_outcome"] = sandboxOutcome.providerExtension
+}
+
+func attachCodexToolDecisionSignal(attributes, extensions map[string]any, fields map[string]any, id, sessionID string) {
+	toolDecision, ok := codexToolDecision(fields, id, sessionID)
+	if !ok {
+		return
+	}
+	mergeSignalAttributes(attributes, toolDecision.attributes)
+	extensions["tool_decision"] = toolDecision.providerExtension
+}
+
+func mergeSignalAttributes(target, source map[string]any) {
+	for key, value := range source {
+		target[key] = value
+	}
 }
 
 func hasCodexOutcomeContract(eventName string) bool {
@@ -233,17 +258,22 @@ func codexLogAttributes(fields map[string]any) map[string]any {
 		return allowedCodexAttributes(fields, codexEventNameKey)
 	}
 	known := []string{"mcp_server", "conversation.id"}
-	if stringValue(fields[codexEventNameKey], "") == codexToolResultEvent {
+	switch stringValue(fields[codexEventNameKey], "") {
+	case codexToolResultEvent:
 		known = append(known, codexToolResultFieldKeys()...)
+	case codexToolDecisionEvent:
+		known = append(known, codexToolDecisionFieldKeys()...)
 	}
 	return safeCodexLogAttributes(normalize.UnknownFields(fields, known...))
 }
 
 func codexLogResourceAttributes(eventName string, resource map[string]any) map[string]any {
-	if eventName != codexSandboxOutcomeEvent {
+	switch eventName {
+	case codexSandboxOutcomeEvent, codexToolDecisionEvent:
+		return allowedCodexAttributes(resource, "service.name", "service.version")
+	default:
 		return resource
 	}
-	return allowedCodexAttributes(resource, "service.name", "service.version")
 }
 
 func codexLogUnavailableFields(eventName string) []string {
@@ -254,7 +284,20 @@ func codexLogUnavailableFields(eventName string) []string {
 	if eventName != codexToolResultEvent {
 		fields = append(fields, "tool_calls")
 	}
+	if eventName == codexToolDecisionEvent {
+		fields = removeUnavailableField(fields, "approvals")
+	}
 	return fields
+}
+
+func removeUnavailableField(fields []string, target string) []string {
+	filtered := fields[:0]
+	for _, field := range fields {
+		if field != target {
+			filtered = append(filtered, field)
+		}
+	}
+	return filtered
 }
 
 type codexToolCallSignal struct {
@@ -375,6 +418,63 @@ func codexSandboxOutcomeFieldKeys() []string {
 	return []string{"call_id", "initial_duration_ms", "duration_ms", "outcome", "success", "tool_name", "model", "terminal.type"}
 }
 
+func codexToolDecision(fields map[string]any, fallbackID, sessionID string) (codexToolCallSignal, bool) {
+	if stringValue(fields[codexEventNameKey], "") != codexToolDecisionEvent {
+		return codexToolCallSignal{}, false
+	}
+	approvalID := fallbackID
+	if callID, ok := normalize.ObservedString(fields["call_id"]); ok {
+		approvalID = sessionID + ":approval:" + callID
+	}
+	decision := codexApprovalDecisionStatus(fields["decision"])
+	attributes := map[string]any{
+		"approval_id":       approvalID,
+		"approval_decision": decision,
+	}
+	if reasonClass, ok := normalize.ObservedString(fields["source"]); ok {
+		attributes["approval_reason_class"] = reasonClass
+	}
+	for _, key := range []string{"tool_name", "tool_namespace"} {
+		if value, ok := fields[key]; ok {
+			attributes[key] = value
+		}
+	}
+	extension := map[string]any{
+		"approval_id": approvalID,
+		"decision":    decision,
+		"provenance":  string(canonical.ProvenanceObserved),
+	}
+	for _, key := range codexToolDecisionFieldKeys() {
+		if value, ok := fields[key]; ok {
+			if key == "decision" {
+				extension["raw_decision"] = value
+				continue
+			}
+			extension[key] = value
+		}
+	}
+	return codexToolCallSignal{attributes: attributes, providerExtension: extension}, true
+}
+
+func codexApprovalDecisionStatus(value any) string {
+	decision, ok := normalize.ObservedString(value)
+	if !ok {
+		return "unknown"
+	}
+	switch strings.ToLower(strings.TrimSpace(decision)) {
+	case "approved", "approve", "allow", "allowed", "granted", "accepted", "yes":
+		return "approved"
+	case "denied", "deny", "blocked", "rejected", "no":
+		return "denied"
+	default:
+		return decision
+	}
+}
+
+func codexToolDecisionFieldKeys() []string {
+	return []string{"call_id", "decision", "source", "tool_name", "tool_namespace"}
+}
+
 func allowedCodexAttributes(fields map[string]any, keys ...string) map[string]any {
 	allowed := make(map[string]any, len(keys))
 	for _, key := range keys {
@@ -398,7 +498,7 @@ func safeCodexLogAttributes(fields map[string]any) map[string]any {
 
 func sensitiveCodexLogAttribute(key string) bool {
 	switch strings.ToLower(strings.TrimSpace(key)) {
-	case "arguments", "output", "api_key", "user.email", "user.account_id", "custom_metadata", "hostname", "host.name":
+	case "arguments", "output", "api_key", "user.email", "user.account_id", "custom_metadata", "hostname", "host.name", "slug":
 		return true
 	default:
 		return false
