@@ -81,6 +81,42 @@ Committed evidence:
 - `fixtures/claude/expected/claude-code-2.1.268-token-usage-metrics.events.json`
   (golden canonical token-usage events)
 
+## Traces capture
+
+To capture the Claude Code OTLP **traces** surface (`POST /v1/traces`), the
+enhanced-telemetry beta must be enabled — the span exporter is gated behind it and
+the default telemetry build emits no spans. Run a synthetic turn against a loopback
+sink with the traces exporter enabled:
+
+```bash
+export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
+export OTEL_TRACES_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318
+export OTEL_TRACES_EXPORT_INTERVAL=2000
+```
+
+Run a synthetic prompt (`claude -p 'Reply with exactly the word: pong'`) so a real
+model request produces a span tree, then let the exporter flush before exit. The
+observed shape (tool 2.1.268): a `resourceSpans` envelope with `service.name =
+claude-code`, scope `com.anthropic.claude_code.tracing`, and a two-span tree — a
+root `claude_code.interaction` span and a child `claude_code.llm_request` span
+whose `parentSpanId` is the interaction's `spanId`. Each span carries
+`traceId`/`spanId`, `startTimeUnixNano`/`endTimeUnixNano`, `kind`, `status`, and
+per-span `attributes` (`span.type`, `gen_ai.*`, token counts, `stop_reason`,
+`interaction.*`). Sanitise per the rules above — replace `user.id`, `session.id`,
+`organization.id`, `user.email`, host identifiers, and any request/response IDs
+with synthetic values, and zero-pad the synthetic `traceId`/`spanId` while keeping
+the parent→child linkage intact.
+
+Committed evidence:
+
+- `fixtures/claude/observed-sanitised/claude-code-2.1.268-trace-spans-otlp.json`
+  (sanitised OTLP `resourceSpans` for live `/v1/traces` ingest)
+- `fixtures/claude/expected/claude-code-2.1.268-trace-spans.events.json`
+  (golden canonical span events)
+
 ## Outcome-contract capture
 
 To raise Task outcome above `unknown`, capture provider-completion signals without

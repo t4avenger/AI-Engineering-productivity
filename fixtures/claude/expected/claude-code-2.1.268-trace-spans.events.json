@@ -1,0 +1,147 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:span:1d47ed330e0218fe88f1a30a661cb95c939e1b86ec7765fc27e7721da9417d4a",
+    "event_type": "claude_code.interaction",
+    "occurred_at": "2026-09-11T09:05:49.92Z",
+    "received_at": "2026-09-11T10:05:51Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.268",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "span_type": "interaction",
+      "unavailable_fields": [
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "command_execution",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:span:1d47ed330e0218fe88f1a30a661cb95c939e1b86ec7765fc27e7721da9417d4a",
+        "ordering_key": "01789117549920000000:claude-code:span:1d47ed330e0218fe88f1a30a661cb95c939e1b86ec7765fc27e7721da9417d4a",
+        "parent_span_id": "",
+        "span_id": "0000000000000002",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code trace spans: per-span task-boundary mapping deferred to T-phase (#100–#103)"
+        },
+        "trace_id": "00000000000000000000000000000001"
+      },
+      "resource": {
+        "host.arch": "amd64",
+        "os.type": "linux"
+      },
+      "span": {
+        "end_unix_nano": "1789117552520201650",
+        "kind": 1,
+        "name": "claude_code.interaction",
+        "parent_span_id": "",
+        "scope": "com.anthropic.claude_code.tracing",
+        "span_id": "0000000000000002",
+        "start_unix_nano": "1789117549920000000",
+        "status_code": 0,
+        "trace_id": "00000000000000000000000000000001"
+      },
+      "span_attributes": {
+        "interaction.duration_ms": 2600,
+        "interaction.sequence": 1,
+        "parent.source": "none",
+        "queued_sends": 0,
+        "span.type": "interaction",
+        "user_prompt_length": 33
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:span:badf57d34c5c4c514a1ec621b64115db72c2f8930d58ee0792d3eb9a1e91328c",
+    "event_type": "claude_code.llm_request",
+    "occurred_at": "2026-09-11T09:05:49.991Z",
+    "received_at": "2026-09-11T10:05:51Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.268",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "model": "claude-haiku-4-5-20251001",
+      "span_type": "llm_request",
+      "unavailable_fields": [
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "command_execution",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:span:badf57d34c5c4c514a1ec621b64115db72c2f8930d58ee0792d3eb9a1e91328c",
+        "ordering_key": "01789117549991000000:claude-code:span:badf57d34c5c4c514a1ec621b64115db72c2f8930d58ee0792d3eb9a1e91328c",
+        "parent_span_id": "0000000000000002",
+        "span_id": "0000000000000001",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code trace spans: per-span task-boundary mapping deferred to T-phase (#100–#103)"
+        },
+        "trace_id": "00000000000000000000000000000001"
+      },
+      "resource": {
+        "host.arch": "amd64",
+        "os.type": "linux"
+      },
+      "span": {
+        "end_unix_nano": "1789117552490594954",
+        "kind": 1,
+        "name": "claude_code.llm_request",
+        "parent_span_id": "0000000000000002",
+        "scope": "com.anthropic.claude_code.tracing",
+        "span_id": "0000000000000001",
+        "start_unix_nano": "1789117549991000000",
+        "status_code": 0,
+        "trace_id": "00000000000000000000000000000001"
+      },
+      "span_attributes": {
+        "attempt": 1,
+        "cache_creation_tokens": 18854,
+        "cache_read_tokens": 0,
+        "duration_ms": 2499,
+        "first_content_ms": 2171,
+        "gen_ai.request.model": "claude-haiku-4-5-20251001",
+        "gen_ai.response.id": "req_synthetic00000000000001",
+        "gen_ai.system": "anthropic",
+        "input_tokens": 10,
+        "llm_request.context": "interaction",
+        "output_tokens": 46,
+        "query_source_safe": "sdk",
+        "request_id": "req_synthetic00000000000001",
+        "span.type": "llm_request",
+        "speed": "normal",
+        "stop_reason": "end_turn",
+        "success": true,
+        "ttft_ms": 1918
+      }
+    }
+  }
+]
