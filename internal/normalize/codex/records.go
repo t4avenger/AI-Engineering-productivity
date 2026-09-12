@@ -63,9 +63,10 @@ func ExtractLogModelInteractions(data []byte, receivedAt time.Time) ([]canonical
 	return normalize.CorrelateModelInteractions(records), nil
 }
 
-// ExtractLogOperations maps observed Codex tool-result logs into stable-primitive
-// Operation records. Only codex.tool_result is eligible; other log records do
-// not prove an executed tool call and are skipped.
+// ExtractLogOperations maps observed Codex operation logs into stable-primitive
+// Operation records. codex.tool_result proves an executed tool call;
+// codex.sandbox_outcome proves sandboxed command execution. Other log records
+// are skipped rather than fabricated into operations.
 func ExtractLogOperations(data []byte, receivedAt time.Time) ([]canonical.Operation, error) {
 	var payload logsPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
@@ -114,50 +115,94 @@ func scopeLogOperations(resource map[string]any, scope scopeLog, receivedAt time
 
 func logRecordOperation(resource map[string]any, record logRecord, receivedAt time.Time) (canonical.Operation, bool, error) {
 	fields := attributes(record.Attributes)
-	if stringValue(fields[codexEventNameKey], "") != codexToolResultEvent {
-		return canonical.Operation{}, false, nil
-	}
 	recordData, err := json.Marshal(record)
 	if err != nil {
 		return canonical.Operation{}, false, fmt.Errorf("marshal Codex log record: %w", err)
 	}
 	id := contentID("codex-log:", recordData)
 	sessionID := codexLogSessionID(fields, id)
-	toolCall, _ := codexToolCall(fields, id, sessionID)
 	started := tolerantNano(record.TimeUnixNano, receivedAt)
-	return canonical.Operation{
-		SchemaVersion:      canonical.RecordSchemaVersion,
-		OperationID:        toolCall.attributes["operation_id"].(string),
-		SessionID:          sessionID,
-		Provider:           "openai",
-		Tool:               "codex",
-		Category:           codexOperationCategory(fields),
-		Outcome:            toolCall.attributes["outcome"].(string),
-		Provenance:         canonical.ProvenanceObserved,
-		ProviderExtensions: operationProviderExtensions(resource, fields, record.SeverityText, id, sessionID, started.value),
-	}, true, nil
+	switch stringValue(fields[codexEventNameKey], "") {
+	case codexToolResultEvent:
+		toolCall, _ := codexToolCall(fields, id, sessionID)
+		return codexOperation(operationInput{resource: resource, fields: fields, severity: record.SeverityText, id: id, sessionID: sessionID, orderingTime: started.value, signal: toolCall, category: codexOperationCategory(fields), taskBoundaryReason: "Codex tool-result telemetry has no reviewed task-boundary signal"}), true, nil
+	case codexSandboxOutcomeEvent:
+		sandboxOutcome, _ := codexSandboxOutcome(fields, id, sessionID)
+		return codexOperation(operationInput{resource: resource, fields: fields, severity: record.SeverityText, id: id, sessionID: sessionID, orderingTime: started.value, signal: sandboxOutcome, category: canonical.OperationCategoryShellCommand, taskBoundaryReason: "Codex sandbox-outcome telemetry has no reviewed task-boundary signal"}), true, nil
+	default:
+		return canonical.Operation{}, false, nil
+	}
 }
 
-func operationProviderExtensions(resource, fields map[string]any, severity, id, sessionID string, orderingTime time.Time) map[string]any {
-	toolCall, _ := codexToolCall(fields, id, sessionID)
+type operationInput struct {
+	resource           map[string]any
+	fields             map[string]any
+	severity           string
+	id                 string
+	sessionID          string
+	orderingTime       time.Time
+	signal             codexToolCallSignal
+	category           canonical.OperationCategory
+	taskBoundaryReason string
+}
+
+func codexOperation(input operationInput) canonical.Operation {
+	return canonical.Operation{
+		SchemaVersion:      canonical.RecordSchemaVersion,
+		OperationID:        input.signal.attributes["operation_id"].(string),
+		SessionID:          input.sessionID,
+		Provider:           "openai",
+		Tool:               "codex",
+		Category:           input.category,
+		Outcome:            input.signal.attributes["outcome"].(string),
+		Provenance:         canonical.ProvenanceObserved,
+		ProviderExtensions: operationProviderExtensions(input),
+	}
+}
+
+func operationProviderExtensions(input operationInput) map[string]any {
 	extensions := map[string]any{
 		"correlation": map[string]any{
-			"dedup_key":    id,
-			"ordering_key": fmt.Sprintf("%020d:%s", orderingTime.UTC().UnixNano(), id),
+			"dedup_key":    input.id,
+			"ordering_key": fmt.Sprintf("%020d:%s", input.orderingTime.UTC().UnixNano(), input.id),
 			"task_boundary": map[string]any{
 				"confidence": "unknown",
-				"reason":     "Codex tool-result telemetry has no reviewed task-boundary signal",
+				"reason":     input.taskBoundaryReason,
 			},
 		},
-		"resource_attributes": resource,
-		"log_attributes":      safeCodexLogAttributes(normalize.UnknownFields(fields, append(codexToolResultFieldKeys(), "conversation.id", "mcp_server")...)),
-		"severity":            severity,
-		"tool_call":           toolCall.providerExtension,
+		"resource_attributes": operationResourceAttributes(input),
+		"log_attributes":      operationLogAttributes(input.fields),
+		"severity":            input.severity,
 	}
-	if mcpCall, ok := codexMCPCall(fields); ok {
+	switch stringValue(input.fields[codexEventNameKey], "") {
+	case codexToolResultEvent:
+		extensions["tool_call"] = input.signal.providerExtension
+	case codexSandboxOutcomeEvent:
+		extensions["sandbox_outcome"] = input.signal.providerExtension
+	}
+	if mcpCall, ok := codexMCPCall(input.fields); ok {
 		extensions["mcp_call"] = mcpCall
 	}
 	return extensions
+}
+
+func operationResourceAttributes(input operationInput) map[string]any {
+	if stringValue(input.fields[codexEventNameKey], "") != codexSandboxOutcomeEvent {
+		return input.resource
+	}
+	return allowedCodexAttributes(input.resource, "service.name", "service.version")
+}
+
+func operationLogAttributes(fields map[string]any) map[string]any {
+	if stringValue(fields[codexEventNameKey], "") == codexSandboxOutcomeEvent {
+		return allowedCodexAttributes(fields, codexEventNameKey)
+	}
+	known := []string{"conversation.id", "mcp_server"}
+	switch stringValue(fields[codexEventNameKey], "") {
+	case codexToolResultEvent:
+		known = append(known, codexToolResultFieldKeys()...)
+	}
+	return safeCodexLogAttributes(normalize.UnknownFields(fields, known...))
 }
 
 // logRecordModelInteraction builds one ModelInteraction from a log record,
