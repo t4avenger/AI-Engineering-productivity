@@ -17,34 +17,17 @@ var ErrUnsupportedLogs = errors.New("unsupported Cursor OTEL log payload")
 
 const apiRequestBody = "api_request"
 
-// safeLogAttributeKeys is the allow-list of log/resource attribute keys carried
-// into provider_extensions. Conversation/request/event IDs are promoted onto
-// canonical identity fields and are not repeated here. Account identifiers
-// (cursor.team.id, cursor.user.id) are deliberately omitted.
-var safeLogAttributeKeys = map[string]struct{}{
-	"cursor.surface":         {},
-	"cursor.entrypoint":      {},
-	"cursor.api.billable":    {},
-	"cursor.source_event.id": {},
-	"cursor.usage_event.id":  {},
-}
-
 type logsPayload struct {
 	ResourceLogs []resourceLog `json:"resourceLogs"`
 }
 
 type resourceLog struct {
-	Resource struct {
-		Attributes []otlpAttribute `json:"attributes"`
-	} `json:"resource"`
-	ScopeLogs []scopeLog `json:"scopeLogs"`
+	Resource  otlpResource `json:"resource"`
+	ScopeLogs []scopeLog   `json:"scopeLogs"`
 }
 
 type scopeLog struct {
-	Scope struct {
-		Name    string `json:"name"`
-		Version string `json:"version"`
-	} `json:"scope"`
+	Scope      otlpScope   `json:"scope"`
 	LogRecords []logRecord `json:"logRecords"`
 }
 
@@ -55,10 +38,19 @@ type logRecord struct {
 	Attributes     []otlpAttribute `json:"attributes"`
 }
 
+type logContext struct {
+	scopeName        string
+	resourceIdentity string
+	safeResource     map[string]any
+	version          string
+	receivedAt       time.Time
+}
+
 // NormalizeLogs maps Cursor Enterprise OTLP/HTTP logs into canonical events.
-// Only resources with service.name=cursor are considered. Within a Cursor
-// resource, log records whose body is api_request become token-bearing events;
-// every other event family is route-tolerated until fixtures prove them.
+// Only resources with service.name=cursor and instrumentation scope
+// cursor.telemetry are considered. Within that scope, log records whose body is
+// api_request become token-bearing events; every other event family is
+// route-tolerated until fixtures prove them.
 func NormalizeLogs(data []byte, receivedAt time.Time) ([]canonical.Event, error) {
 	var payload logsPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
@@ -83,12 +75,20 @@ func apiRequestEventsFromResource(resource resourceLog, receivedAt time.Time) ([
 	if service, _ := resourceAttrs[attrServiceName].(string); service != otelServiceName {
 		return nil, nil
 	}
-	version := fallbackString(stringAttr(resourceAttrs, attrServiceVersion), unavailable)
-	safeResource := allowListed(resourceAttrs, safeLogAttributeKeys)
+	ctx := logContext{
+		resourceIdentity: otelResourceIdentity(resourceAttrs),
+		safeResource:     allowListed(resourceAttrs, safeOTELAttributeKeys),
+		version:          fallbackString(stringAttr(resourceAttrs, attrServiceVersion), unavailable),
+		receivedAt:       receivedAt,
+	}
 	var events []canonical.Event
 	for _, scope := range resource.ScopeLogs {
+		if !isCursorTelemetryScope(scope.Scope.Name) {
+			continue
+		}
+		ctx.scopeName = scope.Scope.Name
 		for index, record := range scope.LogRecords {
-			event, ok, err := apiRequestEvent(record, index, version, safeResource, receivedAt)
+			event, ok, err := apiRequestEvent(record, index, ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -100,7 +100,7 @@ func apiRequestEventsFromResource(resource resourceLog, receivedAt time.Time) ([
 	return events, nil
 }
 
-func apiRequestEvent(record logRecord, index int, version string, safeResource map[string]any, receivedAt time.Time) (canonical.Event, bool, error) {
+func apiRequestEvent(record logRecord, index int, ctx logContext) (canonical.Event, bool, error) {
 	body, _ := record.Body["stringValue"].(string)
 	if strings.TrimSpace(body) != apiRequestBody {
 		return canonical.Event{}, false, nil
@@ -115,29 +115,16 @@ func apiRequestEvent(record logRecord, index int, version string, safeResource m
 		return canonical.Event{}, false, fmt.Errorf("cursor api.request has no parseable token counts")
 	}
 
-	occurredAt := otlpTime(record.TimeUnixNano, receivedAt)
+	occurredAt := otlpTime(record.TimeUnixNano, ctx.receivedAt)
 	model, modelObserved := normalize.ObservedString(fields["cursor.model.name"])
 	conversationID := strings.TrimSpace(stringAttr(fields, "cursor.conversation.id"))
 	sessionID := normalize.ProviderNativeSessionID(otelSessionPrefix, conversationID)
 
-	eventID := eventIDFromRecord(fields, sessionID, index, occurredAt)
-	safeFields := allowListed(fields, safeLogAttributeKeys)
+	eventID := eventIDFromRecord(fields, sessionID, index, occurredAt, ctx)
+	safeFields := allowListed(fields, safeOTELAttributeKeys)
 
 	attributes := map[string]any{
-		"unavailable_fields": []string{
-			"tool_calls",
-			"mcp_calls",
-			"skill_invocations",
-			"file_operations",
-			"command_execution",
-			"approvals",
-			"prompt_content",
-			"response_content",
-			"repository_context",
-			"task_outcome",
-			"provider_cost",
-			"trace_span_correlation",
-		},
+		"unavailable_fields": otelUnavailableFields(),
 	}
 	if modelObserved {
 		attributes["model"] = model
@@ -161,7 +148,7 @@ func apiRequestEvent(record logRecord, index int, version string, safeResource m
 			"body":            apiRequestBody,
 			"severity_number": record.SeverityNumber,
 		},
-		"resource":       safeResource,
+		"resource":       ctx.safeResource,
 		"log_attributes": safeFields,
 	}
 	if requestID := strings.TrimSpace(stringAttr(fields, "cursor.request.id")); requestID != "" {
@@ -173,11 +160,11 @@ func apiRequestEvent(record logRecord, index int, version string, safeResource m
 		EventID:            eventID,
 		EventType:          "cursor.api.request",
 		OccurredAt:         occurredAt,
-		ReceivedAt:         receivedAt.UTC(),
+		ReceivedAt:         ctx.receivedAt.UTC(),
 		Provider:           provider,
 		Tool:               otelTool,
 		SourceSchema:       otelSourceSchema,
-		SourceVersion:      version,
+		SourceVersion:      ctx.version,
 		ActorID:            unavailable,
 		DeviceID:           unavailable,
 		SessionID:          sessionID,
@@ -187,18 +174,23 @@ func apiRequestEvent(record logRecord, index int, version string, safeResource m
 	}, true, nil
 }
 
-func eventIDFromRecord(fields map[string]any, sessionID string, index int, occurredAt time.Time) string {
+func eventIDFromRecord(fields map[string]any, sessionID string, index int, occurredAt time.Time, ctx logContext) string {
 	if raw := strings.TrimSpace(stringAttr(fields, "cursor.event.id")); raw != "" {
 		return normalize.ProviderNativeSessionID(otelSessionPrefix, raw)
 	}
+	if source := strings.TrimSpace(stringAttr(fields, "cursor.source_event.id")); source != "" {
+		return contentID("cursor:api:", []byte(strings.Join([]string{sessionID, source, ctx.resourceIdentity, ctx.scopeName}, "|")))
+	}
 	identity, err := json.Marshal(map[string]any{
-		"session": sessionID,
-		"index":   index,
-		"at":      occurredAt.UnixNano(),
-		"body":    apiRequestBody,
+		"session":  sessionID,
+		"index":    index,
+		"at":       occurredAt.UnixNano(),
+		"body":     apiRequestBody,
+		"resource": ctx.resourceIdentity,
+		"scope":    ctx.scopeName,
 	})
 	if err != nil {
-		return contentID("cursor:api:", []byte(fmt.Sprintf("%s|%d", sessionID, index)))
+		return contentID("cursor:api:", []byte(fmt.Sprintf("%s|%s|%s|%d", sessionID, ctx.resourceIdentity, ctx.scopeName, index)))
 	}
 	return contentID("cursor:api:", identity)
 }

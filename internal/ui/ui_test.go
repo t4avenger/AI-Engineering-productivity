@@ -383,7 +383,7 @@ func TestSessionsEmptyStateExplainsIngestNextStep(t *testing.T) {
 	handler := server.Wrap(http.NotFoundHandler())
 	cookie := unlock(t, handler)
 	body := getAuthed(t, handler, cookie, "/sessions").Body.String()
-	for _, want := range []string{"No retained sessions yet.", "Point Codex or Claude Code OTLP logs", "supported local Cursor Agent ingest path"} {
+	for _, want := range []string{"No retained sessions yet.", "Cursor Enterprise OTLP", "local-dev Cursor Agent ingest path"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("sessions empty state missing %q in body: %q", want, body)
 		}

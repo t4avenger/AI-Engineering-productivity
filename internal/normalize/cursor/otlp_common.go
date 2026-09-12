@@ -1,6 +1,10 @@
 package cursor
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -24,6 +28,27 @@ const (
 type otlpAttribute struct {
 	Key   string         `json:"key"`
 	Value map[string]any `json:"value"`
+}
+
+type otlpResource struct {
+	Attributes []otlpAttribute `json:"attributes"`
+}
+
+type otlpScope struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+// safeOTELAttributeKeys is the shared allow-list of behavioural Cursor OTEL
+// attributes retained in provider_extensions. Account identifiers
+// (cursor.team.id, cursor.user.id) are deliberately omitted.
+var safeOTELAttributeKeys = map[string]struct{}{
+	"cursor.surface":         {},
+	"cursor.entrypoint":      {},
+	"cursor.api.status":      {},
+	"cursor.api.billable":    {},
+	"cursor.source_event.id": {},
+	"cursor.usage_event.id":  {},
 }
 
 func attributeValues(attributes []otlpAttribute) map[string]any {
@@ -88,4 +113,58 @@ func allowListed(fields map[string]any, allowed map[string]struct{}) map[string]
 		}
 	}
 	return safe
+}
+
+func isCursorTelemetryScope(name string) bool {
+	return strings.TrimSpace(name) == otelScopeName
+}
+
+func otelResourceIdentity(resourceAttrs map[string]any) string {
+	return stableJSON(map[string]any{
+		attrServiceName:    stringAttr(resourceAttrs, attrServiceName),
+		attrServiceVersion: stringAttr(resourceAttrs, attrServiceVersion),
+		"resource":         allowListed(resourceAttrs, safeOTELAttributeKeys),
+	})
+}
+
+func otelUnavailableFields(extra ...string) []string {
+	fields := []string{
+		"tool_calls",
+		"mcp_calls",
+		"skill_invocations",
+		"file_operations",
+		"command_execution",
+		"approvals",
+		"prompt_content",
+		"response_content",
+		"repository_context",
+		"task_outcome",
+		"provider_cost",
+		"trace_span_correlation",
+	}
+	return append(fields, extra...)
+}
+
+func stableJSON(value any) string {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func contentID(prefix string, data []byte) string {
+	sum := sha256.Sum256(data)
+	return prefix + hex.EncodeToString(sum[:])
+}
+
+func otelCorrelation(eventID string, occurredAt time.Time, reason string) map[string]any {
+	return map[string]any{
+		"dedup_key":    eventID,
+		"ordering_key": fmt.Sprintf("%020d:%s", occurredAt.UnixNano(), eventID),
+		"task_boundary": map[string]any{
+			"confidence": "unknown",
+			"reason":     reason,
+		},
+	}
 }

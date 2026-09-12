@@ -47,8 +47,9 @@ failures return JSON errors with a stable `error.code` (`malformed_payload`,
 
 `POST /v1/metrics` accepts the same content types with a non-empty
 `resourceMetrics` array (JSON or ExportMetricsServiceRequest protobuf). Only
-reviewed Codex `codex.skill.injected` datapoints and Claude Code
-`claude_code.token.usage` datapoints are persisted as canonical events; other
+reviewed Codex `codex.skill.injected` datapoints, Claude Code
+`claude_code.token.usage` datapoints, and Cursor Enterprise
+`cursor.token.usage` datapoints are persisted as canonical events; other
 metrics are accepted so exporters can flush, but are not turned into insight
 rows.
 
@@ -83,7 +84,9 @@ OTLP/HTTP **binary protobuf** to `/v1/logs` and `/v1/metrics`. See
 Cursor usage telemetry; Enterprise plan + admin Team Settings are required.
 
 `POST /v1/logs` and `POST /v1/metrics` accept both `application/json` and
-`application/x-protobuf`.
+`application/x-protobuf`. Enterprise `cursor.telemetry` normalisation currently
+persists `cursor.api.request` logs and `cursor.token.usage` metrics (#130);
+other Cursor wire families are accepted but not mapped yet.
 
 **Local-dev only (not org setup):** Cursor Agent stream-json can be posted to
 `POST /v1/cursor-agent` via `scripts/ingest-cursor-agent-stream-json.py` or

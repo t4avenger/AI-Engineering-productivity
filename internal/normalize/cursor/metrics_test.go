@@ -126,7 +126,7 @@ func TestNormalizeMetricsRejectsNonCursorService(t *testing.T) {
 }
 
 func TestNormalizeMetricsRejectsUnparseableMappedValue(t *testing.T) {
-	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"cursor"}}]},"scopeMetrics":[{"metrics":[{"name":"cursor.token.usage","sum":{"dataPoints":[{"attributes":[{"key":"cursor.token.type","value":{"stringValue":"input"}}],"asDouble":-1,"timeUnixNano":"1790000000000000001"}]}}]}]}]}`)
+	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"cursor"}}]},"scopeMetrics":[{"scope":{"name":"cursor.telemetry","version":"0.1.0"},"metrics":[{"name":"cursor.token.usage","sum":{"dataPoints":[{"attributes":[{"key":"cursor.token.type","value":{"stringValue":"input"}}],"asDouble":-1,"timeUnixNano":"1790000000000000001"}]}}]}]}]}`)
 	_, err := NormalizeMetrics(payload, time.Now().UTC())
 	if err == nil || errors.Is(err, ErrUnsupportedMetrics) {
 		t.Fatalf("got %v, want hard normalisation error", err)
@@ -134,9 +134,17 @@ func TestNormalizeMetricsRejectsUnparseableMappedValue(t *testing.T) {
 }
 
 func TestNormalizeMetricsToleratesUnmappedMetricsOnly(t *testing.T) {
-	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"cursor"}}]},"scopeMetrics":[{"metrics":[{"name":"cursor.tool.calls","sum":{"dataPoints":[{"attributes":[{"key":"cursor.tool.name","value":{"stringValue":"read"}}],"asInt":"1","timeUnixNano":"1790000000000000001"}]}}]}]}]}`)
+	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"cursor"}}]},"scopeMetrics":[{"scope":{"name":"cursor.telemetry","version":"0.1.0"},"metrics":[{"name":"cursor.tool.calls","sum":{"dataPoints":[{"attributes":[{"key":"cursor.tool.name","value":{"stringValue":"read"}}],"asInt":"1","timeUnixNano":"1790000000000000001"}]}}]}]}]}`)
 	_, err := NormalizeMetrics(payload, time.Now().UTC())
 	if !errors.Is(err, ErrUnsupportedMetrics) {
 		t.Fatalf("got %v, want ErrUnsupportedMetrics when only unmapped metrics present", err)
+	}
+}
+
+func TestNormalizeMetricsSkipsNonTelemetryScope(t *testing.T) {
+	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"cursor"}}]},"scopeMetrics":[{"scope":{"name":"other.scope","version":"1.0.0"},"metrics":[{"name":"cursor.token.usage","sum":{"dataPoints":[{"attributes":[{"key":"cursor.token.type","value":{"stringValue":"input"}}],"asDouble":12,"timeUnixNano":"1790000000000000001"}]}}]}]}]}`)
+	_, err := NormalizeMetrics(payload, time.Now().UTC())
+	if !errors.Is(err, ErrUnsupportedMetrics) {
+		t.Fatalf("got %v, want ErrUnsupportedMetrics for non-cursor.telemetry scope", err)
 	}
 }

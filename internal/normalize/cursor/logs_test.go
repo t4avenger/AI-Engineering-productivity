@@ -89,9 +89,31 @@ func TestNormalizeLogsRejectsNonCursorService(t *testing.T) {
 }
 
 func TestNormalizeLogsRejectsAPIRequestWithoutTokens(t *testing.T) {
-	payload := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"cursor"}}]},"scopeLogs":[{"logRecords":[{"body":{"stringValue":"api_request"},"attributes":[{"key":"cursor.conversation.id","value":{"stringValue":"c1"}}]}]}]}]}`)
+	payload := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"cursor"}}]},"scopeLogs":[{"scope":{"name":"cursor.telemetry","version":"0.1.0"},"logRecords":[{"body":{"stringValue":"api_request"},"attributes":[{"key":"cursor.conversation.id","value":{"stringValue":"c1"}}]}]}]}]}`)
 	_, err := NormalizeLogs(payload, time.Now().UTC())
 	if err == nil || errors.Is(err, ErrUnsupportedLogs) {
 		t.Fatalf("got %v, want hard normalisation error", err)
+	}
+}
+
+func TestNormalizeLogsSkipsNonTelemetryScope(t *testing.T) {
+	payload := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"cursor"}}]},"scopeLogs":[{"scope":{"name":"other.scope","version":"1.0.0"},"logRecords":[{"body":{"stringValue":"api_request"},"attributes":[{"key":"cursor.api.request.input_tokens","value":{"intValue":"1"}},{"key":"cursor.conversation.id","value":{"stringValue":"c1"}}]}]}]}]}`)
+	_, err := NormalizeLogs(payload, time.Now().UTC())
+	if !errors.Is(err, ErrUnsupportedLogs) {
+		t.Fatalf("got %v, want ErrUnsupportedLogs for non-cursor.telemetry scope", err)
+	}
+}
+
+func TestNormalizeLogsFallbackEventIDsIncludeResourceAndScope(t *testing.T) {
+	payload := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"cursor"}},{"key":"service.version","value":{"stringValue":"a"}}]},"scopeLogs":[{"scope":{"name":"cursor.telemetry","version":"0.1.0"},"logRecords":[{"timeUnixNano":"1790000000000000001","body":{"stringValue":"api_request"},"attributes":[{"key":"cursor.conversation.id","value":{"stringValue":"same"}},{"key":"cursor.api.request.input_tokens","value":{"intValue":"1"}}]}]}]},{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"cursor"}},{"key":"service.version","value":{"stringValue":"b"}}]},"scopeLogs":[{"scope":{"name":"cursor.telemetry","version":"0.1.0"},"logRecords":[{"timeUnixNano":"1790000000000000001","body":{"stringValue":"api_request"},"attributes":[{"key":"cursor.conversation.id","value":{"stringValue":"same"}},{"key":"cursor.api.request.input_tokens","value":{"intValue":"1"}}]}]}]}]}`)
+	events, err := NormalizeLogs(payload, time.Date(2026, 9, 12, 21, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("events = %d, want 2 distinct fallback ids", len(events))
+	}
+	if events[0].EventID == events[1].EventID {
+		t.Fatalf("fallback event ids collided across resources: %q", events[0].EventID)
 	}
 }

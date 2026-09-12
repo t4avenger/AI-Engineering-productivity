@@ -1,8 +1,6 @@
 package cursor
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,32 +17,17 @@ var ErrUnsupportedMetrics = errors.New("unsupported Cursor OTEL metrics payload"
 
 const tokenUsageMetric = "cursor.token.usage"
 
-// safeMetricAttributeKeys is the allow-list of datapoint/resource attribute keys
-// carried into provider_extensions. Account identifiers (cursor.team.id,
-// cursor.user.id) are deliberately omitted.
-var safeMetricAttributeKeys = map[string]struct{}{
-	"cursor.surface":      {},
-	"cursor.entrypoint":   {},
-	"cursor.api.status":   {},
-	"cursor.api.billable": {},
-}
-
 type metricsPayload struct {
 	ResourceMetrics []resourceMetric `json:"resourceMetrics"`
 }
 
 type resourceMetric struct {
-	Resource struct {
-		Attributes []otlpAttribute `json:"attributes"`
-	} `json:"resource"`
+	Resource     otlpResource  `json:"resource"`
 	ScopeMetrics []scopeMetric `json:"scopeMetrics"`
 }
 
 type scopeMetric struct {
-	Scope struct {
-		Name    string `json:"name"`
-		Version string `json:"version"`
-	} `json:"scope"`
+	Scope   otlpScope    `json:"scope"`
 	Metrics []otlpMetric `json:"metrics"`
 }
 
@@ -76,9 +59,9 @@ type metricContext struct {
 }
 
 // NormalizeMetrics maps Cursor Enterprise OTLP/HTTP metrics into canonical
-// events. Only resources with service.name=cursor are considered. Within a
-// Cursor resource, cursor.token.usage sum datapoints become token-usage events;
-// every other metric (tool.calls, cost.usage, …) is route-tolerated.
+// events. Only resources with service.name=cursor and instrumentation scope
+// cursor.telemetry are considered. Within that scope, cursor.token.usage sum
+// datapoints become token-usage events; every other metric is route-tolerated.
 //
 // Metrics carry no conversation correlation IDs on the wire, so session
 // identity falls back to the content-derived event ID (same pattern as Codex
@@ -108,13 +91,16 @@ func tokenEventsFromResource(resource resourceMetric, receivedAt time.Time) ([]c
 		return nil, nil
 	}
 	ctx := metricContext{
-		resourceIdentity: resourceIdentityKey(resourceAttrs),
-		safeResource:     allowListed(resourceAttrs, safeMetricAttributeKeys),
+		resourceIdentity: otelResourceIdentity(resourceAttrs),
+		safeResource:     allowListed(resourceAttrs, safeOTELAttributeKeys),
 		version:          fallbackString(stringAttr(resourceAttrs, attrServiceVersion), unavailable),
 		receivedAt:       receivedAt,
 	}
 	var events []canonical.Event
 	for _, scope := range resource.ScopeMetrics {
+		if !isCursorTelemetryScope(scope.Scope.Name) {
+			continue
+		}
 		ctx.scopeName = scope.Scope.Name
 		for _, item := range scope.Metrics {
 			metricEvents, err := tokenEventsFromMetric(item, ctx)
@@ -165,29 +151,15 @@ func tokenUsageEvent(point metricDataPoint, index int, ctx metricContext, unit s
 
 	occurredAt := otlpTime(point.TimeUnixNano, ctx.receivedAt)
 	model, modelObserved := normalize.ObservedString(fields["cursor.model.name"])
-	safeFields := allowListed(fields, safeMetricAttributeKeys)
+	safeFields := allowListed(fields, safeOTELAttributeKeys)
 
 	identity := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d", tokenUsageMetric, model, tokenType, point.TimeUnixNano, ctx.resourceIdentity, ctx.scopeName, index, *tokens)
 	identity += "|" + stableJSON(safeFields)
 	eventID := contentID("cursor:token:", []byte(identity))
 
 	attributes := map[string]any{
-		"unavailable_fields": []string{
-			"tool_calls",
-			"mcp_calls",
-			"skill_invocations",
-			"file_operations",
-			"command_execution",
-			"approvals",
-			"prompt_content",
-			"response_content",
-			"repository_context",
-			"task_outcome",
-			"provider_cost",
-			"trace_span_correlation",
-			"session_lifecycle",
-		},
-		attributeKey: *tokens,
+		"unavailable_fields": otelUnavailableFields("session_lifecycle"),
+		attributeKey:         *tokens,
 	}
 	if modelObserved {
 		attributes["model"] = model
@@ -241,36 +213,4 @@ func dataPointValue(point metricDataPoint) any {
 		return point.AsDouble
 	}
 	return point.AsInt
-}
-
-func resourceIdentityKey(resourceAttrs map[string]any) string {
-	return stableJSON(map[string]any{
-		attrServiceName:    stringAttr(resourceAttrs, attrServiceName),
-		attrServiceVersion: stringAttr(resourceAttrs, attrServiceVersion),
-		"resource":         allowListed(resourceAttrs, safeMetricAttributeKeys),
-	})
-}
-
-func stableJSON(value any) string {
-	data, err := json.Marshal(value)
-	if err != nil {
-		return ""
-	}
-	return string(data)
-}
-
-func contentID(prefix string, data []byte) string {
-	sum := sha256.Sum256(data)
-	return prefix + hex.EncodeToString(sum[:])
-}
-
-func otelCorrelation(eventID string, occurredAt time.Time, reason string) map[string]any {
-	return map[string]any{
-		"dedup_key":    eventID,
-		"ordering_key": fmt.Sprintf("%020d:%s", occurredAt.UnixNano(), eventID),
-		"task_boundary": map[string]any{
-			"confidence": "unknown",
-			"reason":     reason,
-		},
-	}
 }
