@@ -8,6 +8,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/wayne/telemetryiq/internal/normalize"
+	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
 // Shared OTLP attribute decoding for Enterprise OpenTelemetry Export (#130).
@@ -37,6 +40,15 @@ type otlpResource struct {
 type otlpScope struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
+}
+
+// otelContext carries resource/scope identity shared by log and metric mappers.
+type otelContext struct {
+	scopeName        string
+	resourceIdentity string
+	safeResource     map[string]any
+	version          string
+	receivedAt       time.Time
 }
 
 // safeOTELAttributeKeys is the shared allow-list of behavioural Cursor OTEL
@@ -119,12 +131,47 @@ func isCursorTelemetryScope(name string) bool {
 	return strings.TrimSpace(name) == otelScopeName
 }
 
-func otelResourceIdentity(resourceAttrs map[string]any) string {
-	return stableJSON(map[string]any{
-		attrServiceName:    stringAttr(resourceAttrs, attrServiceName),
-		attrServiceVersion: stringAttr(resourceAttrs, attrServiceVersion),
-		"resource":         allowListed(resourceAttrs, safeOTELAttributeKeys),
-	})
+func cursorResourceContext(resourceAttrs map[string]any, receivedAt time.Time) (otelContext, bool) {
+	if service, _ := resourceAttrs[attrServiceName].(string); service != otelServiceName {
+		return otelContext{}, false
+	}
+	return otelContext{
+		resourceIdentity: stableJSON(map[string]any{
+			attrServiceName:    stringAttr(resourceAttrs, attrServiceName),
+			attrServiceVersion: stringAttr(resourceAttrs, attrServiceVersion),
+			"resource":         allowListed(resourceAttrs, safeOTELAttributeKeys),
+		}),
+		safeResource: allowListed(resourceAttrs, safeOTELAttributeKeys),
+		version:      fallbackString(stringAttr(resourceAttrs, attrServiceVersion), unavailable),
+		receivedAt:   receivedAt,
+	}, true
+}
+
+func finishOTELEvents(events []canonical.Event, unsupported error) ([]canonical.Event, error) {
+	if len(events) == 0 {
+		return nil, unsupported
+	}
+	return normalize.CorrelateEvents(events), nil
+}
+
+func otelCanonicalEvent(eventID, eventType, sessionID string, occurredAt time.Time, ctx otelContext, attributes, extensions map[string]any) canonical.Event {
+	return canonical.Event{
+		SchemaVersion:      canonicalSchemaVersion,
+		EventID:            eventID,
+		EventType:          eventType,
+		OccurredAt:         occurredAt,
+		ReceivedAt:         ctx.receivedAt.UTC(),
+		Provider:           provider,
+		Tool:               otelTool,
+		SourceSchema:       otelSourceSchema,
+		SourceVersion:      ctx.version,
+		ActorID:            unavailable,
+		DeviceID:           unavailable,
+		SessionID:          sessionID,
+		PrivacyLevel:       "operational",
+		Attributes:         attributes,
+		ProviderExtensions: extensions,
+	}
 }
 
 func otelUnavailableFields(extra ...string) []string {

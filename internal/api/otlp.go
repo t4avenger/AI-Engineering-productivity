@@ -241,41 +241,11 @@ func rawPayload(payload map[string]json.RawMessage) ([]byte, error) {
 // rather than misattributed. The payload is normalised verbatim — no ingest-time
 // hiding is applied (epic #87).
 func (i *otlpHTTPIngest) persistLogs(request *http.Request, payload map[string]json.RawMessage) error {
-	if i.repository == nil {
-		return nil
-	}
-	rawBytes, err := rawPayload(payload)
-	if err != nil {
-		return err
-	}
-	receivedAt := time.Now().UTC()
-
-	var events []canonical.Event
-	codexEvents, err := codex.NormalizeLogs(rawBytes, receivedAt)
-	if err != nil && !errors.Is(err, codex.ErrUnsupportedLogs) {
-		return fmt.Errorf("normalise: %w", err)
-	}
-	events = append(events, codexEvents...)
-
-	claudeEvents, err := claude.NormalizeLogs(rawBytes, receivedAt)
-	if err != nil && !errors.Is(err, claude.ErrUnsupportedLogs) {
-		return fmt.Errorf("normalise: %w", err)
-	}
-	events = append(events, claudeEvents...)
-
-	cursorEvents, err := cursor.NormalizeLogs(rawBytes, receivedAt)
-	if err != nil && !errors.Is(err, cursor.ErrUnsupportedLogs) {
-		return fmt.Errorf("normalise: %w", err)
-	}
-	events = append(events, cursorEvents...)
-
-	if len(events) == 0 {
-		return nil
-	}
-	if err := i.repository.SaveEvents(request.Context(), events); err != nil {
-		return fmt.Errorf("persist: %w", err)
-	}
-	return nil
+	return i.persistWithAdapters(request, payload,
+		adapterPass{fn: codex.NormalizeLogs, unsupported: codex.ErrUnsupportedLogs},
+		adapterPass{fn: claude.NormalizeLogs, unsupported: claude.ErrUnsupportedLogs},
+		adapterPass{fn: cursor.NormalizeLogs, unsupported: cursor.ErrUnsupportedLogs},
+	)
 }
 
 // persistMetrics routes a raw OTLP metrics payload through every per-tool metrics
@@ -289,41 +259,11 @@ func (i *otlpHTTPIngest) persistLogs(request *http.Request, payload map[string]j
 // (so exporters do not retry) but produce no events. The payload is normalised
 // verbatim — no ingest-time hiding is applied (epic #87).
 func (i *otlpHTTPIngest) persistMetrics(request *http.Request, payload map[string]json.RawMessage) error {
-	if i.repository == nil {
-		return nil
-	}
-	rawBytes, err := rawPayload(payload)
-	if err != nil {
-		return err
-	}
-	receivedAt := time.Now().UTC()
-
-	var events []canonical.Event
-	codexEvents, err := codex.NormalizeMetrics(rawBytes, receivedAt)
-	if err != nil && !errors.Is(err, codex.ErrUnsupportedMetrics) {
-		return fmt.Errorf("normalise: %w", err)
-	}
-	events = append(events, codexEvents...)
-
-	claudeEvents, err := claude.NormalizeMetrics(rawBytes, receivedAt)
-	if err != nil && !errors.Is(err, claude.ErrUnsupportedMetrics) {
-		return fmt.Errorf("normalise: %w", err)
-	}
-	events = append(events, claudeEvents...)
-
-	cursorEvents, err := cursor.NormalizeMetrics(rawBytes, receivedAt)
-	if err != nil && !errors.Is(err, cursor.ErrUnsupportedMetrics) {
-		return fmt.Errorf("normalise: %w", err)
-	}
-	events = append(events, cursorEvents...)
-
-	if len(events) == 0 {
-		return nil
-	}
-	if err := i.repository.SaveEvents(request.Context(), events); err != nil {
-		return fmt.Errorf("persist: %w", err)
-	}
-	return nil
+	return i.persistWithAdapters(request, payload,
+		adapterPass{fn: codex.NormalizeMetrics, unsupported: codex.ErrUnsupportedMetrics},
+		adapterPass{fn: claude.NormalizeMetrics, unsupported: claude.ErrUnsupportedMetrics},
+		adapterPass{fn: cursor.NormalizeMetrics, unsupported: cursor.ErrUnsupportedMetrics},
+	)
 }
 
 // persistTraces routes a raw OTLP traces payload through every per-tool traces
@@ -337,22 +277,44 @@ func (i *otlpHTTPIngest) persistMetrics(request *http.Request, payload map[strin
 // path keeps the multi-adapter shape so it can slot in. The payload is
 // normalised verbatim — no ingest-time hiding is applied (epic #87).
 func (i *otlpHTTPIngest) persistTraces(request *http.Request, payload map[string]json.RawMessage) error {
+	return i.persistWithAdapters(request, payload,
+		adapterPass{fn: claude.NormalizeTraces, unsupported: claude.ErrUnsupportedTraces},
+	)
+}
+
+type adapterPass struct {
+	fn          func([]byte, time.Time) ([]canonical.Event, error)
+	unsupported error
+}
+
+func (i *otlpHTTPIngest) persistWithAdapters(request *http.Request, payload map[string]json.RawMessage, passes ...adapterPass) error {
+	rawBytes, receivedAt, skip, err := i.beginPersist(payload)
+	if skip || err != nil {
+		return err
+	}
+	var events []canonical.Event
+	for _, pass := range passes {
+		next, normErr := pass.fn(rawBytes, receivedAt)
+		if normErr != nil && !errors.Is(normErr, pass.unsupported) {
+			return fmt.Errorf("normalise: %w", normErr)
+		}
+		events = append(events, next...)
+	}
+	return i.savePersistedEvents(request, events)
+}
+
+func (i *otlpHTTPIngest) beginPersist(payload map[string]json.RawMessage) ([]byte, time.Time, bool, error) {
 	if i.repository == nil {
-		return nil
+		return nil, time.Time{}, true, nil
 	}
 	rawBytes, err := rawPayload(payload)
 	if err != nil {
-		return err
+		return nil, time.Time{}, false, err
 	}
-	receivedAt := time.Now().UTC()
+	return rawBytes, time.Now().UTC(), false, nil
+}
 
-	var events []canonical.Event
-	claudeEvents, err := claude.NormalizeTraces(rawBytes, receivedAt)
-	if err != nil && !errors.Is(err, claude.ErrUnsupportedTraces) {
-		return fmt.Errorf("normalise: %w", err)
-	}
-	events = append(events, claudeEvents...)
-
+func (i *otlpHTTPIngest) savePersistedEvents(request *http.Request, events []canonical.Event) error {
 	if len(events) == 0 {
 		return nil
 	}
