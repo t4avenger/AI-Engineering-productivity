@@ -11,6 +11,8 @@ Provider-specific per-tool findings:
 - Codex: [codex-capability-matrix.md](codex-capability-matrix.md), [codex-phase-0-findings.md](codex-phase-0-findings.md)
 - Claude Code: [claude-code-capability-probe.md](claude-code-capability-probe.md)
 - Cursor Agent: [cursor-agent-capability-probe.md](cursor-agent-capability-probe.md)
+  (local-dev stream-json). Org/SaaS path: [cursor-enterprise-otel.md](cursor-enterprise-otel.md)
+  (Cursor Enterprise server-side OTLP protobuf; epic #128).
 
 ## Observed telemetry sources per provider
 

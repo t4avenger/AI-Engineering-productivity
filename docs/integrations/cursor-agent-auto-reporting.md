@@ -1,4 +1,10 @@
-# Cursor Agent auto-reporting to the TelemetryIQ daemon (local)
+# Cursor Agent auto-reporting to the TelemetryIQ daemon (local-dev only)
+
+> **Not the org/SaaS path.** Organisation fleets must use **Cursor Enterprise
+> OpenTelemetry Export** (admin Team Settings → server-side OTLP protobuf). See
+> [cursor-enterprise-otel.md](cursor-enterprise-otel.md). MDM does not push
+> per-laptop Cursor usage telemetry. This wrapper is for local developer
+> experiments only.
 
 Cursor Agent does not currently arrive in TelemetryIQ via OTLP logs in this
 repository’s reviewed captures. Instead, TelemetryIQ supports a dedicated

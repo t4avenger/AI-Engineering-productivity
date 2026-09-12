@@ -16,6 +16,11 @@ import (
 
 	"github.com/wayne/telemetryiq/internal/storage"
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestOTLPHTTPIngestProof(t *testing.T) {
@@ -54,8 +59,27 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	oversized := postOTLPToPath(t, server.URL, "/v1/logs", bytes.Repeat([]byte("x"), int(maxOTLPPayloadBytes)+1), "application/json")
 	assertIngestError(t, oversized, http.StatusRequestEntityTooLarge, "payload_too_large")
 
-	unsupportedMediaType := postOTLPToPath(t, server.URL, "/v1/logs", []byte(`{"resourceLogs":[{}]}`), "application/x-protobuf")
+	unsupportedMediaType := postOTLPToPath(t, server.URL, "/v1/logs", []byte(`{"resourceLogs":[{}]}`), "text/plain")
 	assertIngestError(t, unsupportedMediaType, http.StatusUnsupportedMediaType, "unsupported_media_type")
+
+	// JSON body with protobuf Content-Type is malformed protobuf (not a media-type reject).
+	malformedProtobuf := postOTLPToPath(t, server.URL, "/v1/logs", []byte(`{"resourceLogs":[{}]}`), otlpContentTypeProtobuf)
+	assertIngestError(t, malformedProtobuf, http.StatusBadRequest, "malformed_payload")
+
+	protobufLogs := postOTLPToPath(t, server.URL, "/v1/logs", mustMarshalOTLPLogsProtobuf(t), otlpContentTypeProtobuf)
+	if protobufLogs.StatusCode != http.StatusAccepted {
+		t.Fatalf("expected protobuf logs status 202, got %d", protobufLogs.StatusCode)
+	}
+	closeBody(t, protobufLogs)
+
+	protobufMetrics := postOTLPToPath(t, server.URL, "/v1/metrics", mustMarshalOTLPMetricsProtobuf(t), otlpContentTypeProtobuf)
+	if protobufMetrics.StatusCode != http.StatusAccepted {
+		t.Fatalf("expected protobuf metrics status 202, got %d", protobufMetrics.StatusCode)
+	}
+	closeBody(t, protobufMetrics)
+
+	protobufTracesRejected := postOTLPToPath(t, server.URL, "/v1/traces", mustMarshalOTLPLogsProtobuf(t), otlpContentTypeProtobuf)
+	assertIngestError(t, protobufTracesRejected, http.StatusUnsupportedMediaType, "unsupported_media_type")
 
 	resp, err := http.Get(server.URL + "/api/v1/ingest/counters")
 	if err != nil {
@@ -66,8 +90,9 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&counters); err != nil {
 		t.Fatalf("decode counters: %v", err)
 	}
-	// 1 accepted log + 1 accepted metrics + 1 accepted traces + 4 validation rejects
-	if counters.AcceptedPayloads != 3 || counters.RejectedPayloads != 4 {
+	// 1 JSON log + 1 JSON metrics + 1 JSON traces + 1 protobuf log + 1 protobuf metrics
+	// + 6 validation rejects (malformed JSON, invalid, oversized, text/plain, malformed protobuf, protobuf-on-traces)
+	if counters.AcceptedPayloads != 5 || counters.RejectedPayloads != 6 {
 		t.Fatalf("unexpected counters: %+v", counters)
 	}
 }
@@ -481,6 +506,60 @@ func TestDevelopmentInspectorRecordsLastIngest(t *testing.T) {
 func postOTLP(t *testing.T, serverURL string, body []byte) *http.Response {
 	t.Helper()
 	return postOTLPWithContentType(t, serverURL, body, "application/json")
+}
+
+func mustMarshalOTLPLogsProtobuf(t *testing.T) []byte {
+	t.Helper()
+	req := &logspb.LogsData{
+		ResourceLogs: []*logspb.ResourceLogs{{
+			Resource: &resourcepb.Resource{
+				Attributes: []*commonpb.KeyValue{{
+					Key: "service.name",
+					Value: &commonpb.AnyValue{
+						Value: &commonpb.AnyValue_StringValue{StringValue: "synthetic-protobuf"},
+					},
+				}},
+			},
+			ScopeLogs: []*logspb.ScopeLogs{{
+				LogRecords: []*logspb.LogRecord{{
+					Body: &commonpb.AnyValue{
+						Value: &commonpb.AnyValue_StringValue{StringValue: "synthetic"},
+					},
+				}},
+			}},
+		}},
+	}
+	body, err := proto.Marshal(req)
+	if err != nil {
+		t.Fatalf("marshal logs protobuf: %v", err)
+	}
+	return body
+}
+
+func mustMarshalOTLPMetricsProtobuf(t *testing.T) []byte {
+	t.Helper()
+	req := &metricspb.MetricsData{
+		ResourceMetrics: []*metricspb.ResourceMetrics{{
+			Resource: &resourcepb.Resource{
+				Attributes: []*commonpb.KeyValue{{
+					Key: "service.name",
+					Value: &commonpb.AnyValue{
+						Value: &commonpb.AnyValue_StringValue{StringValue: "synthetic-protobuf"},
+					},
+				}},
+			},
+			ScopeMetrics: []*metricspb.ScopeMetrics{{
+				Metrics: []*metricspb.Metric{{
+					Name: "synthetic",
+				}},
+			}},
+		}},
+	}
+	body, err := proto.Marshal(req)
+	if err != nil {
+		t.Fatalf("marshal metrics protobuf: %v", err)
+	}
+	return body
 }
 
 func postOTLPWithContentType(t *testing.T, serverURL string, body []byte, contentType string) *http.Response {

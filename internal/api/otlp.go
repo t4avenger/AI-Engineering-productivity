@@ -63,9 +63,8 @@ func (i *otlpHTTPIngest) logsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (i *otlpHTTPIngest) receive(w http.ResponseWriter, r *http.Request, resourceField string) {
-	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	if err != nil || mediaType != "application/json" {
-		i.reject(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Content-Type must be application/json")
+	mediaType, ok := i.parseOTLPMediaType(w, r, resourceField)
+	if !ok {
 		return
 	}
 	if r.ContentLength > maxOTLPPayloadBytes {
@@ -73,23 +72,13 @@ func (i *otlpHTTPIngest) receive(w http.ResponseWriter, r *http.Request, resourc
 		return
 	}
 
-	var payload map[string]json.RawMessage
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxOTLPPayloadBytes))
-	if err := decoder.Decode(&payload); err != nil {
-		if isBodyTooLarge(err) {
-			i.reject(w, http.StatusRequestEntityTooLarge, "payload_too_large", "request body exceeds the 1 MiB limit")
-			return
-		}
-		i.reject(w, http.StatusBadRequest, "malformed_payload", "request body must be valid OTLP JSON")
-		return
-	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		i.reject(w, http.StatusBadRequest, "malformed_payload", "request body must contain one JSON value")
+	payload, ok := i.decodeOTLPBody(w, r, mediaType, resourceField)
+	if !ok {
 		return
 	}
 
 	var resources []json.RawMessage
-	if len(payload) != 1 || len(payload[resourceField]) == 0 || json.Unmarshal(payload[resourceField], &resources) != nil || len(resources) == 0 {
+	if len(payload[resourceField]) == 0 || json.Unmarshal(payload[resourceField], &resources) != nil || len(resources) == 0 {
 		i.reject(w, http.StatusBadRequest, "invalid_payload", "request must contain a non-empty "+resourceField+" array")
 		return
 	}
@@ -104,6 +93,76 @@ func (i *otlpHTTPIngest) receive(w http.ResponseWriter, r *http.Request, resourc
 	}
 	i.accepted.Add(1)
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func (i *otlpHTTPIngest) parseOTLPMediaType(w http.ResponseWriter, r *http.Request, resourceField string) (string, bool) {
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil {
+		i.reject(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Content-Type must be application/json or application/x-protobuf")
+		return "", false
+	}
+	switch mediaType {
+	case otlpContentTypeJSON:
+		return mediaType, true
+	case otlpContentTypeProtobuf:
+		if !otlpAcceptsProtobuf(resourceField) {
+			i.reject(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Content-Type application/x-protobuf is supported on /v1/logs and /v1/metrics only")
+			return "", false
+		}
+		return mediaType, true
+	default:
+		i.reject(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Content-Type must be application/json or application/x-protobuf")
+		return "", false
+	}
+}
+
+func (i *otlpHTTPIngest) decodeOTLPBody(w http.ResponseWriter, r *http.Request, mediaType, resourceField string) (map[string]json.RawMessage, bool) {
+	limited := http.MaxBytesReader(w, r.Body, maxOTLPPayloadBytes)
+	switch mediaType {
+	case otlpContentTypeJSON:
+		return i.decodeOTLPJSON(w, limited)
+	case otlpContentTypeProtobuf:
+		return i.decodeOTLPProtobufBody(w, limited, resourceField)
+	default:
+		i.reject(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Content-Type must be application/json or application/x-protobuf")
+		return nil, false
+	}
+}
+
+func (i *otlpHTTPIngest) decodeOTLPJSON(w http.ResponseWriter, body io.Reader) (map[string]json.RawMessage, bool) {
+	var payload map[string]json.RawMessage
+	decoder := json.NewDecoder(body)
+	if err := decoder.Decode(&payload); err != nil {
+		if isBodyTooLarge(err) {
+			i.reject(w, http.StatusRequestEntityTooLarge, "payload_too_large", "request body exceeds the 1 MiB limit")
+			return nil, false
+		}
+		i.reject(w, http.StatusBadRequest, "malformed_payload", "request body must be valid OTLP JSON")
+		return nil, false
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		i.reject(w, http.StatusBadRequest, "malformed_payload", "request body must contain one JSON value")
+		return nil, false
+	}
+	return payload, true
+}
+
+func (i *otlpHTTPIngest) decodeOTLPProtobufBody(w http.ResponseWriter, body io.Reader, resourceField string) (map[string]json.RawMessage, bool) {
+	raw, err := io.ReadAll(body)
+	if err != nil {
+		if isBodyTooLarge(err) {
+			i.reject(w, http.StatusRequestEntityTooLarge, "payload_too_large", "request body exceeds the 1 MiB limit")
+			return nil, false
+		}
+		i.reject(w, http.StatusBadRequest, "malformed_payload", "request body could not be read")
+		return nil, false
+	}
+	payload, err := decodeOTLPProtobuf(raw, resourceField)
+	if err != nil {
+		i.reject(w, http.StatusBadRequest, "malformed_payload", "request body must be valid OTLP protobuf")
+		return nil, false
+	}
+	return payload, true
 }
 
 func (i *otlpHTTPIngest) persistSignal(request *http.Request, resourceField string, payload map[string]json.RawMessage) error {
