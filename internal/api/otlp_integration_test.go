@@ -483,6 +483,9 @@ func metricsFixturePayloadBytes(t *testing.T, name string) []byte {
 	if os.IsNotExist(err) {
 		data, err = os.ReadFile(filepath.Join("..", "..", "fixtures", "codex", "observed-sanitised", name))
 	}
+	if os.IsNotExist(err) {
+		data, err = os.ReadFile(filepath.Join("..", "..", "fixtures", "cursor", "observed-sanitised", name))
+	}
 	if err != nil {
 		t.Fatal(err)
 	}

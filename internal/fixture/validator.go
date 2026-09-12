@@ -85,14 +85,14 @@ func validateTextMetadata(document map[string]any) error {
 		}
 	}
 	if !supportedTool(document["tool"].(string)) {
-		return errors.New("fixture metadata tool must be codex, claude-code, or cursor-agent")
+		return errors.New("fixture metadata tool must be codex, claude-code, cursor-agent, or cursor")
 	}
 	return nil
 }
 
 func supportedTool(tool string) bool {
 	switch tool {
-	case "codex", "claude-code", "cursor-agent":
+	case "codex", "claude-code", "cursor-agent", "cursor":
 		return true
 	default:
 		return false

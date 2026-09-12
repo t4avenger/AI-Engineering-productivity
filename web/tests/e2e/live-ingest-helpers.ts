@@ -357,6 +357,77 @@ export function codexOutcomeOTLPLogs(): string {
   });
 }
 
+// cursorEnterpriseAPIRequestLogs is a sanitised Cursor Enterprise OTEL
+// api.request log payload for the live e2e gate (#130).
+export function cursorEnterpriseAPIRequestLogs(model: string): string {
+  return JSON.stringify({
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'cursor' } },
+            { key: 'service.version', value: { stringValue: '1.2.3-synthetic' } },
+            { key: 'cursor.team.id', value: { intValue: '424242' } },
+            { key: 'cursor.user.id', value: { intValue: '434343' } },
+            { key: 'cursor.surface', value: { stringValue: 'cli' } },
+            { key: 'cursor.entrypoint', value: { stringValue: 'cli' } },
+          ],
+        },
+        scopeLogs: [
+          {
+            scope: { name: 'cursor.telemetry', version: '0.1.0' },
+            logRecords: [
+              {
+                timeUnixNano: '1790000200000000000',
+                severityNumber: 9,
+                body: { stringValue: 'api_request' },
+                attributes: [
+                  {
+                    key: 'cursor.event.id',
+                    value: {
+                      stringValue: 'customer-telemetry:v1:tiq-live-cursor-event',
+                    },
+                  },
+                  {
+                    key: 'cursor.source_event.id',
+                    value: { stringValue: 'tiq-live-cursor-source' },
+                  },
+                  {
+                    key: 'cursor.request.id',
+                    value: { stringValue: 'tiq-live-cursor-request' },
+                  },
+                  {
+                    key: 'cursor.conversation.id',
+                    value: { stringValue: 'tiq-live-e2e-cursor-session' },
+                  },
+                  {
+                    key: 'cursor.api.request.input_tokens',
+                    value: { intValue: '88' },
+                  },
+                  {
+                    key: 'cursor.api.request.output_tokens',
+                    value: { intValue: '22' },
+                  },
+                  {
+                    key: 'cursor.api.request.cache_read_tokens',
+                    value: { intValue: '0' },
+                  },
+                  {
+                    key: 'cursor.api.request.cache_creation_tokens',
+                    value: { intValue: '0' },
+                  },
+                  { key: 'cursor.model.name', value: { stringValue: model } },
+                  { key: 'cursor.api.billable', value: { boolValue: true } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
+
 /** Claude api_request logs carrying cache-read tokens for the context-waste insight. */
 export function claudeContextWasteOTLPLogs(): string {
   const session = 'tiq-live-e2e-context-waste-session';

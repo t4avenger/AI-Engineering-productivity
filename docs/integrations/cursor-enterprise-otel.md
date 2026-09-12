@@ -46,9 +46,14 @@ Cursor documents fixed egress source IPs and the full attribute surface in:
 
 - **Accepted:** OTLP/HTTP JSON and binary protobuf on `/v1/logs` and `/v1/metrics`
   (optional `Content-Encoding: gzip`).
-- **Not yet:** Cursor `cursor.telemetry` field normalisation into canonical
-  sessions (tracked under epic #128 / normaliser follow-up). Protobuf ingest is
-  the unblocker so Enterprise export can reach the daemon without 415s.
+- **Normalised (#130):** Cursor `cursor.telemetry` subset —
+  `cursor.token.usage` metrics and `cursor.api.request` logs — into canonical
+  events via `cursor.NormalizeMetrics` / `cursor.NormalizeLogs`. Other wire
+  families are accepted without mapping until fixtures prove them. Synthetic
+  wire fixtures live under `fixtures/cursor/observed-sanitised/cursor-otel-0.1.0-*.json`.
+- **Not yet:** live Enterprise capture (synthetic fixtures only); full wire
+  surface (tool calls, cost, skills, cloud_agent, grok_bot); Integrations UX
+  (#132).
 - **Local-dev only:** `POST /v1/cursor-agent` and `scripts/cursor-agent-tiq`
   (see [cursor-agent-auto-reporting.md](cursor-agent-auto-reporting.md)).
 

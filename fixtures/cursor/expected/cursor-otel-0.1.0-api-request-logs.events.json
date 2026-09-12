@@ -1,0 +1,64 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "cursor:customer-telemetry:v1:synthetic-event-001",
+    "event_type": "cursor.api.request",
+    "occurred_at": "2026-09-21T14:15:00Z",
+    "received_at": "2026-09-12T21:05:01Z",
+    "provider": "cursor",
+    "tool": "cursor",
+    "source_schema": "otel",
+    "source_version": "1.2.3-synthetic",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "cursor:00000000-0000-4000-8000-0000000000c1",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cache_write_input_token_count": 5,
+      "cached_input_token_count": 20,
+      "input_token_count": 100,
+      "model": "Thinking",
+      "output_token_count": 40,
+      "unavailable_fields": [
+        "tool_calls",
+        "mcp_calls",
+        "skill_invocations",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "trace_span_correlation"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "cursor:customer-telemetry:v1:synthetic-event-001",
+        "ordering_key": "01790000100000000000:cursor:customer-telemetry:v1:synthetic-event-001",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Cursor Enterprise api.request logs have no reviewed task-boundary signal"
+        }
+      },
+      "log": {
+        "body": "api_request",
+        "severity_number": 9
+      },
+      "log_attributes": {
+        "cursor.api.billable": true,
+        "cursor.source_event.id": "synthetic-source-event-001",
+        "cursor.usage_event.id": "synthetic-usage-001"
+      },
+      "request_id": "cursor:synthetic-request-001",
+      "resource": {
+        "cursor.entrypoint": "desktop",
+        "cursor.surface": "desktop"
+      }
+    }
+  }
+]

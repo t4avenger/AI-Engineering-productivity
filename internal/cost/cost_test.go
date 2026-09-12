@@ -57,6 +57,15 @@ func TestCalculateSkipsClaudeMetricTokenUsage(t *testing.T) {
 	}
 }
 
+func TestCalculateSkipsCursorMetricTokenUsage(t *testing.T) {
+	calculator := &Calculator{catalog: Catalog{SchemaVersion: schemaVersion, CatalogVersion: "test", Currency: "USD", Records: []PriceRecord{{ID: "cursor", Provider: "cursor", ModelMatcher: "Auto", EffectiveAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Source: "test", RatesMicrousdPM: map[string]int64{"input": 1000000}}}}}
+	event := canonical.Event{EventID: "metric", EventType: "cursor.token.usage", SessionID: "cursor:token:x", Provider: "cursor", OccurredAt: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC), ReceivedAt: time.Now(), Attributes: map[string]any{"model": "Auto", "input_token_count": int64(128)}}
+	r := calculator.Calculate(event)
+	if r.Status != "not_applicable" || len(r.ObservedTokens) != 0 || r.AmountMicrousd != nil {
+		t.Fatalf("record=%#v", r)
+	}
+}
+
 func TestLoadDefaultCatalog(t *testing.T) {
 	calculator, err := LoadDefault("")
 	if err != nil {

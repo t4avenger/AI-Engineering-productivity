@@ -1,0 +1,222 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "synthetic",
+  "provider": "cursor",
+  "tool": "cursor",
+  "tool_version": "0.1.0",
+  "captured_at": "2026-09-12T21:00:00Z",
+  "sanitisation_reviewed": true,
+  "notes": "Synthetic Cursor Enterprise OTEL wire-shaped metrics (#130). Includes canary team/user ids that must not be retained.",
+  "payload": {
+    "resourceMetrics": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "cursor"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "1.2.3-synthetic"
+              }
+            },
+            {
+              "key": "cursor.team.id",
+              "value": {
+                "intValue": "424242"
+              }
+            },
+            {
+              "key": "cursor.user.id",
+              "value": {
+                "intValue": "434343"
+              }
+            },
+            {
+              "key": "cursor.surface",
+              "value": {
+                "stringValue": "cli"
+              }
+            },
+            {
+              "key": "cursor.entrypoint",
+              "value": {
+                "stringValue": "cli"
+              }
+            }
+          ]
+        },
+        "scopeMetrics": [
+          {
+            "scope": {
+              "name": "cursor.telemetry",
+              "version": "0.1.0"
+            },
+            "metrics": [
+              {
+                "name": "cursor.token.usage",
+                "unit": "{token}",
+                "sum": {
+                  "aggregationTemporality": 1,
+                  "isMonotonic": true,
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        {
+                          "key": "cursor.token.type",
+                          "value": {
+                            "stringValue": "input"
+                          }
+                        },
+                        {
+                          "key": "cursor.model.name",
+                          "value": {
+                            "stringValue": "Auto"
+                          }
+                        },
+                        {
+                          "key": "cursor.api.status",
+                          "value": {
+                            "stringValue": "success"
+                          }
+                        },
+                        {
+                          "key": "cursor.api.billable",
+                          "value": {
+                            "boolValue": true
+                          }
+                        }
+                      ],
+                      "asDouble": 128,
+                      "timeUnixNano": "1790000000000000001"
+                    },
+                    {
+                      "attributes": [
+                        {
+                          "key": "cursor.token.type",
+                          "value": {
+                            "stringValue": "output"
+                          }
+                        },
+                        {
+                          "key": "cursor.model.name",
+                          "value": {
+                            "stringValue": "Auto"
+                          }
+                        },
+                        {
+                          "key": "cursor.api.status",
+                          "value": {
+                            "stringValue": "success"
+                          }
+                        }
+                      ],
+                      "asDouble": 64,
+                      "timeUnixNano": "1790000000000000001"
+                    },
+                    {
+                      "attributes": [
+                        {
+                          "key": "cursor.token.type",
+                          "value": {
+                            "stringValue": "cache_read"
+                          }
+                        },
+                        {
+                          "key": "cursor.model.name",
+                          "value": {
+                            "stringValue": "Auto"
+                          }
+                        }
+                      ],
+                      "asDouble": 512,
+                      "timeUnixNano": "1790000000000000001"
+                    },
+                    {
+                      "attributes": [
+                        {
+                          "key": "cursor.token.type",
+                          "value": {
+                            "stringValue": "cache_creation"
+                          }
+                        },
+                        {
+                          "key": "cursor.model.name",
+                          "value": {
+                            "stringValue": "Auto"
+                          }
+                        }
+                      ],
+                      "asDouble": 32,
+                      "timeUnixNano": "1790000000000000001"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "cursor.tool.calls",
+                "unit": "{call}",
+                "sum": {
+                  "aggregationTemporality": 1,
+                  "isMonotonic": true,
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        {
+                          "key": "cursor.tool.kind",
+                          "value": {
+                            "stringValue": "builtin"
+                          }
+                        },
+                        {
+                          "key": "cursor.tool.name",
+                          "value": {
+                            "stringValue": "read"
+                          }
+                        },
+                        {
+                          "key": "cursor.tool.status",
+                          "value": {
+                            "stringValue": "success"
+                          }
+                        }
+                      ],
+                      "asInt": "1",
+                      "timeUnixNano": "1790000000000000002"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "cursor.cost.usage",
+                "unit": "USD",
+                "sum": {
+                  "aggregationTemporality": 1,
+                  "isMonotonic": true,
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        {
+                          "key": "cursor.model.name",
+                          "value": {
+                            "stringValue": "Auto"
+                          }
+                        }
+                      ],
+                      "asDouble": 0.0042,
+                      "timeUnixNano": "1790000000000000003"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
