@@ -123,7 +123,7 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 	if !hasCodexOutcomeContract(eventName) {
 		attributes["unavailable_fields"] = append(attributes["unavailable_fields"].([]string), "task_outcome")
 	}
-	extensions := map[string]any{"resource_attributes": resource, "log_attributes": codexLogAttributes(fields), "severity": record.SeverityText}
+	extensions := map[string]any{"resource_attributes": codexLogResourceAttributes(eventName, resource), "log_attributes": codexLogAttributes(fields), "severity": record.SeverityText}
 	if toolCall, ok := codexToolCall(fields, id, sessionID); ok {
 		extensions["tool_call"] = toolCall.providerExtension
 	}
@@ -229,14 +229,21 @@ func codexErrorCode(fields map[string]any, status string) string {
 }
 
 func codexLogAttributes(fields map[string]any) map[string]any {
+	if stringValue(fields[codexEventNameKey], "") == codexSandboxOutcomeEvent {
+		return allowedCodexAttributes(fields, codexEventNameKey)
+	}
 	known := []string{"mcp_server", "conversation.id"}
 	if stringValue(fields[codexEventNameKey], "") == codexToolResultEvent {
 		known = append(known, codexToolResultFieldKeys()...)
 	}
-	if stringValue(fields[codexEventNameKey], "") == codexSandboxOutcomeEvent {
-		known = append(known, codexSandboxOutcomeFieldKeys()...)
-	}
 	return safeCodexLogAttributes(normalize.UnknownFields(fields, known...))
+}
+
+func codexLogResourceAttributes(eventName string, resource map[string]any) map[string]any {
+	if eventName != codexSandboxOutcomeEvent {
+		return resource
+	}
+	return allowedCodexAttributes(resource, "service.name", "service.version")
 }
 
 func codexLogUnavailableFields(eventName string) []string {
@@ -365,7 +372,17 @@ func codexSandboxDurationMs(fields map[string]any) *int64 {
 }
 
 func codexSandboxOutcomeFieldKeys() []string {
-	return []string{"call_id", "initial_duration_ms", "duration_ms", "outcome", "success", "tool_name", "model", "slug", "terminal.type"}
+	return []string{"call_id", "initial_duration_ms", "duration_ms", "outcome", "success", "tool_name", "model", "terminal.type"}
+}
+
+func allowedCodexAttributes(fields map[string]any, keys ...string) map[string]any {
+	allowed := make(map[string]any, len(keys))
+	for _, key := range keys {
+		if value, ok := fields[key]; ok {
+			allowed[key] = value
+		}
+	}
+	return allowed
 }
 
 func safeCodexLogAttributes(fields map[string]any) map[string]any {

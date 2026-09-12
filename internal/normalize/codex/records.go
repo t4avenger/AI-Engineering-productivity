@@ -170,7 +170,7 @@ func operationProviderExtensions(input operationInput) map[string]any {
 				"reason":     input.taskBoundaryReason,
 			},
 		},
-		"resource_attributes": input.resource,
+		"resource_attributes": operationResourceAttributes(input),
 		"log_attributes":      operationLogAttributes(input.fields),
 		"severity":            input.severity,
 	}
@@ -186,13 +186,21 @@ func operationProviderExtensions(input operationInput) map[string]any {
 	return extensions
 }
 
+func operationResourceAttributes(input operationInput) map[string]any {
+	if stringValue(input.fields[codexEventNameKey], "") != codexSandboxOutcomeEvent {
+		return input.resource
+	}
+	return allowedCodexAttributes(input.resource, "service.name", "service.version")
+}
+
 func operationLogAttributes(fields map[string]any) map[string]any {
+	if stringValue(fields[codexEventNameKey], "") == codexSandboxOutcomeEvent {
+		return allowedCodexAttributes(fields, codexEventNameKey)
+	}
 	known := []string{"conversation.id", "mcp_server"}
 	switch stringValue(fields[codexEventNameKey], "") {
 	case codexToolResultEvent:
 		known = append(known, codexToolResultFieldKeys()...)
-	case codexSandboxOutcomeEvent:
-		known = append(known, codexSandboxOutcomeFieldKeys()...)
 	}
 	return safeCodexLogAttributes(normalize.UnknownFields(fields, known...))
 }

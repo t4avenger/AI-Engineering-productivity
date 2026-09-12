@@ -73,6 +73,20 @@ func TestExtractLogSandboxOutcomeOperationsGolden(t *testing.T) {
 	assertOperationsGolden(t, "codex-0.153.4-sandbox-outcome-otlp.json", "codex-0.153.4-sandbox-outcome.operations.json", "sandbox operations")
 }
 
+func TestExtractLogSandboxOutcomeDropsSensitiveProviderExtensions(t *testing.T) {
+	t.Parallel()
+	data := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.version","value":{"stringValue":"0.153.4"}},{"key":"host.name","value":{"stringValue":"sandbox-host.example.test"}},{"key":"user.account_id","value":{"stringValue":"sandbox-account-123"}},{"key":"authorization","value":{"stringValue":"Bearer tiq-canary-resource-token"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sandbox_outcome"}},{"key":"conversation.id","value":{"stringValue":"sandbox-session"}},{"key":"call_id","value":{"stringValue":"sandbox-call"}},{"key":"tool_name","value":{"stringValue":"exec_command"}},{"key":"initial_duration_ms","value":{"stringValue":"123"}},{"key":"outcome","value":{"stringValue":"success"}},{"key":"model","value":{"stringValue":"gpt-6-astra"}},{"key":"slug","value":{"stringValue":"tiq-canary-sandbox-slug"}},{"key":"command","value":{"stringValue":"tiq-canary-sandbox-command"}},{"key":"command_args","value":{"stringValue":"tiq-canary-sandbox-command-args"}},{"key":"cwd","value":{"stringValue":"/tmp/tiq-canary-sandbox-cwd"}},{"key":"path","value":{"stringValue":"/tmp/tiq-canary-sandbox-path"}},{"key":"arguments","value":{"stringValue":"--token=tiq-canary-sandbox-argument"}},{"key":"output","value":{"stringValue":"tiq-canary-sandbox-output"}},{"key":"user.email","value":{"stringValue":"sandbox-user@example.test"}}],"body":{"stringValue":"tiq-canary-sandbox-body"},"severityText":"INFO","timeUnixNano":"1788717763000000000"}]}]}]}`)
+	operations, err := ExtractLogOperations(data, fixtureReceivedAt)
+	if err != nil {
+		t.Fatalf("extract operations: %v", err)
+	}
+	if len(operations) != 1 {
+		t.Fatalf("operations = %d, want 1: %#v", len(operations), operations)
+	}
+	encoded, _ := json.Marshal(operations[0])
+	assertNoStringCanaries(t, string(encoded), []string{"tiq-canary-sandbox-argument", "tiq-canary-sandbox-output", "sandbox-user@example.test", "tiq-canary-sandbox-body", "sandbox-host.example.test", "sandbox-account-123", "tiq-canary-resource-token", "tiq-canary-sandbox-slug", "tiq-canary-sandbox-command", "tiq-canary-sandbox-command-args", "tiq-canary-sandbox-cwd", "tiq-canary-sandbox-path"})
+}
+
 func assertOperationsGolden(t *testing.T, fixture, golden, label string) {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "fixtures", "codex", "observed-sanitised", fixture))

@@ -153,7 +153,10 @@ func TestCodexToolResultIngestExposesToolCallSignal(t *testing.T) {
 
 const rawCodexSandboxOutcomeOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
   {"key":"service.name","value":{"stringValue":"codex_exec"}},
-  {"key":"service.version","value":{"stringValue":"0.153.4"}}]},
+  {"key":"service.version","value":{"stringValue":"0.153.4"}},
+  {"key":"host.name","value":{"stringValue":"sandbox-host.example.test"}},
+  {"key":"user.account_id","value":{"stringValue":"sandbox-account-123"}},
+  {"key":"authorization","value":{"stringValue":"Bearer tiq-canary-resource-token"}}]},
  "scopeLogs":[{"logRecords":[
    {"attributes":[
      {"key":"event.name","value":{"stringValue":"codex.sandbox_outcome"}},
@@ -163,6 +166,11 @@ const rawCodexSandboxOutcomeOTLPLogs = `{"resourceLogs":[{"resource":{"attribute
      {"key":"initial_duration_ms","value":{"stringValue":"123"}},
      {"key":"outcome","value":{"stringValue":"success"}},
      {"key":"model","value":{"stringValue":"gpt-6-astra"}},
+     {"key":"slug","value":{"stringValue":"tiq-canary-sandbox-slug"}},
+     {"key":"command","value":{"stringValue":"tiq-canary-sandbox-command"}},
+     {"key":"command_args","value":{"stringValue":"tiq-canary-sandbox-command-args"}},
+     {"key":"cwd","value":{"stringValue":"/tmp/tiq-canary-sandbox-cwd"}},
+     {"key":"path","value":{"stringValue":"/tmp/tiq-canary-sandbox-path"}},
      {"key":"arguments","value":{"stringValue":"--token=tiq-canary-sandbox-argument"}},
      {"key":"output","value":{"stringValue":"tiq-canary-sandbox-output"}},
      {"key":"api_key","value":{"stringValue":"tiq-canary-sandbox-api-key"}},
@@ -197,6 +205,14 @@ func TestCodexSandboxOutcomeIngestExposesCommandExecutionSignal(t *testing.T) {
 		"tiq-canary-sandbox-api-key",
 		"sandbox-user@example.test",
 		"tiq-canary-sandbox-body",
+		"sandbox-host.example.test",
+		"sandbox-account-123",
+		"tiq-canary-resource-token",
+		"tiq-canary-sandbox-slug",
+		"tiq-canary-sandbox-command",
+		"tiq-canary-sandbox-command-args",
+		"tiq-canary-sandbox-cwd",
+		"tiq-canary-sandbox-path",
 	}
 	assertNoRawIdentifiers(t, canaries, marshalJSON(t, events))
 
