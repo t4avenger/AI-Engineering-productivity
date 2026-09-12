@@ -254,15 +254,16 @@ func codexErrorCode(fields map[string]any, status string) string {
 }
 
 func codexLogAttributes(fields map[string]any) map[string]any {
-	if stringValue(fields[codexEventNameKey], "") == codexSandboxOutcomeEvent {
+	switch stringValue(fields[codexEventNameKey], "") {
+	case codexSandboxOutcomeEvent:
 		return allowedCodexAttributes(fields, codexEventNameKey)
+	case codexToolDecisionEvent:
+		return allowedCodexAttributes(fields, codexEventNameKey, "model")
 	}
 	known := []string{"mcp_server", "conversation.id"}
 	switch stringValue(fields[codexEventNameKey], "") {
 	case codexToolResultEvent:
 		known = append(known, codexToolResultFieldKeys()...)
-	case codexToolDecisionEvent:
-		known = append(known, codexToolDecisionFieldKeys()...)
 	}
 	return safeCodexLogAttributes(normalize.UnknownFields(fields, known...))
 }
@@ -498,7 +499,7 @@ func safeCodexLogAttributes(fields map[string]any) map[string]any {
 
 func sensitiveCodexLogAttribute(key string) bool {
 	switch strings.ToLower(strings.TrimSpace(key)) {
-	case "arguments", "output", "api_key", "user.email", "user.account_id", "custom_metadata", "hostname", "host.name", "slug":
+	case "api_key", "arguments", "authorization", "cmd", "command", "command_args", "command_line", "commandarguments", "custom_metadata", "cwd", "file", "file_path", "filename", "files", "host.name", "hostname", "input", "output", "path", "prompt", "response", "slug", "source_code", "user.account_id", "user.email":
 		return true
 	default:
 		return false

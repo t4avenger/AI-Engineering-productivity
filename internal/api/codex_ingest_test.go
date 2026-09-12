@@ -155,7 +155,8 @@ const rawCodexToolDecisionOTLPLogs = `{"resourceLogs":[{"resource":{"attributes"
   {"key":"service.name","value":{"stringValue":"codex_exec"}},
   {"key":"service.version","value":{"stringValue":"0.153.4"}},
   {"key":"host.name","value":{"stringValue":"decision-host.example.test"}},
-  {"key":"user.account_id","value":{"stringValue":"decision-account-123"}}]},
+  {"key":"user.account_id","value":{"stringValue":"decision-account-123"}},
+  {"key":"authorization","value":{"stringValue":"Bearer tiq-canary-decision-resource-token"}}]},
  "scopeLogs":[{"logRecords":[
    {"attributes":[
      {"key":"event.name","value":{"stringValue":"codex.tool_decision"}},
@@ -167,6 +168,13 @@ const rawCodexToolDecisionOTLPLogs = `{"resourceLogs":[{"resource":{"attributes"
      {"key":"tool_namespace","value":{"stringValue":"functions"}},
      {"key":"model","value":{"stringValue":"gpt-6-astra"}},
      {"key":"slug","value":{"stringValue":"tiq-canary-decision-slug"}},
+     {"key":"authorization","value":{"stringValue":"Bearer tiq-canary-decision-token"}},
+     {"key":"command","value":{"stringValue":"tiq-canary-decision-command"}},
+     {"key":"command_args","value":{"stringValue":"tiq-canary-decision-command-args"}},
+     {"key":"command_line","value":{"stringValue":"tiq-canary-decision-command-line"}},
+     {"key":"cwd","value":{"stringValue":"/tmp/tiq-canary-decision-cwd"}},
+     {"key":"path","value":{"stringValue":"/tmp/tiq-canary-decision-path"}},
+     {"key":"file_path","value":{"stringValue":"/tmp/tiq-canary-decision-file-path"}},
      {"key":"arguments","value":{"stringValue":"--token=tiq-canary-decision-argument"}},
      {"key":"output","value":{"stringValue":"tiq-canary-decision-output"}},
      {"key":"api_key","value":{"stringValue":"tiq-canary-decision-api-key"}},
@@ -230,7 +238,15 @@ func codexToolDecisionCanaries() []string {
 		"tiq-canary-decision-body",
 		"decision-host.example.test",
 		"decision-account-123",
+		"tiq-canary-decision-resource-token",
 		"tiq-canary-decision-slug",
+		"tiq-canary-decision-token",
+		"tiq-canary-decision-command",
+		"tiq-canary-decision-command-args",
+		"tiq-canary-decision-command-line",
+		"tiq-canary-decision-cwd",
+		"tiq-canary-decision-path",
+		"tiq-canary-decision-file-path",
 	}
 }
 
