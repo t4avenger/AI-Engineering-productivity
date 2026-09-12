@@ -1,0 +1,186 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "synthetic",
+  "provider": "cursor",
+  "tool": "cursor",
+  "tool_version": "0.1.0",
+  "captured_at": "2026-09-12T21:05:00Z",
+  "sanitisation_reviewed": true,
+  "notes": "Synthetic Cursor Enterprise OTEL wire-shaped api.request log (#130). Includes canary team/user ids that must not be retained.",
+  "payload": {
+    "resourceLogs": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "cursor"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "1.2.3-synthetic"
+              }
+            },
+            {
+              "key": "cursor.team.id",
+              "value": {
+                "intValue": "424242"
+              }
+            },
+            {
+              "key": "cursor.user.id",
+              "value": {
+                "intValue": "434343"
+              }
+            },
+            {
+              "key": "cursor.surface",
+              "value": {
+                "stringValue": "desktop"
+              }
+            },
+            {
+              "key": "cursor.entrypoint",
+              "value": {
+                "stringValue": "desktop"
+              }
+            }
+          ]
+        },
+        "scopeLogs": [
+          {
+            "scope": {
+              "name": "cursor.telemetry",
+              "version": "0.1.0"
+            },
+            "logRecords": [
+              {
+                "timeUnixNano": "1790000100000000000",
+                "severityNumber": 9,
+                "body": {
+                  "stringValue": "api_request"
+                },
+                "attributes": [
+                  {
+                    "key": "cursor.event.id",
+                    "value": {
+                      "stringValue": "customer-telemetry:v1:synthetic-event-001"
+                    }
+                  },
+                  {
+                    "key": "cursor.source_event.id",
+                    "value": {
+                      "stringValue": "synthetic-source-event-001"
+                    }
+                  },
+                  {
+                    "key": "cursor.request.id",
+                    "value": {
+                      "stringValue": "synthetic-request-001"
+                    }
+                  },
+                  {
+                    "key": "cursor.conversation.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000c1"
+                    }
+                  },
+                  {
+                    "key": "cursor.usage_event.id",
+                    "value": {
+                      "stringValue": "synthetic-usage-001"
+                    }
+                  },
+                  {
+                    "key": "cursor.api.request.input_tokens",
+                    "value": {
+                      "intValue": "100"
+                    }
+                  },
+                  {
+                    "key": "cursor.api.request.output_tokens",
+                    "value": {
+                      "intValue": "40"
+                    }
+                  },
+                  {
+                    "key": "cursor.api.request.cache_read_tokens",
+                    "value": {
+                      "intValue": "20"
+                    }
+                  },
+                  {
+                    "key": "cursor.api.request.cache_creation_tokens",
+                    "value": {
+                      "intValue": "5"
+                    }
+                  },
+                  {
+                    "key": "cursor.model.name",
+                    "value": {
+                      "stringValue": "Thinking"
+                    }
+                  },
+                  {
+                    "key": "cursor.api.billable",
+                    "value": {
+                      "boolValue": true
+                    }
+                  }
+                ]
+              },
+              {
+                "timeUnixNano": "1790000101000000000",
+                "severityNumber": 13,
+                "body": {
+                  "stringValue": "skill_activated"
+                },
+                "attributes": [
+                  {
+                    "key": "cursor.event.id",
+                    "value": {
+                      "stringValue": "customer-telemetry:v1:synthetic-skill-001"
+                    }
+                  },
+                  {
+                    "key": "cursor.source_event.id",
+                    "value": {
+                      "stringValue": "synthetic-source-event-002"
+                    }
+                  },
+                  {
+                    "key": "cursor.conversation.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000c1"
+                    }
+                  },
+                  {
+                    "key": "cursor.skill.name",
+                    "value": {
+                      "stringValue": "tiq-probe"
+                    }
+                  },
+                  {
+                    "key": "cursor.skill.trigger",
+                    "value": {
+                      "stringValue": "manually_attached"
+                    }
+                  },
+                  {
+                    "key": "cursor.skill.source",
+                    "value": {
+                      "stringValue": "workspace"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

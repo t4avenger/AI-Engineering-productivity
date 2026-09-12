@@ -48,7 +48,7 @@ func TestValidateRequiresOriginAndToolVersion(t *testing.T) {
 
 func TestValidateRejectsUnsupportedTools(t *testing.T) {
 	err := Validate([]byte(fixtureWithPayload("unknown-tool", `{}`)))
-	if err == nil || !strings.Contains(err.Error(), "codex, claude-code, or cursor-agent") {
+	if err == nil || !strings.Contains(err.Error(), "codex, claude-code, cursor-agent, or cursor") {
 		t.Fatalf("expected unsupported tool error, got %v", err)
 	}
 }

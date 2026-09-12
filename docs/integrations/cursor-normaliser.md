@@ -84,9 +84,28 @@ explicitly unavailable/unknown and are never fabricated):
 
 For organisation fleets, the supported path is **Cursor Enterprise OpenTelemetry
 Export** (server-side OTLP/HTTP binary protobuf to `/v1/logs` and `/v1/metrics`).
-See [cursor-enterprise-otel.md](cursor-enterprise-otel.md). Field normalisation
-of `cursor.telemetry` signals is tracked under epic #128; protobuf acceptance
-on the ingest routes is issue #129.
+See [cursor-enterprise-otel.md](cursor-enterprise-otel.md).
+
+### Enterprise normaliser entry points (#130)
+
+Under `internal/normalize/cursor/`:
+
+- `cursor.NormalizeMetrics`: maps `cursor.token.usage` datapoints
+  (`cursor.token.type` = `input` | `output` | `cache_read` | `cache_creation`)
+  when `service.name=cursor`. Other metrics (`cursor.tool.calls`,
+  `cursor.cost.usage`, …) are route-tolerated.
+- `cursor.NormalizeLogs`: maps log records whose body is `api_request` into
+  token-bearing `cursor.api.request` events with session
+  `cursor:<cursor.conversation.id>`. Other families (skills, cloud_agent,
+  grok_bot, …) are route-tolerated.
+
+Fixtures: `fixtures/cursor/observed-sanitised/cursor-otel-0.1.0-token-usage-metrics.json`,
+`fixtures/cursor/observed-sanitised/cursor-otel-0.1.0-api-request-logs.json`
+(synthetic wire-shaped until live Enterprise capture). Account identifiers
+`cursor.team.id` / `cursor.user.id` are dropped by allow-list; conversation /
+request / event IDs are retained with a `cursor:` prefix.
+
+Local CLI wrapper docs and `POST /v1/cursor-agent` remain local-dev only.
 
 ## Live ingest into the daemon (local-dev only)
 

@@ -1,0 +1,231 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "cursor:token:314fe27835cd2f114243b2b1fe52272669f5f59d3702199518c6ea5f1bc0c367",
+    "event_type": "cursor.token.usage",
+    "occurred_at": "2026-09-21T14:13:20.000000001Z",
+    "received_at": "2026-09-12T21:00:01Z",
+    "provider": "cursor",
+    "tool": "cursor",
+    "source_schema": "otel",
+    "source_version": "1.2.3-synthetic",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "cursor:token:314fe27835cd2f114243b2b1fe52272669f5f59d3702199518c6ea5f1bc0c367",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "input_token_count": 128,
+      "model": "Auto",
+      "unavailable_fields": [
+        "tool_calls",
+        "mcp_calls",
+        "skill_invocations",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "trace_span_correlation",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "cursor:token:314fe27835cd2f114243b2b1fe52272669f5f59d3702199518c6ea5f1bc0c367",
+        "ordering_key": "01790000000000000001:cursor:token:314fe27835cd2f114243b2b1fe52272669f5f59d3702199518c6ea5f1bc0c367",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Cursor Enterprise token metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "name": "cursor.token.usage",
+        "token_type": "input",
+        "unit": "{token}"
+      },
+      "metric_attributes": {
+        "cursor.api.billable": true,
+        "cursor.api.status": "success"
+      },
+      "resource": {
+        "cursor.entrypoint": "cli",
+        "cursor.surface": "cli"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "cursor:token:4fc6d10fd03805ff3f20339336ae6944222e54cdc00ed684d9049f62a522c62d",
+    "event_type": "cursor.token.usage",
+    "occurred_at": "2026-09-21T14:13:20.000000001Z",
+    "received_at": "2026-09-12T21:00:01Z",
+    "provider": "cursor",
+    "tool": "cursor",
+    "source_schema": "otel",
+    "source_version": "1.2.3-synthetic",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "cursor:token:4fc6d10fd03805ff3f20339336ae6944222e54cdc00ed684d9049f62a522c62d",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cached_input_token_count": 512,
+      "model": "Auto",
+      "unavailable_fields": [
+        "tool_calls",
+        "mcp_calls",
+        "skill_invocations",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "trace_span_correlation",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "cursor:token:4fc6d10fd03805ff3f20339336ae6944222e54cdc00ed684d9049f62a522c62d",
+        "ordering_key": "01790000000000000001:cursor:token:4fc6d10fd03805ff3f20339336ae6944222e54cdc00ed684d9049f62a522c62d",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Cursor Enterprise token metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "name": "cursor.token.usage",
+        "token_type": "cache_read",
+        "unit": "{token}"
+      },
+      "metric_attributes": {},
+      "resource": {
+        "cursor.entrypoint": "cli",
+        "cursor.surface": "cli"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "cursor:token:9d3bf1345e90d0a9227d67656bd984344268e916aced76c2d55144911fc3d8a0",
+    "event_type": "cursor.token.usage",
+    "occurred_at": "2026-09-21T14:13:20.000000001Z",
+    "received_at": "2026-09-12T21:00:01Z",
+    "provider": "cursor",
+    "tool": "cursor",
+    "source_schema": "otel",
+    "source_version": "1.2.3-synthetic",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "cursor:token:9d3bf1345e90d0a9227d67656bd984344268e916aced76c2d55144911fc3d8a0",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cache_write_input_token_count": 32,
+      "model": "Auto",
+      "unavailable_fields": [
+        "tool_calls",
+        "mcp_calls",
+        "skill_invocations",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "trace_span_correlation",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "cursor:token:9d3bf1345e90d0a9227d67656bd984344268e916aced76c2d55144911fc3d8a0",
+        "ordering_key": "01790000000000000001:cursor:token:9d3bf1345e90d0a9227d67656bd984344268e916aced76c2d55144911fc3d8a0",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Cursor Enterprise token metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "name": "cursor.token.usage",
+        "token_type": "cache_creation",
+        "unit": "{token}"
+      },
+      "metric_attributes": {},
+      "resource": {
+        "cursor.entrypoint": "cli",
+        "cursor.surface": "cli"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "cursor:token:f026b27e60d5fb0d1e17dc4253ffa4898c85bf7c6c229b1311188e2e7b7bfc5c",
+    "event_type": "cursor.token.usage",
+    "occurred_at": "2026-09-21T14:13:20.000000001Z",
+    "received_at": "2026-09-12T21:00:01Z",
+    "provider": "cursor",
+    "tool": "cursor",
+    "source_schema": "otel",
+    "source_version": "1.2.3-synthetic",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "cursor:token:f026b27e60d5fb0d1e17dc4253ffa4898c85bf7c6c229b1311188e2e7b7bfc5c",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "model": "Auto",
+      "output_token_count": 64,
+      "unavailable_fields": [
+        "tool_calls",
+        "mcp_calls",
+        "skill_invocations",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "trace_span_correlation",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "cursor:token:f026b27e60d5fb0d1e17dc4253ffa4898c85bf7c6c229b1311188e2e7b7bfc5c",
+        "ordering_key": "01790000000000000001:cursor:token:f026b27e60d5fb0d1e17dc4253ffa4898c85bf7c6c229b1311188e2e7b7bfc5c",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Cursor Enterprise token metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "name": "cursor.token.usage",
+        "token_type": "output",
+        "unit": "{token}"
+      },
+      "metric_attributes": {
+        "cursor.api.status": "success"
+      },
+      "resource": {
+        "cursor.entrypoint": "cli",
+        "cursor.surface": "cli"
+      }
+    }
+  }
+]
