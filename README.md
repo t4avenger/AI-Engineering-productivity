@@ -40,7 +40,8 @@ Secure cookie over local HTTP). The daemon exposes HTML dashboard routes plus
 `POST /v1/logs` is the supported live ingest path for provider log events. It
 accepts one OTLP payload with a non-empty `resourceLogs` array as either
 `application/json` or `application/x-protobuf` (OTLP ExportLogsServiceRequest),
-and is limited to 1 MiB. Accepted payloads return `202 Accepted`. Validation
+optionally with `Content-Encoding: gzip`, and is limited to 1 MiB (compressed
+and decompressed). Accepted payloads return `202 Accepted`. Validation
 failures return JSON errors with a stable `error.code` (`malformed_payload`,
 `invalid_payload`, `unsupported_media_type`, `payload_too_large`).
 

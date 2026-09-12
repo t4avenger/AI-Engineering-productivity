@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"log/slog"
@@ -20,6 +21,7 @@ import (
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -81,6 +83,16 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	protobufTracesRejected := postOTLPToPath(t, server.URL, "/v1/traces", mustMarshalOTLPLogsProtobuf(t), otlpContentTypeProtobuf)
 	assertIngestError(t, protobufTracesRejected, http.StatusUnsupportedMediaType, "unsupported_media_type")
 
+	extraField := postOTLPToPath(t, server.URL, "/v1/logs", []byte(`{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"stringValue":"x"}}]}]}],"unexpected":true}`), "application/json")
+	assertIngestError(t, extraField, http.StatusBadRequest, "invalid_payload")
+
+	gzipProtobuf := mustGzip(t, mustMarshalOTLPLogsProtobuf(t))
+	gzipLogs := postOTLPToPathWithEncoding(t, server.URL, "/v1/logs", gzipProtobuf, otlpContentTypeProtobuf, "gzip")
+	if gzipLogs.StatusCode != http.StatusAccepted {
+		t.Fatalf("expected gzip protobuf logs status 202, got %d", gzipLogs.StatusCode)
+	}
+	closeBody(t, gzipLogs)
+
 	resp, err := http.Get(server.URL + "/api/v1/ingest/counters")
 	if err != nil {
 		t.Fatalf("GET ingest counters: %v", err)
@@ -90,9 +102,9 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&counters); err != nil {
 		t.Fatalf("decode counters: %v", err)
 	}
-	// 1 JSON log + 1 JSON metrics + 1 JSON traces + 1 protobuf log + 1 protobuf metrics
-	// + 6 validation rejects (malformed JSON, invalid, oversized, text/plain, malformed protobuf, protobuf-on-traces)
-	if counters.AcceptedPayloads != 5 || counters.RejectedPayloads != 6 {
+	// 1 JSON log + 1 JSON metrics + 1 JSON traces + 1 protobuf log + 1 protobuf metrics + 1 gzip protobuf log
+	// + 7 validation rejects (malformed JSON, invalid, oversized, text/plain, malformed protobuf, protobuf-on-traces, extra field)
+	if counters.AcceptedPayloads != 6 || counters.RejectedPayloads != 7 {
 		t.Fatalf("unexpected counters: %+v", counters)
 	}
 }
@@ -113,6 +125,60 @@ func TestOTLPTracesValidatedThenAcceptedForForeignTool(t *testing.T) {
 		t.Fatalf("expected traces status 202, got %d", traces.StatusCode)
 	}
 	closeBody(t, traces)
+}
+
+// TestOTLPProtobufPersistsRecognizedPayloads proves protobuf decode feeds the
+// same normalise/persist path as JSON (#129 Copilot review): a Codex logs
+// envelope and a Codex skill metric both survive ingest→read.
+func TestOTLPProtobufPersistsRecognizedPayloads(t *testing.T) {
+	repository, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = repository.Close() })
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
+	t.Cleanup(server.Close)
+
+	logsBody := mustJSONOTLPToProtobuf(t, rawCodexOTLPLogs, "resourceLogs")
+	logsResponse := postOTLPToPath(t, server.URL, "/v1/logs", logsBody, otlpContentTypeProtobuf)
+	if logsResponse.StatusCode != http.StatusAccepted {
+		t.Fatalf("protobuf logs status = %d", logsResponse.StatusCode)
+	}
+	closeBody(t, logsResponse)
+
+	sessions := fetchSessionList(t, server.URL+"/api/v1/sessions?limit=10")
+	if len(sessions.Data) != 1 {
+		t.Fatalf("expected 1 Codex session from protobuf logs, got %d: %#v", len(sessions.Data), sessions.Data)
+	}
+	if sessions.Data[0].SessionID != "codex:synthetic-conversation" {
+		t.Fatalf("session id = %q", sessions.Data[0].SessionID)
+	}
+	model, _ := sessions.Data[0].Attributes["model"].(string)
+	if model != "tiq-live-codex-model" {
+		t.Fatalf("session model = %#v", sessions.Data[0].Attributes["model"])
+	}
+
+	metricsBody := mustJSONOTLPToProtobuf(t, rawCodexSkillMetrics, "resourceMetrics")
+	metricsResponse := postOTLPToPath(t, server.URL, "/v1/metrics", metricsBody, otlpContentTypeProtobuf)
+	if metricsResponse.StatusCode != http.StatusAccepted {
+		t.Fatalf("protobuf metrics status = %d", metricsResponse.StatusCode)
+	}
+	closeBody(t, metricsResponse)
+
+	usage := getInsightJSON[skillUsageResponse](t, server.URL+"/api/v1/insights/skill-usage")
+	if usage.Data.Totals.ExplicitDetection < 1 || usage.Data.Totals.ObservedSkills < 1 {
+		t.Fatalf("expected explicit Codex skill from protobuf metrics, got %#v", usage.Data.Totals)
+	}
+	foundProbe := false
+	for _, skill := range usage.Data.Skills {
+		if skill.SkillName == "tiq-probe" {
+			foundProbe = true
+			break
+		}
+	}
+	if !foundProbe {
+		t.Fatalf("expected tiq-probe skill from protobuf metrics, got %#v", usage.Data.Skills)
+	}
 }
 
 // TestCodexLogsPersistWithRawConversationIdentity proves the #88 invariant: the
@@ -562,6 +628,41 @@ func mustMarshalOTLPMetricsProtobuf(t *testing.T) []byte {
 	return body
 }
 
+func mustJSONOTLPToProtobuf(t *testing.T, jsonPayload, resourceField string) []byte {
+	t.Helper()
+	opts := protojson.UnmarshalOptions{DiscardUnknown: true}
+	var message proto.Message
+	switch resourceField {
+	case "resourceLogs":
+		message = &logspb.LogsData{}
+	case "resourceMetrics":
+		message = &metricspb.MetricsData{}
+	default:
+		t.Fatalf("unsupported resource field %q", resourceField)
+	}
+	if err := opts.Unmarshal([]byte(jsonPayload), message); err != nil {
+		t.Fatalf("protojson unmarshal: %v", err)
+	}
+	body, err := proto.Marshal(message)
+	if err != nil {
+		t.Fatalf("protobuf marshal: %v", err)
+	}
+	return body
+}
+
+func mustGzip(t *testing.T, raw []byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	if _, err := zw.Write(raw); err != nil {
+		t.Fatalf("gzip write: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("gzip close: %v", err)
+	}
+	return buf.Bytes()
+}
+
 func postOTLPWithContentType(t *testing.T, serverURL string, body []byte, contentType string) *http.Response {
 	t.Helper()
 	return postOTLPToPath(t, serverURL, "/v1/traces", body, contentType)
@@ -569,11 +670,19 @@ func postOTLPWithContentType(t *testing.T, serverURL string, body []byte, conten
 
 func postOTLPToPath(t *testing.T, serverURL, path string, body []byte, contentType string) *http.Response {
 	t.Helper()
+	return postOTLPToPathWithEncoding(t, serverURL, path, body, contentType, "")
+}
+
+func postOTLPToPathWithEncoding(t *testing.T, serverURL, path string, body []byte, contentType, contentEncoding string) *http.Response {
+	t.Helper()
 	req, err := http.NewRequest(http.MethodPost, serverURL+path, bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("create request: %v", err)
 	}
 	req.Header.Set("Content-Type", contentType)
+	if contentEncoding != "" {
+		req.Header.Set("Content-Encoding", contentEncoding)
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("POST OTLP payload: %v", err)
