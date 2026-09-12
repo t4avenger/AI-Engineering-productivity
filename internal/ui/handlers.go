@@ -91,6 +91,9 @@ type timelineRow struct {
 	Model             string
 	InputTokens       tokenDisplay
 	OutputTokens      tokenDisplay
+	ApprovalDecision  string
+	ApprovalReason    string
+	ApprovalTool      string
 	UnavailableFields []string
 }
 
@@ -510,6 +513,9 @@ func (s *Server) loadTimeline(r *http.Request, sessionID, cursorRaw string) ([]t
 			Model:             attrString(event.Attributes["model"]),
 			InputTokens:       tokenValue(event.Attributes["input_token_count"]),
 			OutputTokens:      tokenValue(event.Attributes["output_token_count"]),
+			ApprovalDecision:  attrString(event.Attributes["approval_decision"]),
+			ApprovalReason:    attrString(event.Attributes["approval_reason_class"]),
+			ApprovalTool:      approvalToolLabel(event.Attributes["tool_namespace"], event.Attributes["tool_name"]),
 			UnavailableFields: fieldLabels(unavailableFields(event.Attributes["unavailable_fields"])),
 		}
 	}
@@ -559,6 +565,18 @@ func attrString(value any) string {
 	default:
 		return statusLabel("unavailable")
 	}
+}
+
+func approvalToolLabel(namespace, name any) string {
+	toolName, hasName := name.(string)
+	if !hasName || strings.TrimSpace(toolName) == "" {
+		return statusLabel("unavailable")
+	}
+	toolNamespace, hasNamespace := namespace.(string)
+	if !hasNamespace || strings.TrimSpace(toolNamespace) == "" {
+		return toolName
+	}
+	return toolNamespace + "/" + toolName
 }
 
 func tokenValue(value any) tokenDisplay {

@@ -13,21 +13,26 @@ import (
 )
 
 type timelineEvent struct {
-	EventID           string   `json:"event_id"`
-	EventType         string   `json:"event_type"`
-	OccurredAt        string   `json:"occurred_at"`
-	ReceivedAt        string   `json:"received_at"`
-	Provider          string   `json:"provider"`
-	Tool              string   `json:"tool"`
-	SourceVersion     string   `json:"source_version"`
-	Model             *string  `json:"model"`
-	InputTokenCount   *string  `json:"input_token_count"`
-	OutputTokenCount  *string  `json:"output_token_count"`
-	OperationID       *string  `json:"operation_id"`
-	Category          *string  `json:"category"`
-	Outcome           *string  `json:"outcome"`
-	DurationMs        *string  `json:"duration_ms"`
-	UnavailableFields []string `json:"unavailable_fields"`
+	EventID             string   `json:"event_id"`
+	EventType           string   `json:"event_type"`
+	OccurredAt          string   `json:"occurred_at"`
+	ReceivedAt          string   `json:"received_at"`
+	Provider            string   `json:"provider"`
+	Tool                string   `json:"tool"`
+	SourceVersion       string   `json:"source_version"`
+	Model               *string  `json:"model"`
+	InputTokenCount     *string  `json:"input_token_count"`
+	OutputTokenCount    *string  `json:"output_token_count"`
+	OperationID         *string  `json:"operation_id"`
+	Category            *string  `json:"category"`
+	Outcome             *string  `json:"outcome"`
+	DurationMs          *string  `json:"duration_ms"`
+	ApprovalID          *string  `json:"approval_id"`
+	ApprovalDecision    *string  `json:"approval_decision"`
+	ApprovalReasonClass *string  `json:"approval_reason_class"`
+	ToolName            *string  `json:"tool_name"`
+	ToolNamespace       *string  `json:"tool_namespace"`
+	UnavailableFields   []string `json:"unavailable_fields"`
 }
 
 type eventListResponse struct {
@@ -123,6 +128,8 @@ func publicTimelineEvent(event canonical.Event) timelineEvent {
 		EventID: event.EventID, EventType: event.EventType, OccurredAt: event.OccurredAt.UTC().Format(time.RFC3339Nano), ReceivedAt: event.ReceivedAt.UTC().Format(time.RFC3339Nano), Provider: event.Provider, Tool: event.Tool, SourceVersion: event.SourceVersion,
 		Model: optionalString(event.Attributes["model"]), InputTokenCount: optionalString(event.Attributes["input_token_count"]), OutputTokenCount: optionalString(event.Attributes["output_token_count"]),
 		OperationID: optionalString(event.Attributes["operation_id"]), Category: optionalString(event.Attributes["category"]), Outcome: optionalString(event.Attributes["outcome"]), DurationMs: optionalString(event.Attributes["duration_ms"]),
+		ApprovalID: optionalString(event.Attributes["approval_id"]), ApprovalDecision: optionalString(event.Attributes["approval_decision"]), ApprovalReasonClass: optionalString(event.Attributes["approval_reason_class"]),
+		ToolName: optionalString(event.Attributes["tool_name"]), ToolNamespace: optionalString(event.Attributes["tool_namespace"]),
 		UnavailableFields: unavailableFields(event.Attributes["unavailable_fields"]),
 	}
 }

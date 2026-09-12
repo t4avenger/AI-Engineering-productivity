@@ -41,6 +41,33 @@ func assertGoldenJSON[T any](t *testing.T, filename string, got T, label string)
 	}
 }
 
+func TestNormalizeLogToolDecisionGolden(t *testing.T) {
+	t.Parallel()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "fixtures", "codex", "observed-sanitised", "codex-0.153.4-tool-decision-otlp.json"))
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	var wrapper struct {
+		Payload json.RawMessage `json:"payload"`
+	}
+	if err := json.Unmarshal(raw, &wrapper); err != nil {
+		t.Fatalf("unwrap payload: %v", err)
+	}
+	events, err := NormalizeLogs([]byte(wrapper.Payload), fixtureReceivedAt)
+	if err != nil {
+		t.Fatalf("normalize logs: %v", err)
+	}
+	encoded, err := json.Marshal(events)
+	if err != nil {
+		t.Fatalf("marshal normalized events: %v", err)
+	}
+	var got []map[string]any
+	if err := json.Unmarshal(encoded, &got); err != nil {
+		t.Fatalf("decode normalized events: %v", err)
+	}
+	assertGoldenJSON(t, "codex-0.153.4-tool-decision.events.json", got, "tool decision events")
+}
+
 func TestExtractLogModelInteractionsGolden(t *testing.T) {
 	t.Parallel()
 

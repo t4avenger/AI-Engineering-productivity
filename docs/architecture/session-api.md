@@ -27,10 +27,23 @@ or `unknown`. The UI must render non-observed states as labelled cells, never
 as blanks or numeric zeroes.
 
 Session event timeline entries include optional operation fields for retained
-tool-call signals: `operation_id`, `category`, `outcome`, and `duration_ms`. `operation_id` is session-scoped when the provider reports a call ID, preventing cross-session call-ID reuse from collapsing evidence.
-These fields are populated only when the provider event proves an executed tool
-call, such as Codex `codex.tool_result`; ordinary model/lifecycle events leave
-them absent/null and keep `tool_calls` in `unavailable_fields` where appropriate.
+tool-call signals: `operation_id`, `category`, `outcome`, and `duration_ms`.
+`operation_id` is session-scoped when the provider reports a call ID, preventing
+cross-session call-ID reuse from collapsing evidence. These fields are populated
+only when the provider event proves an executed tool call, such as Codex
+`codex.tool_result`; ordinary model/lifecycle events leave them absent/null and
+keep `tool_calls` in `unavailable_fields` where appropriate.
+
+Timeline entries can also include optional approval fields for reviewed
+authorization decisions: `approval_id`, `approval_decision`,
+`approval_reason_class`, `tool_name`, and `tool_namespace`. `approval_id` is
+session-scoped when the provider reports a call ID. Codex `codex.tool_decision`
+currently maps allow/approved-like values to `approved`, deny/block-like values
+to `denied`, and missing decisions to explicit `unknown`. These fields must not
+retain raw command arguments, prompts, responses, source code, host/user
+identifiers, authorization headers, working directories, or file paths; such
+values remain absent/null and are represented through `unavailable_fields` where
+appropriate.
 
 The MCP inventory insight response contains `data.totals`, `data.servers`, and `data.notes`. Server identities are the raw provider-reported MCP server names (`identity_state: provider_reported`), which are themselves the correlation key — epic #87 removed the HMAC fingerprint. Usage is `observed` only with explicit matching invocation evidence; otherwise it is `not_observed` or `unavailable`. Token context is request-level and labelled as not exact per-MCP allocation.
 

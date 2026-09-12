@@ -61,6 +61,57 @@ export function codexOTLPLogs(model: string): string {
   });
 }
 
+
+export function codexToolDecisionOTLPLogs(): string {
+  return JSON.stringify({
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'codex_exec' } },
+            { key: 'service.version', value: { stringValue: '0.153.4' } },
+          ],
+        },
+        scopeLogs: [
+          {
+            logRecords: [
+              {
+                attributes: [
+                  {
+                    key: 'event.name',
+                    value: { stringValue: 'codex.tool_decision' },
+                  },
+                  {
+                    key: 'conversation.id',
+                    value: { stringValue: 'tiq-live-e2e-decision-session' },
+                  },
+                  {
+                    key: 'call_id',
+                    value: { stringValue: 'tiq-live-e2e-decision-call' },
+                  },
+                  { key: 'decision', value: { stringValue: 'allow' } },
+                  { key: 'source', value: { stringValue: 'policy' } },
+                  { key: 'tool_name', value: { stringValue: 'exec_command' } },
+                  { key: 'tool_namespace', value: { stringValue: 'functions' } },
+                  {
+                    key: 'arguments',
+                    value: { stringValue: '--token=tiq-canary-live-decision' },
+                  },
+                  {
+                    key: 'user.email',
+                    value: { stringValue: 'decision-live@example.test' },
+                  },
+                ],
+                body: { stringValue: 'tiq-canary-live-decision-body' },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
+
 // clearSessions empties the shared daemon so retries cannot pass on leftovers.
 async function clearSessions(): Promise<void> {
   const response = await fetch(`${daemonBase}/api/v1/sessions`, {

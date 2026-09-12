@@ -1,0 +1,118 @@
+[
+  {
+    "actor_id": "unavailable",
+    "attributes": {
+      "approval_decision": "approved",
+      "approval_id": "codex:synthetic-decision-session:approval:synthetic-decision-approved",
+      "approval_reason_class": "policy",
+      "model": "gpt-6-astra",
+      "tool_name": "exec_command",
+      "tool_namespace": "functions",
+      "unavailable_fields": [
+        "session_lifecycle",
+        "cache_usage",
+        "reasoning_tokens",
+        "file_operations",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost",
+        "command_execution",
+        "tool_calls",
+        "task_outcome"
+      ]
+    },
+    "device_id": "unavailable",
+    "event_id": "codex-log:7212b2eb544d0c2e055d5b503e6a0242035fdd61e3ff6dcbab883e700c9083ff",
+    "event_type": "codex.tool_decision",
+    "occurred_at": "2026-07-28T12:00:00Z",
+    "privacy_level": "operational",
+    "provider": "openai",
+    "provider_extensions": {
+      "log_attributes": {
+        "event.name": "codex.tool_decision",
+        "model": "gpt-6-astra"
+      },
+      "resource_attributes": {
+        "service.name": "codex_exec",
+        "service.version": "0.153.4"
+      },
+      "severity": "INFO",
+      "tool_decision": {
+        "approval_id": "codex:synthetic-decision-session:approval:synthetic-decision-approved",
+        "call_id": "synthetic-decision-approved",
+        "decision": "approved",
+        "provenance": "observed",
+        "raw_decision": "allow",
+        "source": "policy",
+        "tool_name": "exec_command",
+        "tool_namespace": "functions"
+      }
+    },
+    "received_at": "2026-07-28T12:00:00Z",
+    "repository_id": null,
+    "schema_version": "0.1.0",
+    "session_id": "codex:synthetic-decision-session",
+    "source_schema": "otel",
+    "source_version": "0.153.4",
+    "task_id": null,
+    "tool": "codex"
+  },
+  {
+    "actor_id": "unavailable",
+    "attributes": {
+      "approval_decision": "denied",
+      "approval_id": "codex:synthetic-decision-session:approval:synthetic-decision-denied",
+      "approval_reason_class": "sandbox",
+      "tool_name": "apply_patch",
+      "tool_namespace": "functions",
+      "unavailable_fields": [
+        "session_lifecycle",
+        "cache_usage",
+        "reasoning_tokens",
+        "file_operations",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost",
+        "command_execution",
+        "tool_calls",
+        "task_outcome"
+      ]
+    },
+    "device_id": "unavailable",
+    "event_id": "codex-log:92f3844bc4529852dca73b1e08dda8fe0e2bb5c63cba05b202cb3135387a53bc",
+    "event_type": "codex.tool_decision",
+    "occurred_at": "2026-07-28T12:00:00Z",
+    "privacy_level": "operational",
+    "provider": "openai",
+    "provider_extensions": {
+      "log_attributes": {
+        "event.name": "codex.tool_decision"
+      },
+      "resource_attributes": {
+        "service.name": "codex_exec",
+        "service.version": "0.153.4"
+      },
+      "severity": "INFO",
+      "tool_decision": {
+        "approval_id": "codex:synthetic-decision-session:approval:synthetic-decision-denied",
+        "call_id": "synthetic-decision-denied",
+        "decision": "denied",
+        "provenance": "observed",
+        "raw_decision": "deny",
+        "source": "sandbox",
+        "tool_name": "apply_patch",
+        "tool_namespace": "functions"
+      }
+    },
+    "received_at": "2026-07-28T12:00:00Z",
+    "repository_id": null,
+    "schema_version": "0.1.0",
+    "session_id": "codex:synthetic-decision-session",
+    "source_schema": "otel",
+    "source_version": "0.153.4",
+    "task_id": null,
+    "tool": "codex"
+  }
+]

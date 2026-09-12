@@ -343,6 +343,43 @@ func (errStub) ListSessions(context.Context, storage.SessionFilter) ([]canonical
 	return nil, context.DeadlineExceeded
 }
 
+func TestTimelineRendersCodexToolDecisionApproval(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fullStub{
+		sessions: []canonical.Session{syntheticSession("decision-session", now)},
+		events: map[string][]canonical.Event{
+			"decision-session": {{
+				EventID:    "decision-event",
+				EventType:  "codex.tool_decision",
+				SessionID:  "decision-session",
+				OccurredAt: now,
+				ReceivedAt: now,
+				Provider:   "openai",
+				Tool:       "codex",
+				Attributes: map[string]any{
+					"approval_decision":     "approved",
+					"approval_reason_class": "policy",
+					"tool_namespace":        "functions",
+					"tool_name":             "exec_command",
+					"unavailable_fields":    []string{"tool_calls"},
+				},
+			}},
+		},
+	}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	body := getAuthed(t, handler, cookie, "/sessions/decision-session").Body.String()
+	for _, want := range []string{"Approval", "approved", "Reason", "policy", "Tool", "functions/exec_command"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("tool decision timeline missing %q in body: %q", want, body)
+		}
+	}
+}
+
 func TestTimelineInvalidTokenStringIsUnavailable(t *testing.T) {
 	now := time.Now().UTC()
 	repo := &fullStub{
