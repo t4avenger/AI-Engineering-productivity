@@ -48,9 +48,10 @@ func newOTLPHTTPIngest(inspector *ingestInspector, repository storage.Repository
 }
 
 func (i *otlpHTTPIngest) tracesHandler(w http.ResponseWriter, r *http.Request) {
-	// Observed first-class providers export behaviour signals as OTLP logs.
-	// Accepting traces with 202 while dropping them misleads exporters (issue #50).
-	i.rejectUnsupportedSignal(w, r, "traces")
+	// Claude Code's enhanced-telemetry beta exports a span hierarchy
+	// (interaction → llm_request/tool/hook) that logs do not carry; it is
+	// normalised and persisted here, resolving the /v1/traces 501 (issue #50).
+	i.receive(w, r, "resourceSpans")
 }
 
 func (i *otlpHTTPIngest) metricsHandler(w http.ResponseWriter, r *http.Request) {
@@ -59,21 +60,6 @@ func (i *otlpHTTPIngest) metricsHandler(w http.ResponseWriter, r *http.Request) 
 
 func (i *otlpHTTPIngest) logsHandler(w http.ResponseWriter, r *http.Request) {
 	i.receive(w, r, "resourceLogs")
-}
-
-// rejectUnsupportedSignal refuses OTLP signal paths that are not persisted in
-// the MVP. The body is drained within the size limit so clients can reuse the
-// connection; the payload is never inspected, normalised, or stored.
-func (i *otlpHTTPIngest) rejectUnsupportedSignal(w http.ResponseWriter, r *http.Request, signal string) {
-	if r.Body != nil {
-		_, _ = io.Copy(io.Discard, http.MaxBytesReader(w, r.Body, maxOTLPPayloadBytes+1))
-	}
-	i.reject(
-		w,
-		http.StatusNotImplemented,
-		"not_implemented",
-		fmt.Sprintf("OTLP %s are not persisted; export logs to POST /v1/logs", signal),
-	)
 }
 
 func (i *otlpHTTPIngest) receive(w http.ResponseWriter, r *http.Request, resourceField string) {
@@ -126,6 +112,8 @@ func (i *otlpHTTPIngest) persistSignal(request *http.Request, resourceField stri
 		return i.persistLogs(request, payload)
 	case "resourceMetrics":
 		return i.persistMetrics(request, payload)
+	case "resourceSpans":
+		return i.persistTraces(request, payload)
 	default:
 		return nil
 	}
@@ -215,6 +203,42 @@ func (i *otlpHTTPIngest) persistMetrics(request *http.Request, payload map[strin
 
 	claudeEvents, err := claude.NormalizeMetrics(rawBytes, receivedAt)
 	if err != nil && !errors.Is(err, claude.ErrUnsupportedMetrics) {
+		return fmt.Errorf("normalise: %w", err)
+	}
+	events = append(events, claudeEvents...)
+
+	if len(events) == 0 {
+		return nil
+	}
+	if err := i.repository.SaveEvents(request.Context(), events); err != nil {
+		return fmt.Errorf("persist: %w", err)
+	}
+	return nil
+}
+
+// persistTraces routes a raw OTLP traces payload through every per-tool traces
+// adapter. Each adapter normalises only the resources whose service.name it
+// recognises (Claude Code: claude-code) and returns ErrUnsupportedTraces for a
+// payload with none of its own, so a payload from an unknown tool — or one
+// mixing tools — is handled safely rather than misattributed. A non-sentinel
+// error aborts the whole batch: a malformed span never lets half a mixed batch
+// persist, so the route never silently 202-accepts and drops supported Claude
+// trace data (#50/#49). Codex trace ingest is tracked separately (#112); this
+// path keeps the multi-adapter shape so it can slot in. The payload is
+// normalised verbatim — no ingest-time hiding is applied (epic #87).
+func (i *otlpHTTPIngest) persistTraces(request *http.Request, payload map[string]json.RawMessage) error {
+	if i.repository == nil {
+		return nil
+	}
+	rawBytes, err := rawPayload(payload)
+	if err != nil {
+		return err
+	}
+	receivedAt := time.Now().UTC()
+
+	var events []canonical.Event
+	claudeEvents, err := claude.NormalizeTraces(rawBytes, receivedAt)
+	if err != nil && !errors.Is(err, claude.ErrUnsupportedTraces) {
 		return fmt.Errorf("normalise: %w", err)
 	}
 	events = append(events, claudeEvents...)

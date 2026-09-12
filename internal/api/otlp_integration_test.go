@@ -22,9 +22,14 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	server := httptest.NewServer(NewHandler(slog.Default()))
 	t.Cleanup(server.Close)
 
-	// Traces must fail honestly — never 202-then-drop (issue #50).
+	// Traces are now persisted, resolving the /v1/traces 501 (issue #50). A
+	// well-formed spans payload with no claude-code resource is accepted (so
+	// exporters flush) but produces no persisted events.
 	traces := postOTLP(t, server.URL, []byte(`{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","name":"synthetic"}]}]}]}`))
-	assertIngestError(t, traces, http.StatusNotImplemented, "not_implemented")
+	if traces.StatusCode != http.StatusAccepted {
+		t.Fatalf("expected OTLP traces status 202, got %d", traces.StatusCode)
+	}
+	closeBody(t, traces)
 
 	// Metrics without Codex skill datapoints are accepted (so exporters flush)
 	// but produce no persisted events.
@@ -61,24 +66,28 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&counters); err != nil {
 		t.Fatalf("decode counters: %v", err)
 	}
-	// 1 accepted log + 1 accepted metrics + 1 unsupported traces + 4 validation rejects
-	if counters.AcceptedPayloads != 2 || counters.RejectedPayloads != 5 {
+	// 1 accepted log + 1 accepted metrics + 1 accepted traces + 4 validation rejects
+	if counters.AcceptedPayloads != 3 || counters.RejectedPayloads != 4 {
 		t.Fatalf("unexpected counters: %+v", counters)
 	}
 }
 
-func TestOTLPTracesStillRefusedMetricsAccepted(t *testing.T) {
+// TestOTLPTracesValidatedThenAcceptedForForeignTool proves the /v1/traces route
+// now behaves like the other signal routes (issue #50 resolved): a body with no
+// resourceSpans array is a validation error, while a well-formed spans payload
+// from another tool is accepted (so exporters flush) yet persists no events.
+func TestOTLPTracesValidatedThenAcceptedForForeignTool(t *testing.T) {
 	server := httptest.NewServer(NewHandler(slog.Default()))
 	t.Cleanup(server.Close)
 
-	traces := postOTLPToPath(t, server.URL, "/v1/traces", []byte(`{"ignored":true}`), "application/json")
-	assertIngestError(t, traces, http.StatusNotImplemented, "not_implemented")
+	invalid := postOTLPToPath(t, server.URL, "/v1/traces", []byte(`{"ignored":true}`), "application/json")
+	assertIngestError(t, invalid, http.StatusBadRequest, "invalid_payload")
 
-	metrics := postOTLPToPath(t, server.URL, "/v1/metrics", []byte(`{"resourceMetrics":[{"scopeMetrics":[{"metrics":[{"name":"synthetic"}]}]}]}`), "application/json")
-	if metrics.StatusCode != http.StatusAccepted {
-		t.Fatalf("expected metrics status 202, got %d", metrics.StatusCode)
+	traces := postOTLPToPath(t, server.URL, "/v1/traces", []byte(`{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}]},"scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","name":"codex.turn"}]}]}]}`), "application/json")
+	if traces.StatusCode != http.StatusAccepted {
+		t.Fatalf("expected traces status 202, got %d", traces.StatusCode)
 	}
-	closeBody(t, metrics)
+	closeBody(t, traces)
 }
 
 // TestCodexLogsPersistWithRawConversationIdentity proves the #88 invariant: the
@@ -241,6 +250,62 @@ func TestClaudeTokenUsageMetricsPersistThroughMetricsReceiver(t *testing.T) {
 	}
 	if !sawInput {
 		t.Fatalf("expected a persisted input token count of 10, got %s", encoded)
+	}
+}
+
+// TestClaudeTraceSpansPersistThroughTracesReceiver proves the F3 route end to
+// end: the enhanced-telemetry beta span fixture POSTs to /v1/traces, persists,
+// and reads back correlated to the same raw provider-native session id as the
+// metrics/logs fixtures — with the interaction → llm_request span tree intact
+// and no raw identifiers leaked (#50 resolved; #88/#87 raw-identity invariant).
+func TestClaudeTraceSpansPersistThroughTracesReceiver(t *testing.T) {
+	repository, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = repository.Close() })
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
+	t.Cleanup(server.Close)
+
+	response := postOTLPToPath(t, server.URL, "/v1/traces", metricsFixturePayloadBytes(t, "claude-code-2.1.268-trace-spans-otlp.json"), "application/json")
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("claude trace spans status = %d", response.StatusCode)
+	}
+	closeBody(t, response)
+
+	// Both spans carry the same session.id, so they share one raw session — the
+	// same identity the token-usage metrics fixture uses, proving cross-signal
+	// correlation.
+	sessions, err := repository.ListSessions(context.Background(), storage.SessionFilter{Limit: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sessions) != 1 || sessions[0].SessionID != "claude-code:00000000-0000-4000-8000-000000000001" {
+		t.Fatalf("sessions = %#v, want one raw provider-native Claude session", sessions)
+	}
+	events, err := repository.ListEvents(context.Background(), storage.EventFilter{SessionID: sessions[0].SessionID, Limit: 20})
+	if err != nil || len(events) != 2 {
+		t.Fatalf("events = %#v, %v, want 2 spans (interaction + llm_request)", events, err)
+	}
+	encoded, err := json.Marshal(events)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNoRawIdentifiers(t, []string{"microrutter2514@gmail.com", "synthetic@example.test", "user_synthetic", "8d699259db92da74599fd7d5007f335c54e8b16495fdb36464dfbf688d4145bc"}, encoded)
+
+	var sawInteraction, sawLLMRequest bool
+	for _, event := range events {
+		switch event.EventType {
+		case "claude_code.interaction":
+			sawInteraction = true
+		case "claude_code.llm_request":
+			sawLLMRequest = true
+		default:
+			t.Fatalf("unexpected span event type %q", event.EventType)
+		}
+	}
+	if !sawInteraction || !sawLLMRequest {
+		t.Fatalf("expected both spans persisted: interaction=%v llm_request=%v (%s)", sawInteraction, sawLLMRequest, encoded)
 	}
 }
 

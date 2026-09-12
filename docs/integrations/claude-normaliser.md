@@ -109,6 +109,46 @@ token type, model, timestamp, resource/scope identity, datapoint index, and
 value, so same-timestamp datapoints in one session stay distinct under
 `CorrelateEvents`.
 
+## Traces path — `NormalizeTraces`
+
+Issue #90 (F3) routes Claude Code's OTLP **traces** (`POST /v1/traces`) into the
+adapter, replacing the previous 501 that bug #50 filed. `persistTraces`
+(`internal/api/otlp.go`) invokes `claude.NormalizeTraces`, which normalises only
+resources whose `service.name` is `claude-code` and returns `ErrUnsupportedTraces`
+for a payload with none of its own, so a mixed-tool batch is safe. A structurally
+malformed claude-code span (missing `traceId`/`spanId`) is a hard normalisation
+error — not the sentinel — so the route never silently 202-accepts and drops
+supported Claude trace data (#50/#49). Codex has no traces adapter yet (#112);
+the ingest path keeps the multi-adapter shape so one can slot in.
+
+The enhanced-telemetry beta exports the span tree that logs do not carry:
+`claude_code.interaction` (root) → `claude_code.llm_request` (child), confirmed by
+a live capture (tool 2.1.268,
+`fixtures/claude/observed-sanitised/claude-code-2.1.268-trace-spans-otlp.json`).
+Each span becomes one `canonical.Event`. The raw `session.id` is promoted to the
+canonical `session_id` (`claude-code:<session.id>`); when a span carries no
+`session.id` the identity falls back to the trace id (`claude-code:trace:<traceId>`)
+so spans from different traces are not merged into one synthetic session. The raw
+span identity (`traceId`/`spanId`/`parentSpanId`), span `name`, `kind`, start/end
+nanos, status, and scope are retained verbatim under
+`provider_extensions.span`/`correlation` (epic #87); a root span's absent parent
+is kept as `null`, not an empty string, so a genuine root is distinguishable from
+an empty parent. The event ID is a content hash over `traceId`+`spanId`+resource
+identity, so two resources cannot collide on one event ID and be silently dropped
+by `CorrelateEvents`. A supported claude-code span missing a required structural
+field (`traceId`, `spanId`, `name`, or a positive `startTimeUnixNano`) is a hard
+normalisation error, never a silently dropped or schema-invalid event.
+
+Per-span-type field mapping (interaction/llm_request/tool/hook/sub-agent) is
+deliberately **out of scope** for F3 — it is owned by the T-phase issues
+(#100–#103) — so `provider_extensions.correlation.task_boundary` is stamped with
+`confidence: unknown` until then. As with metrics, #88 removed storage-side
+sanitising, so the adapter is the sole guard: span attributes are reduced to an
+**allow-list** (`safeSpanAttributeKeys`, e.g. `span.type`, `gen_ai.*`,
+`stop_reason`, token counts, `duration_ms`), dropping operator/identity and any
+unforeseen or secret-bearing attribute (`user.*`, `session.id`, `authorization`,
+the redacted `user_prompt`) by default.
+
 ## Privacy
 
 `NormalizeEvents` and `ExtractModelInteractions` retain `session_id` and
@@ -127,6 +167,8 @@ in #94.
   model-interaction records for the same input.
 - `fixtures/claude/expected/claude-code-2.1.268-token-usage-metrics.events.json` —
   canonical token-usage events for the committed `/v1/metrics` fixture.
+- `fixtures/claude/expected/claude-code-2.1.268-trace-spans.events.json` —
+  canonical span events for the committed `/v1/traces` fixture.
 
 Regenerate them with `UPDATE_GOLDEN=1 go test ./internal/normalize/claude/ -run Golden`
 after a reviewed change, then inspect the diff.
@@ -134,7 +176,8 @@ after a reviewed change, then inspect the diff.
 ## Out of scope
 
 Session JSONL is not parsed: no reviewed, sanitised JSONL fixture is committed, so
-that source stays `unknown`. Live HTTP ingest for Claude Code OTLP logs is
-supported via `NormalizeLogs`; the sample-event fixture shape remains the
-reviewed golden path for `NormalizeEvents`.
+that source stays `unknown`. Live HTTP ingest for Claude Code OTLP logs, metrics,
+and traces is supported via `NormalizeLogs`, `NormalizeMetrics`, and
+`NormalizeTraces`; the sample-event fixture shape remains the reviewed golden path
+for `NormalizeEvents`.
 
