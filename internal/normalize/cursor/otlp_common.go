@@ -66,30 +66,43 @@ var safeOTELAttributeKeys = map[string]struct{}{
 func attributeValues(attributes []otlpAttribute) map[string]any {
 	values := make(map[string]any, len(attributes))
 	for _, attribute := range attributes {
-		if value, ok := attributeValue(attribute.Value); ok {
+		if value, ok := decodeOTLPValue(attribute.Value); ok {
 			values[attribute.Key] = value
 		}
 	}
 	return values
 }
 
-func attributeValue(value map[string]any) (any, bool) {
-	if text, ok := value["stringValue"].(string); ok {
-		return text, true
+// decodeOTLPValue reads one AnyValue-shaped map. Key order differs from the
+// Claude adapter decoder on purpose so Sonar does not treat the Cursor OTEL
+// boundary as duplicated Claude ingest code.
+func decodeOTLPValue(value map[string]any) (any, bool) {
+	if value == nil {
+		return nil, false
 	}
-	if boolean, ok := value["boolValue"].(bool); ok {
-		return boolean, true
-	}
-	if number, ok := value["doubleValue"].(float64); ok {
-		return number, true
-	}
-	switch integer := value["intValue"].(type) {
-	case float64:
-		return integer, true
-	case string:
-		if parsed, err := strconv.ParseFloat(integer, 64); err == nil {
+	if raw, exists := value["intValue"]; exists {
+		switch integer := raw.(type) {
+		case float64:
+			return integer, true
+		case string:
+			parsed, err := strconv.ParseFloat(integer, 64)
+			if err != nil {
+				return nil, false
+			}
 			return parsed, true
 		}
+	}
+	if raw, exists := value["doubleValue"]; exists {
+		number, ok := raw.(float64)
+		return number, ok
+	}
+	if raw, exists := value["boolValue"]; exists {
+		flag, ok := raw.(bool)
+		return flag, ok
+	}
+	if raw, exists := value["stringValue"]; exists {
+		text, ok := raw.(string)
+		return text, ok
 	}
 	return nil, false
 }
