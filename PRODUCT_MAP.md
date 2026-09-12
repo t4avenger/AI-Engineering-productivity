@@ -51,7 +51,7 @@ semantically equivalent data. Separate immutable **observations** from versioned
 - **P2 — Claude Code adapter + capability-driven conformance suite.** OTLP + session JSONL
   (the JSONL half is now implemented: `claude.NormalizeTranscript` via `POST /v1/claude/transcript`
   emits `assistant_message` events with model + full token usage, correlated to the same
-  session as OTLP; content bodies deferred to E7/#94 and J18/#105 — #91).
+  session as OTLP; content bodies deferred to E7/#94, J17/#104, and J18/#105 — #91).
   Skill detection marked `explicit | inferred | unavailable`. Cross-tool session view with
   honest "unavailable" cells.
 - **P3 — Behaviour, efficiency & model-performance insights.** MCP inventory & context cost

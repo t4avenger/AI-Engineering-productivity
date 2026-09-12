@@ -207,16 +207,19 @@ it to canonical events and is served live at `POST /v1/claude/transcript`
   canonical key, are carried under `provider_extensions.cache_usage_extra`.
 - **Content deferred, not silently dropped.** Prompt/response text, tool
   `input`/results, and file diffs are never read into an event; they are listed in
-  `attributes.unavailable_fields` and owned by E7 (#94) and J18 (#105). The
+  `attributes.unavailable_fields`. Ownership: prompts/responses → E7 (#94);
+  MCP calls → J17 (#104); tool IO / diffs / sub-agents → J18 (#105). The
   per-adapter allow-list is the sole guard (epic #88 removed ingest-time hiding):
   only safe scalar envelope fields (`git_branch`, `entrypoint`, `user_type`,
   `request_id`, `effort`, `api_block_index`, `is_sidechain`) reach
   `provider_extensions.transcript` — `cwd` and every content body are excluded.
 - **Contract.** An `assistant` record missing a structural field (`uuid`,
-  `sessionId`, `timestamp`) is a hard error that aborts the whole import (matching
-  the traces adapter — supported data is never silently dropped or half-persisted);
-  a missing `version` becomes `source_version = "unavailable"`, not an error; a
-  transcript with no `assistant` records yields zero events and no error.
+  `sessionId`, `timestamp`) — including whitespace-only values — is a hard error
+  that aborts the whole import (matching the traces adapter — supported data is
+  never silently dropped or half-persisted); invalid JSON lines surface as
+  `ErrMalformedTranscript` (HTTP 400); a missing `version` becomes
+  `source_version = "unavailable"`, not an error; a transcript with no
+  `assistant` records yields zero events and no error.
 - **Size cap and inspector.** The route caps the body at 32 MiB (real transcripts
   reach a few MB), larger than the 1 MiB OTLP cap. It deliberately does **not**
   wire the dev ingest inspector: the inspector echoes the raw captured payload, so

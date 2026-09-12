@@ -3,12 +3,19 @@ package claude
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/normalize"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
+
+// ErrMalformedTranscript marks a JSON syntax failure in a transcript line so the
+// ingest route can return HTTP 400 (matching OTLP malformed_payload) rather than
+// conflating it with a structural normalisation failure (HTTP 422).
+var ErrMalformedTranscript = errors.New("malformed claude transcript")
 
 // sourceSchemaTranscript marks events derived from the on-disk session JSONL
 // transcript (~/.claude/projects/**/<session>.jsonl), distinguishing them from
@@ -71,7 +78,8 @@ type assistantUsage struct {
 
 // transcriptContentFields are the content/body signals F4 deliberately does not
 // emit; they are listed as unavailable so an absent signal is explicit rather
-// than silently missing. They are owned by E7 (#94) and J18 (#105).
+// than silently missing. Ownership: prompts/responses → E7 (#94); MCP calls →
+// J17 (#104); tool IO / diffs / sub-agents → J18 (#105).
 var transcriptContentFields = []string{
 	"prompt_content",
 	"response_content",
@@ -98,12 +106,25 @@ var transcriptContentFields = []string{
 // reported as source_version "unavailable", not an error. A transcript with no
 // assistant records yields an empty slice and no error.
 //
+// Lines are walked one at a time (no bytes.Split) so a newline-dense 32 MiB body
+// cannot amplify into hundreds of MiB of slice headers before parsing starts.
+//
 // The per-adapter allow-list is the sole guard (epic #88 removed ingest-time
 // hiding): only safe scalar envelope fields are copied into provider_extensions,
 // and no content body is ever read.
 func NormalizeTranscript(data []byte, receivedAt time.Time) ([]canonical.Event, error) {
 	var events []canonical.Event
-	for index, line := range bytes.Split(data, []byte("\n")) {
+	lineNum := 0
+	for remaining := data; len(remaining) > 0; {
+		lineNum++
+		var line []byte
+		if i := bytes.IndexByte(remaining, '\n'); i >= 0 {
+			line = remaining[:i]
+			remaining = remaining[i+1:]
+		} else {
+			line = remaining
+			remaining = nil
+		}
 		trimmed := bytes.TrimSpace(line)
 		if len(trimmed) == 0 {
 			continue
@@ -114,7 +135,7 @@ func NormalizeTranscript(data []byte, receivedAt time.Time) ([]canonical.Event, 
 			Type string `json:"type"`
 		}
 		if err := json.Unmarshal(trimmed, &discriminator); err != nil {
-			return nil, fmt.Errorf("claude transcript line %d is not valid JSON", index+1)
+			return nil, fmt.Errorf("%w: line %d is not valid JSON", ErrMalformedTranscript, lineNum)
 		}
 		if discriminator.Type != "assistant" {
 			continue
@@ -132,22 +153,25 @@ func NormalizeTranscript(data []byte, receivedAt time.Time) ([]canonical.Event, 
 func assistantEvent(line []byte, receivedAt time.Time) (canonical.Event, error) {
 	var record transcriptRecord
 	if err := json.Unmarshal(line, &record); err != nil {
-		return canonical.Event{}, fmt.Errorf("decode claude assistant record: %w", err)
+		return canonical.Event{}, fmt.Errorf("%w: decode assistant record: %v", ErrMalformedTranscript, err)
 	}
-	if record.UUID == "" || record.SessionID == "" || record.Timestamp == "" {
-		return canonical.Event{}, fmt.Errorf("claude assistant record %q missing uuid, sessionId, or timestamp", record.UUID)
+	uuid := strings.TrimSpace(record.UUID)
+	sessionIDRaw := strings.TrimSpace(record.SessionID)
+	timestamp := strings.TrimSpace(record.Timestamp)
+	if uuid == "" || sessionIDRaw == "" || timestamp == "" {
+		return canonical.Event{}, fmt.Errorf("claude assistant record missing uuid, sessionId, or timestamp")
 	}
-	occurredAt, err := time.Parse(time.RFC3339, record.Timestamp)
+	occurredAt, err := time.Parse(time.RFC3339, timestamp)
 	if err != nil {
-		return canonical.Event{}, fmt.Errorf("claude assistant record %q timestamp must be RFC3339", record.UUID)
+		return canonical.Event{}, fmt.Errorf("claude assistant record %q timestamp must be RFC3339", uuid)
 	}
 	occurredAt = occurredAt.UTC()
 
-	sessionID := normalize.ProviderNativeSessionID("claude-code:", record.SessionID)
+	sessionID := normalize.ProviderNativeSessionID("claude-code:", sessionIDRaw)
 	// The per-line uuid makes the event ID deterministic, so a SessionEnd hook
 	// re-shipping a now-complete transcript fills in earlier gaps idempotently
 	// via INSERT OR IGNORE rather than duplicating events.
-	eventID := sessionID + ":" + record.UUID
+	eventID := sessionID + ":" + uuid
 
 	attributes := map[string]any{
 		"unavailable_fields": append([]string(nil), transcriptContentFields...),
@@ -165,7 +189,7 @@ func assistantEvent(line []byte, receivedAt time.Time) (canonical.Event, error) 
 	}
 
 	extensions := map[string]any{
-		"correlation": transcriptCorrelation(eventID, occurredAt, record.UUID, record.ParentUUID),
+		"correlation": transcriptCorrelation(eventID, occurredAt, uuid, trimmedParentUUID(record.ParentUUID)),
 		"transcript":  transcriptEnvelope(record),
 	}
 	if extra := cacheExtraTokens(record.Message); len(extra) > 0 {
@@ -287,4 +311,17 @@ func transcriptCorrelation(eventID string, occurredAt time.Time, uuid string, pa
 			"reason":     "Claude Code transcript assistant records have no reviewed task-boundary signal",
 		},
 	}
+}
+
+// trimmedParentUUID returns a trimmed non-empty parent uuid, or nil when absent
+// or whitespace-only — matching RequiredString's blank-is-missing contract.
+func trimmedParentUUID(parent *string) *string {
+	if parent == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*parent)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }

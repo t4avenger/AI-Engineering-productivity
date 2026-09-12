@@ -26,10 +26,14 @@ func FuzzNormalizeTranscript(f *testing.F) {
 // fixture wrapper and re-serialises them to newline-delimited JSON — the exact
 // on-disk format the /v1/claude/transcript route hands to the adapter — so the
 // test replays a real transcript shape rather than a bespoke test-only encoding.
+// Numbers are preserved via UseNumber so large token counts are not rounded
+// through float64 before reaching NormalizeTranscript.
 func transcriptFixtureNDJSON(t *testing.T, name string) []byte {
 	t.Helper()
+	decoder := json.NewDecoder(strings.NewReader(string(readFixture(t, name))))
+	decoder.UseNumber()
 	var document map[string]any
-	if err := json.Unmarshal(readFixture(t, name), &document); err != nil {
+	if err := decoder.Decode(&document); err != nil {
 		t.Fatalf("decode fixture: %v", err)
 	}
 	payload, ok := document["payload"].(map[string]any)
@@ -181,10 +185,12 @@ func TestNormalizeTranscriptSkipsUnknownAndBlank(t *testing.T) {
 // as "unavailable" rather than failing.
 func TestNormalizeTranscriptMissingStructuralFieldIsError(t *testing.T) {
 	cases := map[string]string{
-		"missing uuid":      `{"type":"assistant","sessionId":"s1","timestamp":"2026-09-12T09:00:00Z","message":{"model":"claude-opus-4-8"}}`,
-		"missing sessionId": `{"type":"assistant","uuid":"a1","timestamp":"2026-09-12T09:00:00Z","message":{"model":"claude-opus-4-8"}}`,
-		"missing timestamp": `{"type":"assistant","uuid":"a1","sessionId":"s1","message":{"model":"claude-opus-4-8"}}`,
-		"bad timestamp":     `{"type":"assistant","uuid":"a1","sessionId":"s1","timestamp":"not-a-time","message":{"model":"claude-opus-4-8"}}`,
+		"missing uuid":         `{"type":"assistant","sessionId":"s1","timestamp":"2026-09-12T09:00:00Z","message":{"model":"claude-opus-4-8"}}`,
+		"missing sessionId":    `{"type":"assistant","uuid":"a1","timestamp":"2026-09-12T09:00:00Z","message":{"model":"claude-opus-4-8"}}`,
+		"missing timestamp":    `{"type":"assistant","uuid":"a1","sessionId":"s1","message":{"model":"claude-opus-4-8"}}`,
+		"bad timestamp":        `{"type":"assistant","uuid":"a1","sessionId":"s1","timestamp":"not-a-time","message":{"model":"claude-opus-4-8"}}`,
+		"whitespace uuid":      `{"type":"assistant","uuid":"   ","sessionId":"s1","timestamp":"2026-09-12T09:00:00Z","message":{"model":"claude-opus-4-8"}}`,
+		"whitespace sessionId": `{"type":"assistant","uuid":"a1","sessionId":" \t ","timestamp":"2026-09-12T09:00:00Z","message":{"model":"claude-opus-4-8"}}`,
 	}
 	for name, line := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -273,5 +279,21 @@ func TestNormalizeTranscriptDoesNotEmitContent(t *testing.T) {
 	}
 	if events[0].Attributes["input_token_count"] != int64(10) {
 		t.Fatalf("input tokens dropped: %#v", events[0].Attributes["input_token_count"])
+	}
+}
+
+// TestNormalizeTranscriptPreservesLargeTokenCounts proves json.Number keeps
+// token integers beyond float64 mantissa precision (2^53) instead of rounding.
+func TestNormalizeTranscriptPreservesLargeTokenCounts(t *testing.T) {
+	const large = "9007199254740993" // 2^53 + 1
+	line := `{"type":"assistant","uuid":"a1","sessionId":"s1","timestamp":"2026-09-12T09:00:00Z","version":"2.1.269",` +
+		`"message":{"model":"claude-opus-4-8","usage":{"input_tokens":` + large + `,"output_tokens":1}}}`
+	events, err := NormalizeTranscript([]byte(line), time.Now().UTC())
+	if err != nil {
+		t.Fatalf("NormalizeTranscript: %v", err)
+	}
+	got, ok := events[0].Attributes["input_token_count"].(int64)
+	if !ok || got != 9007199254740993 {
+		t.Fatalf("input_token_count = %#v, want exact %s", events[0].Attributes["input_token_count"], large)
 	}
 }

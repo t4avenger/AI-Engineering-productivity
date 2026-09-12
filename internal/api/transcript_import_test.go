@@ -77,6 +77,23 @@ func TestTranscriptImportRejectsWrongMediaType(t *testing.T) {
 	}
 }
 
+// TestTranscriptImportRejectsMalformedJSONWith400 mirrors OTLP: invalid JSONL
+// syntax is malformed_payload (400), not normalization_failed (422).
+func TestTranscriptImportRejectsMalformedJSONWith400(t *testing.T) {
+	_, server := transcriptTestServer(t, false)
+	resp := postOTLPToPath(t, server.URL, "/v1/claude/transcript", []byte("not-json\n"), "application/x-ndjson")
+	assertIngestError(t, resp, http.StatusBadRequest, "malformed_payload")
+}
+
+// TestTranscriptImportRejectsStructuralFailureWith422 reserves 422 for valid
+// JSON whose supported assistant records are missing required fields.
+func TestTranscriptImportRejectsStructuralFailureWith422(t *testing.T) {
+	_, server := transcriptTestServer(t, false)
+	body := `{"type":"assistant","uuid":"a1","sessionId":"s1","message":{"model":"claude-opus-4-8"}}`
+	resp := postOTLPToPath(t, server.URL, "/v1/claude/transcript", []byte(body), "application/x-ndjson")
+	assertIngestError(t, resp, http.StatusUnprocessableEntity, "normalization_failed")
+}
+
 // TestTranscriptImportSharesAcceptedCounter proves a successful transcript import
 // increments the same accepted counter the OTLP routes use, so ingest
 // observability stays consistent across every push route.

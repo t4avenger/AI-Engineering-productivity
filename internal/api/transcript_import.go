@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"io"
 	"mime"
 	"net/http"
@@ -64,6 +65,10 @@ func (i *transcriptIngest) handler(w http.ResponseWriter, r *http.Request) {
 	// event_id + INSERT OR IGNORE.
 	events, err := claude.NormalizeTranscript(body, time.Now().UTC())
 	if err != nil {
+		if errors.Is(err, claude.ErrMalformedTranscript) {
+			i.counters.reject(w, http.StatusBadRequest, "malformed_payload", "request body must be valid newline-delimited JSON")
+			return
+		}
 		i.counters.reject(w, http.StatusUnprocessableEntity, "normalization_failed", "supported transcript records could not be normalised")
 		return
 	}
