@@ -35,8 +35,11 @@ fixture, and a review of any newly evidenced capabilities.
 Codex CLI 0.145.0 was observed exporting OTLP JSON logs with `service.name`
 `codex_cli_rs` (interactive TUI) and `codex_exec` (the non-interactive `codex
 exec` subcommand); the log adapter accepts both. The log adapter retains reviewed operational attributes (`event.name`,
-`model`, `input_token_count`, and `output_token_count`) plus sanitised provider
-extensions. Local Codex 0.153.4 metadata also shows tool telemetry such as
+`model`, `input_token_count`, `output_token_count`, cached-input tokens from
+the observed `cached_token_count` log key, and `reasoning_token_count`) plus
+sanitised provider extensions. Cached and reasoning counts are promoted only
+when they parse as non-negative integer token counts; absent or malformed values
+stay absent rather than becoming `0`. Local Codex 0.153.4 metadata also shows tool telemetry such as
 `codex.tool_decision`, `codex.tool_result`, `codex.sandbox_outcome`,
 `tool_name`, `tool_namespace`, `call_id`, `duration_ms`, `success`,
 `mcp_server`, and `mcp_server_origin`. A `codex.tool_result` now becomes a

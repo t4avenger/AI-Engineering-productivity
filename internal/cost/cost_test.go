@@ -35,6 +35,18 @@ func TestCalculateStatusesAndRates(t *testing.T) {
 	}
 }
 
+func TestCalculatePricesCodexCachedAndReasoningTokens(t *testing.T) {
+	calculator := &Calculator{catalog: Catalog{SchemaVersion: schemaVersion, CatalogVersion: "test", Currency: "USD", Records: []PriceRecord{{ID: "codex", Provider: "openai", ModelMatcher: "gpt-5-codex-*", EffectiveAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Source: "test", RatesMicrousdPM: map[string]int64{"input": 1000000, "cached_input": 500000, "output": 2000000, "reasoning": 3000000}}}}}
+	event := canonical.Event{EventID: "codex-log", EventType: "codex.sse_event", SessionID: "codex:session", Provider: "openai", OccurredAt: time.Date(2026, 9, 10, 20, 9, 20, 0, time.UTC), ReceivedAt: time.Now(), Attributes: map[string]any{"model": "gpt-5-codex-synthetic", "input_token_count": int64(1200), "cached_input_token_count": int64(300), "output_token_count": int64(144), "reasoning_token_count": int64(55)}}
+	r := calculator.Calculate(event)
+	if r.Status != "calculated" || r.AmountMicrousd == nil || *r.AmountMicrousd != 1803 {
+		t.Fatalf("record=%#v", r)
+	}
+	if r.ObservedTokens["cached_input"] != 300 || r.ObservedTokens["reasoning"] != 55 {
+		t.Fatalf("observed tokens=%#v", r.ObservedTokens)
+	}
+}
+
 func TestCalculateSkipsCodexMetricTokenUsage(t *testing.T) {
 	calculator := &Calculator{catalog: Catalog{SchemaVersion: schemaVersion, CatalogVersion: "test", Currency: "USD", Records: []PriceRecord{{ID: "one", Provider: "openai", ModelMatcher: "model-*", EffectiveAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Source: "test", RatesMicrousdPM: map[string]int64{"input": 1000000}}}}}
 	event := canonical.Event{EventID: "metric", EventType: "codex.turn.token_usage", SessionID: "s", Provider: "openai", OccurredAt: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC), ReceivedAt: time.Now(), Attributes: map[string]any{"model": "model-a", "input_token_count": "100"}}

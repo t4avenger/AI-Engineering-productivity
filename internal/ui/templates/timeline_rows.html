@@ -7,6 +7,8 @@
     <div><dt>Model</dt><dd>{{.Model}}</dd></div>
     <div><dt>Input tokens</dt><dd>{{if .InputTokens.Observed}}{{.InputTokens.Text}}{{else}}{{template "status-badge" .InputTokens.Machine}}{{end}}</dd></div>
     <div><dt>Output tokens</dt><dd>{{if .OutputTokens.Observed}}{{.OutputTokens.Text}}{{else}}{{template "status-badge" .OutputTokens.Machine}}{{end}}</dd></div>
+    <div><dt>Cached input tokens</dt><dd>{{if .CachedInputTokens.Observed}}{{.CachedInputTokens.Text}}{{else}}{{template "status-badge" .CachedInputTokens.Machine}}{{end}}</dd></div>
+    <div><dt>Reasoning tokens</dt><dd>{{if .ReasoningTokens.Observed}}{{.ReasoningTokens.Text}}{{else}}{{template "status-badge" .ReasoningTokens.Machine}}{{end}}</dd></div>
     {{if eq .RawEventType "codex.tool_decision"}}
     <div><dt>Approval</dt><dd>{{.ApprovalDecision}}</dd></div>
     <div><dt>Reason</dt><dd>{{.ApprovalReason}}</dd></div>

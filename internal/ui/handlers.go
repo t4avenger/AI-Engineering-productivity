@@ -91,6 +91,8 @@ type timelineRow struct {
 	Model             string
 	InputTokens       tokenDisplay
 	OutputTokens      tokenDisplay
+	CachedInputTokens tokenDisplay
+	ReasoningTokens   tokenDisplay
 	ApprovalDecision  string
 	ApprovalReason    string
 	ApprovalTool      string
@@ -598,6 +600,8 @@ func (s *Server) loadTimeline(r *http.Request, sessionID, cursorRaw string) ([]t
 			Model:             attrString(event.Attributes["model"]),
 			InputTokens:       tokenValue(event.Attributes["input_token_count"]),
 			OutputTokens:      tokenValue(event.Attributes["output_token_count"]),
+			CachedInputTokens: tokenValue(event.Attributes["cached_input_token_count"]),
+			ReasoningTokens:   tokenValue(event.Attributes["reasoning_token_count"]),
 			ApprovalDecision:  attrString(event.Attributes["approval_decision"]),
 			ApprovalReason:    attrString(event.Attributes["approval_reason_class"]),
 			ApprovalTool:      approvalToolLabel(event.Attributes["tool_namespace"], event.Attributes["tool_name"]),
@@ -796,6 +800,10 @@ func fieldLabel(field string) string {
 		return "Input tokens"
 	case "output_token_count":
 		return "Output tokens"
+	case "cached_input_token_count":
+		return "Cached input tokens"
+	case "reasoning_token_count":
+		return "Reasoning tokens"
 	default:
 		return strings.TrimSpace(strings.NewReplacer("_", " ", ".", " ").Replace(field))
 	}

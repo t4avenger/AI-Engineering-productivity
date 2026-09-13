@@ -106,11 +106,12 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 	sessionID := codexLogSessionID(fields, id)
 	eventName := stringValue(fields[codexEventNameKey], "codex.log.received")
 	attributes := map[string]any{"unavailable_fields": codexLogUnavailableFields(eventName)}
-	for _, key := range []string{"model", "input_token_count", "output_token_count"} {
+	for _, key := range []string{"model"} {
 		if value, ok := fields[key]; ok {
 			attributes[key] = value
 		}
 	}
+	attachCodexLogTokenCounts(attributes, fields)
 	if !hasCodexOutcomeContract(eventName) {
 		attributes["unavailable_fields"] = append(attributes["unavailable_fields"].([]string), "task_outcome")
 	}
@@ -122,6 +123,34 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 	}
 	attachCodexOutcomeContract(extensions, fields, eventName)
 	return canonical.Event{SchemaVersion: canonicalSchemaVersion, EventID: id, EventType: eventName, OccurredAt: receivedAt.UTC(), ReceivedAt: receivedAt.UTC(), Provider: "openai", Tool: "codex", SourceSchema: sourceSchema, SourceVersion: stringValue(resource["service.version"], unavailable), ActorID: unavailable, DeviceID: unavailable, SessionID: sessionID, PrivacyLevel: "operational", Attributes: attributes, ProviderExtensions: extensions}, nil
+}
+
+func attachCodexLogTokenCounts(attributes, fields map[string]any) {
+	for _, mapping := range []struct {
+		source, target string
+	}{
+		{source: "input_token_count", target: "input_token_count"},
+		{source: "output_token_count", target: "output_token_count"},
+		{source: "cached_input_token_count", target: "cached_input_token_count"},
+		{source: "cached_token_count", target: "cached_input_token_count"},
+		{source: "reasoning_token_count", target: "reasoning_token_count"},
+	} {
+		if _, exists := attributes[mapping.target]; exists {
+			continue
+		}
+		count := normalize.OptionalTokenCount(fields[mapping.source])
+		if count == nil {
+			continue
+		}
+		attributes[mapping.target] = *count
+		unavailable := attributes["unavailable_fields"].([]string)
+		switch mapping.target {
+		case "cached_input_token_count":
+			attributes["unavailable_fields"] = removeUnavailableField(unavailable, "cache_usage")
+		case "reasoning_token_count":
+			attributes["unavailable_fields"] = removeUnavailableField(unavailable, "reasoning_tokens")
+		}
+	}
 }
 
 func codexLogSessionID(fields map[string]any, fallback string) string {

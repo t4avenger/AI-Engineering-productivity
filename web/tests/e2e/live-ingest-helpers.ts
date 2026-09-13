@@ -61,9 +61,10 @@ export function codexOTLPLogs(model: string): string {
   });
 }
 
-
-
-export function codexToolResultOTLPLogs(): string {
+function codexExecOTLPLogs(
+  attributes: Array<{ key: string; value: { stringValue: string } }>,
+  body: string,
+): string {
   return JSON.stringify({
     resourceLogs: [
       {
@@ -75,38 +76,59 @@ export function codexToolResultOTLPLogs(): string {
         },
         scopeLogs: [
           {
-            logRecords: [
-              {
-                attributes: [
-                  {
-                    key: 'event.name',
-                    value: { stringValue: 'codex.tool_result' },
-                  },
-                  {
-                    key: 'conversation.id',
-                    value: { stringValue: 'tiq-live-e2e-operation-codex' },
-                  },
-                  { key: 'tool_name', value: { stringValue: 'exec_command' } },
-                  { key: 'tool_namespace', value: { stringValue: 'functions' } },
-                  {
-                    key: 'call_id',
-                    value: { stringValue: 'tiq-live-e2e-operation-call' },
-                  },
-                  { key: 'duration_ms', value: { stringValue: '92' } },
-                  { key: 'success', value: { stringValue: 'true' } },
-                  {
-                    key: 'arguments',
-                    value: { stringValue: '--token=tiq-canary-live-operation' },
-                  },
-                ],
-                body: { stringValue: 'tiq-canary-live-operation-body' },
-              },
-            ],
+            logRecords: [{ attributes, body: { stringValue: body } }],
           },
         ],
       },
     ],
   });
+}
+
+function codexStringAttrs(
+  entries: Array<[string, string]>,
+): Array<{ key: string; value: { stringValue: string } }> {
+  return entries.map(([key, stringValue]) => ({ key, value: { stringValue } }));
+}
+
+export function codexCachedReasoningOTLPLogs(): string {
+  return codexExecOTLPLogs(
+    codexStringAttrs([
+      ['event.name', 'codex.sse_event'],
+      ['conversation.id', 'tiq-live-e2e-codex-token-session'],
+      ['model', 'gpt-5-codex-live'],
+      ['input_token_count', '1200'],
+      ['cached_token_count', '300'],
+      ['output_token_count', '144'],
+      ['reasoning_token_count', '55'],
+      ['arguments', '--token=tiq-canary-live-codex-token'],
+    ]),
+    'tiq-canary-live-codex-token-body',
+  );
+}
+
+export function codexToolResultOTLPLogs(): string {
+  return codexExecOTLPLogs(
+    [
+      { key: 'event.name', value: { stringValue: 'codex.tool_result' } },
+      {
+        key: 'conversation.id',
+        value: { stringValue: 'tiq-live-e2e-operation-codex' },
+      },
+      { key: 'tool_name', value: { stringValue: 'exec_command' } },
+      { key: 'tool_namespace', value: { stringValue: 'functions' } },
+      {
+        key: 'call_id',
+        value: { stringValue: 'tiq-live-e2e-operation-call' },
+      },
+      { key: 'duration_ms', value: { stringValue: '92' } },
+      { key: 'success', value: { stringValue: 'true' } },
+      {
+        key: 'arguments',
+        value: { stringValue: '--token=tiq-canary-live-operation' },
+      },
+    ],
+    'tiq-canary-live-operation-body',
+  );
 }
 
 export function claudeToolResultOTLPLogs(): string {
