@@ -26,6 +26,11 @@ shared cross-tool fields rendered by the dashboard: `provider`, `tool`,
 or `unknown`. The UI must render non-observed states as labelled cells, never
 as blanks or numeric zeroes.
 
+Session event timeline entries include optional token fields for retained model
+signals: `input_token_count`, `output_token_count`, `cached_input_token_count`,
+and `reasoning_token_count`. Missing or malformed provider values remain
+absent/null rather than becoming `0`.
+
 Session event timeline entries include optional operation fields for retained
 tool-call signals: `operation_id`, `category`, `outcome`, and `duration_ms`.
 `operation_id` is session-scoped when the provider reports a call ID, preventing

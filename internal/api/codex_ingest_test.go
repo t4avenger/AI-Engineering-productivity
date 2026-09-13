@@ -23,7 +23,9 @@ const rawCodexOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
      {"key":"event.name","value":{"stringValue":"codex.sse_event"}},
      {"key":"model","value":{"stringValue":"tiq-live-codex-model"}},
      {"key":"input_token_count","value":{"stringValue":"42"}},
+     {"key":"cached_token_count","value":{"stringValue":"21"}},
      {"key":"output_token_count","value":{"stringValue":"7"}},
+     {"key":"reasoning_token_count","value":{"stringValue":"3"}},
      {"key":"arguments","value":{"stringValue":"--token=tiq-canary-argument-token"}},
      {"key":"output","value":{"stringValue":"tiq-canary-output"}},
      {"key":"custom_metadata","value":{"stringValue":"token=tiq-canary-provider-extension"}},
@@ -67,6 +69,16 @@ func TestCodexLogsIngestEndToEnd(t *testing.T) {
 	}
 	if session.Availability["model"] != "observed" {
 		t.Fatalf("model availability = %#v", session.Availability)
+	}
+	timeline := timelinePage(t, server.URL+"/api/v1/sessions/codex:synthetic-conversation/events?limit=10")
+	if len(timeline.Data) != 1 {
+		t.Fatalf("timeline events = %d, want 1: %#v", len(timeline.Data), timeline.Data)
+	}
+	if timeline.Data[0].CachedInputTokenCount == nil || *timeline.Data[0].CachedInputTokenCount != "21" {
+		t.Fatalf("cached input token count = %#v", timeline.Data[0].CachedInputTokenCount)
+	}
+	if timeline.Data[0].ReasoningTokenCount == nil || *timeline.Data[0].ReasoningTokenCount != "3" {
+		t.Fatalf("reasoning token count = %#v", timeline.Data[0].ReasoningTokenCount)
 	}
 
 	canaries := []string{

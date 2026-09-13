@@ -61,7 +61,48 @@ export function codexOTLPLogs(model: string): string {
   });
 }
 
-
+export function codexCachedReasoningOTLPLogs(): string {
+  return JSON.stringify({
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'codex_exec' } },
+            { key: 'service.version', value: { stringValue: '0.153.4' } },
+          ],
+        },
+        scopeLogs: [
+          {
+            logRecords: [
+              {
+                attributes: [
+                  {
+                    key: 'event.name',
+                    value: { stringValue: 'codex.sse_event' },
+                  },
+                  {
+                    key: 'conversation.id',
+                    value: { stringValue: 'tiq-live-e2e-codex-token-session' },
+                  },
+                  { key: 'model', value: { stringValue: 'gpt-5-codex-live' } },
+                  { key: 'input_token_count', value: { stringValue: '1200' } },
+                  { key: 'cached_token_count', value: { stringValue: '300' } },
+                  { key: 'output_token_count', value: { stringValue: '144' } },
+                  { key: 'reasoning_token_count', value: { stringValue: '55' } },
+                  {
+                    key: 'arguments',
+                    value: { stringValue: '--token=tiq-canary-live-codex-token' },
+                  },
+                ],
+                body: { stringValue: 'tiq-canary-live-codex-token-body' },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
 
 export function codexToolResultOTLPLogs(): string {
   return JSON.stringify({

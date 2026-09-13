@@ -127,8 +127,7 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 
 func attachCodexLogTokenCounts(attributes map[string]any, fields map[string]any) {
 	for _, mapping := range []struct {
-		source string
-		target string
+		source, target string
 	}{
 		{source: "input_token_count", target: "input_token_count"},
 		{source: "output_token_count", target: "output_token_count"},
