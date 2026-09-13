@@ -61,27 +61,39 @@ export function codexOTLPLogs(model: string): string {
   });
 }
 
-function codexExecOTLPLogs(
-  attributes: Array<{ key: string; value: { stringValue: string } }>,
-  body: string,
+type OTLPLogRecord = {
+  attributes: OTLPAttribute[];
+  body?: { stringValue: string };
+  severityText?: string;
+  timeUnixNano?: string;
+};
+
+function otlpLogs(
+  serviceName: string,
+  serviceVersion: string,
+  logRecords: OTLPLogRecord[],
 ): string {
   return JSON.stringify({
     resourceLogs: [
       {
         resource: {
           attributes: [
-            { key: 'service.name', value: { stringValue: 'codex_exec' } },
-            { key: 'service.version', value: { stringValue: '0.153.4' } },
+            { key: 'service.name', value: { stringValue: serviceName } },
+            { key: 'service.version', value: { stringValue: serviceVersion } },
           ],
         },
-        scopeLogs: [
-          {
-            logRecords: [{ attributes, body: { stringValue: body } }],
-          },
-        ],
+        scopeLogs: [{ logRecords }],
       },
     ],
   });
+}
+
+function codexExecOTLPLogs(logRecords: OTLPLogRecord[]): string {
+  return otlpLogs('codex_exec', '0.153.4', logRecords);
+}
+
+function codexExecOTLPLog(attributes: OTLPAttribute[], body: string): string {
+  return codexExecOTLPLogs([{ attributes, body: { stringValue: body } }]);
 }
 
 function codexStringAttrs(
@@ -91,7 +103,7 @@ function codexStringAttrs(
 }
 
 export function codexCachedReasoningOTLPLogs(): string {
-  return codexExecOTLPLogs(
+  return codexExecOTLPLog(
     codexStringAttrs([
       ['event.name', 'codex.sse_event'],
       ['conversation.id', 'tiq-live-e2e-codex-token-session'],
@@ -107,7 +119,7 @@ export function codexCachedReasoningOTLPLogs(): string {
 }
 
 export function codexToolResultOTLPLogs(): string {
-  return codexExecOTLPLogs(
+  return codexExecOTLPLog(
     [
       { key: 'event.name', value: { stringValue: 'codex.tool_result' } },
       {
@@ -180,135 +192,63 @@ export function claudeToolResultOTLPLogs(): string {
 
 
 export function codexLifecycleOTLPLogs(): string {
-  return JSON.stringify({
-    resourceLogs: [
-      {
-        resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'codex_exec' } },
-            { key: 'service.version', value: { stringValue: '0.153.4' } },
-          ],
-        },
-        scopeLogs: [
-          {
-            logRecords: [
-              {
-                attributes: [
-                  {
-                    key: 'event.name',
-                    value: { stringValue: 'codex.conversation_starts' },
-                  },
-                  {
-                    key: 'conversation.id',
-                    value: { stringValue: 'tiq-live-e2e-lifecycle-session' },
-                  },
-                  { key: 'model', value: { stringValue: 'gpt-6-astra' } },
-                  { key: 'approval_policy', value: { stringValue: 'on-request' } },
-                  {
-                    key: 'sandbox_policy',
-                    value: { stringValue: 'workspace-write' },
-                  },
-                  { key: 'auth_mode', value: { stringValue: 'api-key' } },
-                  { key: 'terminal.type', value: { stringValue: 'pty' } },
-                  {
-                    key: 'slug',
-                    value: { stringValue: 'tiq-canary-live-lifecycle-slug' },
-                  },
-                  {
-                    key: 'user.email',
-                    value: { stringValue: 'lifecycle-live@example.test' },
-                  },
-                ],
-                body: { stringValue: 'tiq-canary-live-lifecycle-body' },
-                timeUnixNano: '1788717763000000000',
-              },
-              {
-                attributes: [
-                  {
-                    key: 'event.name',
-                    value: { stringValue: 'codex.startup_phase' },
-                  },
-                  {
-                    key: 'conversation.id',
-                    value: { stringValue: 'tiq-live-e2e-lifecycle-session' },
-                  },
-                  { key: 'startup.phase', value: { stringValue: 'init' } },
-                  { key: 'startup.status', value: { stringValue: 'ok' } },
-                  { key: 'duration_ms', value: { stringValue: '17' } },
-                ],
-                timeUnixNano: '1788717763000000001',
-              },
-              {
-                attributes: [
-                  {
-                    key: 'event.name',
-                    value: { stringValue: 'codex.websocket_connect' },
-                  },
-                  {
-                    key: 'conversation.id',
-                    value: { stringValue: 'tiq-live-e2e-lifecycle-session' },
-                  },
-                  { key: 'success', value: { boolValue: true } },
-                  { key: 'duration_ms', value: { stringValue: '23' } },
-                ],
-                timeUnixNano: '1788717763000000002',
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  });
+  return codexExecOTLPLogs([
+    {
+      attributes: codexStringAttrs([
+        ['event.name', 'codex.conversation_starts'],
+        ['conversation.id', 'tiq-live-e2e-lifecycle-session'],
+        ['model', 'gpt-6-astra'],
+        ['approval_policy', 'on-request'],
+        ['sandbox_policy', 'workspace-write'],
+        ['auth_mode', 'api-key'],
+        ['terminal.type', 'pty'],
+        ['slug', 'tiq-canary-live-lifecycle-slug'],
+        ['user.email', 'lifecycle-live@example.test'],
+      ]),
+      body: { stringValue: 'tiq-canary-live-lifecycle-body' },
+      timeUnixNano: '1788717763000000000',
+    },
+    {
+      attributes: codexStringAttrs([
+        ['event.name', 'codex.startup_phase'],
+        ['conversation.id', 'tiq-live-e2e-lifecycle-session'],
+        ['startup.phase', 'init'],
+        ['startup.status', 'ok'],
+        ['duration_ms', '17'],
+      ]),
+      timeUnixNano: '1788717763000000001',
+    },
+    {
+      attributes: [
+        ...codexStringAttrs([
+          ['event.name', 'codex.websocket_connect'],
+          ['conversation.id', 'tiq-live-e2e-lifecycle-session'],
+          ['duration_ms', '23'],
+        ]),
+        { key: 'success', value: { boolValue: true } },
+      ],
+      timeUnixNano: '1788717763000000002',
+    },
+  ]);
 }
 
 export function codexToolDecisionOTLPLogs(): string {
-  return JSON.stringify({
-    resourceLogs: [
-      {
-        resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'codex_exec' } },
-            { key: 'service.version', value: { stringValue: '0.153.4' } },
-          ],
-        },
-        scopeLogs: [
-          {
-            logRecords: [
-              {
-                attributes: [
-                  {
-                    key: 'event.name',
-                    value: { stringValue: 'codex.tool_decision' },
-                  },
-                  {
-                    key: 'conversation.id',
-                    value: { stringValue: 'tiq-live-e2e-decision-session' },
-                  },
-                  {
-                    key: 'call_id',
-                    value: { stringValue: 'tiq-live-e2e-decision-call' },
-                  },
-                  { key: 'decision', value: { stringValue: 'allow' } },
-                  { key: 'source', value: { stringValue: 'policy' } },
-                  { key: 'tool_name', value: { stringValue: 'exec_command' } },
-                  { key: 'tool_namespace', value: { stringValue: 'functions' } },
-                  {
-                    key: 'arguments',
-                    value: { stringValue: '--token=tiq-canary-live-decision' },
-                  },
-                  {
-                    key: 'user.email',
-                    value: { stringValue: 'decision-live@example.test' },
-                  },
-                ],
-                body: { stringValue: 'tiq-canary-live-decision-body' },
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  });
+  return codexExecOTLPLogs([
+    {
+      attributes: codexStringAttrs([
+        ['event.name', 'codex.tool_decision'],
+        ['conversation.id', 'tiq-live-e2e-decision-session'],
+        ['call_id', 'tiq-live-e2e-decision-call'],
+        ['decision', 'allow'],
+        ['source', 'policy'],
+        ['tool_name', 'exec_command'],
+        ['tool_namespace', 'functions'],
+        ['arguments', '--token=tiq-canary-live-decision'],
+        ['user.email', 'decision-live@example.test'],
+      ]),
+      body: { stringValue: 'tiq-canary-live-decision-body' },
+    },
+  ]);
 }
 
 // clearSessions empties the shared daemon so retries cannot pass on leftovers.
@@ -555,56 +495,33 @@ export function claudeOutcomeSuccessOTLPLogs(): string {
 
 /** Codex tool_result + api_request outcome contracts for scorecard e2e. */
 export function codexOutcomeOTLPLogs(): string {
-  return JSON.stringify({
-    resourceLogs: [
-      {
-        resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'codex_exec' } },
-            { key: 'service.version', value: { stringValue: '0.153.4' } },
-          ],
-        },
-        scopeLogs: [
-          {
-            logRecords: [
-              {
-                attributes: [
-                  {
-                    key: 'event.name',
-                    value: { stringValue: 'codex.tool_result' },
-                  },
-                  { key: 'tool_name', value: { stringValue: 'exec_command' } },
-                  { key: 'success', value: { stringValue: 'true' } },
-                  { key: 'model', value: { stringValue: 'gpt-6-astra' } },
-                  { key: 'duration_ms', value: { stringValue: '92' } },
-                  { key: 'call_id', value: { stringValue: 'synthetic-call' } },
-                ],
-                severityText: 'INFO',
-              },
-              {
-                attributes: [
-                  {
-                    key: 'event.name',
-                    value: { stringValue: 'codex.api_request' },
-                  },
-                  { key: 'success', value: { boolValue: false } },
-                  { key: 'model', value: { stringValue: 'gpt-6-astra' } },
-                  { key: 'attempt', value: { stringValue: '2' } },
-                  { key: 'duration_ms', value: { stringValue: '268' } },
-                  {
-                    key: 'http.status_code',
-                    value: { stringValue: '401' },
-                  },
-                  { key: 'error_code', value: { stringValue: 'http_401' } },
-                ],
-                severityText: 'INFO',
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  });
+  return codexExecOTLPLogs([
+    {
+      attributes: codexStringAttrs([
+        ['event.name', 'codex.tool_result'],
+        ['tool_name', 'exec_command'],
+        ['success', 'true'],
+        ['model', 'gpt-6-astra'],
+        ['duration_ms', '92'],
+        ['call_id', 'synthetic-call'],
+      ]),
+      severityText: 'INFO',
+    },
+    {
+      attributes: [
+        ...codexStringAttrs([
+          ['event.name', 'codex.api_request'],
+          ['model', 'gpt-6-astra'],
+          ['attempt', '2'],
+          ['duration_ms', '268'],
+          ['http.status_code', '401'],
+          ['error_code', 'http_401'],
+        ]),
+        { key: 'success', value: { boolValue: false } },
+      ],
+      severityText: 'INFO',
+    },
+  ]);
 }
 
 // cursorEnterpriseAPIRequestLogs is a sanitised Cursor Enterprise OTEL
