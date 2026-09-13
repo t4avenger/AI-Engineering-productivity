@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/fixture"
@@ -37,6 +38,7 @@ const (
 	eventAPIError       = "api_error"
 	eventSkillActivated = "skill_activated"
 	eventToolResult     = "tool_result"
+	eventToolDecision   = "tool_decision"
 )
 
 // NormalizeEvents maps the reviewed Claude Code OTLP event fixture into
@@ -90,21 +92,103 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 
 	extensions := map[string]any{
 		"correlation": eventCorrelation(eventID, occurredAt),
-		"event":       normalize.UnknownFields(raw, promotedEventFields(name)...),
+		"event":       normalize.UnknownFields(raw, append(promotedEventFields(name), gatedEventFields()...)...),
 	}
 	if requestID := normalize.OptionalString(raw, "request_id"); requestID != nil {
 		extensions["request_id"] = nativeSessionPrefix + *requestID
 	}
+	attributes := map[string]any{"unavailable_fields": unavailableFields(name)}
 	attachSkillDetection(extensions, raw, name)
 	attachOutcomeContract(extensions, raw, name)
+	attachToolDecision(extensions, attributes, raw, name, nativeSessionID, eventID)
 	return canonical.Event{
 		SchemaVersion: canonicalSchemaVersion, EventID: eventID, EventType: name,
 		OccurredAt: occurredAt, ReceivedAt: capturedAt, Provider: provider, Tool: tool,
 		SourceSchema: sourceSchema, SourceVersion: document.ToolVersion, ActorID: unavailable, DeviceID: unavailable,
 		SessionID: nativeSessionID, TaskID: nil, RepositoryID: nil, PrivacyLevel: "operational",
-		Attributes:         map[string]any{"unavailable_fields": unavailableFields(name)},
+		Attributes:         attributes,
 		ProviderExtensions: extensions,
 	}, nil
+}
+
+// attachToolDecision stamps canonical approval attributes and a raw-preserving
+// provider extension on tool_decision events — the only Claude signal that
+// reports a permission grant or denial (accept/reject) together with its source
+// (config/hook/user_permanent/user_temporary/user_abort/user_reject). Reject
+// decisions appear only here: the tool_result event's decision_type is always
+// "accept", so without this event a denied tool call is invisible.
+//
+// The canonical approval_decision is normalised to the cross-provider
+// approved/denied vocabulary (matching codex) so the capability matrix reads
+// consistently; the untouched wire value is preserved under
+// provider_extensions.tool_decision.raw_decision, so nothing is hidden (epic
+// #87). The approval_id shares the tool_use_id key with the E5 operation id
+// (...:tool:<tool_use_id>), so a decision correlates to its result.
+func attachToolDecision(extensions, attributes, raw map[string]any, eventName, nativeSessionID, eventID string) {
+	if eventName != eventToolDecision {
+		return
+	}
+	// Without a provider tool_use_id, fall back to the per-event ID (unique per
+	// session and sequence) rather than a constant literal, so two decisions that
+	// both lack a tool_use_id do not collapse onto one approval_id.
+	approvalID := eventID
+	if toolUseID, ok := normalize.ObservedString(raw["tool_use_id"]); ok {
+		approvalID = nativeSessionID + ":approval:" + toolUseID
+	}
+	decision := claudeApprovalDecisionStatus(raw["decision"])
+	attributes["approval_id"] = approvalID
+	attributes["approval_decision"] = decision
+	if reasonClass, ok := normalize.ObservedString(raw["source"]); ok {
+		attributes["approval_reason_class"] = reasonClass
+	}
+	for _, key := range []string{"tool_name", "tool_source"} {
+		if value, ok := raw[key]; ok {
+			attributes[key] = value
+		}
+	}
+	extension := map[string]any{
+		"approval_id": approvalID,
+		"decision":    decision,
+		"provenance":  string(canonical.ProvenanceObserved),
+	}
+	for _, key := range toolDecisionFieldKeys() {
+		if value, ok := raw[key]; ok {
+			if key == "decision" {
+				extension["raw_decision"] = value
+				continue
+			}
+			extension[key] = value
+		}
+	}
+	extensions["tool_decision"] = extension
+}
+
+// claudeApprovalDecisionStatus normalises the wire decision onto the
+// cross-provider approved/denied vocabulary. Claude emits bare accept/reject; a
+// missing decision is reported as unknown and never inferred from any other
+// signal, and an unrecognised value passes through verbatim rather than being
+// forced into a bucket.
+func claudeApprovalDecisionStatus(value any) string {
+	decision, ok := normalize.ObservedString(value)
+	if !ok {
+		return "unknown"
+	}
+	switch strings.ToLower(strings.TrimSpace(decision)) {
+	case "accept", "accepted", "approve", "approved", "allow", "allowed":
+		return "approved"
+	case "reject", "rejected", "deny", "denied", "abort", "aborted", "blocked":
+		return "denied"
+	default:
+		return decision
+	}
+}
+
+// toolDecisionFieldKeys are the wire fields preserved verbatim under
+// provider_extensions.tool_decision. tool_parameters is deliberately excluded —
+// it carries gated content (full commands, MCP server/tool names) and is dropped
+// at the wire boundary by NormalizeLogs (logs.go droppedKeys).
+func toolDecisionFieldKeys() []string {
+	return []string{"decision", "source", "tool_name", "tool_source", "tool_use_id"}
 }
 
 // attachSkillDetection stamps explicit skill identity on skill_activated events.
@@ -211,10 +295,28 @@ func firstString(raw map[string]any, keys ...string) string {
 
 func promotedEventFields(eventName string) []string {
 	fields := []string{"event_name", "event_timestamp", "event_sequence", "session_id", "request_id"}
-	if eventName == eventSkillActivated {
+	switch eventName {
+	case eventSkillActivated:
 		return append(fields, "skill.name", "skill_name", "skill.status", "skill_status", "invocation_trigger", "skill.source", "skill_source")
+	case eventToolDecision:
+		// The decision fields are promoted verbatim into
+		// provider_extensions.tool_decision, so they must not double-echo under
+		// provider_extensions.event.
+		return append(fields, "decision", "source", "tool_name", "tool_source", "tool_use_id")
 	}
 	return fields
+}
+
+// gatedEventFields carry content that must never surface under
+// provider_extensions.event, whatever the event type. tool_parameters holds the
+// full command and MCP server/tool names (present under OTEL_LOG_TOOL_DETAILS=1);
+// NormalizeLogs drops it at the wire boundary (logs.go droppedKeys), and it is
+// dropped from the event echo here too — NormalizeEvents replays reviewed
+// fixtures whose validator does not prohibit this key, so this is the
+// defence-in-depth that makes "gated content never surfaces" hold on both paths
+// (epic #87 keeps behaviour, not command bodies).
+func gatedEventFields() []string {
+	return []string{"tool_parameters"}
 }
 
 // unavailableFields lists the behaviour signals a Claude Code event does not
@@ -224,17 +326,26 @@ func promotedEventFields(eventName string) []string {
 // skill_activated via skill_detection — it is never listed as unavailable on
 // other events just because those events are not skill events.
 func unavailableFields(eventName string) []string {
-	common := []string{"tool_calls", "mcp_calls", "file_operations", "reasoning_tokens", "repository_context", "prompt_content", "response_content", "provider_cost", "trace_span_correlation"}
+	common := []string{"tool_calls", "mcp_calls", "file_operations", "reasoning_tokens", "repository_context", "prompt_content", "response_content", "provider_cost", "trace_span_correlation", "approvals"}
 	switch eventName {
 	case eventAPIRequest, eventAPIError:
-		// Provider-completion outcome contracts are stamped for these events.
+		// Provider-completion outcome contracts are stamped for these events;
+		// neither carries a permission decision, so approvals stays unavailable.
 		return common
 	case eventToolResult:
 		// tool_result is the first real evidence of an executed tool call, so
 		// tool_calls is not unavailable here; the typed tool-call signal is
-		// promoted into canonical.Operation by ExtractOperations. The event
-		// carries no model/token identity of its own.
-		return []string{"model", "token_usage", "cache_usage", "task_outcome", "mcp_calls", "file_operations", "reasoning_tokens", "repository_context", "prompt_content", "response_content", "provider_cost", "trace_span_correlation"}
+		// promoted into canonical.Operation by ExtractOperations. It carries no
+		// canonical approval attributes (its decision_type is always accept — the
+		// authoritative grant/denial is tool_decision), so approvals stays
+		// unavailable. The event carries no model/token identity of its own.
+		return []string{"model", "token_usage", "cache_usage", "task_outcome", "approvals", "mcp_calls", "file_operations", "reasoning_tokens", "repository_context", "prompt_content", "response_content", "provider_cost", "trace_span_correlation"}
+	case eventToolDecision:
+		// tool_decision is the authoritative permission grant/denial signal, so
+		// approvals is available (removed) here; the decision references a tool
+		// but is not evidence of an executed call, so tool_calls stays
+		// unavailable. It carries no model/token identity of its own.
+		return []string{"model", "token_usage", "cache_usage", "task_outcome", "tool_calls", "mcp_calls", "file_operations", "reasoning_tokens", "repository_context", "prompt_content", "response_content", "provider_cost", "trace_span_correlation"}
 	default:
 		return append([]string{"model", "token_usage", "cache_usage", "task_outcome"}, common...)
 	}

@@ -366,28 +366,58 @@ func (errStub) ListSessions(context.Context, storage.SessionFilter) ([]canonical
 	return nil, context.DeadlineExceeded
 }
 
-func TestTimelineRendersCodexToolDecisionApproval(t *testing.T) {
+func TestTimelineRendersToolDecisionApprovals(t *testing.T) {
 	now := time.Now().UTC()
-	repo := &fullStub{
-		sessions: []canonical.Session{syntheticSession("decision-session", now)},
-		events: map[string][]canonical.Event{
-			"decision-session": {{
-				EventID:    "decision-event",
-				EventType:  "codex.tool_decision",
-				SessionID:  "decision-session",
-				OccurredAt: now,
-				ReceivedAt: now,
-				Provider:   "openai",
-				Tool:       "codex",
-				Attributes: map[string]any{
-					"approval_decision":     "approved",
-					"approval_reason_class": "policy",
-					"tool_namespace":        "functions",
-					"tool_name":             "exec_command",
-					"unavailable_fields":    []string{"tool_calls"},
-				},
-			}},
+	// Flat cases avoid Sonar CPD pairing near-identical Event/map literals.
+	cases := []struct {
+		name, sessionID, eventID, eventType, provider, tool      string
+		decision, reason, qualifierKey, qualifierValue, toolName string
+		wantToolLabel                                            string
+		extraWants                                               []string
+	}{
+		{
+			name: "codex uses tool_namespace qualifier", sessionID: "decision-session",
+			eventID: "decision-event", eventType: "codex.tool_decision", provider: "openai", tool: "codex",
+			decision: "approved", reason: "policy", qualifierKey: "tool_namespace", qualifierValue: "functions",
+			toolName: "exec_command", wantToolLabel: "functions/exec_command",
 		},
+		{
+			name: "claude uses tool_source qualifier", sessionID: "claude-decision-session",
+			eventID: "claude-code:claude-decision-session:28", eventType: "tool_decision", provider: "anthropic", tool: "claude-code",
+			decision: "denied", reason: "hook", qualifierKey: "tool_source", qualifierValue: "builtin",
+			toolName: "Bash", wantToolLabel: "builtin/Bash",
+			extraWants: []string{"Tool decision"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			attrs := map[string]any{
+				"approval_decision":     tc.decision,
+				"approval_reason_class": tc.reason,
+				tc.qualifierKey:         tc.qualifierValue,
+				"tool_name":             tc.toolName,
+				"unavailable_fields":    []string{"tool_calls"},
+			}
+			event := canonical.Event{
+				EventID: tc.eventID, EventType: tc.eventType, SessionID: tc.sessionID,
+				OccurredAt: now, ReceivedAt: now, Provider: tc.provider, Tool: tc.tool,
+				Attributes: attrs,
+			}
+			want := append([]string{"Approval", tc.decision, "Reason", tc.reason, "Tool", tc.wantToolLabel}, tc.extraWants...)
+			assertTimelineContains(t, tc.sessionID, event, want...)
+		})
+	}
+}
+
+func assertTimelineContains(t *testing.T, sessionID string, event canonical.Event, want ...string) {
+	t.Helper()
+	now := event.OccurredAt
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	repo := &fullStub{
+		sessions: []canonical.Session{syntheticSession(sessionID, now)},
+		events:   map[string][]canonical.Event{sessionID: {event}},
 	}
 	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
 	if err != nil {
@@ -395,10 +425,10 @@ func TestTimelineRendersCodexToolDecisionApproval(t *testing.T) {
 	}
 	handler := server.Wrap(http.NotFoundHandler())
 	cookie := unlock(t, handler)
-	body := getAuthed(t, handler, cookie, "/sessions/decision-session").Body.String()
-	for _, want := range []string{"Approval", "approved", "Reason", "policy", "Tool", "functions/exec_command"} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("tool decision timeline missing %q in body: %q", want, body)
+	body := getAuthed(t, handler, cookie, "/sessions/"+sessionID).Body.String()
+	for _, fragment := range want {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("timeline missing %q in body: %q", fragment, body)
 		}
 	}
 }

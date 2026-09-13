@@ -29,7 +29,8 @@
         "prompt_content",
         "response_content",
         "provider_cost",
-        "trace_span_correlation"
+        "trace_span_correlation",
+        "approvals"
       ]
     },
     "provider_extensions": {

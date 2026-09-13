@@ -8,6 +8,9 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
 func TestNormalizeEventsGolden(t *testing.T) {
@@ -180,6 +183,23 @@ func writeGolden(t *testing.T, name string, value any) {
 func readFixture(t *testing.T, name string) []byte {
 	t.Helper()
 	return readFile(t, filepath.Join(repositoryRoot(t), "fixtures", "claude", "observed-sanitised", name))
+}
+
+// normalizeObservedOTLPLogs unwraps a reviewed observed-sanitised fixture and
+// runs its raw OTLP payload through NormalizeLogs.
+func normalizeObservedOTLPLogs(t *testing.T, name string) []canonical.Event {
+	t.Helper()
+	var wrapper struct {
+		Payload json.RawMessage `json:"payload"`
+	}
+	if err := json.Unmarshal(readFixture(t, name), &wrapper); err != nil {
+		t.Fatalf("decode fixture: %v", err)
+	}
+	events, err := NormalizeLogs([]byte(wrapper.Payload), time.Unix(0, 0).UTC())
+	if err != nil {
+		t.Fatalf("normalise: %v", err)
+	}
+	return events
 }
 
 func readGolden(t *testing.T, name string) []byte {

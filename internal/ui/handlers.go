@@ -604,7 +604,7 @@ func (s *Server) loadTimeline(r *http.Request, sessionID, cursorRaw string) ([]t
 			ReasoningTokens:   tokenValue(event.Attributes["reasoning_token_count"]),
 			ApprovalDecision:  attrString(event.Attributes["approval_decision"]),
 			ApprovalReason:    attrString(event.Attributes["approval_reason_class"]),
-			ApprovalTool:      approvalToolLabel(event.Attributes["tool_namespace"], event.Attributes["tool_name"]),
+			ApprovalTool:      approvalToolLabel(approvalToolQualifier(event.Attributes), event.Attributes["tool_name"]),
 			UnavailableFields: fieldLabels(unavailableFields(event.Attributes["unavailable_fields"])),
 		}
 	}
@@ -654,6 +654,17 @@ func attrString(value any) string {
 	default:
 		return statusLabel("unavailable")
 	}
+}
+
+// approvalToolQualifier returns the value that qualifies the approved/denied
+// tool label: Codex reports tool_namespace (e.g. "functions"), Claude reports
+// tool_source (builtin/mcp). Whichever is present is used, so the origin of the
+// tool stays visible in the timeline across providers.
+func approvalToolQualifier(attributes map[string]any) any {
+	if namespace, ok := attributes["tool_namespace"].(string); ok && strings.TrimSpace(namespace) != "" {
+		return namespace
+	}
+	return attributes["tool_source"]
 }
 
 func approvalToolLabel(namespace, name any) string {
@@ -761,6 +772,8 @@ func eventTitle(eventType string) string {
 		return "Operation"
 	case "mcp_server_connection":
 		return "MCP server connection"
+	case "tool_decision", "codex.tool_decision":
+		return "Tool decision"
 	case "skill_invocation":
 		return "Skill invocation"
 	case "assistant_message":

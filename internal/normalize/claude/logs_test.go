@@ -126,16 +126,7 @@ func requireConnectionExtensions(t *testing.T, events []canonical.Event) map[str
 }
 
 func TestNormalizeLogsRecognisesToolResultEvent(t *testing.T) {
-	var wrapper struct {
-		Payload json.RawMessage `json:"payload"`
-	}
-	if err := json.Unmarshal(readFixture(t, "claude-code-2.1.263-tool-result-otlp.json"), &wrapper); err != nil {
-		t.Fatalf("decode fixture: %v", err)
-	}
-	events, err := NormalizeLogs([]byte(wrapper.Payload), time.Unix(0, 0).UTC())
-	if err != nil {
-		t.Fatalf("normalise: %v", err)
-	}
+	events := normalizeObservedOTLPLogs(t, "claude-code-2.1.263-tool-result-otlp.json")
 	if len(events) != 3 {
 		t.Fatalf("expected 3 tool_result events, got %d", len(events))
 	}

@@ -34,6 +34,7 @@ type timelineEvent struct {
 	ApprovalReasonClass   *string  `json:"approval_reason_class"`
 	ToolName              *string  `json:"tool_name"`
 	ToolNamespace         *string  `json:"tool_namespace"`
+	ToolSource            *string  `json:"tool_source"`
 	UnavailableFields     []string `json:"unavailable_fields"`
 }
 
@@ -132,7 +133,7 @@ func publicTimelineEvent(event canonical.Event) timelineEvent {
 		CachedInputTokenCount: optionalString(event.Attributes["cached_input_token_count"]), ReasoningTokenCount: optionalString(event.Attributes["reasoning_token_count"]),
 		OperationID: optionalString(event.Attributes["operation_id"]), Category: optionalString(event.Attributes["category"]), Outcome: optionalString(event.Attributes["outcome"]), DurationMs: optionalString(event.Attributes["duration_ms"]),
 		ApprovalID: optionalString(event.Attributes["approval_id"]), ApprovalDecision: optionalString(event.Attributes["approval_decision"]), ApprovalReasonClass: optionalString(event.Attributes["approval_reason_class"]),
-		ToolName: optionalString(event.Attributes["tool_name"]), ToolNamespace: optionalString(event.Attributes["tool_namespace"]),
+		ToolName: optionalString(event.Attributes["tool_name"]), ToolNamespace: optionalString(event.Attributes["tool_namespace"]), ToolSource: optionalString(event.Attributes["tool_source"]),
 		UnavailableFields: unavailableFields(event.Attributes["unavailable_fields"]),
 	}
 }
