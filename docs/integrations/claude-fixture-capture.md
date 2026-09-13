@@ -163,6 +163,53 @@ Committed evidence:
 - `fixtures/claude/expected/claude-code-2.1.269-session-transcript.events.json`
   (golden canonical `assistant_message` events)
 
+## Tool-decision capture
+
+To raise Approval / permission decisions above `unknown`, capture `tool_decision`
+events covering both a grant and a denial, from more than one `source`. The
+denial is the point of the exercise — `tool_result.decision_type` is always
+`accept`, so a reject shows up only on `tool_decision`.
+
+Run a non-interactive session against a loopback OTLP logs sink with tool details
+on, in an isolated throwaway workspace:
+
+```bash
+# Project .claude/settings.json in the throwaway workspace (project settings
+# override the user's ~/.claude env, so telemetry goes to the local sink, and
+# the deny hooks are honoured even when the workspace is untrusted):
+#   env: {
+#     CLAUDE_CODE_ENABLE_TELEMETRY:"1", OTEL_LOGS_EXPORTER:"otlp",
+#     OTEL_EXPORTER_OTLP_PROTOCOL:"http/json",
+#     OTEL_EXPORTER_OTLP_ENDPOINT:"http://127.0.0.1:4318",
+#     OTEL_LOG_TOOL_DETAILS:"1"
+#   }
+#   permissions.allow: ["Read"]            # → accept, source:config
+#   hooks.PreToolUse: deny Bash and an MCP tool  # → reject, source:hook
+claude -p '<prompt that reads a file, runs a bash command, and calls an MCP tool>'
+```
+
+Notes learned from the live capture (2.1.270):
+
+- A config **allow** yields `decision:accept`, `source:config`. A config **deny**
+  removes the tool entirely and emits *no* decision event — use a `PreToolUse`
+  deny **hook** (`permissionDecision:"deny"`) to get `decision:reject`,
+  `source:hook`. Deny hooks are honoured even in an untrusted workspace, whereas
+  `permissions.allow` entries are ignored there.
+- `tool_source` is `builtin` or `mcp`. The MCP server/tool names live *only* inside
+  the gated `tool_parameters` attribute (present under `OTEL_LOG_TOOL_DETAILS=1`),
+  which `NormalizeLogs` drops — so do **not** reproduce real `tool_parameters` in
+  the reviewed wrapper. The `-otlp` fixture carries a short synthetic
+  `tool_parameters` canary purely to prove the drop; the reviewed wrapper omits it.
+
+Committed evidence:
+
+- `fixtures/claude/observed-sanitised/claude-code-2.1.270-tool-decision.json`
+  (reviewed wrapper: one config-allow, two hook-denials — builtin and mcp)
+- `fixtures/claude/observed-sanitised/claude-code-2.1.270-tool-decision-otlp.json`
+  (raw OTLP wire shape, with `prompt.id` and `tool_parameters` drop canaries)
+- `fixtures/claude/expected/claude-code-2.1.270-tool-decision.events.json`
+  (golden canonical approval events)
+
 ## Validation
 
 The validator rejects missing origin or tool-version metadata, prohibited field

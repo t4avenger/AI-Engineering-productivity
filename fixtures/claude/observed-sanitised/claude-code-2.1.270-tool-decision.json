@@ -1,0 +1,60 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.270",
+  "captured_at": "2026-09-13T18:53:00Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "source_type": "otlp_http_json_logs",
+    "capture": {
+      "workspace": "isolated_tmp",
+      "telemetry_endpoint": "loopback_dump_receiver",
+      "outcome_signal": "tool_decision",
+      "note": "tool_decision is the only signal that reports a reject: an allow came from config (source:config), both denials came from PreToolUse hooks (source:hook). tool_source distinguishes builtin from mcp. The gated tool_parameters attribute (full command / MCP server+tool names) is present on the wire under OTEL_LOG_TOOL_DETAILS=1 and is dropped at ingest (see the -otlp fixture); it is not reproduced here."
+    },
+    "observations": [
+      {
+        "name": "approvals",
+        "state": "supported",
+        "evidence": "tool_decision carries decision/source/tool_name/tool_source/tool_use_id and maps to a canonical.Event approval signal (approved/denied). Reject decisions appear only on this event; tool_result.decision_type is always accept."
+      }
+    ],
+    "sample_events": [
+      {
+        "event_name": "tool_decision",
+        "session_id": "synthetic-decision-session",
+        "event_timestamp": "2026-09-13T18:53:10.354Z",
+        "event_sequence": 14,
+        "decision": "accept",
+        "source": "config",
+        "tool_name": "Read",
+        "tool_source": "builtin",
+        "tool_use_id": "toolu_synthetic_read"
+      },
+      {
+        "event_name": "tool_decision",
+        "session_id": "synthetic-decision-session",
+        "event_timestamp": "2026-09-13T18:53:13.229Z",
+        "event_sequence": 22,
+        "decision": "reject",
+        "source": "hook",
+        "tool_name": "mcp_tool",
+        "tool_source": "mcp",
+        "tool_use_id": "toolu_synthetic_mcp"
+      },
+      {
+        "event_name": "tool_decision",
+        "session_id": "synthetic-decision-session",
+        "event_timestamp": "2026-09-13T18:53:17.908Z",
+        "event_sequence": 28,
+        "decision": "reject",
+        "source": "hook",
+        "tool_name": "Bash",
+        "tool_source": "builtin",
+        "tool_use_id": "toolu_synthetic_bash"
+      }
+    ]
+  }
+}

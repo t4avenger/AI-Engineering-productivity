@@ -39,6 +39,44 @@ confidence are stored under `provider_extensions.correlation`. Safe fields outsi
 the mapped set survive verbatim under `provider_extensions.event`, minus the
 promoted identifiers.
 
+### Tool-decision approval signals
+
+The `tool_decision` event is the only Claude signal that reports a permission
+**grant or denial**, together with its source. Reject decisions appear *only*
+here — the `tool_result` event's `decision_type` is always `accept` — so without
+this event a denied tool call is invisible. `attachToolDecision`
+(`internal/normalize/claude/normalizer.go`) stamps, on `tool_decision` events only:
+
+- `attributes.approval_id` = `claude-code:<session_id>:approval:<tool_use_id>`. This
+  shares the `tool_use_id` key with the E5 operation id
+  (`…:tool:<tool_use_id>`), so a decision correlates to its result.
+- `attributes.approval_decision` = the wire `decision` normalised onto the
+  cross-provider `approved`/`denied` vocabulary (matching Codex):
+  `accept`→`approved`, `reject`→`denied`. A missing `decision` is reported as
+  `unknown` and is **never** inferred from any other signal; an unrecognised value
+  passes through verbatim.
+- `attributes.approval_reason_class` = the wire `source`
+  (`config` / `hook` / `user_permanent` / `user_temporary` / `user_abort` /
+  `user_reject`).
+- `attributes.tool_name`, `attributes.tool_source` (`builtin` / `mcp`).
+- `provider_extensions.tool_decision` preserves the raw wire fields verbatim
+  (`decision`, `source`, `tool_name`, `tool_source`, `tool_use_id`), with the
+  untouched decision under `raw_decision` and `provenance: "observed"` — nothing is
+  hidden (epic #87). These fields are excluded from `provider_extensions.event` so
+  they are not double-echoed.
+
+`unavailable_fields` on a `tool_decision` event drops `approvals` (the decision is
+the authoritative approval signal) while keeping `tool_calls` unavailable — a
+decision references a tool but is not evidence of an executed call. Every other
+event lists `approvals` as unavailable, so the capability is explicit per event.
+
+The gated `tool_parameters` attribute — which under `OTEL_LOG_TOOL_DETAILS=1`
+carries the full command and MCP server/tool names — is dropped at the wire
+boundary by `NormalizeLogs` (`logs.go` `droppedKeys`) and never reaches
+`provider_extensions`; the reviewed-wrapper fixture omits it entirely. Extracting
+the MCP server/tool identity from that gated blob is deferred to a follow-up
+(the reject/`mcp` decision here classifies only `tool_source: mcp`).
+
 ## Model-interaction records — `ExtractModelInteractions`
 
 Only `api_request` events become a `canonical.ModelInteraction`. Executed tool

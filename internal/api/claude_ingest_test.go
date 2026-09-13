@@ -42,7 +42,18 @@ const rawClaudeOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
      {"key":"request_id","value":{"stringValue":"synthetic-request"}},
      {"key":"model","value":{"stringValue":"claude-opus-4-8"}},
      {"key":"input_tokens","value":{"intValue":"1200"}},
-     {"key":"output_tokens","value":{"intValue":"340"}}]}]}]}]}`
+     {"key":"output_tokens","value":{"intValue":"340"}}]},
+   {"attributes":[
+     {"key":"event.name","value":{"stringValue":"tool_decision"}},
+     {"key":"event.timestamp","value":{"stringValue":"2026-09-06T08:40:02.000Z"}},
+     {"key":"event.sequence","value":{"intValue":"11"}},
+     {"key":"session.id","value":{"stringValue":"tiq-canary-session"}},
+     {"key":"decision","value":{"stringValue":"reject"}},
+     {"key":"source","value":{"stringValue":"hook"}},
+     {"key":"tool_name","value":{"stringValue":"Bash"}},
+     {"key":"tool_source","value":{"stringValue":"builtin"}},
+     {"key":"tool_use_id","value":{"stringValue":"toolu_canary_decision"}},
+     {"key":"tool_parameters","value":{"stringValue":"tiq-canary-gated-params"}}]}]}]}]}`
 
 // TestClaudeLogsIngestEndToEnd is the end-to-end gate the reorientation roadmap
 // never had: it POSTs a raw Claude Code OTLP log payload to the live /v1/logs
@@ -62,9 +73,10 @@ func TestClaudeLogsIngestEndToEnd(t *testing.T) {
 		t.Fatalf("server name missing from MCP inventory: %#v", inventory.Data.Servers)
 	}
 
-	// Sensitive identifiers still do not survive the round trip through the read API.
+	// Sensitive identifiers — including the gated tool_decision tool_parameters
+	// (full command / MCP names on the wire) — do not survive the round trip.
 	assertNoRawIdentifiers(t,
-		[]string{"tiq-canary@example.test", "tiq-canary-api-key"},
+		[]string{"tiq-canary@example.test", "tiq-canary-api-key", "tiq-canary-gated-params"},
 		marshalJSON(t, sessions), marshalJSON(t, inventory))
 }
 

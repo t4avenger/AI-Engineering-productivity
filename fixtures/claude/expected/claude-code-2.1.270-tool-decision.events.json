@@ -1,0 +1,182 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:synthetic-decision-session:14",
+    "event_type": "tool_decision",
+    "occurred_at": "2026-09-13T18:53:10.354Z",
+    "received_at": "2026-09-13T18:53:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.270",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:synthetic-decision-session",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "approval_decision": "approved",
+      "approval_id": "claude-code:synthetic-decision-session:approval:toolu_synthetic_read",
+      "approval_reason_class": "config",
+      "tool_name": "Read",
+      "tool_source": "builtin",
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:synthetic-decision-session:14",
+        "ordering_key": "01789325590354000000:claude-code:synthetic-decision-session:14",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "event": {},
+      "tool_decision": {
+        "approval_id": "claude-code:synthetic-decision-session:approval:toolu_synthetic_read",
+        "decision": "approved",
+        "provenance": "observed",
+        "raw_decision": "accept",
+        "source": "config",
+        "tool_name": "Read",
+        "tool_source": "builtin",
+        "tool_use_id": "toolu_synthetic_read"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:synthetic-decision-session:22",
+    "event_type": "tool_decision",
+    "occurred_at": "2026-09-13T18:53:13.229Z",
+    "received_at": "2026-09-13T18:53:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.270",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:synthetic-decision-session",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "approval_decision": "denied",
+      "approval_id": "claude-code:synthetic-decision-session:approval:toolu_synthetic_mcp",
+      "approval_reason_class": "hook",
+      "tool_name": "mcp_tool",
+      "tool_source": "mcp",
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:synthetic-decision-session:22",
+        "ordering_key": "01789325593229000000:claude-code:synthetic-decision-session:22",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "event": {},
+      "tool_decision": {
+        "approval_id": "claude-code:synthetic-decision-session:approval:toolu_synthetic_mcp",
+        "decision": "denied",
+        "provenance": "observed",
+        "raw_decision": "reject",
+        "source": "hook",
+        "tool_name": "mcp_tool",
+        "tool_source": "mcp",
+        "tool_use_id": "toolu_synthetic_mcp"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:synthetic-decision-session:28",
+    "event_type": "tool_decision",
+    "occurred_at": "2026-09-13T18:53:17.908Z",
+    "received_at": "2026-09-13T18:53:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.270",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:synthetic-decision-session",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "approval_decision": "denied",
+      "approval_id": "claude-code:synthetic-decision-session:approval:toolu_synthetic_bash",
+      "approval_reason_class": "hook",
+      "tool_name": "Bash",
+      "tool_source": "builtin",
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:synthetic-decision-session:28",
+        "ordering_key": "01789325597908000000:claude-code:synthetic-decision-session:28",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "event": {},
+      "tool_decision": {
+        "approval_id": "claude-code:synthetic-decision-session:approval:toolu_synthetic_bash",
+        "decision": "denied",
+        "provenance": "observed",
+        "raw_decision": "reject",
+        "source": "hook",
+        "tool_name": "Bash",
+        "tool_source": "builtin",
+        "tool_use_id": "toolu_synthetic_bash"
+      }
+    }
+  }
+]
