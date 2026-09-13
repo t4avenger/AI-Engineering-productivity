@@ -92,7 +92,7 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 
 	extensions := map[string]any{
 		"correlation": eventCorrelation(eventID, occurredAt),
-		"event":       normalize.UnknownFields(raw, promotedEventFields(name)...),
+		"event":       normalize.UnknownFields(raw, append(promotedEventFields(name), gatedEventFields()...)...),
 	}
 	if requestID := normalize.OptionalString(raw, "request_id"); requestID != nil {
 		extensions["request_id"] = nativeSessionPrefix + *requestID
@@ -100,7 +100,7 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 	attributes := map[string]any{"unavailable_fields": unavailableFields(name)}
 	attachSkillDetection(extensions, raw, name)
 	attachOutcomeContract(extensions, raw, name)
-	attachToolDecision(extensions, attributes, raw, name, nativeSessionID)
+	attachToolDecision(extensions, attributes, raw, name, nativeSessionID, eventID)
 	return canonical.Event{
 		SchemaVersion: canonicalSchemaVersion, EventID: eventID, EventType: name,
 		OccurredAt: occurredAt, ReceivedAt: capturedAt, Provider: provider, Tool: tool,
@@ -124,11 +124,14 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 // provider_extensions.tool_decision.raw_decision, so nothing is hidden (epic
 // #87). The approval_id shares the tool_use_id key with the E5 operation id
 // (...:tool:<tool_use_id>), so a decision correlates to its result.
-func attachToolDecision(extensions, attributes, raw map[string]any, eventName, nativeSessionID string) {
+func attachToolDecision(extensions, attributes, raw map[string]any, eventName, nativeSessionID, eventID string) {
 	if eventName != eventToolDecision {
 		return
 	}
-	approvalID := nativeSessionID + ":approval:" + unavailable
+	// Without a provider tool_use_id, fall back to the per-event ID (unique per
+	// session and sequence) rather than a constant literal, so two decisions that
+	// both lack a tool_use_id do not collapse onto one approval_id.
+	approvalID := eventID
 	if toolUseID, ok := normalize.ObservedString(raw["tool_use_id"]); ok {
 		approvalID = nativeSessionID + ":approval:" + toolUseID
 	}
@@ -304,6 +307,18 @@ func promotedEventFields(eventName string) []string {
 	return fields
 }
 
+// gatedEventFields carry content that must never surface under
+// provider_extensions.event, whatever the event type. tool_parameters holds the
+// full command and MCP server/tool names (present under OTEL_LOG_TOOL_DETAILS=1);
+// NormalizeLogs drops it at the wire boundary (logs.go droppedKeys), and it is
+// dropped from the event echo here too — NormalizeEvents replays reviewed
+// fixtures whose validator does not prohibit this key, so this is the
+// defence-in-depth that makes "gated content never surfaces" hold on both paths
+// (epic #87 keeps behaviour, not command bodies).
+func gatedEventFields() []string {
+	return []string{"tool_parameters"}
+}
+
 // unavailableFields lists the behaviour signals a Claude Code event does not
 // carry, so an absent signal is explicit rather than silently missing. The
 // api_request event carries model and token identity; the connection and
@@ -320,10 +335,11 @@ func unavailableFields(eventName string) []string {
 	case eventToolResult:
 		// tool_result is the first real evidence of an executed tool call, so
 		// tool_calls is not unavailable here; the typed tool-call signal is
-		// promoted into canonical.Operation by ExtractOperations. It carries
-		// decision_type/decision_source, so approvals is not listed here either.
-		// The event carries no model/token identity of its own.
-		return []string{"model", "token_usage", "cache_usage", "task_outcome", "mcp_calls", "file_operations", "reasoning_tokens", "repository_context", "prompt_content", "response_content", "provider_cost", "trace_span_correlation"}
+		// promoted into canonical.Operation by ExtractOperations. It carries no
+		// canonical approval attributes (its decision_type is always accept — the
+		// authoritative grant/denial is tool_decision), so approvals stays
+		// unavailable. The event carries no model/token identity of its own.
+		return []string{"model", "token_usage", "cache_usage", "task_outcome", "approvals", "mcp_calls", "file_operations", "reasoning_tokens", "repository_context", "prompt_content", "response_content", "provider_cost", "trace_span_correlation"}
 	case eventToolDecision:
 		// tool_decision is the authoritative permission grant/denial signal, so
 		// approvals is available (removed) here; the decision references a tool

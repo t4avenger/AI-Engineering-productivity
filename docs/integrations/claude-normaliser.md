@@ -59,11 +59,13 @@ this event a denied tool call is invisible. `attachToolDecision`
   (`config` / `hook` / `user_permanent` / `user_temporary` / `user_abort` /
   `user_reject`).
 - `attributes.tool_name`, `attributes.tool_source` (`builtin` / `mcp`).
-- `provider_extensions.tool_decision` preserves the raw wire fields verbatim
-  (`decision`, `source`, `tool_name`, `tool_source`, `tool_use_id`), with the
-  untouched decision under `raw_decision` and `provenance: "observed"` — nothing is
-  hidden (epic #87). These fields are excluded from `provider_extensions.event` so
-  they are not double-echoed.
+- `provider_extensions.tool_decision` carries `source`, `tool_name`, `tool_source`,
+  and `tool_use_id` verbatim, plus `provenance: "observed"`. Note the two decision
+  keys: `decision` holds the **normalised** `approved`/`denied` value (identical to
+  `attributes.approval_decision`), while `raw_decision` holds the **untouched** wire
+  value (`accept`/`reject`) — so a consumer can read either the canonical or the
+  original decision, and nothing is hidden (epic #87). These fields are excluded
+  from `provider_extensions.event` so they are not double-echoed.
 
 `unavailable_fields` on a `tool_decision` event drops `approvals` (the decision is
 the authoritative approval signal) while keeping `tool_calls` unavailable — a

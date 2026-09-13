@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -73,11 +74,28 @@ func TestClaudeLogsIngestEndToEnd(t *testing.T) {
 		t.Fatalf("server name missing from MCP inventory: %#v", inventory.Data.Servers)
 	}
 
+	// The tool_decision approval signal survives ingest→persist→serve on the
+	// read API, with the wire reject normalised to denied and builtin/mcp origin
+	// preserved via tool_source.
+	decision := requireToolDecisionEvent(t, server.URL, "claude-code:tiq-canary-session")
+	if got := stringValue(decision.ApprovalDecision); got != "denied" {
+		t.Fatalf("approval_decision = %q, want denied", got)
+	}
+	if got := stringValue(decision.ApprovalReasonClass); got != "hook" {
+		t.Fatalf("approval_reason_class = %q, want hook", got)
+	}
+	if got := stringValue(decision.ToolName); got != "Bash" {
+		t.Fatalf("tool_name = %q, want Bash", got)
+	}
+	if got := stringValue(decision.ToolSource); got != "builtin" {
+		t.Fatalf("tool_source = %q, want builtin", got)
+	}
+
 	// Sensitive identifiers — including the gated tool_decision tool_parameters
 	// (full command / MCP names on the wire) — do not survive the round trip.
 	assertNoRawIdentifiers(t,
 		[]string{"tiq-canary@example.test", "tiq-canary-api-key", "tiq-canary-gated-params"},
-		marshalJSON(t, sessions), marshalJSON(t, inventory))
+		marshalJSON(t, sessions), marshalJSON(t, inventory), marshalJSON(t, decision))
 }
 
 // newPersistentTestServer starts a live persistent daemon backed by an in-memory
@@ -123,6 +141,28 @@ func requireClaudeSession(t *testing.T, repository storage.Repository) []canonic
 		t.Fatalf("session id = %q, want native provider ID", sessions[0].SessionID)
 	}
 	return sessions
+}
+
+// requireToolDecisionEvent reads a session's event timeline through the live
+// HTTP read API and returns its single tool_decision event.
+func requireToolDecisionEvent(t *testing.T, baseURL, sessionID string) timelineEvent {
+	t.Helper()
+	response := getInsightJSON[eventListResponse](t, baseURL+"/api/v1/sessions/"+url.PathEscape(sessionID)+"/events")
+	for _, event := range response.Data {
+		if event.EventType == "tool_decision" {
+			return event
+		}
+	}
+	t.Fatalf("no tool_decision event in timeline: %#v", response.Data)
+	return timelineEvent{}
+}
+
+// stringValue dereferences an optional read-API string field for comparison.
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 // fetchMCPInventory reads the MCP inventory through the live HTTP read API.

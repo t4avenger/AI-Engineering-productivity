@@ -380,6 +380,45 @@ func TestTimelineRendersCodexToolDecisionApproval(t *testing.T) {
 	}
 }
 
+func TestTimelineRendersClaudeToolDecisionApproval(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fullStub{
+		sessions: []canonical.Session{syntheticSession("claude-decision-session", now)},
+		events: map[string][]canonical.Event{
+			"claude-decision-session": {{
+				EventID:    "claude-code:claude-decision-session:28",
+				EventType:  "tool_decision",
+				SessionID:  "claude-decision-session",
+				OccurredAt: now,
+				ReceivedAt: now,
+				Provider:   "anthropic",
+				Tool:       "claude-code",
+				Attributes: map[string]any{
+					"approval_decision":     "denied",
+					"approval_reason_class": "hook",
+					"tool_source":           "builtin",
+					"tool_name":             "Bash",
+					"unavailable_fields":    []string{"tool_calls"},
+				},
+			}},
+		},
+	}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	body := getAuthed(t, handler, cookie, "/sessions/claude-decision-session").Body.String()
+	// Claude tool_decision (event type "tool_decision", not "codex.tool_decision")
+	// now renders the approval block, with builtin/mcp origin from tool_source.
+	for _, want := range []string{"Tool decision", "Approval", "denied", "Reason", "hook", "builtin/Bash"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("claude tool decision timeline missing %q in body: %q", want, body)
+		}
+	}
+}
+
 func TestTimelineInvalidTokenStringIsUnavailable(t *testing.T) {
 	now := time.Now().UTC()
 	repo := &fullStub{

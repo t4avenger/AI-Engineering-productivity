@@ -156,6 +156,70 @@ func TestNormalizeLogsToolDecisionUnknownIsNeverInferred(t *testing.T) {
 	}
 }
 
+// TestNormalizeEventsDropsGatedToolParameters proves gated content never
+// surfaces on the reviewed-fixture path either: a sample event carrying
+// tool_parameters (which the fixture validator does not prohibit) must not echo
+// it under provider_extensions.event.
+func TestNormalizeEventsDropsGatedToolParameters(t *testing.T) {
+	fixture := `{"fixture_version":1,"fixture_origin":"observed-sanitised","provider":"anthropic","tool":"claude-code","tool_version":"2.1.270","captured_at":"2026-09-13T18:53:00Z","sanitisation_reviewed":true,"payload":{"source_type":"otlp_http_json_logs","sample_events":[{"event_name":"tool_decision","session_id":"synthetic-decision-session","event_timestamp":"2026-09-13T18:53:10.354Z","event_sequence":14,"decision":"reject","source":"hook","tool_name":"Bash","tool_source":"builtin","tool_use_id":"toolu_synthetic_bash","tool_parameters":"{\"canary\":\"drop-me\"}"}]}}`
+	events, err := NormalizeEvents([]byte(fixture))
+	if err != nil {
+		t.Fatalf("normalise: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+	serialized, err := json.Marshal(events)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	for _, leaked := range []string{"tool_parameters", "drop-me"} {
+		if strings.Contains(string(serialized), leaked) {
+			t.Fatalf("gated content leaked through NormalizeEvents: %q", leaked)
+		}
+	}
+	echo, _ := events[0].ProviderExtensions["event"].(map[string]any)
+	if _, present := echo["tool_parameters"]; present {
+		t.Fatalf("tool_parameters must not echo under provider_extensions.event: %#v", echo)
+	}
+}
+
+// TestNormalizeLogsToolDecisionFallbackApprovalIDsAreUnique proves that two
+// decisions both lacking a tool_use_id do not collapse onto one approval_id: the
+// fallback is the per-event ID, unique per session and sequence.
+func TestNormalizeLogsToolDecisionFallbackApprovalIDsAreUnique(t *testing.T) {
+	record := func(sequence, ts string) string {
+		return `{"attributes":[
+		   {"key":"event.name","value":{"stringValue":"tool_decision"}},
+		   {"key":"event.timestamp","value":{"stringValue":"` + ts + `"}},
+		   {"key":"event.sequence","value":{"intValue":"` + sequence + `"}},
+		   {"key":"session.id","value":{"stringValue":"synthetic-decision-session"}},
+		   {"key":"decision","value":{"stringValue":"reject"}},
+		   {"key":"source","value":{"stringValue":"user_abort"}},
+		   {"key":"tool_name","value":{"stringValue":"Bash"}},
+		   {"key":"tool_source","value":{"stringValue":"builtin"}}]}`
+	}
+	payload := `{"resourceLogs":[{"resource":{"attributes":[
+	  {"key":"service.name","value":{"stringValue":"claude-code"}},
+	  {"key":"service.version","value":{"stringValue":"2.1.270"}}]},
+	 "scopeLogs":[{"logRecords":[` + record("30", "2026-09-13T18:53:20.000Z") + `,` + record("31", "2026-09-13T18:53:21.000Z") + `]}]}]}`
+	events, err := NormalizeLogs([]byte(payload), time.Unix(0, 0).UTC())
+	if err != nil {
+		t.Fatalf("normalise: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(events))
+	}
+	first := events[0].Attributes["approval_id"].(string)
+	second := events[1].Attributes["approval_id"].(string)
+	if first == second {
+		t.Fatalf("fallback approval_ids collided: %q", first)
+	}
+	if first != events[0].EventID || second != events[1].EventID {
+		t.Fatalf("fallback approval_id must be the per-event ID: %q/%q vs %q/%q", first, second, events[0].EventID, events[1].EventID)
+	}
+}
+
 // TestNormalizeLogsRecognisesToolDecisionEvent runs the raw OTLP capture through
 // the wire adapter and proves gated content is dropped: the tool_parameters
 // canary (full command / MCP server+tool names on the wire) and the prompt.id
