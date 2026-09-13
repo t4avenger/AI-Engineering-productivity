@@ -27,6 +27,7 @@ var ErrUnsupportedLogs = errors.New("unsupported Codex log payload")
 
 const (
 	codexEventNameKey        = "event.name"
+	codexServiceNameKey      = "service.name"
 	codexToolResultEvent     = "codex.tool_result"
 	codexSandboxOutcomeEvent = "codex.sandbox_outcome"
 	codexToolDecisionEvent   = "codex.tool_decision"
@@ -83,7 +84,7 @@ func NormalizeLogs(data []byte, receivedAt time.Time) ([]canonical.Event, error)
 
 func normalizeResourceLog(raw resourceLog, receivedAt time.Time) ([]canonical.Event, error) {
 	resource := attributes(raw.Resource.Attributes)
-	if !isCodexLogService(resource["service.name"]) {
+	if !isCodexLogService(resource[codexServiceNameKey]) {
 		return nil, nil
 	}
 	var events []canonical.Event
@@ -213,7 +214,7 @@ func attachCodexLifecycleSignal(attributes, extensions, resource, fields map[str
 			lifecycle["status"] = status
 		}
 	}
-	if entrypoint := codexEntrypoint(resource["service.name"]); entrypoint != "" {
+	if entrypoint := codexEntrypoint(resource[codexServiceNameKey]); entrypoint != "" {
 		attributes["entrypoint"] = entrypoint
 		lifecycle["entrypoint"] = entrypoint
 	}
@@ -361,7 +362,7 @@ func codexLogAttributes(fields map[string]any) map[string]any {
 }
 
 func codexLogResourceAttributes(_ string, resource map[string]any) map[string]any {
-	return allowedCodexAttributes(resource, "service.name", "service.version")
+	return allowedCodexAttributes(resource, codexServiceNameKey, "service.version")
 }
 
 func codexLifecycleEvent(eventName string) bool {
