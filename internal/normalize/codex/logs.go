@@ -125,7 +125,7 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 	return canonical.Event{SchemaVersion: canonicalSchemaVersion, EventID: id, EventType: eventName, OccurredAt: receivedAt.UTC(), ReceivedAt: receivedAt.UTC(), Provider: "openai", Tool: "codex", SourceSchema: sourceSchema, SourceVersion: stringValue(resource["service.version"], unavailable), ActorID: unavailable, DeviceID: unavailable, SessionID: sessionID, PrivacyLevel: "operational", Attributes: attributes, ProviderExtensions: extensions}, nil
 }
 
-func attachCodexLogTokenCounts(attributes map[string]any, fields map[string]any) {
+func attachCodexLogTokenCounts(attributes, fields map[string]any) {
 	for _, mapping := range []struct {
 		source, target string
 	}{
