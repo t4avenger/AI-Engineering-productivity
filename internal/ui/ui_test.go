@@ -21,11 +21,12 @@ var defaultContextWasteThresholds = insights.ContextWasteThresholds{
 }
 
 type fullStub struct {
-	sessions []canonical.Session
-	events   map[string][]canonical.Event
-	costs    []cost.Record
-	deleted  []string
-	cleared  bool
+	sessions   []canonical.Session
+	events     map[string][]canonical.Event
+	operations []canonical.Operation
+	costs      []cost.Record
+	deleted    []string
+	cleared    bool
 }
 
 func (s *fullStub) Session(_ context.Context, id string) (canonical.Session, bool, error) {
@@ -61,6 +62,10 @@ func (s *fullStub) DeleteAllSessions(context.Context) error {
 
 func (s *fullStub) ListEvents(_ context.Context, filter storage.EventFilter) ([]canonical.Event, error) {
 	return append([]canonical.Event(nil), s.events[filter.SessionID]...), nil
+}
+
+func (s *fullStub) ListOperations(context.Context, storage.OperationFilter) ([]canonical.Operation, error) {
+	return append([]canonical.Operation(nil), s.operations...), nil
 }
 
 func (s *fullStub) ListCostRecords(context.Context, string) ([]cost.Record, error) {
@@ -159,6 +164,19 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 				},
 			}},
 		},
+		operations: []canonical.Operation{{
+			SchemaVersion: canonical.RecordSchemaVersion,
+			OperationID:   "op-1",
+			SessionID:     "s1",
+			Provider:      "openai",
+			Tool:          "codex",
+			Category:      canonical.OperationCategoryShellCommand,
+			Outcome:       "success",
+			Provenance:    canonical.ProvenanceObserved,
+			ProviderExtensions: map[string]any{"tool_call": map[string]any{
+				"duration_ms": "92",
+			}},
+		}},
 		costs: []cost.Record{{
 			Currency: "USD",
 			Status:   "calculated",
@@ -189,6 +207,9 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 		{"/sessions/s1", "2 tokens"},
 		{"/insights", "MCP inventory"},
 		{"/insights", "Skill usage"},
+		{"/insights", "Operations"},
+		{"/insights", "shell command"},
+		{"/insights", "92 ms"},
 		{"/insights", "Model performance"},
 		{"/insights", "1234 ms"},
 		{"/insights", "Context pressure"},

@@ -62,6 +62,100 @@ export function codexOTLPLogs(model: string): string {
 }
 
 
+
+export function codexToolResultOTLPLogs(): string {
+  return JSON.stringify({
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'codex_exec' } },
+            { key: 'service.version', value: { stringValue: '0.153.4' } },
+          ],
+        },
+        scopeLogs: [
+          {
+            logRecords: [
+              {
+                attributes: [
+                  {
+                    key: 'event.name',
+                    value: { stringValue: 'codex.tool_result' },
+                  },
+                  {
+                    key: 'conversation.id',
+                    value: { stringValue: 'tiq-live-e2e-operation-codex' },
+                  },
+                  { key: 'tool_name', value: { stringValue: 'exec_command' } },
+                  { key: 'tool_namespace', value: { stringValue: 'functions' } },
+                  {
+                    key: 'call_id',
+                    value: { stringValue: 'tiq-live-e2e-operation-call' },
+                  },
+                  { key: 'duration_ms', value: { stringValue: '92' } },
+                  { key: 'success', value: { stringValue: 'true' } },
+                  {
+                    key: 'arguments',
+                    value: { stringValue: '--token=tiq-canary-live-operation' },
+                  },
+                ],
+                body: { stringValue: 'tiq-canary-live-operation-body' },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
+
+export function claudeToolResultOTLPLogs(): string {
+  return JSON.stringify({
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'claude-code' } },
+            { key: 'service.version', value: { stringValue: '2.1.263' } },
+          ],
+        },
+        scopeLogs: [
+          {
+            logRecords: [
+              {
+                attributes: [
+                  { key: 'event.name', value: { stringValue: 'tool_result' } },
+                  {
+                    key: 'event.timestamp',
+                    value: { stringValue: '2026-09-06T14:50:01Z' },
+                  },
+                  { key: 'event.sequence', value: { intValue: '11' } },
+                  {
+                    key: 'session.id',
+                    value: { stringValue: 'tiq-live-e2e-operation-claude' },
+                  },
+                  { key: 'tool_name', value: { stringValue: 'Bash' } },
+                  {
+                    key: 'tool_use_id',
+                    value: { stringValue: 'toolu_live_operation_bash' },
+                  },
+                  { key: 'duration_ms', value: { intValue: '1234' } },
+                  { key: 'success', value: { stringValue: 'true' } },
+                  {
+                    key: 'tool_input',
+                    value: { stringValue: 'tiq-canary-live-operation-input' },
+                  },
+                ],
+                body: { stringValue: 'tiq-canary-live-operation-claude-body' },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
+
 export function codexToolDecisionOTLPLogs(): string {
   return JSON.stringify({
     resourceLogs: [

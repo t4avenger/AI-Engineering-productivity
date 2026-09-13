@@ -64,6 +64,22 @@ type EventReader interface {
 	ListEvents(context.Context, EventFilter) ([]canonical.Event, error)
 }
 
+// OperationFilter constrains operation queries. Empty SessionID returns every
+// retained operation; callers that need a session-scoped view pass SessionID.
+type OperationFilter struct {
+	SessionID string
+}
+
+// OperationReader exposes retained stable-primitive operation records.
+type OperationReader interface {
+	ListOperations(context.Context, OperationFilter) ([]canonical.Operation, error)
+}
+
+// OperationWriter persists stable-primitive operation records.
+type OperationWriter interface {
+	SaveOperations(context.Context, []canonical.Operation) error
+}
+
 // CostReader returns calculation provenance without exposing raw intake data.
 type CostReader interface {
 	ListCostRecords(context.Context, string) ([]cost.Record, error)
@@ -71,9 +87,11 @@ type CostReader interface {
 
 type Repository interface {
 	SaveEvents(context.Context, []canonical.Event) error
+	OperationWriter
 	SessionReader
 	SessionDeleter
 	EventReader
+	OperationReader
 	CostReader
 	Close() error
 }

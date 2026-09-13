@@ -54,6 +54,7 @@ type Server struct {
 	sessions               storage.SessionReader
 	deleter                storage.SessionDeleter
 	events                 storage.EventReader
+	operations             storage.OperationReader
 	costs                  storage.CostReader
 	contextWasteThresholds insights.ContextWasteThresholds
 	templates              *template.Template
@@ -103,6 +104,7 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 	}
 	deleter, _ := sessions.(storage.SessionDeleter)
 	events, _ := sessions.(storage.EventReader)
+	operations, _ := sessions.(storage.OperationReader)
 	costs, _ := sessions.(storage.CostReader)
 	return &Server{
 		token:                  token,
@@ -110,6 +112,7 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 		sessions:               sessions,
 		deleter:                deleter,
 		events:                 events,
+		operations:             operations,
 		costs:                  costs,
 		contextWasteThresholds: contextWasteThresholds,
 		templates:              tmpl,

@@ -241,10 +241,16 @@ func rawPayload(payload map[string]json.RawMessage) ([]byte, error) {
 // rather than misattributed. The payload is normalised verbatim — no ingest-time
 // hiding is applied (epic #87).
 func (i *otlpHTTPIngest) persistLogs(request *http.Request, payload map[string]json.RawMessage) error {
-	return i.persistWithAdapters(request, payload,
-		adapterPass{fn: codex.NormalizeLogs, unsupported: codex.ErrUnsupportedLogs},
-		adapterPass{fn: claude.NormalizeLogs, unsupported: claude.ErrUnsupportedLogs},
-		adapterPass{fn: cursor.NormalizeLogs, unsupported: cursor.ErrUnsupportedLogs},
+	return i.persistWithLogAdapters(request, payload,
+		[]adapterPass{
+			{fn: codex.NormalizeLogs, unsupported: codex.ErrUnsupportedLogs},
+			{fn: claude.NormalizeLogs, unsupported: claude.ErrUnsupportedLogs},
+			{fn: cursor.NormalizeLogs, unsupported: cursor.ErrUnsupportedLogs},
+		},
+		[]operationAdapterPass{
+			{fn: codex.ExtractLogOperations, unsupported: codex.ErrUnsupportedLogs},
+			{fn: claude.ExtractLogOperations, unsupported: claude.ErrUnsupportedLogs},
+		},
 	)
 }
 
@@ -287,6 +293,38 @@ type adapterPass struct {
 	unsupported error
 }
 
+type operationAdapterPass struct {
+	fn          func([]byte, time.Time) ([]canonical.Operation, error)
+	unsupported error
+}
+
+func (i *otlpHTTPIngest) persistWithLogAdapters(request *http.Request, payload map[string]json.RawMessage, eventPasses []adapterPass, operationPasses []operationAdapterPass) error {
+	rawBytes, receivedAt, skip, err := i.beginPersist(payload)
+	if skip || err != nil {
+		return err
+	}
+	var events []canonical.Event
+	for _, pass := range eventPasses {
+		next, normErr := pass.fn(rawBytes, receivedAt)
+		if normErr != nil && !errors.Is(normErr, pass.unsupported) {
+			return fmt.Errorf("normalise: %w", normErr)
+		}
+		events = append(events, next...)
+	}
+	var operations []canonical.Operation
+	for _, pass := range operationPasses {
+		next, normErr := pass.fn(rawBytes, receivedAt)
+		if normErr != nil && !errors.Is(normErr, pass.unsupported) {
+			return fmt.Errorf("normalise: %w", normErr)
+		}
+		operations = append(operations, next...)
+	}
+	if err := i.savePersistedEvents(request, events); err != nil {
+		return err
+	}
+	return i.savePersistedOperations(request, operations)
+}
+
 func (i *otlpHTTPIngest) persistWithAdapters(request *http.Request, payload map[string]json.RawMessage, passes ...adapterPass) error {
 	rawBytes, receivedAt, skip, err := i.beginPersist(payload)
 	if skip || err != nil {
@@ -312,6 +350,16 @@ func (i *otlpHTTPIngest) beginPersist(payload map[string]json.RawMessage) ([]byt
 		return nil, time.Time{}, false, err
 	}
 	return rawBytes, time.Now().UTC(), false, nil
+}
+
+func (i *otlpHTTPIngest) savePersistedOperations(request *http.Request, operations []canonical.Operation) error {
+	if len(operations) == 0 {
+		return nil
+	}
+	if err := i.repository.SaveOperations(request.Context(), operations); err != nil {
+		return fmt.Errorf("persist: %w", err)
+	}
+	return nil
 }
 
 func (i *otlpHTTPIngest) savePersistedEvents(request *http.Request, events []canonical.Event) error {

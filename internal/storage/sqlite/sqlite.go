@@ -72,7 +72,7 @@ func (r *Repository) migrate(ctx context.Context) error {
 	_, err := r.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS events (event_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, occurred_at TEXT NOT NULL, event_json BLOB NOT NULL);
 CREATE INDEX IF NOT EXISTS events_session_occurred ON events(session_id, occurred_at, event_id);
-CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, session_json BLOB NOT NULL); CREATE TABLE IF NOT EXISTS cost_records (event_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, cost_json BLOB NOT NULL); CREATE INDEX IF NOT EXISTS cost_records_session ON cost_records(session_id);`)
+CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, session_json BLOB NOT NULL); CREATE TABLE IF NOT EXISTS cost_records (event_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, cost_json BLOB NOT NULL); CREATE INDEX IF NOT EXISTS cost_records_session ON cost_records(session_id); CREATE TABLE IF NOT EXISTS operations (session_id TEXT NOT NULL, operation_id TEXT NOT NULL, operation_json BLOB NOT NULL, PRIMARY KEY(session_id, operation_id)); CREATE INDEX IF NOT EXISTS operations_session ON operations(session_id);`)
 	if err != nil {
 		return fmt.Errorf("migrate database: %w", err)
 	}
@@ -84,6 +84,9 @@ CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, session_json B
 		return fmt.Errorf("record migration 2: %w", err)
 	}
 	if err := r.dropEventProvenance(ctx); err != nil {
+		return err
+	}
+	if err := r.ensureOperationsTable(ctx); err != nil {
 		return err
 	}
 	return nil
@@ -152,6 +155,25 @@ func (r *Repository) eventsHasProvenance(ctx context.Context) (bool, error) {
 	return false, rows.Err()
 }
 
+func (r *Repository) ensureOperationsTable(ctx context.Context) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin migration 4: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS operations (session_id TEXT NOT NULL, operation_id TEXT NOT NULL, operation_json BLOB NOT NULL, PRIMARY KEY(session_id, operation_id));
+CREATE INDEX IF NOT EXISTS operations_session ON operations(session_id);`); err != nil {
+		return fmt.Errorf("create operations table: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO schema_migrations(version) VALUES (4)"); err != nil {
+		return fmt.Errorf("record migration 4: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit migration 4: %w", err)
+	}
+	return nil
+}
+
 func (r *Repository) SaveEvents(ctx context.Context, events []canonical.Event) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -186,6 +208,27 @@ func (r *Repository) SaveEvents(ctx context.Context, events []canonical.Event) e
 	}
 	for id := range ids {
 		if err := r.rebuildSession(ctx, tx, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (r *Repository) SaveOperations(ctx context.Context, operations []canonical.Operation) error {
+	if len(operations) == 0 {
+		return nil
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, operation := range operations {
+		payload, err := json.Marshal(operation)
+		if err != nil {
+			return fmt.Errorf("marshal operation: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO operations(session_id,operation_id,operation_json) VALUES(?,?,?)", operation.SessionID, operation.OperationID, payload); err != nil {
 			return err
 		}
 	}
@@ -410,6 +453,34 @@ func decodeSessions(rows *sql.Rows, limit int) ([]canonical.Session, error) {
 }
 
 // ListCostRecords returns immutable, sanitised calculation provenance for a session.
+func (r *Repository) ListOperations(ctx context.Context, filter storage.OperationFilter) ([]canonical.Operation, error) {
+	query := "SELECT operation_json FROM operations"
+	args := []any{}
+	if filter.SessionID != "" {
+		query += " WHERE session_id=?"
+		args = append(args, filter.SessionID)
+	}
+	query += " ORDER BY session_id, operation_id"
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	operations := []canonical.Operation{}
+	for rows.Next() {
+		var data []byte
+		if err := rows.Scan(&data); err != nil {
+			return nil, err
+		}
+		var operation canonical.Operation
+		if err := json.Unmarshal(data, &operation); err != nil {
+			return nil, err
+		}
+		operations = append(operations, operation)
+	}
+	return operations, rows.Err()
+}
+
 func (r *Repository) ListCostRecords(ctx context.Context, sessionID string) ([]cost.Record, error) {
 	query := "SELECT cost_json FROM cost_records"
 	args := []any{}
@@ -445,6 +516,9 @@ func (r *Repository) DeleteSession(ctx context.Context, id string) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 	if _, err = tx.ExecContext(ctx, "DELETE FROM cost_records WHERE session_id=?", id); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM operations WHERE session_id=?", id); err != nil {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, "DELETE FROM events WHERE session_id=?", id); err != nil {

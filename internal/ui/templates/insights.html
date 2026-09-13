@@ -110,6 +110,63 @@
     {{end}}
   </section>
   <section>
+    <h2>Operations</h2>
+    <p>Executed tool-call records are counted only when retained canonical operation evidence exists.</p>
+    {{if .OperationErr}}
+    <p>{{.OperationErr}}</p>
+    {{else}}
+    <p>Total operations {{.Operations.Totals.TotalOperations}} · Duration samples {{.Operations.Totals.DurationObservedCount}} · Average duration {{formatMillis .Operations.Totals.AverageDurationMs}}</p>
+    {{if .Operations.Notes}}
+    <h3>Evidence notes</h3>
+    <ul>{{range .Operations.Notes}}<li>{{.}}</li>{{end}}</ul>
+    {{end}}
+    {{if .Operations.ByCategory}}
+    <section class="table-wrap" aria-label="Operation categories">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Category</th>
+            <th scope="col">Operations</th>
+            <th scope="col">Duration samples</th>
+            <th scope="col">Average duration</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Operations.ByCategory}}
+          <tr>
+            <td>{{.Category}}</td>
+            <td>{{.Count}} operations</td>
+            <td>{{.DurationObservedCount}} samples</td>
+            <td>{{formatMillis .AverageDurationMs}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </section>
+    <section class="table-wrap" aria-label="Operation outcomes">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Outcome</th>
+            <th scope="col">Operations</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Operations.ByOutcome}}
+          <tr>
+            <td>{{template "status-badge" .Outcome}}</td>
+            <td>{{.Count}} operations</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </section>
+    {{else}}
+    <p>No retained operation records yet. Tool-call timelines can appear before the stable operation store has evidence.</p>
+    {{end}}
+    {{end}}
+  </section>
+  <section>
     <h2>Model performance</h2>
     <p>Outcome-contract scorecards use provider-reported completion evidence, retry linkage, token totals, and latency where retained. Session lifecycle state is not used as a model outcome.</p>
     <p>Ranking available: {{if .ModelPerformance.RankingAvailable}}yes{{else}}no, sample size below the ranking guard{{end}}.</p>

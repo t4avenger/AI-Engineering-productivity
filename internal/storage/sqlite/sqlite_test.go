@@ -254,3 +254,48 @@ func TestEventTimelineReads(t *testing.T) {
 		t.Fatal("expected invalid limit")
 	}
 }
+
+func TestOperationsPersistIdempotentlyAndDeleteWithSessions(t *testing.T) {
+	repo, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = repo.Close() }()
+	ctx := context.Background()
+	operations := []canonical.Operation{{
+		SchemaVersion: canonical.RecordSchemaVersion,
+		OperationID:   "op-1",
+		SessionID:     "session-ops",
+		Provider:      "openai",
+		Tool:          "codex",
+		Category:      canonical.OperationCategoryShellCommand,
+		Outcome:       "success",
+		Provenance:    canonical.ProvenanceObserved,
+		ProviderExtensions: map[string]any{"tool_call": map[string]any{
+			"duration_ms": "92",
+		}},
+	}}
+	if err := repo.SaveOperations(ctx, operations); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SaveOperations(ctx, operations); err != nil {
+		t.Fatal(err)
+	}
+	got, err := repo.ListOperations(ctx, storage.OperationFilter{SessionID: "session-ops"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].OperationID != "op-1" {
+		t.Fatalf("operations = %#v", got)
+	}
+	if err := repo.DeleteSession(ctx, "session-ops"); err != nil {
+		t.Fatal(err)
+	}
+	got, err = repo.ListOperations(ctx, storage.OperationFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("operations after delete = %#v", got)
+	}
+}
