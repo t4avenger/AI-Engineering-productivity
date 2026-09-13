@@ -96,6 +96,10 @@ type timelineRow struct {
 	ApprovalDecision  string
 	ApprovalReason    string
 	ApprovalTool      string
+	LifecycleKind     string
+	LifecyclePhase    string
+	LifecycleStatus   string
+	Entrypoint        string
 	UnavailableFields []string
 }
 
@@ -605,6 +609,10 @@ func (s *Server) loadTimeline(r *http.Request, sessionID, cursorRaw string) ([]t
 			ApprovalDecision:  attrString(event.Attributes["approval_decision"]),
 			ApprovalReason:    attrString(event.Attributes["approval_reason_class"]),
 			ApprovalTool:      approvalToolLabel(approvalToolQualifier(event.Attributes), event.Attributes["tool_name"]),
+			LifecycleKind:     attrString(event.Attributes["lifecycle_kind"]),
+			LifecyclePhase:    attrString(event.Attributes["lifecycle_phase"]),
+			LifecycleStatus:   attrString(event.Attributes["lifecycle_status"]),
+			Entrypoint:        attrString(event.Attributes["entrypoint"]),
 			UnavailableFields: fieldLabels(unavailableFields(event.Attributes["unavailable_fields"])),
 		}
 	}

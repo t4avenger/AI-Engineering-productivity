@@ -70,6 +70,54 @@ func TestNormalizeLogsMapsCachedAndReasoningTokens(t *testing.T) {
 	}
 }
 
+func TestNormalizeLogsMapsCodexSessionLifecycle(t *testing.T) {
+	data := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.version","value":{"stringValue":"0.153.4"}},{"key":"host.name","value":{"stringValue":"lifecycle-host.example.test"}},{"key":"user.account_id","value":{"stringValue":"lifecycle-account-123"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.conversation_starts"}},{"key":"conversation.id","value":{"stringValue":"lifecycle-session"}},{"key":"model","value":{"stringValue":"gpt-6-astra"}},{"key":"approval_policy","value":{"stringValue":"on-request"}},{"key":"sandbox_policy","value":{"stringValue":"workspace-write"}},{"key":"auth_mode","value":{"stringValue":"api-key"}},{"key":"terminal.type","value":{"stringValue":"pty"}},{"key":"slug","value":{"stringValue":"tiq-canary-lifecycle-slug"}},{"key":"user.email","value":{"stringValue":"lifecycle-user@example.test"}}],"body":{"stringValue":"tiq-canary-lifecycle-body"},"severityText":"INFO"},{"attributes":[{"key":"event.name","value":{"stringValue":"codex.startup_phase"}},{"key":"conversation.id","value":{"stringValue":"lifecycle-session"}},{"key":"startup.phase","value":{"stringValue":"init"}},{"key":"startup.status","value":{"stringValue":"ok"}},{"key":"duration_ms","value":{"stringValue":"17"}}],"severityText":"INFO"},{"attributes":[{"key":"event.name","value":{"stringValue":"codex.websocket_connect"}},{"key":"conversation.id","value":{"stringValue":"lifecycle-session"}},{"key":"success","value":{"boolValue":true}},{"key":"duration_ms","value":{"stringValue":"23"}}],"severityText":"INFO","timeUnixNano":"1788717763000000002"}]}]}]}`)
+	events, err := NormalizeLogs(data, time.Date(2026, 9, 10, 20, 9, 20, 0, time.UTC))
+	if err != nil || len(events) != 3 {
+		t.Fatalf("events = %#v, %v", events, err)
+	}
+	assertCodexSessionStartEvent(t, events[0])
+	assertCodexStartupPhaseEvent(t, events[1])
+	assertCodexWebsocketLifecycleEvent(t, events[2])
+
+	encoded, _ := json.Marshal(events)
+	assertNoStringCanaries(t, string(encoded), []string{"tiq-canary-lifecycle-slug", "lifecycle-user@example.test", "tiq-canary-lifecycle-body", "lifecycle-host.example.test", "lifecycle-account-123"})
+}
+
+func assertCodexSessionStartEvent(t *testing.T, event canonical.Event) {
+	t.Helper()
+	if event.EventType != "session.active" || event.SessionID != "codex:lifecycle-session" {
+		t.Fatalf("start event = %#v", event)
+	}
+	if event.Attributes["lifecycle_kind"] != "session_start" || event.Attributes["entrypoint"] != "codex exec" {
+		t.Fatalf("start lifecycle attributes = %#v", event.Attributes)
+	}
+	if unavailable := event.Attributes["unavailable_fields"].([]string); slices.Contains(unavailable, "session_lifecycle") {
+		t.Fatalf("session_lifecycle must be available for lifecycle event: %#v", unavailable)
+	}
+	startLifecycle := event.ProviderExtensions["session_lifecycle"].(map[string]any)
+	if startLifecycle["source_event"] != codexConversationStarts || startLifecycle["approval_policy"] != "on-request" || startLifecycle["sandbox_policy"] != "workspace-write" || startLifecycle["provenance"] != "observed" {
+		t.Fatalf("start lifecycle extension = %#v", startLifecycle)
+	}
+	if logAttributes := event.ProviderExtensions["log_attributes"].(map[string]any); logAttributes[codexEventNameKey] != codexConversationStarts {
+		t.Fatalf("log attributes should retain provider event name: %#v", logAttributes)
+	}
+}
+
+func assertCodexStartupPhaseEvent(t *testing.T, event canonical.Event) {
+	t.Helper()
+	if event.EventType != codexStartupPhaseEvent || event.Attributes["lifecycle_kind"] != "startup_phase" || event.Attributes["lifecycle_phase"] != "init" || event.Attributes["lifecycle_status"] != "ok" || event.Attributes["duration_ms"] != int64(17) {
+		t.Fatalf("startup lifecycle attributes = %#v", event.Attributes)
+	}
+}
+
+func assertCodexWebsocketLifecycleEvent(t *testing.T, event canonical.Event) {
+	t.Helper()
+	if event.EventType != codexWebsocketConnect || event.Attributes["lifecycle_kind"] != "websocket_connect" || event.Attributes["lifecycle_status"] != "success" || event.Attributes["duration_ms"] != int64(23) {
+		t.Fatalf("websocket lifecycle attributes = %#v", event.Attributes)
+	}
+}
+
 func TestNormalizeLogsDoesNotFabricateMalformedTokenCounts(t *testing.T) {
 	data := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"cached_token_count","value":{"stringValue":"not-a-number"}},{"key":"reasoning_token_count","value":{"doubleValue":1.5}}],"severityText":"INFO"}]}]}]}`)
 	events, err := NormalizeLogs(data, time.Date(2026, 9, 10, 20, 9, 20, 0, time.UTC))

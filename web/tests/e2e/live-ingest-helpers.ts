@@ -178,6 +178,89 @@ export function claudeToolResultOTLPLogs(): string {
   });
 }
 
+
+export function codexLifecycleOTLPLogs(): string {
+  return JSON.stringify({
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'codex_exec' } },
+            { key: 'service.version', value: { stringValue: '0.153.4' } },
+          ],
+        },
+        scopeLogs: [
+          {
+            logRecords: [
+              {
+                attributes: [
+                  {
+                    key: 'event.name',
+                    value: { stringValue: 'codex.conversation_starts' },
+                  },
+                  {
+                    key: 'conversation.id',
+                    value: { stringValue: 'tiq-live-e2e-lifecycle-session' },
+                  },
+                  { key: 'model', value: { stringValue: 'gpt-6-astra' } },
+                  { key: 'approval_policy', value: { stringValue: 'on-request' } },
+                  {
+                    key: 'sandbox_policy',
+                    value: { stringValue: 'workspace-write' },
+                  },
+                  { key: 'auth_mode', value: { stringValue: 'api-key' } },
+                  { key: 'terminal.type', value: { stringValue: 'pty' } },
+                  {
+                    key: 'slug',
+                    value: { stringValue: 'tiq-canary-live-lifecycle-slug' },
+                  },
+                  {
+                    key: 'user.email',
+                    value: { stringValue: 'lifecycle-live@example.test' },
+                  },
+                ],
+                body: { stringValue: 'tiq-canary-live-lifecycle-body' },
+                timeUnixNano: '1788717763000000000',
+              },
+              {
+                attributes: [
+                  {
+                    key: 'event.name',
+                    value: { stringValue: 'codex.startup_phase' },
+                  },
+                  {
+                    key: 'conversation.id',
+                    value: { stringValue: 'tiq-live-e2e-lifecycle-session' },
+                  },
+                  { key: 'startup.phase', value: { stringValue: 'init' } },
+                  { key: 'startup.status', value: { stringValue: 'ok' } },
+                  { key: 'duration_ms', value: { stringValue: '17' } },
+                ],
+                timeUnixNano: '1788717763000000001',
+              },
+              {
+                attributes: [
+                  {
+                    key: 'event.name',
+                    value: { stringValue: 'codex.websocket_connect' },
+                  },
+                  {
+                    key: 'conversation.id',
+                    value: { stringValue: 'tiq-live-e2e-lifecycle-session' },
+                  },
+                  { key: 'success', value: { boolValue: true } },
+                  { key: 'duration_ms', value: { stringValue: '23' } },
+                ],
+                timeUnixNano: '1788717763000000002',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
+
 export function codexToolDecisionOTLPLogs(): string {
   return JSON.stringify({
     resourceLogs: [

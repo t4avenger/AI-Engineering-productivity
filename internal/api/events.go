@@ -35,6 +35,10 @@ type timelineEvent struct {
 	ToolName              *string  `json:"tool_name"`
 	ToolNamespace         *string  `json:"tool_namespace"`
 	ToolSource            *string  `json:"tool_source"`
+	LifecycleKind         *string  `json:"lifecycle_kind"`
+	LifecyclePhase        *string  `json:"lifecycle_phase"`
+	LifecycleStatus       *string  `json:"lifecycle_status"`
+	Entrypoint            *string  `json:"entrypoint"`
 	UnavailableFields     []string `json:"unavailable_fields"`
 }
 
@@ -134,6 +138,7 @@ func publicTimelineEvent(event canonical.Event) timelineEvent {
 		OperationID: optionalString(event.Attributes["operation_id"]), Category: optionalString(event.Attributes["category"]), Outcome: optionalString(event.Attributes["outcome"]), DurationMs: optionalString(event.Attributes["duration_ms"]),
 		ApprovalID: optionalString(event.Attributes["approval_id"]), ApprovalDecision: optionalString(event.Attributes["approval_decision"]), ApprovalReasonClass: optionalString(event.Attributes["approval_reason_class"]),
 		ToolName: optionalString(event.Attributes["tool_name"]), ToolNamespace: optionalString(event.Attributes["tool_namespace"]), ToolSource: optionalString(event.Attributes["tool_source"]),
+		LifecycleKind: optionalString(event.Attributes["lifecycle_kind"]), LifecyclePhase: optionalString(event.Attributes["lifecycle_phase"]), LifecycleStatus: optionalString(event.Attributes["lifecycle_status"]), Entrypoint: optionalString(event.Attributes["entrypoint"]),
 		UnavailableFields: unavailableFields(event.Attributes["unavailable_fields"]),
 	}
 }
