@@ -744,55 +744,104 @@ func TestTimelinePartialRejectsInvalidSessionID(t *testing.T) {
 	}
 }
 
-func TestIntegrationsCursorEnterpriseNotObserved(t *testing.T) {
-	now := time.Now().UTC()
-	repo := &fullStub{
-		sessions: []canonical.Session{
-			{SessionID: "codex:s1", Provider: "openai", Tool: "codex", StartedAt: now},
-			// Local-dev cursor-agent must not count as Enterprise observed.
-			{SessionID: "cursor-agent:local", Provider: "cursor", Tool: "cursor-agent", StartedAt: now},
+func TestIntegrationsCursorEnterpriseStatus(t *testing.T) {
+	start := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
+	later := start.Add(45 * time.Minute)
+
+	tests := []struct {
+		name     string
+		repo     storage.SessionReader
+		want     []string
+		wantNone []string
+	}{
+		{
+			name: "unavailable when only local-dev cursor-agent sessions exist",
+			repo: &fullStub{sessions: []canonical.Session{
+				{SessionID: "codex:s1", Provider: "openai", Tool: "codex", StartedAt: start},
+				{SessionID: "cursor-agent:local", Provider: "cursor", Tool: "cursor-agent", StartedAt: start},
+			}},
+			want: []string{
+				"Cursor Enterprise OpenTelemetry Export",
+				"Team Settings",
+				"OpenTelemetry Export",
+				"docs/integrations/cursor-enterprise-otel.md",
+				"protected-gateway",
+				"Do not expose the unauthenticated loopback daemon",
+				"Not available from this provider",
+				"Local-dev only",
+				"POST /v1/cursor-agent",
+				"cursor-agent (cursor)",
+			},
+			wantNone: []string{
+				`scripts/cursor-agent-tiq "say ok"`,
+				`class="status status-observed"`,
+				"Seen in telemetry",
+			},
+		},
+		{
+			name: "observed uses latest event time not session start",
+			repo: &fullStub{
+				sessions: []canonical.Session{{
+					SessionID: "cursor:enterprise-session",
+					Provider:  "cursor",
+					Tool:      "cursor",
+					StartedAt: start,
+				}},
+				events: map[string][]canonical.Event{
+					"cursor:enterprise-session": {{
+						EventID:    "e1",
+						EventType:  "model_interaction",
+						OccurredAt: start,
+						ReceivedAt: start,
+						Provider:   "cursor",
+						Tool:       "cursor",
+					}, {
+						EventID:    "e2",
+						EventType:  "model_interaction",
+						OccurredAt: later,
+						ReceivedAt: later,
+						Provider:   "cursor",
+						Tool:       "cursor",
+					}},
+				},
+			},
+			want: []string{
+				"Cursor Enterprise OpenTelemetry Export",
+				"Team Settings",
+				"Seen in telemetry",
+				"Last seen",
+				"2026-09-13T12:45:00Z",
+				"cursor (cursor)",
+			},
+			wantNone: []string{
+				"Not available from this provider",
+				"Awaiting telemetry",
+				"2026-09-13T12:00:00Z",
+			},
+		},
+		{
+			name: "storage failure is unknown not unavailable",
+			repo: errStub{},
+			want: []string{
+				"Unable to load integrations.",
+				"Not proven yet",
+			},
+			wantNone: []string{
+				"Not available from this provider",
+				"Seen in telemetry",
+			},
 		},
 	}
-	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
-	if err != nil {
-		t.Fatal(err)
-	}
-	handler := server.Wrap(http.NotFoundHandler())
-	cookie := unlock(t, handler)
-	body := getAuthed(t, handler, cookie, "/integrations").Body.String()
 
-	for _, want := range []string{
-		"Cursor Enterprise OpenTelemetry Export",
-		"Team Settings",
-		"OpenTelemetry Export",
-		"docs/integrations/cursor-enterprise-otel.md",
-		"Not seen in telemetry",
-		"Local-dev only",
-		"POST /v1/cursor-agent",
-		"cursor-agent (cursor)",
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("integrations not-observed missing %q in body: %q", want, body)
-		}
-	}
-	if strings.Contains(body, "scripts/cursor-agent-tiq \"say ok\"") {
-		t.Fatalf("must not present wrapper install steps as primary setup: %q", body)
-	}
-	if strings.Contains(body, `class="status status-observed"`) {
-		t.Fatalf("cursor-agent-only sessions must not mark Enterprise observed: %q", body)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assertIntegrationsBody(t, tc.repo, tc.want, tc.wantNone)
+		})
 	}
 }
 
-func TestIntegrationsCursorEnterpriseObserved(t *testing.T) {
-	now := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
-	repo := &fullStub{
-		sessions: []canonical.Session{{
-			SessionID: "cursor:enterprise-session",
-			Provider:  "cursor",
-			Tool:      "cursor",
-			StartedAt: now,
-		}},
-	}
+func assertIntegrationsBody(t *testing.T, repo storage.SessionReader, want, wantNone []string) {
+	t.Helper()
 	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
 	if err != nil {
 		t.Fatal(err)
@@ -800,23 +849,14 @@ func TestIntegrationsCursorEnterpriseObserved(t *testing.T) {
 	handler := server.Wrap(http.NotFoundHandler())
 	cookie := unlock(t, handler)
 	body := getAuthed(t, handler, cookie, "/integrations").Body.String()
-
-	for _, want := range []string{
-		"Cursor Enterprise OpenTelemetry Export",
-		"Team Settings",
-		"Seen in telemetry",
-		"Last seen",
-		"2026-09-13T12:00:00Z",
-		"cursor (cursor)",
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("integrations observed missing %q in body: %q", want, body)
+	for _, fragment := range want {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("missing %q in body: %q", fragment, body)
 		}
 	}
-	if strings.Contains(body, "Not seen in telemetry") {
-		t.Fatalf("Enterprise cursor session must not render not_observed: %q", body)
-	}
-	if strings.Contains(body, "Awaiting telemetry") {
-		t.Fatalf("observed tools list should not be empty: %q", body)
+	for _, fragment := range wantNone {
+		if strings.Contains(body, fragment) {
+			t.Fatalf("unexpected %q in body: %q", fragment, body)
+		}
 	}
 }

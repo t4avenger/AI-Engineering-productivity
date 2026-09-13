@@ -187,10 +187,10 @@ MVP filters: document date/tool/provider as later if API query params are not ye
 ### Integrations / Privacy / Costs
 
 - **Integrations:** Cursor Enterprise OpenTelemetry Export setup + honest
-  observed/`not_observed` ingest status from retained `tool=cursor` sessions;
-  tools list derived only from retained sessions; else “Awaiting telemetry”
-  with a next-step. Never fabricate “connected”; wrapper/`cursor-agent` is
-  local-dev footnote only.
+  observed/`unavailable` ingest status from retained `tool=cursor` sessions
+  (`unknown` when storage cannot be read); tools list derived only from
+  retained sessions; else “Awaiting telemetry” with a gateway-aware next-step.
+  Never fabricate “connected”; wrapper/`cursor-agent` is local-dev footnote only.
 - **Privacy:** static enforced defaults + typed `DELETE ALL` confirm (must type phrase).
 - **Costs:** aggregate summary and statuses; unknown never shown as `$0`.
 

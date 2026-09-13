@@ -164,7 +164,7 @@ Missing → 404 page with link back to Sessions
 [Cursor Enterprise section]
   setup copy (Team Settings → OTEL)
   status from retained tool=cursor sessions
-  observed | not_observed (never “connected”)
+  observed | unavailable | unknown (never “connected”)
          |
          v
 [Derive distinct tool/provider from sessions]
