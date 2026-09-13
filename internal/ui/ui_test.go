@@ -368,46 +368,43 @@ func (errStub) ListSessions(context.Context, storage.SessionFilter) ([]canonical
 
 func TestTimelineRendersToolDecisionApprovals(t *testing.T) {
 	now := time.Now().UTC()
+	// Flat cases avoid Sonar CPD pairing near-identical Event/map literals.
 	cases := []struct {
-		name      string
-		sessionID string
-		event     canonical.Event
-		wantFrags []string
+		name, sessionID, eventID, eventType, provider, tool      string
+		decision, reason, qualifierKey, qualifierValue, toolName string
+		wantToolLabel                                            string
+		extraWants                                               []string
 	}{
 		{
-			name:      "codex uses tool_namespace qualifier",
-			sessionID: "decision-session",
-			event: canonical.Event{
-				EventID: "decision-event", EventType: "codex.tool_decision", SessionID: "decision-session",
-				OccurredAt: now, ReceivedAt: now, Provider: "openai", Tool: "codex",
-				Attributes: map[string]any{
-					"approval_decision": "approved", "approval_reason_class": "policy",
-					"tool_namespace": "functions", "tool_name": "exec_command",
-					"unavailable_fields": []string{"tool_calls"},
-				},
-			},
-			wantFrags: []string{"Approval", "approved", "Reason", "policy", "Tool", "functions/exec_command"},
+			name: "codex uses tool_namespace qualifier", sessionID: "decision-session",
+			eventID: "decision-event", eventType: "codex.tool_decision", provider: "openai", tool: "codex",
+			decision: "approved", reason: "policy", qualifierKey: "tool_namespace", qualifierValue: "functions",
+			toolName: "exec_command", wantToolLabel: "functions/exec_command",
 		},
 		{
-			// Claude event type is "tool_decision" (not "codex.tool_decision");
-			// qualifier falls back to tool_source when tool_namespace is absent.
-			name:      "claude uses tool_source qualifier",
-			sessionID: "claude-decision-session",
-			event: canonical.Event{
-				EventID: "claude-code:claude-decision-session:28", EventType: "tool_decision", SessionID: "claude-decision-session",
-				OccurredAt: now, ReceivedAt: now, Provider: "anthropic", Tool: "claude-code",
-				Attributes: map[string]any{
-					"approval_decision": "denied", "approval_reason_class": "hook",
-					"tool_source": "builtin", "tool_name": "Bash",
-					"unavailable_fields": []string{"tool_calls"},
-				},
-			},
-			wantFrags: []string{"Tool decision", "Approval", "denied", "Reason", "hook", "builtin/Bash"},
+			name: "claude uses tool_source qualifier", sessionID: "claude-decision-session",
+			eventID: "claude-code:claude-decision-session:28", eventType: "tool_decision", provider: "anthropic", tool: "claude-code",
+			decision: "denied", reason: "hook", qualifierKey: "tool_source", qualifierValue: "builtin",
+			toolName: "Bash", wantToolLabel: "builtin/Bash",
+			extraWants: []string{"Tool decision"},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assertTimelineContains(t, tc.sessionID, tc.event, tc.wantFrags...)
+			attrs := map[string]any{
+				"approval_decision":     tc.decision,
+				"approval_reason_class": tc.reason,
+				tc.qualifierKey:         tc.qualifierValue,
+				"tool_name":             tc.toolName,
+				"unavailable_fields":    []string{"tool_calls"},
+			}
+			event := canonical.Event{
+				EventID: tc.eventID, EventType: tc.eventType, SessionID: tc.sessionID,
+				OccurredAt: now, ReceivedAt: now, Provider: tc.provider, Tool: tc.tool,
+				Attributes: attrs,
+			}
+			want := append([]string{"Approval", tc.decision, "Reason", tc.reason, "Tool", tc.wantToolLabel}, tc.extraWants...)
+			assertTimelineContains(t, tc.sessionID, event, want...)
 		})
 	}
 }
