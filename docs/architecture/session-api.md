@@ -47,11 +47,13 @@ appropriate.
 
 The MCP inventory insight response contains `data.totals`, `data.servers`, and `data.notes`. Server identities are the raw provider-reported MCP server names (`identity_state: provider_reported`), which are themselves the correlation key — epic #87 removed the HMAC fingerprint. Usage is `observed` only with explicit matching invocation evidence; otherwise it is `not_observed` or `unavailable`. Token context is request-level and labelled as not exact per-MCP allocation.
 
+The operation stats insight response (`GET /api/v1/insights/operations`) reads retained `canonical.Operation` records rather than timeline event attributes. It returns total operations, category counts, outcome counts, duration sample counts, and average duration only where a reviewed provider field reports `duration_ms`. Missing operation durations remain unavailable and are never represented as zero.
+
 The daemon opens the existing local SQLite repository at the platform
 configuration directory and reuses its installation-specific privacy salt.
 The API never reads raw intake payloads. Session endpoints require a bearer token; the auth-token CLI command deliberately prints the protected local token for dashboard setup. Health and OTLP intake remain unauthenticated, and the daemon remains loopback-only by default.
 
-Live OTLP persistence accepts `POST /v1/logs` (provider log events), a
+Live OTLP persistence accepts `POST /v1/logs` (provider log events and reviewed Codex/Claude Code operation records), a
 `POST /v1/metrics` path that persists reviewed Codex `codex.skill.injected`,
 Claude Code `claude_code.token.usage`, and Cursor Enterprise
 `cursor.token.usage` datapoints as canonical events, and a

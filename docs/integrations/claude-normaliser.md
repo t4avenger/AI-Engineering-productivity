@@ -90,7 +90,7 @@ evidence of an executed tool call (capability matrix "Tool calls (generic)",
 
 Tool input parameters and result bodies (gated content) are out of scope —
 owned by the JSONL issues. Operations are ordered and deduplicated by
-`CorrelateOperations`.
+`CorrelateOperations`. Live `/v1/logs` ingest uses `ExtractLogOperations` to reduce OTLP wire records through the same reviewed sample-event mapper, persist the resulting `canonical.Operation` records, and feed operation stats on the Insights page without changing `NormalizeLogs`' event-only contract.
 
 ## Metrics path — `NormalizeMetrics`
 

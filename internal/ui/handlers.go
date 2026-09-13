@@ -108,6 +108,8 @@ type insightsData struct {
 	Skills           insights.SkillUsage
 	ModelPerformance insights.ModelPerformance
 	ContextWaste     insights.ContextWaste
+	Operations       insights.OperationStats
+	OperationErr     string
 	Error            string
 }
 
@@ -302,6 +304,12 @@ func (s *Server) insightsPage(w http.ResponseWriter, r *http.Request) {
 		data.Skills = insights.SkillUsageFromEvents(events)
 		data.ModelPerformance = insights.ModelPerformanceFromEvents(events)
 		data.ContextWaste = insights.ContextWasteFromEvents(events, s.contextWasteThresholds)
+	}
+	operations, err := s.listOperations(r)
+	if err != nil {
+		data.OperationErr = "Operation stats unavailable."
+	} else {
+		data.Operations = insights.OperationStatsFromOperations(operations)
 	}
 	s.render(w, tmplInsights, layoutData{Title: "Insights", Nav: "insights", Health: s.healthLabel(r), Content: data})
 }
@@ -504,6 +512,13 @@ func (s *Server) insightEvents(r *http.Request) ([]canonical.Event, error) {
 		events = append(events, batch...)
 	}
 	return events, nil
+}
+
+func (s *Server) listOperations(r *http.Request) ([]canonical.Operation, error) {
+	if s.operations == nil {
+		return nil, errUnavailable
+	}
+	return s.operations.ListOperations(r.Context(), storage.OperationFilter{})
 }
 
 func (s *Server) listSessionEvents(r *http.Request, sessionID string) ([]canonical.Event, error) {

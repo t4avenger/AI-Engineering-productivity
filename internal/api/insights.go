@@ -6,6 +6,7 @@ import (
 	"github.com/wayne/telemetryiq/internal/governance"
 	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
+	"github.com/wayne/telemetryiq/internal/storage"
 )
 
 const (
@@ -30,6 +31,10 @@ type modelPerformanceResponse struct {
 
 type contextWasteResponse struct {
 	Data insights.ContextWaste `json:"data"`
+}
+
+type operationStatsResponse struct {
+	Data insights.OperationStats `json:"data"`
 }
 
 type riskyAccessResponse struct {
@@ -70,6 +75,19 @@ func (a sessionAPI) contextWaste(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSessionJSON(w, http.StatusOK, contextWasteResponse{Data: insights.ContextWasteFromEvents(events, a.thresholds.ContextWaste)})
+}
+
+func (a sessionAPI) operations(w http.ResponseWriter, r *http.Request) {
+	if a.operationReader == nil {
+		writeSessionError(w, http.StatusServiceUnavailable, insightUnavailableCode, insightUnavailableMsg)
+		return
+	}
+	operations, err := a.operationReader.ListOperations(r.Context(), storage.OperationFilter{})
+	if err != nil {
+		writeSessionError(w, http.StatusInternalServerError, insightQueryFailedCode, insightQueryFailedMsg)
+		return
+	}
+	writeSessionJSON(w, http.StatusOK, operationStatsResponse{Data: insights.OperationStatsFromOperations(operations)})
 }
 
 func (a sessionAPI) riskyAccess(w http.ResponseWriter, r *http.Request) {

@@ -168,7 +168,7 @@ func TestUnapprovedMCPInsightAPIIndeterminateWhenUnconfigured(t *testing.T) {
 }
 
 func TestInsightsPathRequiresManagementAuth(t *testing.T) {
-	for _, path := range []string{"/api/v1/insights/mcp-inventory", "/api/v1/insights/skill-usage", "/api/v1/insights/model-performance", "/api/v1/insights/context-waste", "/api/v1/insights/unapproved-mcp"} {
+	for _, path := range []string{"/api/v1/insights/mcp-inventory", "/api/v1/insights/skill-usage", "/api/v1/insights/model-performance", "/api/v1/insights/context-waste", "/api/v1/insights/operations", "/api/v1/insights/unapproved-mcp"} {
 		if !isManagementPath(path) {
 			t.Fatalf("insight endpoint %q must require local API authentication", path)
 		}

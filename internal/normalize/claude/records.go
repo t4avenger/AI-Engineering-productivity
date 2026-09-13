@@ -237,7 +237,27 @@ func operationExtensions(raw map[string]any, operationID string, occurredAt time
 				"reason":     "Claude Code tool_result telemetry has no reviewed task-boundary signal",
 			},
 		},
-		"event": normalize.UnknownFields(raw, operationStructuralFields...),
+		"event": safeOperationEventFields(normalize.UnknownFields(raw, operationStructuralFields...)),
+	}
+}
+
+func safeOperationEventFields(fields map[string]any) map[string]any {
+	safe := make(map[string]any, len(fields))
+	for key, value := range fields {
+		if sensitiveOperationEventField(key) {
+			continue
+		}
+		safe[key] = value
+	}
+	return safe
+}
+
+func sensitiveOperationEventField(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "api_key", "arguments", "authorization", "cmd", "command", "command_args", "command_line", "content", "cwd", "file", "file_path", "filename", "host.name", "input", "output", "path", "prompt", "response", "slug", "source_code", "tool_input", "tool_result", "user.email", "user.account_id":
+		return true
+	default:
+		return false
 	}
 }
 

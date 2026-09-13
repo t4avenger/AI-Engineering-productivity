@@ -88,7 +88,10 @@ func TestCodexLogsIngestEndToEnd(t *testing.T) {
 
 const rawCodexToolResultOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
   {"key":"service.name","value":{"stringValue":"codex_exec"}},
-  {"key":"service.version","value":{"stringValue":"0.153.4"}}]},
+  {"key":"service.version","value":{"stringValue":"0.153.4"}},
+  {"key":"host.name","value":{"stringValue":"tool-host.example.test"}},
+  {"key":"user.account_id","value":{"stringValue":"tool-account-123"}},
+  {"key":"authorization","value":{"stringValue":"Bearer tiq-canary-tool-resource-token"}}]},
  "scopeLogs":[{"logRecords":[
    {"attributes":[
      {"key":"event.name","value":{"stringValue":"codex.tool_result"}},
@@ -139,6 +142,9 @@ func TestCodexToolResultIngestExposesToolCallSignal(t *testing.T) {
 		"tiq-canary-tool-argument",
 		"tiq-canary-tool-output",
 		"tiq-canary-tool-api-key",
+		"tiq-canary-tool-resource-token",
+		"tool-host.example.test",
+		"tool-account-123",
 		"tool-user@example.test",
 		"tiq-canary-tool-body",
 	}
