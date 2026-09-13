@@ -51,9 +51,13 @@ Cursor documents fixed egress source IPs and the full attribute surface in:
   events via `cursor.NormalizeMetrics` / `cursor.NormalizeLogs`. Other wire
   families are accepted without mapping until fixtures prove them. Synthetic
   wire fixtures live under `fixtures/cursor/observed-sanitised/cursor-otel-0.1.0-*.json`.
+- **Integrations UI (#132):** `/integrations` shows Enterprise setup copy and
+  honest observed/`unavailable` status from retained `tool=cursor` sessions
+  (`unknown` on storage failure; never a fabricated “connected” state; wrapper
+  path is a local-dev footnote). Empty-state next-step points at the protected
+  gateway recipe, not exposing the loopback daemon.
 - **Not yet:** live Enterprise capture (synthetic fixtures only); full wire
-  surface (tool calls, cost, skills, cloud_agent, grok_bot); Integrations UX
-  (#132).
+  surface (tool calls, cost, skills, cloud_agent, grok_bot).
 - **Local-dev only:** `POST /v1/cursor-agent` and `scripts/cursor-agent-tiq`
   (see [cursor-agent-auto-reporting.md](cursor-agent-auto-reporting.md)).
 
