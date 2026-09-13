@@ -80,6 +80,11 @@ type OperationWriter interface {
 	SaveOperations(context.Context, []canonical.Operation) error
 }
 
+// EventOperationWriter persists events and operation records as one batch.
+type EventOperationWriter interface {
+	SaveEventsAndOperations(context.Context, []canonical.Event, []canonical.Operation) error
+}
+
 // CostReader returns calculation provenance without exposing raw intake data.
 type CostReader interface {
 	ListCostRecords(context.Context, string) ([]cost.Record, error)
@@ -87,6 +92,7 @@ type CostReader interface {
 
 type Repository interface {
 	SaveEvents(context.Context, []canonical.Event) error
+	EventOperationWriter
 	OperationWriter
 	SessionReader
 	SessionDeleter

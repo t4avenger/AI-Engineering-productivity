@@ -21,6 +21,9 @@ func TestDeleteAllSessionsRemovesRetainedTelemetry(t *testing.T) {
 	if err := repo.SaveEvents(ctx, []canonical.Event{created, completed}); err != nil {
 		t.Fatalf("SaveEvents() error = %v", err)
 	}
+	if err := repo.SaveOperations(ctx, []canonical.Operation{{SchemaVersion: canonical.RecordSchemaVersion, OperationID: "op-1", SessionID: "session-1", Provider: "openai", Tool: "codex", Category: canonical.OperationCategoryShellCommand, Outcome: "success", Provenance: canonical.ProvenanceObserved, ProviderExtensions: map[string]any{}}}); err != nil {
+		t.Fatalf("SaveOperations() error = %v", err)
+	}
 	if err := repo.DeleteAllSessions(ctx); err != nil {
 		t.Fatalf("DeleteAllSessions() error = %v", err)
 	}
@@ -31,5 +34,9 @@ func TestDeleteAllSessionsRemovesRetainedTelemetry(t *testing.T) {
 	var events int
 	if err := repo.db.QueryRow("SELECT COUNT(*) FROM events").Scan(&events); err != nil || events != 0 {
 		t.Fatalf("event count = %d, %v", events, err)
+	}
+	var operations int
+	if err := repo.db.QueryRow("SELECT COUNT(*) FROM operations").Scan(&operations); err != nil || operations != 0 {
+		t.Fatalf("operation count = %d, %v", operations, err)
 	}
 }

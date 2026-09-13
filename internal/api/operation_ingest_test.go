@@ -62,5 +62,7 @@ func TestOperationStatsInsightIngestEndToEnd(t *testing.T) {
 		t.Fatalf("average duration = %#v", stats.Data.Totals.AverageDurationMs)
 	}
 	serialized := marshalJSON(t, stats)
-	assertNoRawIdentifiers(t, []string{"tiq-canary-claude-tool-input", "tiq-canary-claude-tool-result", "tiq-canary-claude-tool-body", "claude-tool@example.test"}, serialized)
+	canaries := []string{"tiq-canary-tool-resource-token", "tool-host.example.test", "tool-account-123", "tiq-canary-claude-tool-input", "tiq-canary-claude-tool-result", "tiq-canary-claude-tool-body", "claude-tool@example.test"}
+	assertNoRawIdentifiers(t, canaries, serialized)
+	assertNoRawIdentifiers(t, canaries, marshalJSON(t, stored))
 }

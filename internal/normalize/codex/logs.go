@@ -268,13 +268,8 @@ func codexLogAttributes(fields map[string]any) map[string]any {
 	return safeCodexLogAttributes(normalize.UnknownFields(fields, known...))
 }
 
-func codexLogResourceAttributes(eventName string, resource map[string]any) map[string]any {
-	switch eventName {
-	case codexSandboxOutcomeEvent, codexToolDecisionEvent:
-		return allowedCodexAttributes(resource, "service.name", "service.version")
-	default:
-		return resource
-	}
+func codexLogResourceAttributes(_ string, resource map[string]any) map[string]any {
+	return allowedCodexAttributes(resource, "service.name", "service.version")
 }
 
 func codexLogUnavailableFields(eventName string) []string {

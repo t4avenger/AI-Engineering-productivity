@@ -319,10 +319,7 @@ func (i *otlpHTTPIngest) persistWithLogAdapters(request *http.Request, payload m
 		}
 		operations = append(operations, next...)
 	}
-	if err := i.savePersistedEvents(request, events); err != nil {
-		return err
-	}
-	return i.savePersistedOperations(request, operations)
+	return i.savePersistedEventsAndOperations(request, events, operations)
 }
 
 func (i *otlpHTTPIngest) persistWithAdapters(request *http.Request, payload map[string]json.RawMessage, passes ...adapterPass) error {
@@ -352,11 +349,11 @@ func (i *otlpHTTPIngest) beginPersist(payload map[string]json.RawMessage) ([]byt
 	return rawBytes, time.Now().UTC(), false, nil
 }
 
-func (i *otlpHTTPIngest) savePersistedOperations(request *http.Request, operations []canonical.Operation) error {
-	if len(operations) == 0 {
+func (i *otlpHTTPIngest) savePersistedEventsAndOperations(request *http.Request, events []canonical.Event, operations []canonical.Operation) error {
+	if len(events) == 0 && len(operations) == 0 {
 		return nil
 	}
-	if err := i.repository.SaveOperations(request.Context(), operations); err != nil {
+	if err := i.repository.SaveEventsAndOperations(request.Context(), events, operations); err != nil {
 		return fmt.Errorf("persist: %w", err)
 	}
 	return nil

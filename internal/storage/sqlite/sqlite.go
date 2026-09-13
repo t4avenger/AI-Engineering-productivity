@@ -180,36 +180,26 @@ func (r *Repository) SaveEvents(ctx context.Context, events []canonical.Event) e
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	ids := map[string]struct{}{}
-	for _, event := range events {
-		// Events are persisted verbatim — no ingest-time hiding is applied
-		// (epic #87); raw provider-native identifiers, paths and commands reach
-		// storage and the UI.
-		payload, err := json.Marshal(event)
-		if err != nil {
-			return fmt.Errorf("marshal event: %w", err)
-		}
-		result, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO events(event_id,session_id,occurred_at,event_json) VALUES(?,?,?,?)", event.EventID, event.SessionID, event.OccurredAt.UTC().Format(timeFormat), payload)
-		if err != nil {
-			return err
-		}
-		if r.calculator != nil {
-			inserted, err := result.RowsAffected()
-			if err != nil {
-				return fmt.Errorf("determine event insertion: %w", err)
-			}
-			if inserted > 0 {
-				if err := r.saveCostRecord(ctx, tx, r.calculator.Calculate(event)); err != nil {
-					return err
-				}
-			}
-		}
-		ids[event.SessionID] = struct{}{}
+	if err := r.saveEventsTx(ctx, tx, events); err != nil {
+		return err
 	}
-	for id := range ids {
-		if err := r.rebuildSession(ctx, tx, id); err != nil {
-			return err
-		}
+	return tx.Commit()
+}
+
+func (r *Repository) SaveEventsAndOperations(ctx context.Context, events []canonical.Event, operations []canonical.Operation) error {
+	if len(events) == 0 && len(operations) == 0 {
+		return nil
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := r.saveEventsTx(ctx, tx, events); err != nil {
+		return err
+	}
+	if err := r.saveOperationsTx(ctx, tx, operations); err != nil {
+		return err
 	}
 	return tx.Commit()
 }
@@ -223,6 +213,58 @@ func (r *Repository) SaveOperations(ctx context.Context, operations []canonical.
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if err := r.saveOperationsTx(ctx, tx, operations); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (r *Repository) saveEventsTx(ctx context.Context, tx *sql.Tx, events []canonical.Event) error {
+	ids := map[string]struct{}{}
+	for _, event := range events {
+		if err := r.saveEventTx(ctx, tx, event); err != nil {
+			return err
+		}
+		ids[event.SessionID] = struct{}{}
+	}
+	for id := range ids {
+		if err := r.rebuildSession(ctx, tx, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Repository) saveEventTx(ctx context.Context, tx *sql.Tx, event canonical.Event) error {
+	// Events are persisted verbatim — no ingest-time hiding is applied
+	// (epic #87); raw provider-native identifiers, paths and commands reach
+	// storage and the UI.
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("marshal event: %w", err)
+	}
+	result, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO events(event_id,session_id,occurred_at,event_json) VALUES(?,?,?,?)", event.EventID, event.SessionID, event.OccurredAt.UTC().Format(timeFormat), payload)
+	if err != nil {
+		return err
+	}
+	return r.saveCostForInsertedEvent(ctx, tx, event, result)
+}
+
+func (r *Repository) saveCostForInsertedEvent(ctx context.Context, tx *sql.Tx, event canonical.Event, result sql.Result) error {
+	if r.calculator == nil {
+		return nil
+	}
+	inserted, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("determine event insertion: %w", err)
+	}
+	if inserted == 0 {
+		return nil
+	}
+	return r.saveCostRecord(ctx, tx, r.calculator.Calculate(event))
+}
+
+func (r *Repository) saveOperationsTx(ctx context.Context, tx *sql.Tx, operations []canonical.Operation) error {
 	for _, operation := range operations {
 		payload, err := json.Marshal(operation)
 		if err != nil {
@@ -232,7 +274,7 @@ func (r *Repository) SaveOperations(ctx context.Context, operations []canonical.
 			return err
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 
 func (r *Repository) rebuildAllSessions(ctx context.Context) error {
@@ -452,7 +494,7 @@ func decodeSessions(rows *sql.Rows, limit int) ([]canonical.Session, error) {
 	return sessions, nil
 }
 
-// ListCostRecords returns immutable, sanitised calculation provenance for a session.
+// ListOperations returns retained stable-primitive operation records.
 func (r *Repository) ListOperations(ctx context.Context, filter storage.OperationFilter) ([]canonical.Operation, error) {
 	query := "SELECT operation_json FROM operations"
 	args := []any{}

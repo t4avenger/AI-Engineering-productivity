@@ -78,7 +78,7 @@ func OperationStatsFromOperations(operations []canonical.Operation) OperationSta
 }
 
 func operationDurationMs(operation canonical.Operation) (int64, bool) {
-	for _, path := range [][]string{{"tool_call", "duration_ms"}, {"sandbox_outcome", "duration_ms"}, {"event", "duration_ms"}} {
+	for _, path := range [][]string{{"tool_call", "duration_ms"}, {"sandbox_outcome", "duration_ms"}, {"sandbox_outcome", "initial_duration_ms"}, {"event", "duration_ms"}} {
 		if duration, ok := nestedDuration(operation.ProviderExtensions, path...); ok {
 			return duration, true
 		}
@@ -104,17 +104,30 @@ func nestedDuration(values map[string]any, path ...string) (int64, bool) {
 func durationValue(value any) (int64, bool) {
 	switch v := value.(type) {
 	case int:
-		return int64(v), true
+		return nonNegativeDuration(int64(v))
 	case int64:
-		return v, true
+		return nonNegativeDuration(v)
 	case float64:
+		if v < 0 || v != float64(int64(v)) {
+			return 0, false
+		}
 		return int64(v), true
 	case string:
 		parsed, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
-		return parsed, err == nil
+		if err != nil {
+			return 0, false
+		}
+		return nonNegativeDuration(parsed)
 	default:
 		return 0, false
 	}
+}
+
+func nonNegativeDuration(value int64) (int64, bool) {
+	if value < 0 {
+		return 0, false
+	}
+	return value, true
 }
 
 func averageDuration(acc durationAccumulator) *float64 {
