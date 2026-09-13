@@ -84,24 +84,24 @@ function codexExecOTLPLogs(
   });
 }
 
+function codexStringAttrs(
+  entries: Array<[string, string]>,
+): Array<{ key: string; value: { stringValue: string } }> {
+  return entries.map(([key, stringValue]) => ({ key, value: { stringValue } }));
+}
+
 export function codexCachedReasoningOTLPLogs(): string {
   return codexExecOTLPLogs(
-    [
-      { key: 'event.name', value: { stringValue: 'codex.sse_event' } },
-      {
-        key: 'conversation.id',
-        value: { stringValue: 'tiq-live-e2e-codex-token-session' },
-      },
-      { key: 'model', value: { stringValue: 'gpt-5-codex-live' } },
-      { key: 'input_token_count', value: { stringValue: '1200' } },
-      { key: 'cached_token_count', value: { stringValue: '300' } },
-      { key: 'output_token_count', value: { stringValue: '144' } },
-      { key: 'reasoning_token_count', value: { stringValue: '55' } },
-      {
-        key: 'arguments',
-        value: { stringValue: '--token=tiq-canary-live-codex-token' },
-      },
-    ],
+    codexStringAttrs([
+      ['event.name', 'codex.sse_event'],
+      ['conversation.id', 'tiq-live-e2e-codex-token-session'],
+      ['model', 'gpt-5-codex-live'],
+      ['input_token_count', '1200'],
+      ['cached_token_count', '300'],
+      ['output_token_count', '144'],
+      ['reasoning_token_count', '55'],
+      ['arguments', '--token=tiq-canary-live-codex-token'],
+    ]),
     'tiq-canary-live-codex-token-body',
   );
 }
