@@ -14,6 +14,12 @@
     <div><dt>Reason</dt><dd>{{.ApprovalReason}}</dd></div>
     <div><dt>Tool</dt><dd>{{.ApprovalTool}}</dd></div>
     {{end}}
+    {{if .LifecycleKind}}
+    <div><dt>Lifecycle</dt><dd>{{.LifecycleKind}}</dd></div>
+    {{if .LifecyclePhase}}<div><dt>Phase</dt><dd>{{.LifecyclePhase}}</dd></div>{{end}}
+    {{if .LifecycleStatus}}<div><dt>Status</dt><dd>{{.LifecycleStatus}}</dd></div>{{end}}
+    {{if .Entrypoint}}<div><dt>Entrypoint</dt><dd>{{.Entrypoint}}</dd></div>{{end}}
+    {{end}}
   </dl>
   {{if .UnavailableFields}}
   <p class="muted">Unavailable: {{range $i, $f := .UnavailableFields}}{{if $i}}, {{end}}{{$f}}{{end}}</p>

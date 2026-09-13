@@ -1,0 +1,170 @@
+[
+  {
+    "actor_id": "unavailable",
+    "attributes": {
+      "entrypoint": "codex exec",
+      "lifecycle_kind": "session_start",
+      "model": "gpt-6-astra",
+      "unavailable_fields": [
+        "cache_usage",
+        "reasoning_tokens",
+        "file_operations",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost",
+        "command_execution",
+        "tool_calls",
+        "task_outcome"
+      ]
+    },
+    "device_id": "unavailable",
+    "event_id": "codex-log:d35ac837677ebf5cea81604c95e1c11bc4b1e5f6a5a73c3e6459d96d1bc7950e",
+    "event_type": "session.active",
+    "occurred_at": "2026-07-28T12:00:00Z",
+    "privacy_level": "operational",
+    "provider": "openai",
+    "provider_extensions": {
+      "log_attributes": {
+        "event.name": "codex.conversation_starts"
+      },
+      "resource_attributes": {
+        "service.name": "codex_exec",
+        "service.version": "0.153.4"
+      },
+      "session_lifecycle": {
+        "approval_policy": "on-request",
+        "auth_mode": "api-key",
+        "entrypoint": "codex exec",
+        "kind": "session_start",
+        "provenance": "observed",
+        "sandbox_policy": "workspace-write",
+        "source_event": "codex.conversation_starts",
+        "terminal.type": "pty"
+      },
+      "severity": "INFO"
+    },
+    "received_at": "2026-07-28T12:00:00Z",
+    "repository_id": null,
+    "schema_version": "0.1.0",
+    "session_id": "codex:lifecycle-session",
+    "source_schema": "otel",
+    "source_version": "0.153.4",
+    "task_id": null,
+    "tool": "codex"
+  },
+  {
+    "actor_id": "unavailable",
+    "attributes": {
+      "duration_ms": 17,
+      "entrypoint": "codex exec",
+      "lifecycle_kind": "startup_phase",
+      "lifecycle_phase": "init",
+      "lifecycle_status": "ok",
+      "unavailable_fields": [
+        "cache_usage",
+        "reasoning_tokens",
+        "file_operations",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost",
+        "command_execution",
+        "tool_calls",
+        "task_outcome"
+      ]
+    },
+    "device_id": "unavailable",
+    "event_id": "codex-log:ed5ad8b7c332872fe4a2d2e0421e14fb433928e34e0f73b90952054bf60fe8be",
+    "event_type": "codex.startup_phase",
+    "occurred_at": "2026-07-28T12:00:00Z",
+    "privacy_level": "operational",
+    "provider": "openai",
+    "provider_extensions": {
+      "log_attributes": {
+        "event.name": "codex.startup_phase"
+      },
+      "resource_attributes": {
+        "service.name": "codex_exec",
+        "service.version": "0.153.4"
+      },
+      "session_lifecycle": {
+        "duration_ms": "17",
+        "entrypoint": "codex exec",
+        "kind": "startup_phase",
+        "phase": "init",
+        "provenance": "observed",
+        "source_event": "codex.startup_phase",
+        "startup.phase": "init",
+        "startup.status": "ok",
+        "status": "ok"
+      },
+      "severity": "INFO"
+    },
+    "received_at": "2026-07-28T12:00:00Z",
+    "repository_id": null,
+    "schema_version": "0.1.0",
+    "session_id": "codex:lifecycle-session",
+    "source_schema": "otel",
+    "source_version": "0.153.4",
+    "task_id": null,
+    "tool": "codex"
+  },
+  {
+    "actor_id": "unavailable",
+    "attributes": {
+      "duration_ms": 23,
+      "entrypoint": "codex exec",
+      "lifecycle_kind": "websocket_connect",
+      "lifecycle_status": "success",
+      "unavailable_fields": [
+        "cache_usage",
+        "reasoning_tokens",
+        "file_operations",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost",
+        "command_execution",
+        "tool_calls",
+        "task_outcome"
+      ]
+    },
+    "device_id": "unavailable",
+    "event_id": "codex-log:c051163444147bb5b3375899ea068237b617dd96f4bd68d58048c57b2b64e883",
+    "event_type": "codex.websocket_connect",
+    "occurred_at": "2026-09-06T18:02:43.000000002Z",
+    "privacy_level": "operational",
+    "provider": "openai",
+    "provider_extensions": {
+      "log_attributes": {
+        "event.name": "codex.websocket_connect"
+      },
+      "resource_attributes": {
+        "service.name": "codex_exec",
+        "service.version": "0.153.4"
+      },
+      "session_lifecycle": {
+        "duration_ms": "23",
+        "entrypoint": "codex exec",
+        "kind": "websocket_connect",
+        "provenance": "observed",
+        "source_event": "codex.websocket_connect",
+        "status": "success",
+        "success": true
+      },
+      "severity": "INFO"
+    },
+    "received_at": "2026-07-28T12:00:00Z",
+    "repository_id": null,
+    "schema_version": "0.1.0",
+    "session_id": "codex:lifecycle-session",
+    "source_schema": "otel",
+    "source_version": "0.153.4",
+    "task_id": null,
+    "tool": "codex"
+  }
+]

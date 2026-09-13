@@ -98,6 +98,128 @@ func TestCodexLogsIngestEndToEnd(t *testing.T) {
 	assertNoRawIdentifiers(t, canaries, marshalJSON(t, stored))
 }
 
+const rawCodexLifecycleOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
+  {"key":"service.name","value":{"stringValue":"codex_exec"}},
+  {"key":"service.version","value":{"stringValue":"0.153.4"}},
+  {"key":"host.name","value":{"stringValue":"lifecycle-host.example.test"}},
+  {"key":"user.account_id","value":{"stringValue":"lifecycle-account-123"}},
+  {"key":"authorization","value":{"stringValue":"Bearer tiq-canary-lifecycle-resource-token"}}]},
+ "scopeLogs":[{"logRecords":[
+   {"attributes":[
+     {"key":"event.name","value":{"stringValue":"codex.conversation_starts"}},
+     {"key":"conversation.id","value":{"stringValue":"synthetic-lifecycle-session"}},
+     {"key":"model","value":{"stringValue":"gpt-6-astra"}},
+     {"key":"approval_policy","value":{"stringValue":"on-request"}},
+     {"key":"sandbox_policy","value":{"stringValue":"workspace-write"}},
+     {"key":"auth_mode","value":{"stringValue":"api-key"}},
+     {"key":"terminal.type","value":{"stringValue":"pty"}},
+     {"key":"slug","value":{"stringValue":"tiq-canary-lifecycle-slug"}},
+     {"key":"user.email","value":{"stringValue":"lifecycle-user@example.test"}}],
+    "body":{"stringValue":"tiq-canary-lifecycle-body"},"timeUnixNano":"1788717763000000000"},
+   {"attributes":[
+     {"key":"event.name","value":{"stringValue":"codex.startup_phase"}},
+     {"key":"conversation.id","value":{"stringValue":"synthetic-lifecycle-session"}},
+     {"key":"startup.phase","value":{"stringValue":"init"}},
+     {"key":"startup.status","value":{"stringValue":"ok"}},
+     {"key":"duration_ms","value":{"stringValue":"17"}}],"timeUnixNano":"1788717763000000001"},
+   {"attributes":[
+     {"key":"event.name","value":{"stringValue":"codex.websocket_connect"}},
+     {"key":"conversation.id","value":{"stringValue":"synthetic-lifecycle-session"}},
+     {"key":"success","value":{"boolValue":true}},
+     {"key":"duration_ms","value":{"stringValue":"23"}}],"timeUnixNano":"1788717763000000002"}
+  ]}]}]}`
+
+func TestCodexLifecycleIngestExposesActiveSession(t *testing.T) {
+	repository, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = repository.Close() })
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
+	t.Cleanup(server.Close)
+
+	response := postOTLPToPath(t, server.URL, "/v1/logs", []byte(rawCodexLifecycleOTLPLogs), "application/json")
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("ingest status = %d", response.StatusCode)
+	}
+	closeBody(t, response)
+
+	sessions := fetchSessionList(t, server.URL+"/api/v1/sessions?limit=10")
+	if len(sessions.Data) != 1 {
+		t.Fatalf("expected 1 Codex lifecycle session, got %d: %#v", len(sessions.Data), sessions.Data)
+	}
+	session := sessions.Data[0]
+	if session.SessionID != "codex:synthetic-lifecycle-session" || session.State != "active" || session.CompletedAt != nil {
+		t.Fatalf("session lifecycle = %#v", session)
+	}
+	if session.Availability["outcome"] != "observed" || session.Availability["completed_at"] != "unavailable" {
+		t.Fatalf("session availability = %#v", session.Availability)
+	}
+
+	events := timelinePage(t, server.URL+"/api/v1/sessions/codex:synthetic-lifecycle-session/events?limit=10")
+	if len(events.Data) != 3 {
+		t.Fatalf("timeline events = %d, want 3: %#v", len(events.Data), events.Data)
+	}
+	assertCodexLifecycleTimeline(t, events.Data)
+
+	canaries := codexLifecycleCanaries()
+	assertNoRawIdentifiers(t, canaries, marshalJSON(t, sessions))
+	assertNoRawIdentifiers(t, canaries, marshalJSON(t, events))
+
+	stored, err := repository.ListEvents(t.Context(), storage.EventFilter{SessionID: "codex:synthetic-lifecycle-session", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNoRawIdentifiers(t, canaries, marshalJSON(t, stored))
+}
+
+func assertCodexLifecycleTimeline(t *testing.T, events []timelineEvent) {
+	t.Helper()
+	start := findTimelineEvent(events, "session.active")
+	if start == nil || start.LifecycleKind == nil || *start.LifecycleKind != "session_start" || start.Entrypoint == nil || *start.Entrypoint != "codex exec" {
+		t.Fatalf("start timeline event = %#v", start)
+	}
+	if slices.Contains(start.UnavailableFields, "session_lifecycle") {
+		t.Fatalf("session_lifecycle must be available: %#v", start.UnavailableFields)
+	}
+	assertCodexStartupTimelineEvent(t, findTimelineEvent(events, "codex.startup_phase"))
+	assertCodexWebsocketTimelineEvent(t, findTimelineEvent(events, "codex.websocket_connect"))
+}
+
+func assertCodexStartupTimelineEvent(t *testing.T, event *timelineEvent) {
+	t.Helper()
+	if event == nil || event.LifecyclePhase == nil || *event.LifecyclePhase != "init" || event.LifecycleStatus == nil || *event.LifecycleStatus != "ok" || event.DurationMs == nil || *event.DurationMs != "17" {
+		t.Fatalf("startup timeline event = %#v", event)
+	}
+}
+
+func assertCodexWebsocketTimelineEvent(t *testing.T, event *timelineEvent) {
+	t.Helper()
+	if event == nil || event.LifecycleStatus == nil || *event.LifecycleStatus != "success" || event.DurationMs == nil || *event.DurationMs != "23" {
+		t.Fatalf("websocket timeline event = %#v", event)
+	}
+}
+
+func findTimelineEvent(events []timelineEvent, eventType string) *timelineEvent {
+	for index := range events {
+		if events[index].EventType == eventType {
+			return &events[index]
+		}
+	}
+	return nil
+}
+
+func codexLifecycleCanaries() []string {
+	return []string{
+		"tiq-canary-lifecycle-resource-token",
+		"tiq-canary-lifecycle-slug",
+		"tiq-canary-lifecycle-body",
+		"lifecycle-host.example.test",
+		"lifecycle-account-123",
+		"lifecycle-user@example.test",
+	}
+}
+
 const rawCodexToolResultOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
   {"key":"service.name","value":{"stringValue":"codex_exec"}},
   {"key":"service.version","value":{"stringValue":"0.153.4"}},

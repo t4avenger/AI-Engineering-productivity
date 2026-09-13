@@ -41,6 +41,6 @@ test('renders Codex cached and reasoning tokens ingested through the live daemon
   await expect(page.getByText('Cached input tokens')).toBeVisible();
   await expect(page.getByText('Reasoning tokens')).toBeVisible();
   await expect(page.getByText('300')).toBeVisible();
-  await expect(page.getByText('55')).toBeVisible();
+  await expect(page.getByText('55 tokens')).toBeVisible();
   await expect(page.getByText('tiq-canary-live-codex-token')).toHaveCount(0);
 });

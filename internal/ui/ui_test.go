@@ -366,6 +366,20 @@ func (errStub) ListSessions(context.Context, storage.SessionFilter) ([]canonical
 	return nil, context.DeadlineExceeded
 }
 
+func TestTimelineRendersLifecycleSignals(t *testing.T) {
+	now := time.Now().UTC()
+	event := canonical.Event{
+		EventID: "lifecycle-event", EventType: "session.active", SessionID: "lifecycle-session",
+		OccurredAt: now, ReceivedAt: now, Provider: "openai", Tool: "codex",
+		Attributes: map[string]any{
+			"lifecycle_kind":     "session_start",
+			"entrypoint":         "codex exec",
+			"unavailable_fields": []string{"tool_calls"},
+		},
+	}
+	assertTimelineContains(t, "lifecycle-session", event, "Session active", "Lifecycle", "session_start", "Entrypoint", "codex exec")
+}
+
 func TestTimelineRendersToolDecisionApprovals(t *testing.T) {
 	now := time.Now().UTC()
 	// Flat cases avoid Sonar CPD pairing near-identical Event/map literals.

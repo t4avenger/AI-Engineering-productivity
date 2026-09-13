@@ -59,8 +59,15 @@ operation duration when present. Operation IDs include the session identity plus
 provider call ID when present, so replay deduplication cannot collapse reused
 call IDs from different sessions. `tool_calls` is removed from
 `attributes.unavailable_fields` only for `codex.tool_result`;
-`command_execution` is removed only for `codex.sandbox_outcome`. Other Codex
-log events keep those fields unavailable.
+`command_execution` is removed only for `codex.sandbox_outcome`. Codex
+`codex.conversation_starts` is normalised to canonical `session.active` and
+stamps `lifecycle_kind=session_start`, while `codex.startup_phase` and
+`codex.websocket_connect` retain safe lifecycle/governance evidence such as
+phase, status, duration, entrypoint, auth mode, approval policy, sandbox policy,
+and terminal type. These lifecycle-backed events remove `session_lifecycle` from
+`attributes.unavailable_fields`; session end remains unknown because no reviewed
+Codex 0.153.4 fixture proves a completion signal. Other Codex log events keep
+those fields unavailable.
 
 When a `codex.tool_result` carries a non-empty `mcp_server`, the event normaliser
 also keeps the existing explicit MCP-use signal under
@@ -96,6 +103,10 @@ Codex log shape into stable-primitive `canonical.ModelInteraction` records
 - **Tool-call operations** (`supported` for `codex.tool_result`) and **command-execution operations** (`supported` for `codex.sandbox_outcome`) are extracted into `canonical.Operation` by `ExtractLogOperations`, persisted by the live `/v1/logs` path, and exposed in operation stats on the Insights page. Timeline events still carry operation ID, category, outcome, and duration for the evidence browser. Operation ordering uses observed log timestamps when present, falling back to receive time only when absent. Known observed Codex tool names map conservatively (`exec_command` -> shell command, `apply_patch` -> filesystem write); sandbox outcomes are categorised as shell commands because the reviewed event proves sandboxed command execution but does not retain raw command arguments. Unknown tool-result names stay `unknown`.
 - **Approval/permission decisions** (`supported` for `codex.tool_decision`) are retained as event-level approval signals rather than `canonical.Operation` records, because they describe permission decisions before/around a tool call, not execution itself. Missing decisions are labelled `unknown`; approved/denied variants are normalised without retaining prompt, response, command args, output, account identifiers, emails, or slug values.
 - **MCP-backed tool results** (`partial` for MCP inventory) are represented only when Codex reports a non-empty `mcp_server`; the provider-reported raw server name is retained under `provider_extensions.mcp_call` and is itself the correlation identity.
+- **Session lifecycle/governance** (`partial`) maps `codex.conversation_starts`
+  to canonical `session.active` and keeps safe startup/websocket governance
+  metadata on the timeline. Session end is still `unknown` pending fixture-backed
+  evidence.
 - **Session/request identity** uses the raw `codex:<conversation.id>` for the
   session when a conversation ID is present. Request IDs and records without a
   conversation ID use a non-keyed content ID for deterministic correlation and

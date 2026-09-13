@@ -31,6 +31,10 @@ signals: `input_token_count`, `output_token_count`, `cached_input_token_count`,
 and `reasoning_token_count`. Missing or malformed provider values remain
 absent/null rather than becoming `0`.
 
+Session event timeline entries include optional lifecycle fields for retained
+session/governance signals: `lifecycle_kind`, `lifecycle_phase`,
+`lifecycle_status`, and `entrypoint`.
+
 Session event timeline entries include optional operation fields for retained
 tool-call signals: `operation_id`, `category`, `outcome`, and `duration_ms`.
 `operation_id` is session-scoped when the provider reports a call ID, preventing

@@ -1,0 +1,188 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "openai",
+  "tool": "codex",
+  "tool_version": "0.153.4",
+  "captured_at": "2026-09-10T20:09:20Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "resourceLogs": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.153.4"
+              }
+            },
+            {
+              "key": "host.name",
+              "value": {
+                "stringValue": "lifecycle-host.example.test"
+              }
+            },
+            {
+              "key": "user.account_id",
+              "value": {
+                "stringValue": "lifecycle-account-123"
+              }
+            }
+          ]
+        },
+        "scopeLogs": [
+          {
+            "logRecords": [
+              {
+                "attributes": [
+                  {
+                    "key": "event.name",
+                    "value": {
+                      "stringValue": "codex.conversation_starts"
+                    }
+                  },
+                  {
+                    "key": "conversation.id",
+                    "value": {
+                      "stringValue": "lifecycle-session"
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "gpt-6-astra"
+                    }
+                  },
+                  {
+                    "key": "approval_policy",
+                    "value": {
+                      "stringValue": "on-request"
+                    }
+                  },
+                  {
+                    "key": "sandbox_policy",
+                    "value": {
+                      "stringValue": "workspace-write"
+                    }
+                  },
+                  {
+                    "key": "auth_mode",
+                    "value": {
+                      "stringValue": "api-key"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "pty"
+                    }
+                  },
+                  {
+                    "key": "reasoning_summary",
+                    "value": {
+                      "stringValue": "tiq-canary-lifecycle-reasoning"
+                    }
+                  },
+                  {
+                    "key": "slug",
+                    "value": {
+                      "stringValue": "tiq-canary-lifecycle-slug"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "lifecycle-user@example.test"
+                    }
+                  }
+                ],
+                "body": {
+                  "stringValue": "tiq-canary-lifecycle-body"
+                },
+                "severityText": "INFO"
+              },
+              {
+                "attributes": [
+                  {
+                    "key": "event.name",
+                    "value": {
+                      "stringValue": "codex.startup_phase"
+                    }
+                  },
+                  {
+                    "key": "conversation.id",
+                    "value": {
+                      "stringValue": "lifecycle-session"
+                    }
+                  },
+                  {
+                    "key": "startup.phase",
+                    "value": {
+                      "stringValue": "init"
+                    }
+                  },
+                  {
+                    "key": "startup.status",
+                    "value": {
+                      "stringValue": "ok"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "stringValue": "17"
+                    }
+                  }
+                ],
+                "severityText": "INFO"
+              },
+              {
+                "attributes": [
+                  {
+                    "key": "event.name",
+                    "value": {
+                      "stringValue": "codex.websocket_connect"
+                    }
+                  },
+                  {
+                    "key": "conversation.id",
+                    "value": {
+                      "stringValue": "lifecycle-session"
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "stringValue": "23"
+                    }
+                  },
+                  {
+                    "key": "endpoint",
+                    "value": {
+                      "stringValue": "wss://tiq-canary-lifecycle-endpoint.example.test/ws"
+                    }
+                  }
+                ],
+                "severityText": "INFO",
+                "timeUnixNano": "1788717763000000002"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
