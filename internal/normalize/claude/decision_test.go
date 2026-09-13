@@ -225,16 +225,7 @@ func TestNormalizeLogsToolDecisionFallbackApprovalIDsAreUnique(t *testing.T) {
 // canary (full command / MCP server+tool names on the wire) and the prompt.id
 // identifier never reach canonical output.
 func TestNormalizeLogsRecognisesToolDecisionEvent(t *testing.T) {
-	var wrapper struct {
-		Payload json.RawMessage `json:"payload"`
-	}
-	if err := json.Unmarshal(readFixture(t, "claude-code-2.1.270-tool-decision-otlp.json"), &wrapper); err != nil {
-		t.Fatalf("decode fixture: %v", err)
-	}
-	events, err := NormalizeLogs([]byte(wrapper.Payload), time.Unix(0, 0).UTC())
-	if err != nil {
-		t.Fatalf("normalise: %v", err)
-	}
+	events := normalizeObservedOTLPLogs(t, "claude-code-2.1.270-tool-decision-otlp.json")
 	if len(events) != 3 {
 		t.Fatalf("expected 3 tool_decision events, got %d", len(events))
 	}
