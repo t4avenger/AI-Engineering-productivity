@@ -167,7 +167,7 @@ func assistantEvent(line []byte, receivedAt time.Time) (canonical.Event, error) 
 	}
 	occurredAt = occurredAt.UTC()
 
-	sessionID := normalize.ProviderNativeSessionID("claude-code:", sessionIDRaw)
+	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, sessionIDRaw)
 	// The per-line uuid makes the event ID deterministic, so a SessionEnd hook
 	// re-shipping a now-complete transcript fills in earlier gaps idempotently
 	// via INSERT OR IGNORE rather than duplicating events.
@@ -279,7 +279,7 @@ func transcriptEnvelope(record transcriptRecord) map[string]any {
 		envelope["user_type"] = record.UserType
 	}
 	if record.RequestID != "" {
-		envelope["request_id"] = "claude-code:" + record.RequestID
+		envelope["request_id"] = nativeSessionPrefix + record.RequestID
 	}
 	if record.Effort != "" {
 		envelope["effort"] = record.Effort

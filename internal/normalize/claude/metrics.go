@@ -210,7 +210,7 @@ func tokenUsageEvent(point metricDataPoint, index int, ctx metricContext, unit s
 
 	occurredAt := metricTime(point.TimeUnixNano, ctx.receivedAt)
 	model, modelObserved := normalize.ObservedString(fields["model"])
-	sessionID := normalize.ProviderNativeSessionID("claude-code:", stringAttr(fields, "session.id"))
+	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, "session.id"))
 	safeFields := safeMetricAttributes(fields)
 
 	// session.id is part of the event's semantic identity but is not in the

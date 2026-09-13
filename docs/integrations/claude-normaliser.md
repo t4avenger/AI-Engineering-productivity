@@ -41,9 +41,10 @@ promoted identifiers.
 
 ## Model-interaction records — `ExtractModelInteractions`
 
-Only `api_request` events become a `canonical.ModelInteraction`. An
-`mcp_server_connection` is a connection lifecycle event, not a tool invocation, so
-no `Operation` record is fabricated from it (Claude MCP **calls** stay `unknown`).
+Only `api_request` events become a `canonical.ModelInteraction`. Executed tool
+calls are carried by `canonical.Operation` via `ExtractOperations` (below), not
+this record. An `mcp_server_connection` is a connection lifecycle event, not a
+tool invocation, so no `Operation` is fabricated from it.
 
 Only signals the P2 Claude Code matrix marks `supported`/`partial` are extracted:
 
@@ -62,6 +63,34 @@ Only signals the P2 Claude Code matrix marks `supported`/`partial` are extracted
 
 Records are sorted by `started_at`, `request_id`, and `completed_at`, then
 deduplicated by `request_id`.
+
+## Operation records — `ExtractOperations`
+
+Only `tool_result` events become a `canonical.Operation` — the first real
+evidence of an executed tool call (capability matrix "Tool calls (generic)",
+#92). Every other event is skipped, never turned into a fabricated operation.
+
+- **Outcome** ← `success`, which arrives as the string `"true"`/`"false"` on the
+  wire (a bool is tolerated); an absent or unrecognised value stays `"unknown"`,
+  never a fabricated `success`/`failed`.
+- **Category** (`OperationCategory`, §10.5) is classified from `tool_name`
+  without fabricating what it cannot prove: `mcp__…` prefix (or a
+  `mcp_server_scope`) → `MCP call`; `Bash` → shell command; `Read`/`Glob`/`Grep`
+  → filesystem read; `Write`/`Edit` → filesystem write; `WebFetch`/`WebSearch` →
+  network request; anything else stays `unknown` (still promoted as a generic
+  tool call). MCP-call correlation detail is owned by #104.
+- **OperationID** prefers the provider `tool_use_id`, then the integral
+  `event_sequence`, then a content hash, so operations never silently collide.
+- **ProviderExtensions** preserve every raw field verbatim (`tool_name`,
+  `tool_use_id`, `success`, `duration_ms`, `error_type`,
+  `decision_type`/`decision_source`, the size counters, `mcp_server_scope`)
+  under `event` — including the fields that also derive the typed
+  Category/Outcome, since those are derived views, not replacements. An absent
+  `duration_ms` is omitted, never coerced to `0`.
+
+Tool input parameters and result bodies (gated content) are out of scope —
+owned by the JSONL issues. Operations are ordered and deduplicated by
+`CorrelateOperations`.
 
 ## Metrics path — `NormalizeMetrics`
 

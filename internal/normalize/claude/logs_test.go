@@ -125,6 +125,39 @@ func requireConnectionExtensions(t *testing.T, events []canonical.Event) map[str
 	return nil
 }
 
+func TestNormalizeLogsRecognisesToolResultEvent(t *testing.T) {
+	var wrapper struct {
+		Payload json.RawMessage `json:"payload"`
+	}
+	if err := json.Unmarshal(readFixture(t, "claude-code-2.1.263-tool-result-otlp.json"), &wrapper); err != nil {
+		t.Fatalf("decode fixture: %v", err)
+	}
+	events, err := NormalizeLogs([]byte(wrapper.Payload), time.Unix(0, 0).UTC())
+	if err != nil {
+		t.Fatalf("normalise: %v", err)
+	}
+	if len(events) != 3 {
+		t.Fatalf("expected 3 tool_result events, got %d", len(events))
+	}
+	for _, event := range events {
+		if event.EventType != "tool_result" {
+			t.Fatalf("event type = %q, want tool_result", event.EventType)
+		}
+		// tool_result is executed-tool-call evidence, so tool_calls is no longer
+		// reported as an unavailable field on the event.
+		for _, field := range event.Attributes["unavailable_fields"].([]string) {
+			if field == "tool_calls" {
+				t.Fatalf("tool_calls must not be unavailable on a tool_result event")
+			}
+		}
+		// The raw tool fields survive verbatim under provider_extensions.event.
+		echo := event.ProviderExtensions["event"].(map[string]any)
+		if echo["tool_name"] == nil || echo["success"] == nil {
+			t.Fatalf("tool fields dropped from event echo: %#v", echo)
+		}
+	}
+}
+
 func TestNormalizeLogsRejectsPayloadWithoutClaudeResources(t *testing.T) {
 	other := `{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_cli_rs"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}}]}]}]}]}`
 	if _, err := NormalizeLogs([]byte(other), time.Unix(0, 0).UTC()); err != ErrUnsupportedLogs {

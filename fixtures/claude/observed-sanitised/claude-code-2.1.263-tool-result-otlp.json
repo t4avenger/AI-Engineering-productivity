@@ -1,0 +1,79 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.263",
+  "captured_at": "2026-09-06T18:10:00Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "resourceLogs": [
+      {
+        "resource": {
+          "attributes": [
+            { "key": "service.name", "value": { "stringValue": "claude-code" } },
+            { "key": "service.version", "value": { "stringValue": "2.1.263" } }
+          ]
+        },
+        "scopeLogs": [
+          {
+            "scope": {
+              "name": "com.anthropic.claude_code.events",
+              "version": "2.1.263"
+            },
+            "logRecords": [
+              {
+                "attributes": [
+                  { "key": "session.id", "value": { "stringValue": "synthetic-session-tools" } },
+                  { "key": "event.name", "value": { "stringValue": "tool_result" } },
+                  { "key": "event.timestamp", "value": { "stringValue": "2026-09-06T18:10:00.100Z" } },
+                  { "key": "event.sequence", "value": { "intValue": "4" } },
+                  { "key": "tool_name", "value": { "stringValue": "Bash" } },
+                  { "key": "tool_use_id", "value": { "stringValue": "toolu_synthetic_bash" } },
+                  { "key": "success", "value": { "stringValue": "true" } },
+                  { "key": "duration_ms", "value": { "intValue": "1234" } },
+                  { "key": "decision_type", "value": { "stringValue": "accept" } },
+                  { "key": "decision_source", "value": { "stringValue": "config" } },
+                  { "key": "tool_input_size_bytes", "value": { "intValue": "96" } },
+                  { "key": "tool_result_size_bytes", "value": { "intValue": "512" } }
+                ]
+              },
+              {
+                "attributes": [
+                  { "key": "session.id", "value": { "stringValue": "synthetic-session-tools" } },
+                  { "key": "event.name", "value": { "stringValue": "tool_result" } },
+                  { "key": "event.timestamp", "value": { "stringValue": "2026-09-06T18:10:00.200Z" } },
+                  { "key": "event.sequence", "value": { "intValue": "5" } },
+                  { "key": "tool_name", "value": { "stringValue": "Read" } },
+                  { "key": "tool_use_id", "value": { "stringValue": "toolu_synthetic_read" } },
+                  { "key": "success", "value": { "stringValue": "false" } },
+                  { "key": "duration_ms", "value": { "intValue": "12" } },
+                  { "key": "error_type", "value": { "stringValue": "Error:ENOENT" } },
+                  { "key": "decision_type", "value": { "stringValue": "accept" } },
+                  { "key": "decision_source", "value": { "stringValue": "user_temporary" } },
+                  { "key": "tool_input_size_bytes", "value": { "intValue": "48" } },
+                  { "key": "tool_result_size_bytes", "value": { "intValue": "0" } }
+                ]
+              },
+              {
+                "attributes": [
+                  { "key": "session.id", "value": { "stringValue": "synthetic-session-tools" } },
+                  { "key": "event.name", "value": { "stringValue": "tool_result" } },
+                  { "key": "event.timestamp", "value": { "stringValue": "2026-09-06T18:10:00.300Z" } },
+                  { "key": "event.sequence", "value": { "intValue": "6" } },
+                  { "key": "tool_name", "value": { "stringValue": "mcp__synthetic-fs__read_file" } },
+                  { "key": "tool_use_id", "value": { "stringValue": "toolu_synthetic_mcp" } },
+                  { "key": "success", "value": { "stringValue": "true" } },
+                  { "key": "decision_type", "value": { "stringValue": "accept" } },
+                  { "key": "decision_source", "value": { "stringValue": "hook" } },
+                  { "key": "mcp_server_scope", "value": { "stringValue": "project" } },
+                  { "key": "tool_input_size_bytes", "value": { "intValue": "64" } }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

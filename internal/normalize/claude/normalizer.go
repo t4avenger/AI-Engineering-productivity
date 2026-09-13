@@ -26,6 +26,9 @@ const (
 	unavailable            = "unavailable"
 	provider               = "anthropic"
 	tool                   = "claude-code"
+	// nativeSessionPrefix namespaces provider-native session and request IDs so
+	// they never collide with another tool's identifiers.
+	nativeSessionPrefix = tool + ":"
 
 	sourceTypeOTLPEvents      = "otlp_http_json_logs"
 	sourceTypeCapabilityProbe = "local_cli_capability_probe"
@@ -33,6 +36,7 @@ const (
 	eventAPIRequest     = "api_request"
 	eventAPIError       = "api_error"
 	eventSkillActivated = "skill_activated"
+	eventToolResult     = "tool_result"
 )
 
 // NormalizeEvents maps the reviewed Claude Code OTLP event fixture into
@@ -81,7 +85,7 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 	if err != nil {
 		return canonical.Event{}, err
 	}
-	nativeSessionID := normalize.ProviderNativeSessionID("claude-code:", sessionID)
+	nativeSessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, sessionID)
 	eventID := nativeSessionID + ":" + sequenceKey(raw, index)
 
 	extensions := map[string]any{
@@ -89,7 +93,7 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 		"event":       normalize.UnknownFields(raw, promotedEventFields(name)...),
 	}
 	if requestID := normalize.OptionalString(raw, "request_id"); requestID != nil {
-		extensions["request_id"] = "claude-code:" + *requestID
+		extensions["request_id"] = nativeSessionPrefix + *requestID
 	}
 	attachSkillDetection(extensions, raw, name)
 	attachOutcomeContract(extensions, raw, name)
@@ -225,6 +229,12 @@ func unavailableFields(eventName string) []string {
 	case eventAPIRequest, eventAPIError:
 		// Provider-completion outcome contracts are stamped for these events.
 		return common
+	case eventToolResult:
+		// tool_result is the first real evidence of an executed tool call, so
+		// tool_calls is not unavailable here; the typed tool-call signal is
+		// promoted into canonical.Operation by ExtractOperations. The event
+		// carries no model/token identity of its own.
+		return []string{"model", "token_usage", "cache_usage", "task_outcome", "mcp_calls", "file_operations", "reasoning_tokens", "repository_context", "prompt_content", "response_content", "provider_cost", "trace_span_correlation"}
 	default:
 		return append([]string{"model", "token_usage", "cache_usage", "task_outcome"}, common...)
 	}
