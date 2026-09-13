@@ -51,6 +51,11 @@ func TestNormalizeLogCachedReasoningTokensGolden(t *testing.T) {
 	assertLogEventsGolden(t, "codex-0.153.4-cached-reasoning-log.json", "codex-0.153.4-cached-reasoning-log.events.json", "cached/reasoning token events")
 }
 
+func TestNormalizeLogSessionLifecycleGolden(t *testing.T) {
+	t.Parallel()
+	assertLogEventsGolden(t, "codex-0.153.4-session-lifecycle-otlp.json", "codex-0.153.4-session-lifecycle.events.json", "session lifecycle events")
+}
+
 func assertLogEventsGolden(t *testing.T, fixture, golden, label string) {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "fixtures", "codex", "observed-sanitised", fixture))

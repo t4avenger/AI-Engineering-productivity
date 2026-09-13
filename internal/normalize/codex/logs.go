@@ -347,14 +347,18 @@ func codexErrorCode(fields map[string]any, status string) string {
 }
 
 func codexLogAttributes(fields map[string]any) map[string]any {
-	switch stringValue(fields[codexEventNameKey], "") {
+	eventName := stringValue(fields[codexEventNameKey], "")
+	switch eventName {
 	case codexSandboxOutcomeEvent:
 		return allowedCodexAttributes(fields, codexEventNameKey)
 	case codexToolDecisionEvent:
 		return allowedCodexAttributes(fields, codexEventNameKey, "model")
 	}
+	if codexLifecycleEvent(eventName) {
+		return allowedCodexAttributes(fields, codexEventNameKey)
+	}
 	known := []string{"mcp_server", "conversation.id"}
-	switch stringValue(fields[codexEventNameKey], "") {
+	switch eventName {
 	case codexToolResultEvent:
 		known = append(known, codexToolResultFieldKeys()...)
 	}
@@ -378,7 +382,7 @@ func codexLifecycleFieldKeys(eventName string) []string {
 	keys := []string{"auth_mode", "originator", "terminal.type"}
 	switch eventName {
 	case codexConversationStarts:
-		keys = append(keys, "approval_policy", "provider_name", "reasoning_summary", "sandbox_policy")
+		keys = append(keys, "approval_policy", "provider_name", "sandbox_policy")
 	case codexStartupPhaseEvent:
 		keys = append(keys, "startup.phase", "startup.status", "duration_ms")
 	case codexWebsocketConnect:
