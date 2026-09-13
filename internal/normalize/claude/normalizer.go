@@ -26,6 +26,9 @@ const (
 	unavailable            = "unavailable"
 	provider               = "anthropic"
 	tool                   = "claude-code"
+	// nativeSessionPrefix namespaces provider-native session and request IDs so
+	// they never collide with another tool's identifiers.
+	nativeSessionPrefix = tool + ":"
 
 	sourceTypeOTLPEvents      = "otlp_http_json_logs"
 	sourceTypeCapabilityProbe = "local_cli_capability_probe"
@@ -82,7 +85,7 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 	if err != nil {
 		return canonical.Event{}, err
 	}
-	nativeSessionID := normalize.ProviderNativeSessionID("claude-code:", sessionID)
+	nativeSessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, sessionID)
 	eventID := nativeSessionID + ":" + sequenceKey(raw, index)
 
 	extensions := map[string]any{
@@ -90,7 +93,7 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 		"event":       normalize.UnknownFields(raw, promotedEventFields(name)...),
 	}
 	if requestID := normalize.OptionalString(raw, "request_id"); requestID != nil {
-		extensions["request_id"] = "claude-code:" + *requestID
+		extensions["request_id"] = nativeSessionPrefix + *requestID
 	}
 	attachSkillDetection(extensions, raw, name)
 	attachOutcomeContract(extensions, raw, name)

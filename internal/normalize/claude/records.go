@@ -76,10 +76,10 @@ func sampleModelInteraction(raw map[string]any) (canonical.ModelInteraction, boo
 		return canonical.ModelInteraction{}, false, err
 	}
 
-	nativeSessionID := normalize.ProviderNativeSessionID("claude-code:", sessionID)
+	nativeSessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, sessionID)
 	requestID := nativeSessionID + ":" + sequenceSuffix(raw, completed)
 	if rawRequest := normalize.OptionalString(raw, "request_id"); rawRequest != nil {
-		requestID = "claude-code:" + *rawRequest
+		requestID = nativeSessionPrefix + *rawRequest
 	}
 
 	duration := normalize.OptionalTokenCount(raw["duration_ms"])
@@ -153,10 +153,13 @@ func sequenceSuffix(raw map[string]any, completed time.Time) string {
 // Operation identity (OperationID, SessionID) or its correlation block, so they
 // are excluded from the verbatim event echo under provider_extensions. Every
 // remaining field — tool_name, tool_use_id, success, duration_ms, error_type,
-// decision_type, decision_source, the size counters, mcp_server_scope — is
-// preserved raw (epic #87), including the fields that also derive the typed
-// Category/Outcome, since those are derived views, not replacements.
-var operationStructuralFields = []string{"event_name", "event_timestamp", "event_sequence", "session_id", "request_id"}
+// decision_type, decision_source, the size counters, mcp_server_scope, and any
+// request_id — is preserved raw (epic #87), including the fields that also
+// derive the typed Category/Outcome, since those are derived views, not
+// replacements. request_id is deliberately not excluded here: the Operation has
+// no request-ID field and the correlation block does not carry it, so dropping
+// it would lose a safe correlation signal.
+var operationStructuralFields = []string{"event_name", "event_timestamp", "event_sequence", "session_id"}
 
 // ExtractOperations maps tool_result sample events into stable-primitive
 // canonical.Operation records — the first real evidence of an executed tool
@@ -208,7 +211,7 @@ func sampleOperation(index int, raw map[string]any) (canonical.Operation, bool, 
 	if err != nil {
 		return canonical.Operation{}, false, err
 	}
-	nativeSessionID := normalize.ProviderNativeSessionID("claude-code:", sessionID)
+	nativeSessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, sessionID)
 	operationID := nativeSessionID + ":tool:" + operationSuffix(raw, index)
 
 	return canonical.Operation{
@@ -286,9 +289,11 @@ func operationCategory(toolName string, raw map[string]any) canonical.OperationC
 
 // operationSuffix renders the operation-ID suffix, preferring the provider
 // tool_use_id (which also correlates OTel events with hook data), then the
-// integral event_sequence, and finally a content hash so two tool_result events
-// in one session that lack both identifiers stay distinct rather than colliding
-// on a shared suffix and being silently deduplicated.
+// integral event_sequence, and finally an index-qualified content hash so two
+// tool_result events in one session that lack both identifiers stay distinct
+// rather than colliding on a shared suffix and being silently deduplicated by
+// CorrelateOperations. The event index is the sample's deterministic position
+// in the reviewed wrapper, so two byte-identical events never share a suffix.
 func operationSuffix(raw map[string]any, index int) string {
 	if id := firstString(raw, "tool_use_id"); id != "" {
 		return id
@@ -296,9 +301,10 @@ func operationSuffix(raw map[string]any, index int) string {
 	if number, ok := raw["event_sequence"].(float64); ok && number == float64(int64(number)) {
 		return strconv.FormatInt(int64(number), 10)
 	}
+	prefix := "idx" + strconv.Itoa(index) + ":"
 	payload, err := json.Marshal(raw)
 	if err != nil {
-		return "idx" + strconv.Itoa(index)
+		return prefix[:len(prefix)-1]
 	}
-	return contentID("", payload)
+	return contentID(prefix, payload)
 }

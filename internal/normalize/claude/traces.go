@@ -289,7 +289,7 @@ func spanStartTime(nano string) (time.Time, error) {
 // trace-scoped session identity). Raw identifiers are kept verbatim (epic #87).
 func spanSessionID(fields map[string]any, traceID string) string {
 	if raw := strings.TrimSpace(stringAttr(fields, "session.id")); raw != "" {
-		return normalize.ProviderNativeSessionID("claude-code:", raw)
+		return normalize.ProviderNativeSessionID(nativeSessionPrefix, raw)
 	}
 	return "claude-code:trace:" + traceID
 }

@@ -218,6 +218,67 @@ func TestExtractOperationsOutcomeUnknownWithoutSuccess(t *testing.T) {
 	}
 }
 
+func TestExtractOperationsPreservesRequestID(t *testing.T) {
+	payload := map[string]any{
+		"fixture_version": 1, "fixture_origin": "synthetic", "provider": "anthropic", "tool": "claude-code",
+		"tool_version": "2.1.263", "captured_at": "2026-09-06T18:10:00Z", "sanitisation_reviewed": true,
+		"payload": map[string]any{
+			"source_type": "otlp_http_json_logs",
+			"sample_events": []any{map[string]any{
+				"event_name": "tool_result", "session_id": "s", "event_sequence": float64(1),
+				"event_timestamp": "2026-09-06T18:10:00.000Z", "tool_name": "Bash",
+				"tool_use_id": "toolu_x", "success": "true", "request_id": "req_synthetic",
+			}},
+		},
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	operations, err := ExtractOperations(data)
+	if err != nil {
+		t.Fatalf("extract: %v", err)
+	}
+	// request_id has no typed Operation field, so it must survive raw in the echo
+	// rather than being silently dropped as a structural key (epic #87).
+	echo := operations[0].ProviderExtensions["event"].(map[string]any)
+	if echo["request_id"] != "req_synthetic" {
+		t.Fatalf("request_id must be preserved raw in the event echo: %#v", echo)
+	}
+}
+
+func TestExtractOperationsFallbackIDsStayDistinct(t *testing.T) {
+	// Two byte-identical tool_result events with neither tool_use_id nor an
+	// event_sequence must not collide on a shared content hash and be silently
+	// deduplicated by CorrelateOperations.
+	event := map[string]any{
+		"event_name": "tool_result", "session_id": "s",
+		"event_timestamp": "2026-09-06T18:10:00.000Z", "tool_name": "Bash", "success": "true",
+	}
+	payload := map[string]any{
+		"fixture_version": 1, "fixture_origin": "synthetic", "provider": "anthropic", "tool": "claude-code",
+		"tool_version": "2.1.263", "captured_at": "2026-09-06T18:10:00Z", "sanitisation_reviewed": true,
+		"payload": map[string]any{
+			"source_type":   "otlp_http_json_logs",
+			"sample_events": []any{event, event},
+		},
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	operations, err := ExtractOperations(data)
+	if err != nil {
+		t.Fatalf("extract: %v", err)
+	}
+	if len(operations) != 2 {
+		t.Fatalf("operation count = %d, want 2 distinct fallback IDs", len(operations))
+	}
+	if operations[0].OperationID == operations[1].OperationID {
+		t.Fatalf("identical events must not share an OperationID: %q", operations[0].OperationID)
+	}
+}
+
 func TestExtractOperationsCapabilityProbeYieldsNoRecords(t *testing.T) {
 	operations, err := ExtractOperations(readFixture(t, "claude-code-2.1.251-capability-probe.json"))
 	if err != nil {
