@@ -6,15 +6,28 @@
   <p>Tools appear only after local session data has been observed.</p>
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
   {{with .Content}}
-  {{if .Empty}}
-  <p>Awaiting telemetry</p>
-  {{else}}
-  <ul>
-    {{range .Tools}}
-    <li>{{.Tool}} ({{.Provider}})</li>
+  <section>
+    <h2>Cursor Enterprise OpenTelemetry Export</h2>
+    <p>Ingest status {{template "status-badge" .CursorEnterprise.Status}}</p>
+    {{if .CursorEnterprise.LastSeen}}
+    <p>Last seen <time datetime="{{.CursorEnterprise.LastSeen}}">{{.CursorEnterprise.LastSeen}}</time></p>
     {{end}}
-  </ul>
-  {{end}}
+    <p>Org setup is Team Settings → OpenTelemetry Export: point Cursor at a public HTTPS collector base URL (no <code>/v1</code> suffix) that accepts OTLP/HTTP binary protobuf on <code>/v1/logs</code> and <code>/v1/metrics</code>.</p>
+    <p>See <code>docs/integrations/cursor-enterprise-otel.md</code> for gateway auth, egress IPs, and honest non-goals.</p>
+    <p class="muted">Local-dev only: <code>POST /v1/cursor-agent</code> and the stream-json wrapper are not the org/SaaS path. See <code>docs/integrations/cursor-agent-auto-reporting.md</code>.</p>
+  </section>
+  <section>
+    <h2>Tools observed</h2>
+    {{if .Empty}}
+    <p>Awaiting telemetry. Point Cursor Enterprise OTLP (or another supported tool) at this daemon, then refresh.</p>
+    {{else}}
+    <ul>
+      {{range .Tools}}
+      <li>{{.Tool}} ({{.Provider}})</li>
+      {{end}}
+    </ul>
+    {{end}}
+  </section>
   {{end}}
 </main>
 {{template "shell-end" .}}

@@ -73,7 +73,7 @@ Replace the React/Mantine SPA with a server-rendered local dashboard that helps 
 | `GET /sessions` | Sessions | Find and open readable session evidence |
 | `GET /sessions/{id}` | Session detail | Timeline evidence + provenance + delete |
 | `GET /insights` | Insights | Educate on MCP + skills |
-| `GET /integrations` | Integrations | Observed tools only |
+| `GET /integrations` | Integrations | Observed tools + Cursor Enterprise OTEL setup/status |
 | `GET /privacy` | Privacy | Defaults + DELETE ALL |
 | `GET /costs` | Costs | Secondary estimates only |
 
@@ -186,7 +186,11 @@ MVP filters: document date/tool/provider as later if API query params are not ye
 
 ### Integrations / Privacy / Costs
 
-- **Integrations:** tools derived only from retained sessions; else “Awaiting telemetry”.
+- **Integrations:** Cursor Enterprise OpenTelemetry Export setup + honest
+  observed/`not_observed` ingest status from retained `tool=cursor` sessions;
+  tools list derived only from retained sessions; else “Awaiting telemetry”
+  with a next-step. Never fabricate “connected”; wrapper/`cursor-agent` is
+  local-dev footnote only.
 - **Privacy:** static enforced defaults + typed `DELETE ALL` confirm (must type phrase).
 - **Costs:** aggregate summary and statuses; unknown never shown as `$0`.
 

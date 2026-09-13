@@ -117,13 +117,22 @@ const (
 )
 
 type integrationsData struct {
-	Tools []integrationRow
-	Empty bool
+	Tools            []integrationRow
+	Empty            bool
+	CursorEnterprise cursorEnterpriseStatus
 }
 
 type integrationRow struct {
 	Tool     string
 	Provider string
+}
+
+// cursorEnterpriseStatus is honest ingest health for Cursor Enterprise OTEL
+// (#132). Status is observed only when retained sessions use tool "cursor"
+// (not local-dev "cursor-agent"). Never a fabricated "connected" state.
+type cursorEnterpriseStatus struct {
+	Status   string
+	LastSeen string
 }
 
 type privacyData struct {
@@ -298,20 +307,37 @@ func (s *Server) insightsPage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) integrationsPage(w http.ResponseWriter, r *http.Request) {
 	sessions, err := s.listAllSessions(r)
-	data := integrationsData{}
+	data := integrationsData{
+		CursorEnterprise: cursorEnterpriseStatus{Status: "not_observed"},
+	}
 	if err != nil {
 		s.render(w, tmplIntegrations, layoutData{Title: "Integrations", Nav: "integrations", Health: s.healthLabel(r), Error: "Unable to load integrations.", Content: data})
 		return
 	}
 	seen := map[string]integrationRow{}
+	var latestCursor time.Time
+	cursorSeen := false
 	for _, session := range sessions {
 		key := session.Tool + "|" + session.Provider
 		seen[key] = integrationRow{Tool: session.Tool, Provider: session.Provider}
+		if session.Tool != "cursor" {
+			continue
+		}
+		cursorSeen = true
+		if !session.StartedAt.IsZero() && (latestCursor.IsZero() || session.StartedAt.After(latestCursor)) {
+			latestCursor = session.StartedAt
+		}
 	}
 	for _, row := range seen {
 		data.Tools = append(data.Tools, row)
 	}
 	data.Empty = len(data.Tools) == 0
+	if cursorSeen {
+		data.CursorEnterprise.Status = "observed"
+		if !latestCursor.IsZero() {
+			data.CursorEnterprise.LastSeen = formatTimestamp(latestCursor)
+		}
+	}
 	s.render(w, tmplIntegrations, layoutData{Title: "Integrations", Nav: "integrations", Health: s.healthLabel(r), Content: data})
 }
 

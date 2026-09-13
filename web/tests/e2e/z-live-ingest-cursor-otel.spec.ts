@@ -9,9 +9,10 @@ import {
 } from './live-ingest-helpers';
 
 /**
- * Live end-to-end gate for Cursor Enterprise OTEL (#130): ingest a synthetic
- * api.request log through the real daemon and assert the Sessions UI renders
- * the Cursor tool/session without mocking API responses.
+ * Live end-to-end gate for Cursor Enterprise OTEL (#130/#132): ingest a synthetic
+ * api.request log through the real daemon and assert Sessions + Integrations UI
+ * render the Cursor tool/session and Enterprise observed status without mocking
+ * API responses.
  */
 const liveModel = 'tiq-live-e2e-cursor-model';
 
@@ -57,4 +58,17 @@ test('renders a Cursor Enterprise OTEL session ingested through the live daemon'
   await expect(
     page.getByRole('heading', { name: 'No retained sessions yet.' }),
   ).toHaveCount(0);
+
+  // Integrations (#132): Enterprise setup + honest observed status from retained
+  // tool=cursor sessions (never a fabricated "connected" state).
+  await page.getByRole('link', { name: 'Integrations', exact: true }).click();
+  await expect(
+    page.getByRole('heading', {
+      name: 'Cursor Enterprise OpenTelemetry Export',
+    }),
+  ).toBeVisible();
+  await expect(page.getByText('Team Settings').first()).toBeVisible();
+  await expect(page.getByText('Seen in telemetry').first()).toBeVisible();
+  await expect(page.getByText('cursor (cursor)').first()).toBeVisible();
+  await expect(page.getByText('Not seen in telemetry')).toHaveCount(0);
 });
