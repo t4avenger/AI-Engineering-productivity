@@ -33,6 +33,7 @@ const (
 	eventAPIRequest     = "api_request"
 	eventAPIError       = "api_error"
 	eventSkillActivated = "skill_activated"
+	eventToolResult     = "tool_result"
 )
 
 // NormalizeEvents maps the reviewed Claude Code OTLP event fixture into
@@ -225,6 +226,12 @@ func unavailableFields(eventName string) []string {
 	case eventAPIRequest, eventAPIError:
 		// Provider-completion outcome contracts are stamped for these events.
 		return common
+	case eventToolResult:
+		// tool_result is the first real evidence of an executed tool call, so
+		// tool_calls is not unavailable here; the typed tool-call signal is
+		// promoted into canonical.Operation by ExtractOperations. The event
+		// carries no model/token identity of its own.
+		return []string{"model", "token_usage", "cache_usage", "task_outcome", "mcp_calls", "file_operations", "reasoning_tokens", "repository_context", "prompt_content", "response_content", "provider_cost", "trace_span_correlation"}
 	default:
 		return append([]string{"model", "token_usage", "cache_usage", "task_outcome"}, common...)
 	}
