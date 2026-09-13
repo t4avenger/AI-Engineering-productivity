@@ -47,6 +47,47 @@ func TestNormalizeLogsAcceptsExecService(t *testing.T) {
 	}
 }
 
+func TestNormalizeLogsMapsCachedAndReasoningTokens(t *testing.T) {
+	data := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.version","value":{"stringValue":"0.153.4"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"gpt-5-codex-synthetic"}},{"key":"input_token_count","value":{"stringValue":"1200"}},{"key":"cached_token_count","value":{"stringValue":"300"}},{"key":"output_token_count","value":{"stringValue":"144"}},{"key":"reasoning_token_count","value":{"stringValue":"55"}}],"severityText":"INFO"}]}]}]}`)
+	events, err := NormalizeLogs(data, time.Date(2026, 9, 10, 20, 9, 20, 0, time.UTC))
+	if err != nil || len(events) != 1 {
+		t.Fatalf("events = %#v, %v", events, err)
+	}
+	attributes := events[0].Attributes
+	for key, want := range map[string]int64{
+		"input_token_count":        1200,
+		"cached_input_token_count": 300,
+		"output_token_count":       144,
+		"reasoning_token_count":    55,
+	} {
+		if attributes[key] != want {
+			t.Fatalf("%s = %#v, want %d", key, attributes[key], want)
+		}
+	}
+	unavailable := attributes["unavailable_fields"].([]string)
+	if slices.Contains(unavailable, "cache_usage") || slices.Contains(unavailable, "reasoning_tokens") {
+		t.Fatalf("token availability fields should be removed: %#v", unavailable)
+	}
+}
+
+func TestNormalizeLogsDoesNotFabricateMalformedTokenCounts(t *testing.T) {
+	data := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"cached_token_count","value":{"stringValue":"not-a-number"}},{"key":"reasoning_token_count","value":{"doubleValue":1.5}}],"severityText":"INFO"}]}]}]}`)
+	events, err := NormalizeLogs(data, time.Date(2026, 9, 10, 20, 9, 20, 0, time.UTC))
+	if err != nil || len(events) != 1 {
+		t.Fatalf("events = %#v, %v", events, err)
+	}
+	if _, ok := events[0].Attributes["cached_input_token_count"]; ok {
+		t.Fatalf("malformed cached token count must stay absent: %#v", events[0].Attributes)
+	}
+	if _, ok := events[0].Attributes["reasoning_token_count"]; ok {
+		t.Fatalf("malformed reasoning token count must stay absent: %#v", events[0].Attributes)
+	}
+	unavailable := events[0].Attributes["unavailable_fields"].([]string)
+	if !slices.Contains(unavailable, "cache_usage") || !slices.Contains(unavailable, "reasoning_tokens") {
+		t.Fatalf("unavailable fields should remain when counts are absent: %#v", unavailable)
+	}
+}
+
 func TestNormalizeLogsMapsCodexMCPToolResult(t *testing.T) {
 	data := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_cli_rs"}},{"key":"service.version","value":{"stringValue":"0.153.4"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.tool_result"}},{"key":"mcp_server","value":{"stringValue":"synthetic-filesystem-server"}},{"key":"mcp_server_origin","value":{"stringValue":"config"}},{"key":"tool_name","value":{"stringValue":"read_file"}},{"key":"tool_namespace","value":{"stringValue":"mcp"}},{"key":"call_id","value":{"stringValue":"call_synthetic"}},{"key":"duration_ms","value":{"intValue":"42"}},{"key":"success","value":{"boolValue":true}}],"severityText":"INFO"}]}]}]}`)
 	events, err := NormalizeLogs(data, time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC))
