@@ -21,11 +21,12 @@ const (
 )
 
 type sessionAPI struct {
-	sessions    storage.SessionReader
-	deleter     storage.SessionDeleter
-	eventReader storage.EventReader
-	costReader  storage.CostReader
-	thresholds  InsightThresholds
+	sessions        storage.SessionReader
+	deleter         storage.SessionDeleter
+	eventReader     storage.EventReader
+	operationReader storage.OperationReader
+	costReader      storage.CostReader
+	thresholds      InsightThresholds
 }
 
 type sessionListResponse struct {
@@ -72,8 +73,9 @@ type sessionCursor struct {
 func newSessionAPI(sessions storage.SessionReader, thresholds InsightThresholds) sessionAPI {
 	deleter, _ := sessions.(storage.SessionDeleter)
 	eventReader, _ := sessions.(storage.EventReader)
+	operationReader, _ := sessions.(storage.OperationReader)
 	costReader, _ := sessions.(storage.CostReader)
-	return sessionAPI{sessions: sessions, deleter: deleter, eventReader: eventReader, costReader: costReader, thresholds: thresholds}
+	return sessionAPI{sessions: sessions, deleter: deleter, eventReader: eventReader, operationReader: operationReader, costReader: costReader, thresholds: thresholds}
 }
 
 func (a sessionAPI) list(w http.ResponseWriter, r *http.Request) {

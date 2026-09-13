@@ -1,0 +1,53 @@
+[
+  {
+    "actor_id": "unavailable",
+    "attributes": {
+      "cached_input_token_count": 300,
+      "input_token_count": 1200,
+      "model": "gpt-5-codex-synthetic",
+      "output_token_count": 144,
+      "reasoning_token_count": 55,
+      "unavailable_fields": [
+        "session_lifecycle",
+        "file_operations",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost",
+        "command_execution",
+        "tool_calls",
+        "task_outcome"
+      ]
+    },
+    "device_id": "unavailable",
+    "event_id": "codex-log:e2034be2db445f7c01469991080b57dc355e5f9097a6a8e287c5ee41c78b5b6d",
+    "event_type": "codex.sse_event",
+    "occurred_at": "2026-07-28T12:00:00Z",
+    "privacy_level": "operational",
+    "provider": "openai",
+    "provider_extensions": {
+      "log_attributes": {
+        "cached_token_count": "300",
+        "event.name": "codex.sse_event",
+        "input_token_count": "1200",
+        "model": "gpt-5-codex-synthetic",
+        "output_token_count": "144",
+        "reasoning_token_count": "55"
+      },
+      "resource_attributes": {
+        "service.name": "codex_exec",
+        "service.version": "0.153.4"
+      },
+      "severity": "INFO"
+    },
+    "received_at": "2026-07-28T12:00:00Z",
+    "repository_id": null,
+    "schema_version": "0.1.0",
+    "session_id": "codex:synthetic-cached-reasoning-session",
+    "source_schema": "otel",
+    "source_version": "0.153.4",
+    "task_id": null,
+    "tool": "codex"
+  }
+]

@@ -21,11 +21,12 @@ var defaultContextWasteThresholds = insights.ContextWasteThresholds{
 }
 
 type fullStub struct {
-	sessions []canonical.Session
-	events   map[string][]canonical.Event
-	costs    []cost.Record
-	deleted  []string
-	cleared  bool
+	sessions   []canonical.Session
+	events     map[string][]canonical.Event
+	operations []canonical.Operation
+	costs      []cost.Record
+	deleted    []string
+	cleared    bool
 }
 
 func (s *fullStub) Session(_ context.Context, id string) (canonical.Session, bool, error) {
@@ -61,6 +62,10 @@ func (s *fullStub) DeleteAllSessions(context.Context) error {
 
 func (s *fullStub) ListEvents(_ context.Context, filter storage.EventFilter) ([]canonical.Event, error) {
 	return append([]canonical.Event(nil), s.events[filter.SessionID]...), nil
+}
+
+func (s *fullStub) ListOperations(context.Context, storage.OperationFilter) ([]canonical.Operation, error) {
+	return append([]canonical.Operation(nil), s.operations...), nil
 }
 
 func (s *fullStub) ListCostRecords(context.Context, string) ([]cost.Record, error) {
@@ -159,6 +164,19 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 				},
 			}},
 		},
+		operations: []canonical.Operation{{
+			SchemaVersion: canonical.RecordSchemaVersion,
+			OperationID:   "op-1",
+			SessionID:     "s1",
+			Provider:      "openai",
+			Tool:          "codex",
+			Category:      canonical.OperationCategoryShellCommand,
+			Outcome:       "success",
+			Provenance:    canonical.ProvenanceObserved,
+			ProviderExtensions: map[string]any{"tool_call": map[string]any{
+				"duration_ms": "92",
+			}},
+		}},
 		costs: []cost.Record{{
 			Currency: "USD",
 			Status:   "calculated",
@@ -189,10 +207,15 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 		{"/sessions/s1", "2 tokens"},
 		{"/insights", "MCP inventory"},
 		{"/insights", "Skill usage"},
+		{"/insights", "Operations"},
+		{"/insights", "shell command"},
+		{"/insights", "92 ms"},
 		{"/insights", "Model performance"},
 		{"/insights", "1234 ms"},
 		{"/insights", "Context pressure"},
 		{"/integrations", "codex"},
+		{"/integrations", "Cursor Enterprise OpenTelemetry Export"},
+		{"/integrations", "Team Settings"},
 		{"/privacy", "local-only"},
 		{"/privacy?confirm=1", "Type DELETE ALL"},
 		{"/costs", "1.500000"},
@@ -778,5 +801,122 @@ func TestTimelinePartialRejectsInvalidSessionID(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("invalid timeline id status = %d", rec.Code)
+	}
+}
+
+func TestIntegrationsCursorEnterpriseStatus(t *testing.T) {
+	start := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
+	later := start.Add(45 * time.Minute)
+
+	tests := []struct {
+		name     string
+		repo     storage.SessionReader
+		want     []string
+		wantNone []string
+	}{
+		{
+			name: "unavailable when only local-dev cursor-agent sessions exist",
+			repo: &fullStub{sessions: []canonical.Session{
+				{SessionID: "codex:s1", Provider: "openai", Tool: "codex", StartedAt: start},
+				{SessionID: "cursor-agent:local", Provider: "cursor", Tool: "cursor-agent", StartedAt: start},
+			}},
+			want: []string{
+				"Cursor Enterprise OpenTelemetry Export",
+				"Team Settings",
+				"OpenTelemetry Export",
+				"docs/integrations/cursor-enterprise-otel.md",
+				"protected-gateway",
+				"Do not expose the unauthenticated loopback daemon",
+				"Not available from this provider",
+				"Local-dev only",
+				"POST /v1/cursor-agent",
+				"cursor-agent (cursor)",
+			},
+			wantNone: []string{
+				`scripts/cursor-agent-tiq "say ok"`,
+				`class="status status-observed"`,
+				"Seen in telemetry",
+			},
+		},
+		{
+			name: "observed uses latest event time not session start",
+			repo: &fullStub{
+				sessions: []canonical.Session{{
+					SessionID: "cursor:enterprise-session",
+					Provider:  "cursor",
+					Tool:      "cursor",
+					StartedAt: start,
+				}},
+				events: map[string][]canonical.Event{
+					"cursor:enterprise-session": {{
+						EventID:    "e1",
+						EventType:  "model_interaction",
+						OccurredAt: start,
+						ReceivedAt: start,
+						Provider:   "cursor",
+						Tool:       "cursor",
+					}, {
+						EventID:    "e2",
+						EventType:  "model_interaction",
+						OccurredAt: later,
+						ReceivedAt: later,
+						Provider:   "cursor",
+						Tool:       "cursor",
+					}},
+				},
+			},
+			want: []string{
+				"Cursor Enterprise OpenTelemetry Export",
+				"Team Settings",
+				"Seen in telemetry",
+				"Last seen",
+				"2026-09-13T12:45:00Z",
+				"cursor (cursor)",
+			},
+			wantNone: []string{
+				"Not available from this provider",
+				"Awaiting telemetry",
+				"2026-09-13T12:00:00Z",
+			},
+		},
+		{
+			name: "storage failure is unknown not unavailable",
+			repo: errStub{},
+			want: []string{
+				"Unable to load integrations.",
+				"Not proven yet",
+			},
+			wantNone: []string{
+				"Not available from this provider",
+				"Seen in telemetry",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assertIntegrationsBody(t, tc.repo, tc.want, tc.wantNone)
+		})
+	}
+}
+
+func assertIntegrationsBody(t *testing.T, repo storage.SessionReader, want, wantNone []string) {
+	t.Helper()
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	body := getAuthed(t, handler, cookie, "/integrations").Body.String()
+	for _, fragment := range want {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("missing %q in body: %q", fragment, body)
+		}
+	}
+	for _, fragment := range wantNone {
+		if strings.Contains(body, fragment) {
+			t.Fatalf("unexpected %q in body: %q", fragment, body)
+		}
 	}
 }

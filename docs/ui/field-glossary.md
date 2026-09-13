@@ -152,6 +152,8 @@ strings.
 | `category` | Category | Provider-independent operation category from the canonical operation enum. | Label | Show `Unknown` when the tool name is observed but not safely mapped. |
 | `outcome` | Outcome | Observed operation result such as `success`, `failed`, or `unknown`. | Label | Do not turn absent status into success or failure. |
 | `duration_ms` | Duration | Observed operation duration in milliseconds. | Duration | Leave unavailable when absent or unparseable; never display as zero unless the provider reported zero. |
+| `total_operations` | Total operations | Count of persisted canonical operation records. | Count | Count only retained operation records; do not infer from session counts. |
+| `average_duration_ms` | Average duration | Mean duration across operation records with observed `duration_ms`. | Duration | Average only observed duration samples; unavailable durations are excluded, not treated as zero. |
 | `approval_id` | Approval ID | Session-scoped provider approval decision ID when observed, or deterministic event fallback when absent. | Identifier | Show only for timeline entries that represent reviewed authorization decisions. |
 | `approval_decision` | Approval | Normalized approval decision such as `approved`, `denied`, or `unknown`. | Label | Missing provider decisions stay `unknown`; do not infer approval from execution success. |
 | `approval_reason_class` | Reason | Provider-reported class for why the decision was made, such as `policy` or `sandbox`. | Label | Leave unavailable when absent; do not display raw prompts, commands, paths, or credentials as a reason. |

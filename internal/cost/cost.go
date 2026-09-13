@@ -235,6 +235,14 @@ func token(value any) (int64, bool) {
 		if err == nil && n >= 0 {
 			return n, true
 		}
+	case int64:
+		if v >= 0 {
+			return v, true
+		}
+	case int:
+		if v >= 0 {
+			return int64(v), true
+		}
 	}
 	return 0, false
 }

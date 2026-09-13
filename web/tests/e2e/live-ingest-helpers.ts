@@ -61,6 +61,122 @@ export function codexOTLPLogs(model: string): string {
   });
 }
 
+function codexExecOTLPLogs(
+  attributes: Array<{ key: string; value: { stringValue: string } }>,
+  body: string,
+): string {
+  return JSON.stringify({
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'codex_exec' } },
+            { key: 'service.version', value: { stringValue: '0.153.4' } },
+          ],
+        },
+        scopeLogs: [
+          {
+            logRecords: [{ attributes, body: { stringValue: body } }],
+          },
+        ],
+      },
+    ],
+  });
+}
+
+function codexStringAttrs(
+  entries: Array<[string, string]>,
+): Array<{ key: string; value: { stringValue: string } }> {
+  return entries.map(([key, stringValue]) => ({ key, value: { stringValue } }));
+}
+
+export function codexCachedReasoningOTLPLogs(): string {
+  return codexExecOTLPLogs(
+    codexStringAttrs([
+      ['event.name', 'codex.sse_event'],
+      ['conversation.id', 'tiq-live-e2e-codex-token-session'],
+      ['model', 'gpt-5-codex-live'],
+      ['input_token_count', '1200'],
+      ['cached_token_count', '300'],
+      ['output_token_count', '144'],
+      ['reasoning_token_count', '55'],
+      ['arguments', '--token=tiq-canary-live-codex-token'],
+    ]),
+    'tiq-canary-live-codex-token-body',
+  );
+}
+
+export function codexToolResultOTLPLogs(): string {
+  return codexExecOTLPLogs(
+    [
+      { key: 'event.name', value: { stringValue: 'codex.tool_result' } },
+      {
+        key: 'conversation.id',
+        value: { stringValue: 'tiq-live-e2e-operation-codex' },
+      },
+      { key: 'tool_name', value: { stringValue: 'exec_command' } },
+      { key: 'tool_namespace', value: { stringValue: 'functions' } },
+      {
+        key: 'call_id',
+        value: { stringValue: 'tiq-live-e2e-operation-call' },
+      },
+      { key: 'duration_ms', value: { stringValue: '92' } },
+      { key: 'success', value: { stringValue: 'true' } },
+      {
+        key: 'arguments',
+        value: { stringValue: '--token=tiq-canary-live-operation' },
+      },
+    ],
+    'tiq-canary-live-operation-body',
+  );
+}
+
+export function claudeToolResultOTLPLogs(): string {
+  return JSON.stringify({
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'claude-code' } },
+            { key: 'service.version', value: { stringValue: '2.1.263' } },
+          ],
+        },
+        scopeLogs: [
+          {
+            logRecords: [
+              {
+                attributes: [
+                  { key: 'event.name', value: { stringValue: 'tool_result' } },
+                  {
+                    key: 'event.timestamp',
+                    value: { stringValue: '2026-09-06T14:50:01Z' },
+                  },
+                  { key: 'event.sequence', value: { intValue: '11' } },
+                  {
+                    key: 'session.id',
+                    value: { stringValue: 'tiq-live-e2e-operation-claude' },
+                  },
+                  { key: 'tool_name', value: { stringValue: 'Bash' } },
+                  {
+                    key: 'tool_use_id',
+                    value: { stringValue: 'toolu_live_operation_bash' },
+                  },
+                  { key: 'duration_ms', value: { intValue: '1234' } },
+                  { key: 'success', value: { stringValue: 'true' } },
+                  {
+                    key: 'tool_input',
+                    value: { stringValue: 'tiq-canary-live-operation-input' },
+                  },
+                ],
+                body: { stringValue: 'tiq-canary-live-operation-claude-body' },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
 
 export function codexToolDecisionOTLPLogs(): string {
   return JSON.stringify({

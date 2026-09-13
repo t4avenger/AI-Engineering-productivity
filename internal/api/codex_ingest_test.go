@@ -23,7 +23,9 @@ const rawCodexOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
      {"key":"event.name","value":{"stringValue":"codex.sse_event"}},
      {"key":"model","value":{"stringValue":"tiq-live-codex-model"}},
      {"key":"input_token_count","value":{"stringValue":"42"}},
+     {"key":"cached_token_count","value":{"stringValue":"21"}},
      {"key":"output_token_count","value":{"stringValue":"7"}},
+     {"key":"reasoning_token_count","value":{"stringValue":"3"}},
      {"key":"arguments","value":{"stringValue":"--token=tiq-canary-argument-token"}},
      {"key":"output","value":{"stringValue":"tiq-canary-output"}},
      {"key":"custom_metadata","value":{"stringValue":"token=tiq-canary-provider-extension"}},
@@ -68,6 +70,16 @@ func TestCodexLogsIngestEndToEnd(t *testing.T) {
 	if session.Availability["model"] != "observed" {
 		t.Fatalf("model availability = %#v", session.Availability)
 	}
+	timeline := timelinePage(t, server.URL+"/api/v1/sessions/codex:synthetic-conversation/events?limit=10")
+	if len(timeline.Data) != 1 {
+		t.Fatalf("timeline events = %d, want 1: %#v", len(timeline.Data), timeline.Data)
+	}
+	if timeline.Data[0].CachedInputTokenCount == nil || *timeline.Data[0].CachedInputTokenCount != "21" {
+		t.Fatalf("cached input token count = %#v", timeline.Data[0].CachedInputTokenCount)
+	}
+	if timeline.Data[0].ReasoningTokenCount == nil || *timeline.Data[0].ReasoningTokenCount != "3" {
+		t.Fatalf("reasoning token count = %#v", timeline.Data[0].ReasoningTokenCount)
+	}
 
 	canaries := []string{
 		"tiq-canary-argument-token",
@@ -88,7 +100,10 @@ func TestCodexLogsIngestEndToEnd(t *testing.T) {
 
 const rawCodexToolResultOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
   {"key":"service.name","value":{"stringValue":"codex_exec"}},
-  {"key":"service.version","value":{"stringValue":"0.153.4"}}]},
+  {"key":"service.version","value":{"stringValue":"0.153.4"}},
+  {"key":"host.name","value":{"stringValue":"tool-host.example.test"}},
+  {"key":"user.account_id","value":{"stringValue":"tool-account-123"}},
+  {"key":"authorization","value":{"stringValue":"Bearer tiq-canary-tool-resource-token"}}]},
  "scopeLogs":[{"logRecords":[
    {"attributes":[
      {"key":"event.name","value":{"stringValue":"codex.tool_result"}},
@@ -139,6 +154,9 @@ func TestCodexToolResultIngestExposesToolCallSignal(t *testing.T) {
 		"tiq-canary-tool-argument",
 		"tiq-canary-tool-output",
 		"tiq-canary-tool-api-key",
+		"tiq-canary-tool-resource-token",
+		"tool-host.example.test",
+		"tool-account-123",
 		"tool-user@example.test",
 		"tiq-canary-tool-body",
 	}

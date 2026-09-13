@@ -187,9 +187,6 @@ func operationProviderExtensions(input operationInput) map[string]any {
 }
 
 func operationResourceAttributes(input operationInput) map[string]any {
-	if stringValue(input.fields[codexEventNameKey], "") != codexSandboxOutcomeEvent {
-		return input.resource
-	}
 	return allowedCodexAttributes(input.resource, "service.name", "service.version")
 }
 

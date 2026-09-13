@@ -161,6 +161,12 @@ Missing → 404 page with link back to Sessions
 [GET /integrations]
          |
          v
+[Cursor Enterprise section]
+  setup copy (Team Settings → OTEL)
+  status from retained tool=cursor sessions
+  observed | unavailable | unknown (never “connected”)
+         |
+         v
 [Derive distinct tool/provider from sessions]
          |
     empty?
@@ -168,8 +174,9 @@ Missing → 404 page with link back to Sessions
  Yes        No
   |          |
   v          v
-Awaiting   List observed tools only
+Awaiting   List observed tools
 telemetry  (no false “connected” claims)
++ next step
 ```
 
 ---

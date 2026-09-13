@@ -35,8 +35,11 @@ fixture, and a review of any newly evidenced capabilities.
 Codex CLI 0.145.0 was observed exporting OTLP JSON logs with `service.name`
 `codex_cli_rs` (interactive TUI) and `codex_exec` (the non-interactive `codex
 exec` subcommand); the log adapter accepts both. The log adapter retains reviewed operational attributes (`event.name`,
-`model`, `input_token_count`, and `output_token_count`) plus sanitised provider
-extensions. Local Codex 0.153.4 metadata also shows tool telemetry such as
+`model`, `input_token_count`, `output_token_count`, cached-input tokens from
+the observed `cached_token_count` log key, and `reasoning_token_count`) plus
+sanitised provider extensions. Cached and reasoning counts are promoted only
+when they parse as non-negative integer token counts; absent or malformed values
+stay absent rather than becoming `0`. Local Codex 0.153.4 metadata also shows tool telemetry such as
 `codex.tool_decision`, `codex.tool_result`, `codex.sandbox_outcome`,
 `tool_name`, `tool_namespace`, `call_id`, `duration_ms`, `success`,
 `mcp_server`, and `mcp_server_origin`. A `codex.tool_result` now becomes a
@@ -90,7 +93,7 @@ Codex log shape into stable-primitive `canonical.ModelInteraction` records
   distinguishable from a real zero.
 - **Cached and reasoning tokens, task outcome** (`unknown` for typed model records) are left
   `nil`/`"unknown"`; no typed model field is fabricated from provider-extension evidence.
-- **Tool-call operations** (`supported` for `codex.tool_result`) and **command-execution operations** (`supported` for `codex.sandbox_outcome`) are extracted into `canonical.Operation` by `ExtractLogOperations` and exposed on timeline events through operation ID, category, outcome, and duration. Operation ordering uses observed log timestamps when present, falling back to receive time only when absent. Known observed Codex tool names map conservatively (`exec_command` -> shell command, `apply_patch` -> filesystem write); sandbox outcomes are categorised as shell commands because the reviewed event proves sandboxed command execution but does not retain raw command arguments. Unknown tool-result names stay `unknown`.
+- **Tool-call operations** (`supported` for `codex.tool_result`) and **command-execution operations** (`supported` for `codex.sandbox_outcome`) are extracted into `canonical.Operation` by `ExtractLogOperations`, persisted by the live `/v1/logs` path, and exposed in operation stats on the Insights page. Timeline events still carry operation ID, category, outcome, and duration for the evidence browser. Operation ordering uses observed log timestamps when present, falling back to receive time only when absent. Known observed Codex tool names map conservatively (`exec_command` -> shell command, `apply_patch` -> filesystem write); sandbox outcomes are categorised as shell commands because the reviewed event proves sandboxed command execution but does not retain raw command arguments. Unknown tool-result names stay `unknown`.
 - **Approval/permission decisions** (`supported` for `codex.tool_decision`) are retained as event-level approval signals rather than `canonical.Operation` records, because they describe permission decisions before/around a tool call, not execution itself. Missing decisions are labelled `unknown`; approved/denied variants are normalised without retaining prompt, response, command args, output, account identifiers, emails, or slug values.
 - **MCP-backed tool results** (`partial` for MCP inventory) are represented only when Codex reports a non-empty `mcp_server`; the provider-reported raw server name is retained under `provider_extensions.mcp_call` and is itself the correlation identity.
 - **Session/request identity** uses the raw `codex:<conversation.id>` for the

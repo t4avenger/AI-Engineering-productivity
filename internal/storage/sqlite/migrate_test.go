@@ -36,8 +36,11 @@ func TestMigrationDropsProvenanceFromV2Database(t *testing.T) {
 	if err := repo.db.QueryRowContext(ctx, "SELECT MAX(version) FROM schema_migrations").Scan(&version); err != nil {
 		t.Fatalf("read migration version: %v", err)
 	}
-	if version != 3 {
-		t.Fatalf("schema version = %d, want 3", version)
+	if version != 4 {
+		t.Fatalf("schema version = %d, want 4", version)
+	}
+	if _, err := repo.ListOperations(ctx, storage.OperationFilter{}); err != nil {
+		t.Fatalf("operations table after migration: %v", err)
 	}
 
 	// The pre-existing row survives the rebuild and remains queryable.

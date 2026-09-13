@@ -91,6 +91,8 @@ type timelineRow struct {
 	Model             string
 	InputTokens       tokenDisplay
 	OutputTokens      tokenDisplay
+	CachedInputTokens tokenDisplay
+	ReasoningTokens   tokenDisplay
 	ApprovalDecision  string
 	ApprovalReason    string
 	ApprovalTool      string
@@ -108,6 +110,8 @@ type insightsData struct {
 	Skills           insights.SkillUsage
 	ModelPerformance insights.ModelPerformance
 	ContextWaste     insights.ContextWaste
+	Operations       insights.OperationStats
+	OperationErr     string
 	Error            string
 }
 
@@ -117,13 +121,23 @@ const (
 )
 
 type integrationsData struct {
-	Tools []integrationRow
-	Empty bool
+	Tools            []integrationRow
+	Empty            bool
+	CursorEnterprise cursorEnterpriseStatus
 }
 
 type integrationRow struct {
 	Tool     string
 	Provider string
+}
+
+// cursorEnterpriseStatus is honest ingest health for Cursor Enterprise OTEL
+// (#132). Status is observed only when retained sessions use tool "cursor"
+// (not local-dev "cursor-agent"). Absence uses availability enum unavailable;
+// storage failures use unknown. Never a fabricated "connected" state.
+type cursorEnterpriseStatus struct {
+	Status   string
+	LastSeen string
 }
 
 type privacyData struct {
@@ -293,13 +307,22 @@ func (s *Server) insightsPage(w http.ResponseWriter, r *http.Request) {
 		data.ModelPerformance = insights.ModelPerformanceFromEvents(events)
 		data.ContextWaste = insights.ContextWasteFromEvents(events, s.contextWasteThresholds)
 	}
+	operations, err := s.listOperations(r)
+	if err != nil {
+		data.OperationErr = "Operation stats unavailable."
+	} else {
+		data.Operations = insights.OperationStatsFromOperations(operations)
+	}
 	s.render(w, tmplInsights, layoutData{Title: "Insights", Nav: "insights", Health: s.healthLabel(r), Content: data})
 }
 
 func (s *Server) integrationsPage(w http.ResponseWriter, r *http.Request) {
 	sessions, err := s.listAllSessions(r)
-	data := integrationsData{}
+	data := integrationsData{
+		CursorEnterprise: cursorEnterpriseStatus{Status: "unavailable"},
+	}
 	if err != nil {
+		data.CursorEnterprise.Status = "unknown"
 		s.render(w, tmplIntegrations, layoutData{Title: "Integrations", Nav: "integrations", Health: s.healthLabel(r), Error: "Unable to load integrations.", Content: data})
 		return
 	}
@@ -312,7 +335,51 @@ func (s *Server) integrationsPage(w http.ResponseWriter, r *http.Request) {
 		data.Tools = append(data.Tools, row)
 	}
 	data.Empty = len(data.Tools) == 0
+	data.CursorEnterprise = s.cursorEnterpriseFromSessions(r, sessions)
 	s.render(w, tmplIntegrations, layoutData{Title: "Integrations", Nav: "integrations", Health: s.healthLabel(r), Content: data})
+}
+
+// cursorEnterpriseFromSessions derives Enterprise ingest status from retained
+// sessions. Only tool "cursor" counts; last-seen is the latest event time when
+// events are readable, otherwise max(StartedAt, CompletedAt).
+func (s *Server) cursorEnterpriseFromSessions(r *http.Request, sessions []canonical.Session) cursorEnterpriseStatus {
+	status := cursorEnterpriseStatus{Status: "unavailable"}
+	var latest time.Time
+	seen := false
+	for _, session := range sessions {
+		if session.Tool != "cursor" {
+			continue
+		}
+		seen = true
+		if at := s.sessionLastActivity(r, session); !at.IsZero() && (latest.IsZero() || at.After(latest)) {
+			latest = at
+		}
+	}
+	if !seen {
+		return status
+	}
+	status.Status = "observed"
+	if !latest.IsZero() {
+		status.LastSeen = formatTimestamp(latest)
+	}
+	return status
+}
+
+func (s *Server) sessionLastActivity(r *http.Request, session canonical.Session) time.Time {
+	latest := session.StartedAt
+	if session.CompletedAt != nil && session.CompletedAt.After(latest) {
+		latest = *session.CompletedAt
+	}
+	events, err := s.listSessionEvents(r, session.SessionID)
+	if err != nil {
+		return latest
+	}
+	for _, event := range events {
+		if !event.OccurredAt.IsZero() && (latest.IsZero() || event.OccurredAt.After(latest)) {
+			latest = event.OccurredAt
+		}
+	}
+	return latest
 }
 
 func (s *Server) privacyPage(w http.ResponseWriter, r *http.Request) {
@@ -440,23 +507,43 @@ func (s *Server) insightEvents(r *http.Request) ([]canonical.Event, error) {
 	}
 	var events []canonical.Event
 	for _, session := range sessions {
-		var cursor *storage.EventCursor
-		for {
-			page, err := s.events.ListEvents(r.Context(), storage.EventFilter{SessionID: session.SessionID, Limit: 1000, Cursor: cursor})
-			if err != nil {
-				return nil, err
-			}
-			batch := page
-			cursor = nil
-			if len(page) > 1000 {
-				batch = page[:1000]
-				last := batch[len(batch)-1]
-				cursor = &storage.EventCursor{OccurredAt: last.OccurredAt, EventID: last.EventID}
-			}
-			events = append(events, batch...)
-			if cursor == nil {
-				break
-			}
+		batch, err := s.listSessionEvents(r, session.SessionID)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, batch...)
+	}
+	return events, nil
+}
+
+func (s *Server) listOperations(r *http.Request) ([]canonical.Operation, error) {
+	if s.operations == nil {
+		return nil, errUnavailable
+	}
+	return s.operations.ListOperations(r.Context(), storage.OperationFilter{})
+}
+
+func (s *Server) listSessionEvents(r *http.Request, sessionID string) ([]canonical.Event, error) {
+	if s.events == nil {
+		return nil, errUnavailable
+	}
+	var events []canonical.Event
+	var cursor *storage.EventCursor
+	for {
+		page, err := s.events.ListEvents(r.Context(), storage.EventFilter{SessionID: sessionID, Limit: 1000, Cursor: cursor})
+		if err != nil {
+			return nil, err
+		}
+		batch := page
+		cursor = nil
+		if len(page) > 1000 {
+			batch = page[:1000]
+			last := batch[len(batch)-1]
+			cursor = &storage.EventCursor{OccurredAt: last.OccurredAt, EventID: last.EventID}
+		}
+		events = append(events, batch...)
+		if cursor == nil {
+			break
 		}
 	}
 	return events, nil
@@ -513,6 +600,8 @@ func (s *Server) loadTimeline(r *http.Request, sessionID, cursorRaw string) ([]t
 			Model:             attrString(event.Attributes["model"]),
 			InputTokens:       tokenValue(event.Attributes["input_token_count"]),
 			OutputTokens:      tokenValue(event.Attributes["output_token_count"]),
+			CachedInputTokens: tokenValue(event.Attributes["cached_input_token_count"]),
+			ReasoningTokens:   tokenValue(event.Attributes["reasoning_token_count"]),
 			ApprovalDecision:  attrString(event.Attributes["approval_decision"]),
 			ApprovalReason:    attrString(event.Attributes["approval_reason_class"]),
 			ApprovalTool:      approvalToolLabel(approvalToolQualifier(event.Attributes), event.Attributes["tool_name"]),
@@ -724,6 +813,10 @@ func fieldLabel(field string) string {
 		return "Input tokens"
 	case "output_token_count":
 		return "Output tokens"
+	case "cached_input_token_count":
+		return "Cached input tokens"
+	case "reasoning_token_count":
+		return "Reasoning tokens"
 	default:
 		return strings.TrimSpace(strings.NewReplacer("_", " ", ".", " ").Replace(field))
 	}
