@@ -134,6 +134,37 @@ Committed evidence:
 - `fixtures/claude/observed-sanitised/claude-code-2.1.263-api-error-outcome.json`
 - `fixtures/claude/observed-sanitised/claude-code-2.1.263-api-error-outcome-otlp.json`
 
+## Refusal capture (`api_refusal`, E8/#95)
+
+A refusal is the third provider-completion outcome: the Messages API returns
+`stop_reason: "refusal"` as HTTP `200 OK`, and Claude Code emits
+`event.name = api_refusal` with `model`, `request.id`, `duration_ms`,
+`server_fallback_hop`, `has_category`/`has_explanation`, and (under
+`OTEL_LOG_TOOL_DETAILS=1`) `category` / `explanation`.
+
+**Live capture is bounded by content safety.** A genuine `stop_reason: "refusal"`
+only fires for frontier-safety categories (`cyber` / `bio` / `frontier_llm` /
+`reasoning_extraction`). Do **not** author a real bio/cyber/weapons prompt to force
+one. When the E8 fixture was produced, a loopback OTLP-logs sink was stood up and a
+benign `reasoning_extraction` probe was run against a throwaway workspace — it
+produced a normal soft decline (`stop_reason: end_turn`), **not** an API refusal.
+Because the only remaining lever was a harmful-category prompt, the fixture is
+`fixture_origin: "synthetic"`, reproduced from the documented `api_refusal` schema:
+
+- one user-visible refusal (`server_fallback_hop: false`, `has_category: true`,
+  `category: "cyber"`, `has_explanation: true`, `explanation`), and
+- one silently-retried hop (`server_fallback_hop: true`, `has_category: false`,
+  explanation attributes omitted, matching the documented absence).
+
+If a real refusal is ever captured, re-label the fixture `observed-sanitised` and
+record the tool version actually used.
+
+Committed evidence:
+
+- `fixtures/claude/observed-sanitised/claude-code-2.1.263-api-refusal-outcome.json`
+- `fixtures/claude/observed-sanitised/claude-code-2.1.263-api-refusal-outcome-otlp.json`
+- `fixtures/claude/expected/claude-code-2.1.263-api-refusal-outcome.events.json`
+
 ## Session JSONL transcript capture
 
 To capture a session JSONL transcript fixture for `NormalizeTranscript` (F4, #91),

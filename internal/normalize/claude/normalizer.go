@@ -36,6 +36,7 @@ const (
 
 	eventAPIRequest     = "api_request"
 	eventAPIError       = "api_error"
+	eventAPIRefusal     = "api_refusal"
 	eventSkillActivated = "skill_activated"
 	eventToolResult     = "tool_result"
 	eventToolDecision   = "tool_decision"
@@ -228,8 +229,11 @@ func attachSkillDetection(extensions map[string]any, raw map[string]any, eventNa
 }
 
 // attachOutcomeContract stamps a provider-completion outcome contract for
-// reviewed Claude signals: api_request → success, api_error → failed. Broader
-// task contracts (PR/revert/abandon) remain unobserved and are not fabricated.
+// reviewed Claude signals: api_request → success, api_error → failed,
+// api_refusal → refused. A refusal (Messages API stop_reason: "refusal") is a
+// distinct outcome — neither success nor error — that arrives as HTTP 200 and
+// is invisible to error-rate monitoring. Broader task contracts
+// (PR/revert/abandon) remain unobserved and are not fabricated.
 func attachOutcomeContract(extensions map[string]any, raw map[string]any, eventName string) {
 	var status string
 	switch eventName {
@@ -237,6 +241,8 @@ func attachOutcomeContract(extensions map[string]any, raw map[string]any, eventN
 		status = "success"
 	case eventAPIError:
 		status = "failed"
+	case eventAPIRefusal:
+		status = "refused"
 	default:
 		return
 	}
@@ -263,7 +269,37 @@ func attachOutcomeContract(extensions map[string]any, raw map[string]any, eventN
 	if attempt := normalize.OptionalTokenCount(raw["attempt"]); attempt != nil && *attempt > 0 {
 		contract["retry_attempt"] = *attempt
 	}
+	if eventName == eventAPIRefusal {
+		attachRefusalContext(contract, raw)
+	}
 	extensions["outcome_contract"] = contract
+}
+
+// attachRefusalContext carries the api_refusal-specific attributes verbatim (epic
+// #87 — raw capture, no ingest redaction). server_fallback_hop distinguishes a
+// user-visible refusal (false) from one the server-side model fallback silently
+// retried on another model (true); a single turn can emit a true hop event and a
+// later false final event, so callers counting user-visible refusals must filter
+// on server_fallback_hop == false rather than counting every api_refusal. The
+// category/explanation strings are present only under OTEL_LOG_TOOL_DETAILS=1;
+// the has_* booleans are always emitted, so an absent category is explicit rather
+// than silently missing.
+func attachRefusalContext(contract map[string]any, raw map[string]any) {
+	if hop, ok := firstBool(raw, "server_fallback_hop"); ok {
+		contract["server_fallback_hop"] = hop
+	}
+	if hasCategory, ok := firstBool(raw, "has_category"); ok {
+		contract["has_category"] = hasCategory
+	}
+	if hasExplanation, ok := firstBool(raw, "has_explanation"); ok {
+		contract["has_explanation"] = hasExplanation
+	}
+	if category := firstString(raw, "category"); category != "" {
+		contract["category"] = category
+	}
+	if explanation := firstString(raw, "explanation"); explanation != "" {
+		contract["explanation"] = explanation
+	}
 }
 
 func outcomeErrorCode(raw map[string]any) string {
@@ -303,6 +339,19 @@ func firstString(raw map[string]any, keys ...string) string {
 	return ""
 }
 
+// firstBool returns the first key that decodes to a bool. Both the sample-event
+// fixture path (native JSON bool) and the OTLP wire path (logs.go attributeValue
+// decodes boolValue) present these as Go bools, so a typed assertion suffices.
+// The second return distinguishes an absent key from an explicit false.
+func firstBool(raw map[string]any, keys ...string) (bool, bool) {
+	for _, key := range keys {
+		if value, ok := raw[key].(bool); ok {
+			return value, true
+		}
+	}
+	return false, false
+}
+
 func promotedEventFields(eventName string) []string {
 	fields := []string{"event_name", "event_timestamp", "event_sequence", "session_id", "request_id"}
 	switch eventName {
@@ -338,9 +387,9 @@ func gatedEventFields() []string {
 func unavailableFields(eventName string) []string {
 	common := []string{"tool_calls", "mcp_calls", "file_operations", "reasoning_tokens", "repository_context", "prompt_content", "response_content", "provider_cost", "trace_span_correlation", "approvals"}
 	switch eventName {
-	case eventAPIRequest, eventAPIError:
+	case eventAPIRequest, eventAPIError, eventAPIRefusal:
 		// Provider-completion outcome contracts are stamped for these events;
-		// neither carries a permission decision, so approvals stays unavailable.
+		// none carries a permission decision, so approvals stays unavailable.
 		return common
 	case eventToolResult:
 		// tool_result is the first real evidence of an executed tool call, so

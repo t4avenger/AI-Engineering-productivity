@@ -121,6 +121,38 @@ every string, so no real credential can ride under a prompt/response key; the
 credential/path/command field-name blocks (`password`, `token`, `command*`,
 `file_path*`, …) also remain.
 
+## Provider-completion outcome contract — `attachOutcomeContract`
+
+Three log events carry a provider-completion outcome, stamped verbatim under
+`provider_extensions.outcome_contract` (`source: provider_completion`,
+`confidence: observed`) with the observed `model`/`duration_ms`/token counts and,
+when present, `error_code` and `retry_attempt`:
+
+- `api_request` → `status: success`
+- `api_error` → `status: failed`
+- `api_refusal` → `status: refused` (E8, #95)
+
+A **refusal** is the Messages API `stop_reason: "refusal"` — a distinct outcome
+that is neither success nor error and arrives as HTTP `200 OK`, so error-rate or
+5xx monitoring never sees it. `api_refusal` additionally carries, verbatim (epic
+#87 — raw capture, no ingest redaction):
+
+- `server_fallback_hop` (bool) — `true` when the server-side model fallback
+  silently retried this refusal on another model (**the user never saw it — an
+  intermediate hop**); `false` when the request actually ended in a user-visible
+  refusal. A single turn can emit a `true` hop event **and** a later `false` final
+  event, so any count of *user-visible* refusals must filter on
+  `server_fallback_hop == false` rather than counting every `api_refusal`.
+- `has_category` / `has_explanation` (bools, always emitted) plus, only under
+  `OTEL_LOG_TOOL_DETAILS=1`, the `category` (`cyber` | `bio` | `frontier_llm` |
+  `reasoning_extraction`) and `explanation` strings from the API `stop_details`.
+  The has_* booleans keep an absent category explicit rather than silently missing;
+  `has_explanation`/`explanation` are absent on a `server_fallback_hop` event.
+
+Like `api_request`/`api_error`, `api_refusal` produces a `canonical.Event` with the
+outcome contract but **no** `ModelInteraction` record (only `api_request` does —
+see below); the refusal outcome lives at the event level.
+
 ## Model-interaction records — `ExtractModelInteractions`
 
 Only `api_request` events become a `canonical.ModelInteraction`. Executed tool

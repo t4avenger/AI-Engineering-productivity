@@ -1,0 +1,122 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:synthetic-session-refusal:1",
+    "event_type": "api_refusal",
+    "occurred_at": "2026-09-15T00:00:00.05Z",
+    "received_at": "2026-09-15T00:00:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.263",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:synthetic-session-refusal",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:synthetic-session-refusal:1",
+        "ordering_key": "01789430400050000000:claude-code:synthetic-session-refusal:1",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "duration_ms": 642,
+        "has_category": false,
+        "model": "claude-opus-4-8",
+        "server_fallback_hop": true
+      },
+      "outcome_contract": {
+        "confidence": "observed",
+        "duration_ms": 642,
+        "has_category": false,
+        "model": "claude-opus-4-8",
+        "server_fallback_hop": true,
+        "source": "provider_completion",
+        "status": "refused"
+      },
+      "request_id": "claude-code:synthetic-request-refusal-hop"
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:synthetic-session-refusal:2",
+    "event_type": "api_refusal",
+    "occurred_at": "2026-09-15T00:00:00.1Z",
+    "received_at": "2026-09-15T00:00:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.263",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:synthetic-session-refusal",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:synthetic-session-refusal:2",
+        "ordering_key": "01789430400100000000:claude-code:synthetic-session-refusal:2",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "category": "cyber",
+        "duration_ms": 1284,
+        "explanation": "synthetic-refusal-explanation",
+        "has_category": true,
+        "has_explanation": true,
+        "model": "claude-opus-4-8",
+        "server_fallback_hop": false
+      },
+      "outcome_contract": {
+        "category": "cyber",
+        "confidence": "observed",
+        "duration_ms": 1284,
+        "explanation": "synthetic-refusal-explanation",
+        "has_category": true,
+        "has_explanation": true,
+        "model": "claude-opus-4-8",
+        "server_fallback_hop": false,
+        "source": "provider_completion",
+        "status": "refused"
+      },
+      "request_id": "claude-code:synthetic-request-refusal-final"
+    }
+  }
+]
