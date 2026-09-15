@@ -21,10 +21,21 @@ values.
 
 Session list and detail responses include an `availability` object for the
 shared cross-tool fields rendered by the dashboard: `provider`, `tool`,
-`outcome`, `started_at`, `completed_at`, `model`, `observed_events`, and
-`token_usage`. Values are `observed`, `partial`, `unavailable`, `unsupported`,
-or `unknown`. The UI must render non-observed states as labelled cells, never
-as blanks or numeric zeroes.
+`outcome`, `started_at`, `completed_at`, `model`, `entrypoint`,
+`tool_version`, `observed_events`, and `token_usage`. Values are `observed`,
+`partial`, `unavailable`, `unsupported`, or `unknown`. The UI must render
+non-observed states as labelled cells, never as blanks or numeric zeroes.
+
+Reconstructed Codex sessions promote observed resource metadata from retained
+canonical log or metric events into session-level evidence:
+`attributes.entrypoint`, `attributes.service_name`, and
+`attributes.service_version`, with raw `service.name`/`service.version` mirrored
+under `provider_extensions.resource_attributes`. `codex_cli_rs` is displayed as
+`interactive`; `codex_exec` is displayed as `codex exec`. When the session ID
+comes from log-backed `conversation.id`, the session provider extension records
+that source and the raw provider session ID with the stable `codex:` prefix
+separated. Content-derived Codex metric or trace session IDs must not be labelled
+as `conversation.id` evidence.
 
 Session event timeline entries include optional token fields for retained model
 signals: `input_token_count`, `output_token_count`, `cached_input_token_count`,

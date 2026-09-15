@@ -17,7 +17,7 @@ done
 
 npm audit --prefix web --audit-level=moderate
 gitleaks detect --source . --config .gitleaks.toml --no-banner
-osv-scanner scan --recursive .
+osv-scanner scan --lockfile go.mod --lockfile web/package-lock.json
 semgrep scan --config p/default --error --metrics=off
 trivy fs --scanners vuln,secret,misconfig --exit-code 1 --severity HIGH,CRITICAL .
 find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 shellcheck

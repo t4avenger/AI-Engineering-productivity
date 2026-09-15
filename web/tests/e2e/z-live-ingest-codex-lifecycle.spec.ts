@@ -20,16 +20,32 @@ test('renders Codex lifecycle signals ingested through the live daemon', async (
   });
   expect(sessions.status).toBe(200);
   const sessionBody = (await sessions.json()) as {
-    data: Array<{ session_id: string; state: string; completed_at?: string | null }>;
+    data: Array<{
+      session_id: string;
+      state: string;
+      completed_at?: string | null;
+      attributes: Record<string, string>;
+      provider_extensions: Record<string, Record<string, string>>;
+      availability: Record<string, string>;
+    }>;
   };
-  expect(
-    sessionBody.data.some(
-      (session) =>
-        session.session_id === 'codex:tiq-live-e2e-lifecycle-session' &&
-        session.state === 'active' &&
-        session.completed_at == null,
-    ),
-  ).toBe(true);
+  const session = sessionBody.data.find(
+    (candidate) =>
+      candidate.session_id === 'codex:tiq-live-e2e-lifecycle-session',
+  );
+  expect(session?.state).toBe('active');
+  expect(session?.completed_at ?? null).toBeNull();
+  expect(session?.attributes.entrypoint).toBe('codex exec');
+  expect(session?.attributes.service_name).toBe('codex_exec');
+  expect(session?.attributes.service_version).toBe('0.153.4');
+  expect(session?.availability.entrypoint).toBe('observed');
+  expect(session?.availability.tool_version).toBe('observed');
+  expect(session?.provider_extensions.resource_attributes?.['service.name']).toBe(
+    'codex_exec',
+  );
+  expect(session?.provider_extensions.correlation?.provider_session_id).toBe(
+    'tiq-live-e2e-lifecycle-session',
+  );
 
   const timeline = await fetch(
     'http://localhost:18080/api/v1/sessions/codex:tiq-live-e2e-lifecycle-session/events?limit=10',
@@ -61,6 +77,9 @@ test('renders Codex lifecycle signals ingested through the live daemon', async (
 
   await unlockDashboard(page, authToken);
   await page.goto('/sessions/codex:tiq-live-e2e-lifecycle-session');
+  await expect(page.getByRole('heading', { name: 'Environment' })).toBeVisible();
+  await expect(page.getByText('codex_exec')).toBeVisible();
+  await expect(page.getByText('0.153.4')).toBeVisible();
   await expect(page.getByText('Session active')).toBeVisible();
   await expect(page.getByText('Lifecycle').first()).toBeVisible();
   await expect(page.getByText('session_start')).toBeVisible();

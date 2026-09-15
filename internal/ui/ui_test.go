@@ -126,7 +126,10 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 			State:     "completed",
 			StartedAt: now,
 			Attributes: map[string]any{
-				"model": "gpt-test",
+				"model":           "gpt-test",
+				"entrypoint":      "codex exec",
+				"service_name":    "codex_exec",
+				"service_version": "0.153.4",
 			},
 		}},
 		events: map[string][]canonical.Event{
@@ -202,6 +205,9 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 		{"/sessions", "codex · started"},
 		{"/sessions", "Model"},
 		{"/sessions/s1", "Availability"},
+		{"/sessions/s1", "Environment"},
+		{"/sessions/s1", "codex exec"},
+		{"/sessions/s1", "0.153.4"},
 		{"/sessions/s1", "Model interaction"},
 		{"/sessions/s1", "Input tokens"},
 		{"/sessions/s1", "2 tokens"},

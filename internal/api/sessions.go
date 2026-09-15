@@ -263,6 +263,8 @@ func sessionAvailability(session canonical.Session) map[string]string {
 		"started_at":      observedIf(!session.StartedAt.IsZero()),
 		"completed_at":    observedIf(session.CompletedAt != nil),
 		"model":           modelAvailability(session),
+		"entrypoint":      observedIf(sessionStringAttribute(session, "entrypoint") != ""),
+		"tool_version":    observedIf(sessionStringAttribute(session, "service_version") != ""),
 		"observed_events": observedIf(numericAttribute(session.Attributes, "event_count")),
 		"token_usage":     tokenUsageAvailability(session),
 	}
@@ -311,6 +313,14 @@ func tokenUsageAvailability(session canonical.Session) string {
 	default:
 		return "unknown"
 	}
+}
+
+func sessionStringAttribute(session canonical.Session, key string) string {
+	value, ok := session.Attributes[key].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(value)
 }
 
 func numericAttribute(attributes map[string]any, key string) bool {
