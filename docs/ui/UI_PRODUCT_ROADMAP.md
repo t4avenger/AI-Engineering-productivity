@@ -48,7 +48,7 @@ Nav: [internal/ui/templates/partials.html](../../internal/ui/templates/partials.
 
 | Signal | SQLite / API | UI |
 |--------|--------------|-----|
-| Sessions / events | `sessions`, `events` (~7.3k / ~29k locally sampled) | Yes |
+| Sessions / events | `sessions`, `events` (~7.3k / ~29k locally sampled) | Yes — **but list is fragmented** (see [#163](https://github.com/t4avenger/AI-Engineering-productivity/issues/163)) |
 | Operations | `operations` (~1.2k) + timeline projection | Partial (API richer than UI) |
 | Cost records | `cost_records` | Costs page only |
 | MCP inventory / skills / model / context / ops insights | `GET /api/v1/insights/*` | Insights page |
@@ -64,6 +64,7 @@ Local DB path: `{UserConfigDir}/telemetryiq/telemetryiq.db`.
 ### 2.3 Related open issues
 
 - [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148) — **This roadmap’s epic** (`ui-enterprise`)
+- [#163](https://github.com/t4avenger/AI-Engineering-productivity/issues/163) — **Bug:** Sessions list fragmented by content-derived / `codex-log:` IDs (blocks usable #153 / #159)
 - [#71](https://github.com/t4avenger/AI-Engineering-productivity/issues/71) — Dashboard UX epic (partially completed; residual scope points to #148)
 - [#79](https://github.com/t4avenger/AI-Engineering-productivity/issues/79) — Integrations capability-backed value (superseded by #154)
 - [#87](https://github.com/t4avenger/AI-Engineering-productivity/issues/87) — Claude Code full capture
@@ -204,4 +205,7 @@ Epic: [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148
 
 ## 10. Next implementation step
 
-Implement V1 in order: **#149** (shell) → **#151** (Governance findings) → **#152** (allowlist Save) → **#150** / **#153** / **#154** → **#155** (e2e). Highest enterprise signal for least new telemetry is Governance findings + allowlist Save.
+1. **Unblock Sessions UX:** [#163](https://github.com/t4avenger/AI-Engineering-productivity/issues/163) (exclude or correlate content-derived / `codex-log:` session rows — local DBs can be ~99% singletons).
+2. Then V1 UI order: **#149** (shell) → **#151** (Governance findings) → **#152** (allowlist Save) → **#150** / **#153** / **#154** → **#155** (e2e).
+
+Highest enterprise signal for least new telemetry remains Governance findings + allowlist Save; Sessions density work should not ship on top of an unfiltered orphan list.
