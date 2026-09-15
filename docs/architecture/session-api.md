@@ -80,9 +80,10 @@ Claude Code `claude_code.token.usage`, and Cursor Enterprise
 `POST /v1/traces` path that persists Claude Code's enhanced-telemetry beta span
 tree (`claude_code.interaction` → `claude_code.llm_request`) as canonical span
 events. Cursor Enterprise `cursor.api.request` logs are also persisted via
-`/v1/logs`. Other metrics and spans — including a tool without an adapter yet
-(e.g. Codex traces, tracked in #112) — are accepted with HTTP 202 so exporters
-flush, but are not turned into insight rows.
+`/v1/logs`. Other metrics and spans are accepted with HTTP 202 so exporters
+flush, but are not turned into insight rows. Codex trace export is specifically
+unsupported for the reviewed CLI 0.153.4 evidence (#112); Codex-shaped spans are
+accepted but not persisted unless future fixture evidence proves support.
 
 `POST /v1/claude/transcript` accepts Claude Code session JSONL (`application/x-ndjson`
 or `application/jsonl`, 32 MiB cap) and persists normalised `assistant_message`

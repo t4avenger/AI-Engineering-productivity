@@ -109,12 +109,18 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	}
 }
 
-// TestOTLPTracesValidatedThenAcceptedForForeignTool proves the /v1/traces route
-// now behaves like the other signal routes (issue #50 resolved): a body with no
-// resourceSpans array is a validation error, while a well-formed spans payload
-// from another tool is accepted (so exporters flush) yet persists no events.
-func TestOTLPTracesValidatedThenAcceptedForForeignTool(t *testing.T) {
-	server := httptest.NewServer(NewHandler(slog.Default()))
+// TestOTLPTracesValidatedThenAcceptedForUnsupportedCodex proves the /v1/traces
+// route validates OTLP shape but does not invent Codex trace support (#112): a
+// body with no resourceSpans array is a validation error, while a well-formed
+// Codex-service spans payload is accepted (so exporters flush) yet persists no
+// events until an observed Codex trace fixture exists.
+func TestOTLPTracesValidatedThenAcceptedForUnsupportedCodex(t *testing.T) {
+	repository, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = repository.Close() })
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
 	t.Cleanup(server.Close)
 
 	invalid := postOTLPToPath(t, server.URL, "/v1/traces", []byte(`{"ignored":true}`), "application/json")
@@ -125,6 +131,11 @@ func TestOTLPTracesValidatedThenAcceptedForForeignTool(t *testing.T) {
 		t.Fatalf("expected traces status 202, got %d", traces.StatusCode)
 	}
 	closeBody(t, traces)
+
+	sessions := fetchSessionList(t, server.URL+"/api/v1/sessions?limit=10")
+	if len(sessions.Data) != 0 {
+		t.Fatalf("Codex traces must not persist sessions without observed support, got %#v", sessions.Data)
+	}
 }
 
 // TestOTLPProtobufPersistsRecognizedPayloads proves protobuf decode feeds the

@@ -4,11 +4,16 @@ P1 correlation is a normalisation responsibility. Provider adapters must emit ca
 
 ## Deduplication
 
-For Codex OTLP trace spans, the deduplication key is:
+For the synthetic Codex OTLP trace fixture path, the deduplication key is:
 
 ```text
 codex:<traceId>:<spanId>
 ```
+
+Codex CLI 0.153.4 trace export is recorded as unsupported in the capability
+matrix because the F1 capture observed zero `/v1/traces` POSTs. Live `/v1/traces`
+ingest accepts Codex-shaped spans for exporter compatibility but does not persist
+them unless a future reviewed Codex trace fixture proves a supported surface.
 
 The same value is used as the canonical `event_id` and is copied to `provider_extensions.correlation.dedup_key` so downstream storage, diagnostics, and tests can explain why a duplicate collapsed. Replaying a fixture twice must not create a second observation. If two source spans present the same trace/span identity, the normaliser sorts first and keeps one deterministic canonical event for that key.
 
@@ -23,7 +28,7 @@ Adapters must sort canonical events by:
 3. event type, ascending
 4. received time, ascending
 
-Codex trace events also expose `provider_extensions.correlation.ordering_key` as:
+Synthetic Codex trace fixture events also expose `provider_extensions.correlation.ordering_key` as:
 
 ```text
 <zero-padded occurred_at unix nanoseconds>:<event_id>
@@ -45,7 +50,7 @@ These rules make shuffled fixture replay byte-identical after JSON serialisation
 
 ## Trace and span relationships
 
-For Codex OTLP traces, source trace relationships are retained in `provider_extensions.correlation`:
+For the synthetic Codex OTLP trace fixture path, source trace relationships are retained in `provider_extensions.correlation`:
 
 - `trace_id`: observed OTLP `traceId`
 - `span_id`: observed OTLP `spanId`
@@ -55,7 +60,7 @@ For Codex OTLP traces, source trace relationships are retained in `provider_exte
 
 ## Task boundaries
 
-The current reviewed Codex trace and log fixtures do not expose a privacy-safe task-boundary signal. The canonical trace `task_id` therefore remains `null`, and each trace event carries:
+The current reviewed Codex CLI 0.153.4 capture observed no live trace export, and the reviewed Codex trace fixture is synthetic only. Codex logs also do not expose a privacy-safe task-boundary signal. Synthetic trace fixture events therefore keep `task_id` as `null` and carry:
 
 ```json
 {

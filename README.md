@@ -55,10 +55,11 @@ rows.
 
 `POST /v1/traces` accepts OTLP JSON `resourceSpans` (JSON-only today) and
 persists Claude Code's enhanced-telemetry beta span tree
-(`claude_code.interaction` → `claude_code.llm_request`) as canonical span
-events, resolving the former `501`. As with metrics, a payload from a tool
-without a traces adapter yet (e.g. Codex, tracked in #112) is accepted so
-exporters can flush, but is not persisted.
+(`claude_code.interaction` -> `claude_code.llm_request`) as canonical span
+events, resolving the former `501`. Codex CLI 0.153.4 did not emit `/v1/traces`
+payloads in the reviewed F1 capture, so Codex trace export is documented as
+unsupported for that version. If a Codex-shaped spans payload arrives anyway, it
+is accepted so exporters can flush, but is not persisted.
 
 The raw OTLP envelope is never logged or persisted verbatim. The supported,
 observed Codex and Claude Code OTLP shapes are normalised into canonical events
