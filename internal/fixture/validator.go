@@ -155,10 +155,16 @@ func scan(value any, path string) error {
 	return nil
 }
 
+// prohibitedField blocks field NAMES that can only carry credentials, raw
+// commands, or filesystem paths — data the epic never captures. Prompt and
+// response content is deliberately NOT blocked: epic #87 (#94) captures it raw,
+// deferring the per-field visibility decision to a later policy. The value-based
+// likelySecret scan still runs on every string, so no real credential can be
+// committed under a prompt/response key either.
 func prohibitedField(key string) bool {
 	normalized := strings.NewReplacer("_", "", "-", "", " ", "").Replace(strings.ToLower(key))
 	switch normalized {
-	case "prompt", "prompts", "response", "responses", "sourcecode", "command", "commandline", "commandarguments", "commandargs", "filepath", "filepaths", "filename", "filenames", "password", "token", "accesstoken", "apikey", "authorization", "secret":
+	case "sourcecode", "command", "commandline", "commandarguments", "commandargs", "filepath", "filepaths", "filename", "filenames", "password", "token", "accesstoken", "apikey", "authorization", "secret":
 		return true
 	default:
 		return false

@@ -1,0 +1,99 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:synthetic-content-session:2",
+    "event_type": "user_prompt",
+    "occurred_at": "2026-09-13T18:53:02.1Z",
+    "received_at": "2026-09-13T18:53:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.270",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:synthetic-content-session",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "reasoning_tokens",
+        "repository_context",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:synthetic-content-session:2",
+        "ordering_key": "01789325582100000000:claude-code:synthetic-content-session:2",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "command_name": "tiq-probe",
+        "command_source": "custom",
+        "prompt": "synthetic probe prompt for E7 content capture",
+        "prompt_length": 45
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:synthetic-content-session:8",
+    "event_type": "user_prompt",
+    "occurred_at": "2026-09-13T18:53:08.64Z",
+    "received_at": "2026-09-13T18:53:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.270",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:synthetic-content-session",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "reasoning_tokens",
+        "repository_context",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:synthetic-content-session:8",
+        "ordering_key": "01789325588640000000:claude-code:synthetic-content-session:8",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "prompt_length": 128
+      }
+    }
+  }
+]

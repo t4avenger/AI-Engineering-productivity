@@ -39,6 +39,16 @@ const (
 	eventSkillActivated = "skill_activated"
 	eventToolResult     = "tool_result"
 	eventToolDecision   = "tool_decision"
+	// Content-bearing log events (epic #87 / #94). Their length and metadata
+	// primitives and their gated raw content (prompt/response/body/body_ref) ride
+	// verbatim under provider_extensions.event via normalize.UnknownFields — the
+	// same generic path api_request's numeric primitives take; there is no typed
+	// content record. Content keys are deliberately absent from gatedEventFields
+	// and logs.go droppedKeys so nothing is re-redacted at ingest.
+	eventUserPrompt        = "user_prompt"
+	eventAssistantResponse = "assistant_response"
+	eventAPIRequestBody    = "api_request_body"
+	eventAPIResponseBody   = "api_response_body"
 )
 
 // NormalizeEvents maps the reviewed Claude Code OTLP event fixture into
@@ -346,6 +356,26 @@ func unavailableFields(eventName string) []string {
 		// but is not evidence of an executed call, so tool_calls stays
 		// unavailable. It carries no model/token identity of its own.
 		return []string{"model", "token_usage", "cache_usage", "task_outcome", "tool_calls", "mcp_calls", "file_operations", "reasoning_tokens", "repository_context", "prompt_content", "response_content", "provider_cost", "trace_span_correlation"}
+	case eventUserPrompt:
+		// user_prompt carries the prompt text (behind OTEL_LOG_USER_PROMPTS), so
+		// prompt_content is available (removed). It carries no model, tokens, or
+		// response of its own.
+		return []string{"model", "token_usage", "cache_usage", "task_outcome", "tool_calls", "mcp_calls", "file_operations", "reasoning_tokens", "repository_context", "response_content", "provider_cost", "trace_span_correlation", "approvals"}
+	case eventAssistantResponse:
+		// assistant_response carries the response text (behind
+		// OTEL_LOG_ASSISTANT_RESPONSES) and the answering model, so response_content
+		// and model are available (removed). It reports response_length, not tokens.
+		return []string{"token_usage", "cache_usage", "task_outcome", "tool_calls", "mcp_calls", "file_operations", "reasoning_tokens", "repository_context", "prompt_content", "provider_cost", "trace_span_correlation", "approvals"}
+	case eventAPIRequestBody:
+		// api_request_body is the full Messages API request (behind
+		// OTEL_LOG_RAW_API_BODIES): its body is the conversation/prompts, so
+		// prompt_content and model are available (removed); it carries no response.
+		return []string{"token_usage", "cache_usage", "task_outcome", "tool_calls", "mcp_calls", "file_operations", "reasoning_tokens", "repository_context", "response_content", "provider_cost", "trace_span_correlation", "approvals"}
+	case eventAPIResponseBody:
+		// api_response_body is the full Messages API response (behind
+		// OTEL_LOG_RAW_API_BODIES): its body is the model output, so
+		// response_content and model are available (removed); it carries no prompt.
+		return []string{"token_usage", "cache_usage", "task_outcome", "tool_calls", "mcp_calls", "file_operations", "reasoning_tokens", "repository_context", "prompt_content", "provider_cost", "trace_span_correlation", "approvals"}
 	default:
 		return append([]string{"model", "token_usage", "cache_usage", "task_outcome"}, common...)
 	}

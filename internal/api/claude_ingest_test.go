@@ -100,6 +100,70 @@ func TestClaudeLogsIngestEndToEnd(t *testing.T) {
 
 // newPersistentTestServer starts a live persistent daemon backed by an in-memory
 // sqlite repository, returning both for ingest→read gates.
+// rawClaudeUserPromptLogs is a raw Claude Code OTLP/HTTP log payload carrying a
+// single content-present user_prompt event (content logging enabled) plus a
+// prompt.id drop canary. The prompt is synthetic.
+const rawClaudeUserPromptLogs = `{"resourceLogs":[{"resource":{"attributes":[
+  {"key":"service.name","value":{"stringValue":"claude-code"}},
+  {"key":"service.version","value":{"stringValue":"2.1.270"}}]},
+ "scopeLogs":[{"logRecords":[
+   {"attributes":[
+     {"key":"event.name","value":{"stringValue":"user_prompt"}},
+     {"key":"event.timestamp","value":{"stringValue":"2026-09-13T18:53:02.100Z"}},
+     {"key":"event.sequence","value":{"intValue":"2"}},
+     {"key":"session.id","value":{"stringValue":"tiq-content-session"}},
+     {"key":"prompt.id","value":{"stringValue":"tiq-content-prompt-id"}},
+     {"key":"prompt_length","value":{"intValue":"45"}},
+     {"key":"command_name","value":{"stringValue":"tiq-probe"}},
+     {"key":"command_source","value":{"stringValue":"custom"}},
+     {"key":"prompt","value":{"stringValue":"synthetic probe prompt for E7 content capture"}}]}]}]}]}`
+
+// TestClaudeUserPromptContentPersistsRawEndToEnd proves the E7 content path holds
+// through the live daemon: a user_prompt event POSTed to /v1/logs persists as a
+// canonical.Event whose prompt text survives raw in provider_extensions.event
+// (epic #87 — capture raw, no ingest-time re-redaction), the bare prompt.id
+// correlation id is dropped, and the timeline read API reports the event with
+// prompt_content marked available.
+func TestClaudeUserPromptContentPersistsRawEndToEnd(t *testing.T) {
+	server, repository := newPersistentTestServer(t)
+	response := postOTLPToPath(t, server.URL, "/v1/logs", []byte(rawClaudeUserPromptLogs), "application/json")
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("ingest status = %d", response.StatusCode)
+	}
+	closeBody(t, response)
+
+	events, err := repository.ListEvents(context.Background(), storage.EventFilter{SessionID: "claude-code:tiq-content-session", Limit: 10})
+	if err != nil {
+		t.Fatalf("list events: %v", err)
+	}
+	if len(events) != 1 || events[0].EventType != "user_prompt" {
+		t.Fatalf("expected 1 persisted user_prompt event, got %#v", events)
+	}
+	echo, ok := events[0].ProviderExtensions["event"].(map[string]any)
+	if !ok {
+		t.Fatalf("provider_extensions.event missing: %#v", events[0].ProviderExtensions)
+	}
+	if echo["prompt"] != "synthetic probe prompt for E7 content capture" {
+		t.Fatalf("prompt content not persisted raw: %#v", echo)
+	}
+
+	// The bare prompt.id correlation id never reaches storage (owned by #106).
+	if strings.Contains(string(marshalJSON(t, events)), "tiq-content-prompt-id") {
+		t.Fatal("prompt.id correlation id leaked into persisted event")
+	}
+
+	// The timeline read API reports the event with prompt_content available.
+	timeline := getInsightJSON[eventListResponse](t, server.URL+"/api/v1/sessions/"+url.PathEscape("claude-code:tiq-content-session")+"/events")
+	if len(timeline.Data) != 1 || timeline.Data[0].EventType != "user_prompt" {
+		t.Fatalf("timeline missing user_prompt event: %#v", timeline.Data)
+	}
+	for _, field := range timeline.Data[0].UnavailableFields {
+		if field == "prompt_content" {
+			t.Fatalf("prompt_content must be available on user_prompt: %v", timeline.Data[0].UnavailableFields)
+		}
+	}
+}
+
 func newPersistentTestServer(t *testing.T) (*httptest.Server, storage.Repository) {
 	t.Helper()
 	repository, err := sqlite.Open(":memory:")

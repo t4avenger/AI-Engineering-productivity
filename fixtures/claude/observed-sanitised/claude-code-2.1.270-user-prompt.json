@@ -1,0 +1,45 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.270",
+  "captured_at": "2026-09-13T18:53:00Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "source_type": "otlp_http_json_logs",
+    "capture": {
+      "workspace": "isolated_tmp",
+      "telemetry_endpoint": "loopback_dump_receiver",
+      "outcome_signal": "user_prompt",
+      "content_gates": "OTEL_LOG_USER_PROMPTS=1 and OTEL_LOG_TOOL_DETAILS=1 for the content-present event; both unset for the length-only event",
+      "note": "user_prompt always carries prompt_length; command_name/command_source describe a slash/MCP command. The prompt text is present only under OTEL_LOG_USER_PROMPTS=1 (event_sequence 2) and simply absent by default (event_sequence 8) — it is never fabricated or zero-filled. Prompts here are synthetic. prompt is captured raw (epic #87 / #94), not re-redacted at ingest; see the -otlp fixture for the wire form and the dropped prompt.id/message.uuid correlation ids."
+    },
+    "observations": [
+      {
+        "name": "prompt_content",
+        "state": "supported",
+        "evidence": "user_prompt carries prompt (behind OTEL_LOG_USER_PROMPTS) plus prompt_length and command metadata; it maps to a canonical.Event whose provider_extensions.event echoes prompt/prompt_length/command_name/command_source verbatim. The length-only event proves length is reported without any content when the gate is off."
+      }
+    ],
+    "sample_events": [
+      {
+        "event_name": "user_prompt",
+        "session_id": "synthetic-content-session",
+        "event_timestamp": "2026-09-13T18:53:02.100Z",
+        "event_sequence": 2,
+        "prompt_length": 45,
+        "command_name": "tiq-probe",
+        "command_source": "custom",
+        "prompt": "synthetic probe prompt for E7 content capture"
+      },
+      {
+        "event_name": "user_prompt",
+        "session_id": "synthetic-content-session",
+        "event_timestamp": "2026-09-13T18:53:08.640Z",
+        "event_sequence": 8,
+        "prompt_length": 128
+      }
+    ]
+  }
+}
