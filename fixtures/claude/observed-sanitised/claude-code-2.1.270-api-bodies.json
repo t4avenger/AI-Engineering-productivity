@@ -1,0 +1,58 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.270",
+  "captured_at": "2026-09-13T18:53:00Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "source_type": "otlp_http_json_logs",
+    "capture": {
+      "workspace": "isolated_tmp",
+      "telemetry_endpoint": "loopback_dump_receiver",
+      "outcome_signal": "api_request_body / api_response_body",
+      "content_gates": "OTEL_LOG_RAW_API_BODIES=1 (inline body, truncated at CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH) for the inline events; OTEL_LOG_RAW_API_BODIES=file:<dir> (body written to disk, event carries body_ref) for the body_ref event",
+      "note": "api_request_body / api_response_body are emitted only under OTEL_LOG_RAW_API_BODIES; there is no length-only shape (the events are simply absent when the gate is off). The request body is the full Messages API request (the conversation/prompts); the response body is the model output. body is captured raw and body_ref is a pointer, both echoed verbatim (epic #87 / #94), never re-redacted at ingest. Bodies here are synthetic and truncated. See the -otlp fixture for the wire form and the dropped prompt.id/message.uuid correlation ids."
+    },
+    "observations": [
+      {
+        "name": "raw_api_bodies",
+        "state": "supported",
+        "evidence": "api_request_body/api_response_body carry body (inline) or body_ref (file mode) plus body_length, body_truncated, and model; each maps to a canonical.Event whose provider_extensions.event echoes those fields verbatim. api_request_body marks prompt_content available, api_response_body marks response_content available."
+      }
+    ],
+    "sample_events": [
+      {
+        "event_name": "api_request_body",
+        "session_id": "synthetic-content-session",
+        "event_timestamp": "2026-09-13T18:53:09.200Z",
+        "event_sequence": 9,
+        "model": "claude-opus-4-8",
+        "body_length": 96,
+        "body_truncated": false,
+        "body": "{\"model\":\"claude-opus-4-8\",\"messages\":[{\"role\":\"user\",\"content\":\"synthetic E7 request body\"}]}"
+      },
+      {
+        "event_name": "api_response_body",
+        "session_id": "synthetic-content-session",
+        "event_timestamp": "2026-09-13T18:53:13.050Z",
+        "event_sequence": 11,
+        "model": "claude-opus-4-8",
+        "body_length": 88,
+        "body_truncated": false,
+        "body": "{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"synthetic E7 response body\"}]}"
+      },
+      {
+        "event_name": "api_request_body",
+        "session_id": "synthetic-content-session",
+        "event_timestamp": "2026-09-13T18:53:16.700Z",
+        "event_sequence": 15,
+        "model": "claude-opus-4-8",
+        "body_length": 121904,
+        "body_truncated": false,
+        "body_ref": "raw-api-bodies/synthetic-e7-request.json"
+      }
+    ]
+  }
+}

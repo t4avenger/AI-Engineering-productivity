@@ -79,6 +79,48 @@ boundary by `NormalizeLogs` (`logs.go` `droppedKeys`) and never reaches
 the MCP server/tool identity from that gated blob is deferred to a follow-up
 (the reject/`mcp` decision here classifies only `tool_source: mcp`).
 
+### Prompt & response content path
+
+The four content-bearing `/v1/logs` events — `user_prompt`, `assistant_response`,
+`api_request_body`, `api_response_body` (#94) — are the highest-signal,
+highest-sensitivity Claude surface. They carry no typed content record:
+`ModelInteraction`/`Operation` hold only numeric primitives (`sampleOperation`
+even strips content), so — exactly like `api_request`'s token numerics — every
+non-structural field, **content included**, rides verbatim under
+`provider_extensions.event` via `normalize.UnknownFields`. Nothing about content
+is promoted, hidden, or re-redacted at ingest (epic #87 — capture raw, defer the
+per-field visibility policy):
+
+- `user_prompt` → `prompt_length`, `command_name`, `command_source`, and (behind
+  `OTEL_LOG_USER_PROMPTS=1`) the raw `prompt`. When the gate is off the `prompt`
+  key is simply **absent** — `prompt_length` is still reported and the prompt is
+  never fabricated or zero-filled.
+- `assistant_response` → `response_length`, `model`, `query_source`, the namespaced
+  `request_id`, and (behind `OTEL_LOG_ASSISTANT_RESPONSES=1`) the raw `response`.
+  By default the provider emits the literal string `"<REDACTED>"`; it is captured
+  **as received**, not dropped and not re-redacted.
+- `api_request_body` / `api_response_body` → `model`, `body_length`,
+  `body_truncated`, and (behind `OTEL_LOG_RAW_API_BODIES=1`) either the inline raw
+  `body` or, in `file:<dir>` mode, a `body_ref` pointer — both echoed verbatim.
+
+`unavailable_fields` is precise per event so an absent signal stays explicit:
+`prompt_content` is available (removed) on `user_prompt` and `api_request_body`
+(the request body is the conversation/prompts); `response_content` and `model` are
+available on `assistant_response` and `api_response_body` (the response body is the
+model output). No content key is added to `gatedEventFields()`, and none is in
+`logs.go` `droppedKeys`, so content survives both the reviewed-fixture and live-wire
+paths. The bare `prompt.id`/`message.uuid` correlation identifiers **are** dropped
+at the wire boundary — mapping those into canonical correlation is #106 (X19)'s job,
+not E7.
+
+To let synthetic content-present fixtures be committed, the shared fixture
+validator (`internal/fixture/validator.go`) no longer prohibits the field names
+`prompt`/`prompts`/`response`/`responses`. Its value-based `likelySecret` scan
+(credential regexes + length/entropy heuristic) is untouched and still runs on
+every string, so no real credential can ride under a prompt/response key; the
+credential/path/command field-name blocks (`password`, `token`, `command*`,
+`file_path*`, …) also remain.
+
 ## Model-interaction records — `ExtractModelInteractions`
 
 Only `api_request` events become a `canonical.ModelInteraction`. Executed tool
@@ -224,9 +266,11 @@ the redacted `user_prompt`) by default.
 `request_id` as raw provider-prefixed native correlation keys
 (`claude-code:<session_id>`) — epic #87 removed ingest-time hiding, so there is no
 HMAC fingerprint and no fallback redaction. The fixture validator runs before
-mapping, rejecting prohibited field names (prompt/response/source-code content)
-so that content is not captured by default; its configurable capture is tracked
-in #94.
+mapping; it no longer prohibits the `prompt`/`response` field names — Claude
+prompt/response and raw API body content is now captured raw (#94), deferring the
+per-field visibility policy — but its value-based secret/entropy scan and the
+credential/path/command field-name blocks remain, so no real credential can be
+committed. See "Prompt & response content path" above.
 
 ## Golden fixtures
 
@@ -241,6 +285,13 @@ in #94.
 - `fixtures/claude/expected/claude-code-2.1.269-session-transcript.events.json` —
   canonical `assistant_message` events for the committed session JSONL transcript
   fixture (`claude-code-2.1.269-session-transcript.json`).
+- `fixtures/claude/expected/claude-code-2.1.270-user-prompt.events.json` — canonical
+  `user_prompt` events (content-present + length-only) for the committed content
+  fixture (`claude-code-2.1.270-user-prompt.json`).
+- `fixtures/claude/expected/claude-code-2.1.270-assistant-response.events.json` —
+  canonical `assistant_response` events (raw response + `"<REDACTED>"` sentinel).
+- `fixtures/claude/expected/claude-code-2.1.270-api-bodies.events.json` — canonical
+  `api_request_body`/`api_response_body` events (inline `body` + `body_ref`).
 
 Regenerate them with `UPDATE_GOLDEN=1 go test ./internal/normalize/claude/ -run Golden`
 after a reviewed change, then inspect the diff.

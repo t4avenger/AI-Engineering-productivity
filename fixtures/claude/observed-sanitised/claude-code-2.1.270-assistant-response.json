@@ -1,0 +1,50 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.270",
+  "captured_at": "2026-09-13T18:53:00Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "source_type": "otlp_http_json_logs",
+    "capture": {
+      "workspace": "isolated_tmp",
+      "telemetry_endpoint": "loopback_dump_receiver",
+      "outcome_signal": "assistant_response",
+      "content_gates": "OTEL_LOG_ASSISTANT_RESPONSES=1 for the content-present event; unset (default) for the redacted event",
+      "note": "assistant_response always carries response_length, model, and request_id. The response text is present verbatim under OTEL_LOG_ASSISTANT_RESPONSES=1 (event_sequence 12); by default the wire carries the literal string \"<REDACTED>\" (event_sequence 20), which is captured as received and never re-redacted or dropped (epic #87 / #94). Responses here are synthetic. See the -otlp fixture for the wire form and the dropped message.uuid correlation id."
+    },
+    "observations": [
+      {
+        "name": "response_content",
+        "state": "supported",
+        "evidence": "assistant_response carries response (behind OTEL_LOG_ASSISTANT_RESPONSES) plus response_length, model, and request_id; it maps to a canonical.Event whose provider_extensions.event echoes response/response_length/model/query_source verbatim and namespaces request_id. The default event proves the provider-emitted \"<REDACTED>\" sentinel is captured as received, not synthesised."
+      }
+    ],
+    "sample_events": [
+      {
+        "event_name": "assistant_response",
+        "session_id": "synthetic-content-session",
+        "event_timestamp": "2026-09-13T18:53:12.480Z",
+        "event_sequence": 12,
+        "response_length": 52,
+        "model": "claude-opus-4-8",
+        "request_id": "req_synthetic_e7_present",
+        "query_source": "repl_main_thread",
+        "response": "synthetic assistant response body for E7 capture"
+      },
+      {
+        "event_name": "assistant_response",
+        "session_id": "synthetic-content-session",
+        "event_timestamp": "2026-09-13T18:53:20.910Z",
+        "event_sequence": 20,
+        "response_length": 74,
+        "model": "claude-opus-4-8",
+        "request_id": "req_synthetic_e7_redacted",
+        "query_source": "repl_main_thread",
+        "response": "<REDACTED>"
+      }
+    ]
+  }
+}

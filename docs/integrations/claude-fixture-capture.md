@@ -10,7 +10,9 @@ Fixtures are sensitive even when prompt and response capture is disabled.
 2. Enable only the minimum supported local Claude Code telemetry export needed
    for the experiment. Never enable prompt, response, or source-code capture
    unless the experiment explicitly requires a gated attribute (for example
-   `OTEL_LOG_TOOL_DETAILS=1` to retain custom skill names).
+   `OTEL_LOG_TOOL_DETAILS=1` to retain custom skill names, or the
+   `OTEL_LOG_USER_PROMPTS` / `OTEL_LOG_ASSISTANT_RESPONSES` / `OTEL_LOG_RAW_API_BODIES`
+   content gates for #94 content fixtures — with synthetic prompts only).
 3. Record the Claude Code tool version and export format before copying an event
    into a temporary local file outside this repository.
 4. Remove prohibited fields and replace file paths, identifiers, emails, account
@@ -210,16 +212,67 @@ Committed evidence:
 - `fixtures/claude/expected/claude-code-2.1.270-tool-decision.events.json`
   (golden canonical approval events)
 
+## Prompt/response & raw API body content capture
+
+To raise Prompt/response content above `unsupported` (#94), capture the four
+content-bearing log events with content logging **on**, using only **synthetic
+prompts** in an isolated throwaway workspace against a loopback OTLP sink:
+
+```bash
+# Project .claude/settings.json env in the throwaway workspace:
+#   env: {
+#     CLAUDE_CODE_ENABLE_TELEMETRY:"1", OTEL_LOGS_EXPORTER:"otlp",
+#     OTEL_EXPORTER_OTLP_PROTOCOL:"http/json",
+#     OTEL_EXPORTER_OTLP_ENDPOINT:"http://127.0.0.1:4318",
+#     OTEL_LOG_USER_PROMPTS:"1",        # → user_prompt carries `prompt`
+#     OTEL_LOG_ASSISTANT_RESPONSES:"1", # → assistant_response carries `response`
+#     OTEL_LOG_RAW_API_BODIES:"1",      # → api_request_body/api_response_body
+#     OTEL_LOG_TOOL_DETAILS:"1"         # → real command_name on user_prompt
+#   }
+claude -p '<a synthetic, secret-free prompt, e.g. a /slash command probe>'
+```
+
+Notes for the reviewed wrapper:
+
+- Capture **two shapes** so the length-without-content contract is proven: a
+  content-present `user_prompt` (gate on) and a length-only one (gate off, `prompt`
+  key absent — never fabricated). For `assistant_response` the default is the
+  literal `"<REDACTED>"` sentinel, captured as received.
+- `api_request_body`/`api_response_body` have **no** length-only shape — the events
+  are simply absent when `OTEL_LOG_RAW_API_BODIES` is off. Capture an inline `body`
+  and a `file:<dir>`-mode `body_ref` pointer to prove both ride raw.
+- Keep every prompt/response/body **synthetic**. The validator no longer prohibits
+  the `prompt`/`response` field names, but its value-based secret/entropy scan still
+  runs — so a real credential would still (correctly) be rejected. The `-otlp`
+  fixtures carry `prompt.id`/`message.uuid` drop canaries to prove the bare
+  correlation identifiers never reach canonical output (that mapping is #106's job).
+- Content is captured raw with no ingest-time re-redaction (epic #87); the per-field
+  visibility decision is deferred to a later policy.
+
+Committed evidence:
+
+- `fixtures/claude/observed-sanitised/claude-code-2.1.270-user-prompt.json` +
+  `…-user-prompt-otlp.json` (content-present + length-only)
+- `fixtures/claude/observed-sanitised/claude-code-2.1.270-assistant-response.json` +
+  `…-assistant-response-otlp.json` (raw response + `"<REDACTED>"` sentinel)
+- `fixtures/claude/observed-sanitised/claude-code-2.1.270-api-bodies.json` +
+  `…-api-bodies-otlp.json` (inline `body` + `body_ref`, request and response)
+- `fixtures/claude/expected/claude-code-2.1.270-user-prompt.events.json`,
+  `…-assistant-response.events.json`, `…-api-bodies.events.json` (golden events)
+
 ## Validation
 
 The validator rejects missing origin or tool-version metadata, prohibited field
-names, known credential patterns, private-key markers, and high-entropy
-secret-like strings. Errors contain only field paths, never values.
+names (credential/path/command names — **not** `prompt`/`response`, relaxed for
+#94), known credential patterns, private-key markers, and high-entropy secret-like
+strings. Errors contain only field paths, never values.
 
 ## Review checklist
 
-- Confirm prompts, responses, source code, paths, command arguments, account
-  identifiers, emails, and credentials are absent.
+- Confirm source code, paths, command arguments, account identifiers, emails, and
+  credentials are absent. Prompt/response/body content **may** be present for #94
+  content fixtures — but only if it is synthetic and secret-free (the value-based
+  secret/entropy scan still applies).
 - Confirm remaining values are synthetic or structurally necessary telemetry
   metadata.
 - Confirm unknown fields have not been silently discarded.

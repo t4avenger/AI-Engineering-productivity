@@ -20,7 +20,8 @@ func TestValidateAcceptsAllReviewedProviderFixtures(t *testing.T) {
 
 func TestValidateRejectsLikelySecretsAndProhibitedFields(t *testing.T) {
 	for _, test := range []struct{ name, payload, want, secret string }{
-		{name: "prompt", payload: `{"prompt":"synthetic"}`, want: "payload.prompt", secret: "synthetic"},
+		{name: "prompt with secret value", payload: `{"prompt":"Bearer token-value-that-must-never-be-committed"}`, want: "payload.prompt", secret: "token-value-that-must-never-be-committed"},
+		{name: "response with entropy value", payload: `{"response":"q1w2E3r4T5y6U7i8O9p0AaBbCcDdEeFf"}`, want: "payload.response", secret: "q1w2E3r4T5y6U7i8O9p0AaBbCcDdEeFf"},
 		{name: "bearer", payload: `{"note":"Bearer token-value-that-must-never-be-committed"}`, want: "payload.note", secret: "token-value-that-must-never-be-committed"},
 		{name: "dash key", payload: `{"note":"` + "sk-" + strings.Repeat("x", 20) + `"}`, want: "payload.note", secret: "sk-" + strings.Repeat("x", 20)},
 		{name: "entropy", payload: `{"note":"q1w2E3r4T5y6U7i8O9p0AaBbCcDdEeFf"}`, want: "payload.note", secret: "q1w2E3r4T5y6U7i8O9p0AaBbCcDdEeFf"},
@@ -36,6 +37,24 @@ func TestValidateRejectsLikelySecretsAndProhibitedFields(t *testing.T) {
 				t.Fatalf("validation error must not expose rejected value: %v", err)
 			}
 		})
+	}
+}
+
+// TestValidateAcceptsPromptAndResponseFieldNames proves the epic #87 / #94
+// relaxation: fields literally named prompt/prompts/response/responses are no
+// longer prohibited by name, so synthetic content-present fixtures can be
+// committed — while the value-based likelySecret scan still guards every string
+// (proven above), so no real credential can ride under a prompt/response key.
+func TestValidateAcceptsPromptAndResponseFieldNames(t *testing.T) {
+	for _, payload := range []string{
+		`{"prompt":"synthetic probe prompt for E7 content capture"}`,
+		`{"response":"synthetic assistant response body for E7 capture"}`,
+		`{"prompts":["synthetic one","synthetic two"]}`,
+		`{"responses":["synthetic one","synthetic two"]}`,
+	} {
+		if err := Validate([]byte(fixtureWithPayload("claude-code", payload))); err != nil {
+			t.Fatalf("prompt/response field name must be accepted, got %v", err)
+		}
 	}
 }
 
