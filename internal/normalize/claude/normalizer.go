@@ -284,7 +284,7 @@ func attachOutcomeContract(extensions map[string]any, raw map[string]any, eventN
 // category/explanation strings are present only under OTEL_LOG_TOOL_DETAILS=1;
 // the has_* booleans are always emitted, so an absent category is explicit rather
 // than silently missing.
-func attachRefusalContext(contract map[string]any, raw map[string]any) {
+func attachRefusalContext(contract, raw map[string]any) {
 	if hop, ok := firstBool(raw, "server_fallback_hop"); ok {
 		contract["server_fallback_hop"] = hop
 	}

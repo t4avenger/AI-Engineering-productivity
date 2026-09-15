@@ -3,6 +3,8 @@ package claude
 import (
 	"reflect"
 	"testing"
+
+	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
 // TestNormalizeAPIRefusalOutcomeGolden pins the canonical events produced from
@@ -32,51 +34,75 @@ func TestNormalizeAPIRefusalStampsRefusedOutcome(t *testing.T) {
 	}
 	sawHop, sawFinal := false, false
 	for _, event := range events {
-		if event.EventType != "api_refusal" {
-			t.Fatalf("event type = %q, want api_refusal", event.EventType)
-		}
-		contract, ok := event.ProviderExtensions["outcome_contract"].(map[string]any)
-		if !ok {
-			t.Fatalf("outcome_contract missing: %#v", event.ProviderExtensions)
-		}
-		if contract["status"] != "refused" {
-			t.Fatalf("status = %v, want refused", contract["status"])
-		}
-		if contract["model"] != "claude-opus-4-8" {
-			t.Fatalf("model = %v", contract["model"])
-		}
-		hop, hasHop := contract["server_fallback_hop"].(bool)
-		if !hasHop {
-			t.Fatalf("server_fallback_hop missing on refusal contract: %#v", contract)
-		}
-		if hop {
-			// A silently-retried hop is not a user-visible refusal, so it carries
-			// no category/explanation and must stay distinguishable by the flag.
+		contract := requireRefusalContract(t, event)
+		if requireFallbackHop(t, contract) {
 			sawHop = true
-			if contract["has_category"] != false {
-				t.Fatalf("hop has_category = %v, want false", contract["has_category"])
-			}
-			if _, present := contract["category"]; present {
-				t.Fatalf("hop event must not carry category: %#v", contract)
-			}
-			if _, present := contract["explanation"]; present {
-				t.Fatalf("hop event must not carry explanation: %#v", contract)
-			}
-		} else {
-			sawFinal = true
-			if contract["has_category"] != true || contract["has_explanation"] != true {
-				t.Fatalf("final has_* flags = %v / %v, want true", contract["has_category"], contract["has_explanation"])
-			}
-			if contract["category"] != "cyber" {
-				t.Fatalf("final category = %v, want cyber", contract["category"])
-			}
-			if contract["explanation"] != "synthetic-refusal-explanation" {
-				t.Fatalf("final explanation = %v", contract["explanation"])
-			}
+			assertHopRefusal(t, contract)
+			continue
 		}
+		sawFinal = true
+		assertUserVisibleRefusal(t, contract)
 	}
 	if !sawHop || !sawFinal {
 		t.Fatalf("expected both a hop (server_fallback_hop=true) and a user-visible (false) refusal; hop=%v final=%v", sawHop, sawFinal)
+	}
+}
+
+// requireRefusalContract asserts the event is an api_refusal stamped refused
+// with the observed model, and returns the outcome_contract map.
+func requireRefusalContract(t *testing.T, event canonical.Event) map[string]any {
+	t.Helper()
+	if event.EventType != "api_refusal" {
+		t.Fatalf("event type = %q, want api_refusal", event.EventType)
+	}
+	contract, ok := event.ProviderExtensions["outcome_contract"].(map[string]any)
+	if !ok {
+		t.Fatalf("outcome_contract missing: %#v", event.ProviderExtensions)
+	}
+	if contract["status"] != "refused" {
+		t.Fatalf("status = %v, want refused", contract["status"])
+	}
+	if contract["model"] != "claude-opus-4-8" {
+		t.Fatalf("model = %v", contract["model"])
+	}
+	return contract
+}
+
+// requireFallbackHop returns the server_fallback_hop flag, failing if absent.
+func requireFallbackHop(t *testing.T, contract map[string]any) bool {
+	t.Helper()
+	hop, hasHop := contract["server_fallback_hop"].(bool)
+	if !hasHop {
+		t.Fatalf("server_fallback_hop missing on refusal contract: %#v", contract)
+	}
+	return hop
+}
+
+// assertHopRefusal checks a silently-retried hop carries no category/explanation.
+func assertHopRefusal(t *testing.T, contract map[string]any) {
+	t.Helper()
+	if contract["has_category"] != false {
+		t.Fatalf("hop has_category = %v, want false", contract["has_category"])
+	}
+	if _, present := contract["category"]; present {
+		t.Fatalf("hop event must not carry category: %#v", contract)
+	}
+	if _, present := contract["explanation"]; present {
+		t.Fatalf("hop event must not carry explanation: %#v", contract)
+	}
+}
+
+// assertUserVisibleRefusal checks the final refusal carries category/explanation.
+func assertUserVisibleRefusal(t *testing.T, contract map[string]any) {
+	t.Helper()
+	if contract["has_category"] != true || contract["has_explanation"] != true {
+		t.Fatalf("final has_* flags = %v / %v, want true", contract["has_category"], contract["has_explanation"])
+	}
+	if contract["category"] != "cyber" {
+		t.Fatalf("final category = %v, want cyber", contract["category"])
+	}
+	if contract["explanation"] != "synthetic-refusal-explanation" {
+		t.Fatalf("final explanation = %v", contract["explanation"])
 	}
 }
 
