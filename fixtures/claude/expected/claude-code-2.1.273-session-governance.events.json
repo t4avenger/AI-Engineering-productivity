@@ -1,0 +1,275 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:synthetic-session-governance:0",
+    "event_type": "plugin_loaded",
+    "occurred_at": "2026-09-15T00:00:00Z",
+    "received_at": "2026-09-15T00:00:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.273",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:synthetic-session-governance",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:synthetic-session-governance:0",
+        "ordering_key": "01789430400000000000:claude-code:synthetic-session-governance:0",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "event": {},
+      "governance": {
+        "agent_path_count": 0,
+        "command_path_count": 0,
+        "enabled_via": "user-install",
+        "has_hooks": false,
+        "has_mcp": false,
+        "host_owned_mcp": false,
+        "kind": "plugin_loaded",
+        "marketplace_name": "third-party",
+        "plugin_id_hash": "4c6529ae909eac7d",
+        "plugin_name": "third-party",
+        "plugin_scope": "user-local",
+        "safe_mode": false,
+        "skill_path_count": 0
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:synthetic-session-governance:1",
+    "event_type": "permission_mode_changed",
+    "occurred_at": "2026-09-15T00:00:00.05Z",
+    "received_at": "2026-09-15T00:00:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.273",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:synthetic-session-governance",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:synthetic-session-governance:1",
+        "ordering_key": "01789430400050000000:claude-code:synthetic-session-governance:1",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "event": {},
+      "governance": {
+        "bypass_permissions": false,
+        "from_mode": "default",
+        "kind": "permission_mode_changed",
+        "to_mode": "plan",
+        "trigger": "shift_tab"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:synthetic-session-governance:2",
+    "event_type": "permission_mode_changed",
+    "occurred_at": "2026-09-15T00:00:00.1Z",
+    "received_at": "2026-09-15T00:00:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.273",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:synthetic-session-governance",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:synthetic-session-governance:2",
+        "ordering_key": "01789430400100000000:claude-code:synthetic-session-governance:2",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "event": {},
+      "governance": {
+        "bypass_permissions": true,
+        "from_mode": "acceptEdits",
+        "kind": "permission_mode_changed",
+        "to_mode": "bypassPermissions",
+        "trigger": "shift_tab"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:synthetic-session-governance:3",
+    "event_type": "auth",
+    "occurred_at": "2026-09-15T00:00:00.15Z",
+    "received_at": "2026-09-15T00:00:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.273",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:synthetic-session-governance",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:synthetic-session-governance:3",
+        "ordering_key": "01789430400150000000:claude-code:synthetic-session-governance:3",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "event": {},
+      "governance": {
+        "action": "login",
+        "auth_method": "claude_ai",
+        "kind": "auth",
+        "success": true
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:synthetic-session-governance:4",
+    "event_type": "auth",
+    "occurred_at": "2026-09-15T00:00:00.2Z",
+    "received_at": "2026-09-15T00:00:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.273",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:synthetic-session-governance",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:synthetic-session-governance:4",
+        "ordering_key": "01789430400200000000:claude-code:synthetic-session-governance:4",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "event": {},
+      "governance": {
+        "action": "login",
+        "auth_method": "claude_ai",
+        "error_category": "oauth_error",
+        "kind": "auth",
+        "status_code": 403,
+        "success": false
+      }
+    }
+  }
+]

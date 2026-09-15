@@ -165,6 +165,58 @@ Committed evidence:
 - `fixtures/claude/observed-sanitised/claude-code-2.1.263-api-refusal-outcome-otlp.json`
 - `fixtures/claude/expected/claude-code-2.1.263-api-refusal-outcome.events.json`
 
+## Session-state & governance capture (E9, #96)
+
+Three governance lifecycle events — `permission_mode_changed`, `auth`, and
+`plugin_loaded` — frame how a session is allowed to act. Capture them **live
+first**, in a fully isolated environment so nothing real is mutated or leaked:
+
+```bash
+# Throwaway HOME so no real Claude config, credential, or plugin is touched:
+export HOME="$(mktemp -d)"; export XDG_CONFIG_HOME="$HOME/.config"
+export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318  # loopback dump receiver
+export OTEL_LOGS_EXPORT_INTERVAL=2000
+```
+
+- `plugin_loaded` **is a genuine live capture**. Scaffold a throwaway local plugin
+  (`claude plugin new`) in the isolated HOME and start the CLI against the loopback
+  sink; it emits `plugin_loaded` at startup with no authentication, so **no API
+  call is made**. Observed: the CLI collapses a third-party plugin's name and
+  marketplace to the literal `third-party` and **pre-hashes** `plugin_id_hash`
+  itself, and carries `plugin.scope`, `enabled_via`, `has_hooks`/`has_mcp`/
+  `host_owned_mcp`, `skill_path_count`/`command_path_count`/`agent_path_count`, and
+  `safe_mode` (a stringified bool on the wire).
+- `permission_mode_changed` and `auth` **could not be elicited in a scripted run** —
+  `permission_mode_changed` needs an interactive TUI mode toggle (shift+tab) or a
+  model-driven `exit_plan_mode`, and `auth` needs an interactive OAuth login/logout
+  (`claude auth logout` flushes no OTLP `auth` event). Rather than force an
+  interactive OAuth flow that would surface real account identifiers, their
+  attributes are **reproduced verbatim from the 2.1.273 binary's own event-emit
+  code**, verified against the disassembled strings: `permission_mode_changed =>
+  {from_mode, to_mode, trigger?}` (emitted only when `from != to`) and `auth =>
+  {action, success:String, auth_method, error_category?, status_code?:String}` (the
+  last two only on failure). The fixture stays `observed-sanitised` (its
+  `plugin_loaded` is live) and the mixed provenance is documented honestly in
+  `capture.note`.
+
+Privacy: `auth`/`plugin_loaded` can carry account/token-adjacent identifiers or
+local paths — `user.email`/`user.account_id` are already dropped at the wire
+boundary, no credential-adjacent field is stamped or echoed, and the fixtures use a
+synthetic session id with no user identifiers.
+
+Committed evidence:
+
+- `fixtures/claude/observed-sanitised/claude-code-2.1.273-session-governance.json`
+  (reviewed sample events: plugin_loaded, a benign mode change, a bypassPermissions
+  transition, and auth success + failure)
+- `fixtures/claude/observed-sanitised/claude-code-2.1.273-session-governance-otlp.json`
+  (raw OTLP `resourceLogs` for live `/v1/logs` ingest, for parity)
+- `fixtures/claude/expected/claude-code-2.1.273-session-governance.events.json`
+  (golden canonical governance events)
+
 ## Session JSONL transcript capture
 
 To capture a session JSONL transcript fixture for `NormalizeTranscript` (F4, #91),

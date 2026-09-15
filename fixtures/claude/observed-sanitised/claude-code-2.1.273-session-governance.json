@@ -1,0 +1,93 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.273",
+  "captured_at": "2026-09-15T00:00:00Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "source_type": "otlp_http_json_logs",
+    "capture": {
+      "workspace": "isolated_tmp",
+      "telemetry_endpoint": "loopback_dump_receiver",
+      "governance_signals": ["permission_mode_changed", "auth", "plugin_loaded"],
+      "note": "Session-state & governance lifecycle events (E9, #96). plugin_loaded is a genuine live capture: claude 2.1.273 was run against a loopback OTLP sink in an isolated HOME with a scaffolded local plugin (claude plugin new), and it emitted plugin_loaded at startup with the attributes reproduced verbatim here (the CLI itself collapses a third-party plugin's name/marketplace to the literal 'third-party' and pre-hashes plugin_id_hash, and the run required no authentication so no API call was made). permission_mode_changed and auth could not be elicited in a scripted run — permission_mode_changed needs an interactive TUI mode toggle (shift_tab) or a model-driven exit_plan_mode, and auth needs an interactive OAuth login/logout (the `claude auth logout` subcommand flushes no OTLP auth event). Their attributes are reproduced from the 2.1.273 binary's own event-emit code, verified verbatim: permission_mode_changed => {from_mode, to_mode, trigger?} (emitted only when from!=to; triggers shift_tab/exit_plan_mode/auto_gate_denied/auto_opt_in; modes default/plan/acceptEdits/auto/bypassPermissions), auth => {action, success:String, auth_method, error_category?, status_code?:String} (last two only on failure). Values sanitised: synthetic session id, no user identifiers."
+    },
+    "observations": [
+      {
+        "name": "permission_mode",
+        "state": "supported",
+        "evidence": "permission_mode_changed carries from_mode/to_mode and an optional trigger; a transition into bypassPermissions is the governance red flag and every tool decision is framed by the mode in force"
+      },
+      {
+        "name": "auth_lifecycle",
+        "state": "supported",
+        "evidence": "auth carries action (login/logout), success, auth_method, and on failure error_category/status_code"
+      },
+      {
+        "name": "plugin_inventory",
+        "state": "supported",
+        "evidence": "plugin_loaded (live-captured) carries plugin.scope, enabled_via, pre-hashed plugin_id_hash, has_hooks/has_mcp/host_owned_mcp, skill/command/agent path counts, and safe_mode"
+      }
+    ],
+    "sample_events": [
+      {
+        "event_name": "plugin_loaded",
+        "session_id": "synthetic-session-governance",
+        "event_timestamp": "2026-09-15T00:00:00.000Z",
+        "event_sequence": 0,
+        "plugin.name": "third-party",
+        "marketplace.name": "third-party",
+        "plugin.scope": "user-local",
+        "enabled_via": "user-install",
+        "plugin_id_hash": "4c6529ae909eac7d",
+        "has_hooks": false,
+        "has_mcp": false,
+        "host_owned_mcp": false,
+        "skill_path_count": 0,
+        "command_path_count": 0,
+        "agent_path_count": 0,
+        "safe_mode": "false"
+      },
+      {
+        "event_name": "permission_mode_changed",
+        "session_id": "synthetic-session-governance",
+        "event_timestamp": "2026-09-15T00:00:00.050Z",
+        "event_sequence": 1,
+        "from_mode": "default",
+        "to_mode": "plan",
+        "trigger": "shift_tab"
+      },
+      {
+        "event_name": "permission_mode_changed",
+        "session_id": "synthetic-session-governance",
+        "event_timestamp": "2026-09-15T00:00:00.100Z",
+        "event_sequence": 2,
+        "from_mode": "acceptEdits",
+        "to_mode": "bypassPermissions",
+        "trigger": "shift_tab"
+      },
+      {
+        "event_name": "auth",
+        "session_id": "synthetic-session-governance",
+        "event_timestamp": "2026-09-15T00:00:00.150Z",
+        "event_sequence": 3,
+        "action": "login",
+        "success": "true",
+        "auth_method": "claude_ai"
+      },
+      {
+        "event_name": "auth",
+        "session_id": "synthetic-session-governance",
+        "event_timestamp": "2026-09-15T00:00:00.200Z",
+        "event_sequence": 4,
+        "action": "login",
+        "success": "false",
+        "auth_method": "claude_ai",
+        "error_category": "oauth_error",
+        "status_code": "403"
+      }
+    ]
+  }
+}
