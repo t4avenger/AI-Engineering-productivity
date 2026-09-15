@@ -1,0 +1,52 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "synthetic",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.263",
+  "captured_at": "2026-09-15T00:00:00Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "source_type": "otlp_http_json_logs",
+    "capture": {
+      "workspace": "isolated_tmp",
+      "telemetry_endpoint": "loopback_dump_receiver",
+      "outcome_signal": "api_refusal",
+      "note": "Synthetic api_refusal derived from the documented claude_code.api_refusal schema (Messages API stop_reason: \"refusal\"). A live capture was attempted against a loopback OTLP sink, but eliciting a real refusal requires a frontier-safety (cyber/bio/frontier_llm) prompt that was not authored; a benign reasoning-extraction probe produced a normal decline, not a stop_reason refusal. Shape matches the api_request/api_error outcome siblings."
+    },
+    "observations": [
+      {
+        "name": "task_outcome",
+        "state": "partial",
+        "evidence": "api_refusal carries model/request_id/duration_ms plus server_fallback_hop and has_category/has_explanation — a refused provider-completion contract distinct from success (api_request) and failed (api_error), arriving as HTTP 200 and invisible to error-rate monitoring"
+      }
+    ],
+    "sample_events": [
+      {
+        "event_name": "api_refusal",
+        "session_id": "synthetic-session-refusal",
+        "event_timestamp": "2026-09-15T00:00:00.050Z",
+        "event_sequence": 1,
+        "model": "claude-opus-4-8",
+        "request_id": "synthetic-request-refusal-hop",
+        "duration_ms": 642,
+        "server_fallback_hop": true,
+        "has_category": false
+      },
+      {
+        "event_name": "api_refusal",
+        "session_id": "synthetic-session-refusal",
+        "event_timestamp": "2026-09-15T00:00:00.100Z",
+        "event_sequence": 2,
+        "model": "claude-opus-4-8",
+        "request_id": "synthetic-request-refusal-final",
+        "duration_ms": 1284,
+        "server_fallback_hop": false,
+        "has_category": true,
+        "category": "cyber",
+        "has_explanation": true,
+        "explanation": "synthetic-refusal-explanation"
+      }
+    ]
+  }
+}
