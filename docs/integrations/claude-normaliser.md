@@ -153,6 +153,39 @@ Like `api_request`/`api_error`, `api_refusal` produces a `canonical.Event` with 
 outcome contract but **no** `ModelInteraction` record (only `api_request` does —
 see below); the refusal outcome lives at the event level.
 
+## Session-state & governance — `attachGovernanceContext`
+
+Three lifecycle events frame *how* a session is allowed to act rather than what a
+model returned. They carry no model/token/tool/approval signal (so those stay
+explicitly unavailable, as for any pure lifecycle event), but they are governance
+signals we must persist rather than drop. `attachGovernanceContext` — called from
+`normaliseSampleEvent` alongside `attachOutcomeContract`, and **gated on the event
+name** rather than sniffing fields — stamps a stable, queryable contract under
+`provider_extensions.governance` with a `kind` equal to the event type (E9, #96):
+
+- `permission_mode_changed` → `from_mode`/`to_mode`/`trigger` plus a
+  `bypass_permissions` bool. Modes are `default`/`plan`/`acceptEdits`/`auto`/
+  `bypassPermissions`; triggers are `shift_tab`/`exit_plan_mode`/`auto_gate_denied`/
+  `auto_opt_in`. The event fires only when `from != to`. A transition **into**
+  `bypassPermissions` is the governance red flag — `bypass_permissions` is `true`
+  only for that case — because every subsequent tool decision is framed by the mode
+  in force.
+- `auth` → `action` (login/logout), `success` (bool), `auth_method`, and, only on a
+  failure, `error_category`/`status_code`. `status_code` is coerced to an integer
+  consistently across the sample-JSON and OTLP (int/double/string) paths so golden
+  and parity don't diverge on type; a successful `auth` carries no `status_code`.
+- `plugin_loaded` → `plugin_scope`, `enabled_via`, the CLI's **pre-hashed**
+  `plugin_id_hash`, `has_hooks`/`has_mcp`/`host_owned_mcp`, `skill_path_count`/
+  `command_path_count`/`agent_path_count`, and `safe_mode`. The wire spells the
+  plugin fields both dotted (`plugin.name`) and underscore (`plugin_name`); the
+  helper accepts both so the sample and `/v1/logs` paths agree.
+
+No credential- or account-adjacent field is promoted (the wire boundary already
+drops `user.email`/`user.account_id`), and `promotedEventFields` lists these keys —
+in both dotted and underscore spellings — so they don't double-echo under
+`provider_extensions.event`. Building alerting/rules on the contract is downstream
+(`internal/governance`) and out of scope here.
+
 ## Model-interaction records — `ExtractModelInteractions`
 
 Only `api_request` events become a `canonical.ModelInteraction`. Executed tool

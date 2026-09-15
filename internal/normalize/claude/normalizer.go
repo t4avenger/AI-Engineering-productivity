@@ -50,6 +50,21 @@ const (
 	eventAssistantResponse = "assistant_response"
 	eventAPIRequestBody    = "api_request_body"
 	eventAPIResponseBody   = "api_response_body"
+
+	// Session-state & governance lifecycle events (epic #87 / #96). Each is a pure
+	// lifecycle signal carrying no model/token/tool identity, so the default
+	// unavailableFields set (everything unavailable) already fits them and
+	// attachGovernanceContext stamps a stable provider_extensions.governance
+	// contract — one key downstream governance work (internal/governance) can read
+	// (e.g. a bypassPermissions transition or a failed auth) without building any
+	// rule here, which is out of scope for #96.
+	eventPermissionModeChanged = "permission_mode_changed"
+	eventAuth                  = "auth"
+	eventPluginLoaded          = "plugin_loaded"
+
+	// permissionModeBypass disables every tool-permission prompt for the rest of the
+	// session, so a transition into it is the governance red flag callers key on.
+	permissionModeBypass = "bypassPermissions"
 )
 
 // NormalizeEvents maps the reviewed Claude Code OTLP event fixture into
@@ -111,6 +126,7 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 	attributes := map[string]any{"unavailable_fields": unavailableFields(name)}
 	attachSkillDetection(extensions, raw, name)
 	attachOutcomeContract(extensions, raw, name)
+	attachGovernanceContext(extensions, raw, name)
 	attachToolDecision(extensions, attributes, raw, name, nativeSessionID, eventID)
 	return canonical.Event{
 		SchemaVersion: canonicalSchemaVersion, EventID: eventID, EventType: name,
@@ -302,6 +318,131 @@ func attachRefusalContext(contract, raw map[string]any) {
 	}
 }
 
+// attachGovernanceContext stamps a stable provider_extensions.governance contract
+// for the three Claude Code session-state & governance lifecycle events
+// (permission_mode_changed, auth, plugin_loaded — epic #87 / #96). These events
+// carry no model/token/tool identity, so they are neither outcome nor operation
+// records; they describe how the session was governed and configured. The contract
+// gives downstream governance work (internal/governance) one key to read — a
+// bypassPermissions transition, a failed auth — without building any rule here
+// (out of scope for #96). Values ride verbatim (epic #87 — no ingest redaction);
+// no credential-adjacent field is promoted, and account identifiers
+// (user.email/user.account_id) are already dropped at the wire boundary
+// (logs.go droppedKeyPrefixes).
+//
+// Both the reviewed sample-event path and the raw /v1/logs wire path reach this
+// with the same keys: the wire path leaves event-specific attributes under their
+// emitted names (dotted for plugin.*), so the plugin fields are read under both
+// dotted and underscore spellings for cross-path parity.
+func attachGovernanceContext(extensions, raw map[string]any, eventName string) {
+	var governance map[string]any
+	switch eventName {
+	case eventPermissionModeChanged:
+		governance = permissionModeContext(raw)
+	case eventAuth:
+		governance = authContext(raw)
+	case eventPluginLoaded:
+		governance = pluginLoadedContext(raw)
+	default:
+		return
+	}
+	extensions["governance"] = governance
+}
+
+// permissionModeContext normalises a permission_mode_changed event. Claude Code
+// emits it only on a real transition (from_mode != to_mode), with an optional
+// trigger (shift_tab/exit_plan_mode/auto_gate_denied/auto_opt_in). bypass_permissions
+// is stamped explicit rather than left to be re-derived from to_mode downstream.
+func permissionModeContext(raw map[string]any) map[string]any {
+	governance := map[string]any{"kind": eventPermissionModeChanged}
+	if from := firstString(raw, "from_mode"); from != "" {
+		governance["from_mode"] = from
+	}
+	to := firstString(raw, "to_mode")
+	if to != "" {
+		governance["to_mode"] = to
+	}
+	if trigger := firstString(raw, "trigger"); trigger != "" {
+		governance["trigger"] = trigger
+	}
+	governance["bypass_permissions"] = to == permissionModeBypass
+	return governance
+}
+
+// authContext normalises an auth (login/logout) event. success is emitted as a
+// stringified boolean; error_category/status_code are present only on a failed
+// auth, so their presence is itself the failure signal and they ride verbatim.
+func authContext(raw map[string]any) map[string]any {
+	governance := map[string]any{"kind": eventAuth}
+	if action := firstString(raw, "action"); action != "" {
+		governance["action"] = action
+	}
+	if success, ok := optionalBool(raw, "success"); ok {
+		governance["success"] = success
+	}
+	if method := firstString(raw, "auth_method"); method != "" {
+		governance["auth_method"] = method
+	}
+	if category := firstString(raw, "error_category"); category != "" {
+		governance["error_category"] = category
+	}
+	if status := normalize.OptionalTokenCount(raw["status_code"]); status != nil {
+		governance["status_code"] = *status
+	}
+	return governance
+}
+
+// pluginLoadedContext normalises a plugin_loaded event. Claude Code already
+// collapses a third-party plugin's name and marketplace to the literal
+// "third-party" and pre-hashes the identity (plugin_id_hash) at emit time, so no
+// plugin-author identity is captured here. The string identity fields are dotted
+// on the wire (plugin.name), so both spellings are read for cross-path parity.
+func pluginLoadedContext(raw map[string]any) map[string]any {
+	governance := map[string]any{"kind": eventPluginLoaded}
+	for key, sources := range map[string][]string{
+		"plugin_name":      {"plugin.name", "plugin_name"},
+		"plugin_version":   {"plugin.version", "plugin_version"},
+		"plugin_scope":     {"plugin.scope", "plugin_scope"},
+		"marketplace_name": {"marketplace.name", "marketplace_name"},
+		"enabled_via":      {"enabled_via"},
+		"plugin_id_hash":   {"plugin_id_hash"},
+	} {
+		if value := firstString(raw, sources...); value != "" {
+			governance[key] = value
+		}
+	}
+	for _, key := range []string{"has_hooks", "has_mcp", "host_owned_mcp"} {
+		if value, ok := firstBool(raw, key); ok {
+			governance[key] = value
+		}
+	}
+	for _, key := range []string{"skill_path_count", "command_path_count", "agent_path_count"} {
+		if value := normalize.OptionalTokenCount(raw[key]); value != nil {
+			governance[key] = *value
+		}
+	}
+	if safeMode, ok := optionalBool(raw, "safe_mode"); ok {
+		governance["safe_mode"] = safeMode
+	}
+	return governance
+}
+
+// optionalBool reads a bool Claude Code may emit either as a native boolean
+// (has_hooks) or as a stringified boolean (success, safe_mode — emitted via
+// String(bool)). It returns ok=false when the key is absent or unparseable, so an
+// absent flag stays absent rather than defaulting to false.
+func optionalBool(raw map[string]any, key string) (bool, bool) {
+	if value, ok := raw[key].(bool); ok {
+		return value, true
+	}
+	if text, ok := normalize.ObservedString(raw[key]); ok {
+		if parsed, err := strconv.ParseBool(strings.TrimSpace(text)); err == nil {
+			return parsed, true
+		}
+	}
+	return false, false
+}
+
 func outcomeErrorCode(raw map[string]any) string {
 	if code := firstString(raw, "error", "error_code"); code != "" {
 		return code
@@ -362,6 +503,19 @@ func promotedEventFields(eventName string) []string {
 		// provider_extensions.tool_decision, so they must not double-echo under
 		// provider_extensions.event.
 		return append(fields, "decision", "source", "tool_name", "tool_source", "tool_use_id")
+	case eventPermissionModeChanged:
+		return append(fields, "from_mode", "to_mode", "trigger")
+	case eventAuth:
+		return append(fields, "action", "success", "auth_method", "error_category", "status_code")
+	case eventPluginLoaded:
+		// Both dotted (wire) and underscore spellings are excluded so the fields
+		// promoted into provider_extensions.governance never double-echo under
+		// provider_extensions.event on either path.
+		return append(fields,
+			"plugin.name", "plugin_name", "plugin.version", "plugin_version",
+			"plugin.scope", "plugin_scope", "marketplace.name", "marketplace_name",
+			"enabled_via", "plugin_id_hash", "has_hooks", "has_mcp", "host_owned_mcp",
+			"skill_path_count", "command_path_count", "agent_path_count", "safe_mode")
 	}
 	return fields
 }
