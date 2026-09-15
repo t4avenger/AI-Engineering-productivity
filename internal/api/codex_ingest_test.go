@@ -67,9 +67,8 @@ func TestCodexLogsIngestEndToEnd(t *testing.T) {
 	if model != "tiq-live-codex-model" {
 		t.Fatalf("session model = %#v, want tiq-live-codex-model", session.Attributes["model"])
 	}
-	if session.Availability["model"] != "observed" {
-		t.Fatalf("model availability = %#v", session.Availability)
-	}
+	assertAvailabilityObserved(t, session.Availability, "model", "entrypoint", "tool_version")
+	assertCodexSessionEnvironment(t, session, "codex_cli_rs", "interactive", "0.145.0", "synthetic-conversation")
 	timeline := timelinePage(t, server.URL+"/api/v1/sessions/codex:synthetic-conversation/events?limit=10")
 	if len(timeline.Data) != 1 {
 		t.Fatalf("timeline events = %d, want 1: %#v", len(timeline.Data), timeline.Data)
@@ -152,9 +151,11 @@ func TestCodexLifecycleIngestExposesActiveSession(t *testing.T) {
 	if session.SessionID != "codex:synthetic-lifecycle-session" || session.State != "active" || session.CompletedAt != nil {
 		t.Fatalf("session lifecycle = %#v", session)
 	}
-	if session.Availability["outcome"] != "observed" || session.Availability["completed_at"] != "unavailable" {
-		t.Fatalf("session availability = %#v", session.Availability)
+	assertAvailabilityObserved(t, session.Availability, "outcome", "entrypoint", "tool_version")
+	if session.Availability["completed_at"] != "unavailable" {
+		t.Fatalf("completed availability = %#v", session.Availability)
 	}
+	assertCodexSessionEnvironment(t, session, "codex_exec", "codex exec", "0.153.4", "synthetic-lifecycle-session")
 
 	events := timelinePage(t, server.URL+"/api/v1/sessions/codex:synthetic-lifecycle-session/events?limit=10")
 	if len(events.Data) != 3 {
@@ -171,6 +172,30 @@ func TestCodexLifecycleIngestExposesActiveSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertNoRawIdentifiers(t, canaries, marshalJSON(t, stored))
+}
+
+func assertAvailabilityObserved(t *testing.T, availability map[string]string, keys ...string) {
+	t.Helper()
+	for _, key := range keys {
+		if availability[key] != "observed" {
+			t.Fatalf("%s availability = %#v", key, availability)
+		}
+	}
+}
+
+func assertCodexSessionEnvironment(t *testing.T, session publicSession, serviceName, entrypoint, version, providerSessionID string) {
+	t.Helper()
+	if session.Attributes["service_name"] != serviceName || session.Attributes["entrypoint"] != entrypoint || session.Attributes["service_version"] != version {
+		t.Fatalf("session environment attributes = %#v", session.Attributes)
+	}
+	resource, ok := session.ProviderExtensions["resource_attributes"].(map[string]any)
+	if !ok || resource["service.name"] != serviceName || resource["service.version"] != version {
+		t.Fatalf("session resource metadata = %#v", session.ProviderExtensions)
+	}
+	correlation, ok := session.ProviderExtensions["correlation"].(map[string]any)
+	if !ok || correlation["session_id_source"] != "conversation.id" || correlation["provider_session_id"] != providerSessionID {
+		t.Fatalf("session correlation metadata = %#v", session.ProviderExtensions)
+	}
 }
 
 func assertCodexLifecycleTimeline(t *testing.T, events []timelineEvent) {

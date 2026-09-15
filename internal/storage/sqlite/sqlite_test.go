@@ -34,6 +34,63 @@ func TestPersistenceAcceptance(t *testing.T) {
 	assertSessionDeleted(t, ctx, repo)
 }
 
+func TestReconstructedCodexSessionCarriesEnvironmentMetadata(t *testing.T) {
+	tests := []struct {
+		name       string
+		service    string
+		version    string
+		entrypoint string
+	}{
+		{name: "interactive", service: "codex_cli_rs", version: "0.153.4", entrypoint: "interactive"},
+		{name: "exec", service: "codex_exec", version: "0.153.4", entrypoint: "codex exec"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			session := codexSessionWithEnvironment(t, tc.name, tc.service, tc.version)
+			assertSessionEnvironment(t, session, tc.service, tc.version, tc.entrypoint)
+			assertSessionCorrelation(t, session, "session-"+tc.name)
+		})
+	}
+}
+
+func codexSessionWithEnvironment(t *testing.T, name, service, version string) canonical.Session {
+	t.Helper()
+	repo, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = repo.Close() }()
+	e := event(t, "codex-"+name, "codex:session-"+name, "session.active", "2026-01-02T09:00:00Z")
+	e.ProviderExtensions = map[string]any{"resource_attributes": map[string]any{"service.name": service, "service.version": version}}
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{e}); err != nil {
+		t.Fatal(err)
+	}
+	session, found, err := repo.Session(context.Background(), e.SessionID)
+	if err != nil || !found {
+		t.Fatalf("session = %v, %v", found, err)
+	}
+	return session
+}
+
+func assertSessionEnvironment(t *testing.T, session canonical.Session, service, version, entrypoint string) {
+	t.Helper()
+	if session.Attributes["service_name"] != service || session.Attributes["service_version"] != version || session.Attributes["entrypoint"] != entrypoint {
+		t.Fatalf("session metadata = %#v", session.Attributes)
+	}
+	resource := session.ProviderExtensions["resource_attributes"].(map[string]any)
+	if resource["service.name"] != service || resource["service.version"] != version {
+		t.Fatalf("session resource metadata = %#v", resource)
+	}
+}
+
+func assertSessionCorrelation(t *testing.T, session canonical.Session, providerSessionID string) {
+	t.Helper()
+	correlation := session.ProviderExtensions["correlation"].(map[string]any)
+	if correlation["session_id_source"] != "conversation.id" || correlation["provider_session_id"] != providerSessionID {
+		t.Fatalf("session correlation = %#v", correlation)
+	}
+}
+
 func TestCostRecordsPersistAndDelete(t *testing.T) {
 	calculator, err := cost.LoadDefault("")
 	if err != nil {

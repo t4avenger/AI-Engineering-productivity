@@ -8,6 +8,16 @@
   <h1>Session {{.Session.SessionID}}</h1>
   <p>{{.Session.Tool}} · {{.Session.Provider}} · {{.Session.State}}</p>
   <p><span class="muted">Session ID</span> <code>{{.Session.SessionID}}</code></p>
+  {{if .SessionMetadata}}
+  <section>
+    <h2>Environment</h2>
+    <dl class="metadata-list">
+      {{range .SessionMetadata}}
+      <div><dt>{{.Label}}</dt><dd>{{.Value}}</dd></div>
+      {{end}}
+    </dl>
+  </section>
+  {{end}}
   <section>
     <h2>Availability</h2>
     {{if .Availability}}

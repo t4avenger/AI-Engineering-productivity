@@ -367,6 +367,7 @@ func reconstructSession(id string, events []canonical.Event) canonical.Session {
 				session.Attributes["model"] = model
 			}
 		}
+		attachSessionEnvironment(&session, e)
 		state := lifecycle(e.EventType)
 		if state != "" {
 			session.State = state
@@ -379,6 +380,98 @@ func reconstructSession(id string, events []canonical.Event) canonical.Session {
 		}
 	}
 	return session
+}
+
+func attachSessionEnvironment(session *canonical.Session, event canonical.Event) {
+	resource := sessionResourceAttributes(event)
+	if serviceName := sessionString(resource["service.name"]); serviceName != "" {
+		observeSessionAttribute(session, "service_name", serviceName)
+		observeSessionResource(session, "service.name", serviceName)
+		if entrypoint := sessionEntrypoint(event.Tool, serviceName); entrypoint != "" {
+			observeSessionAttribute(session, "entrypoint", entrypoint)
+		}
+	}
+	if version := sessionString(resource["service.version"]); version != "" {
+		observeSessionAttribute(session, "service_version", version)
+		observeSessionResource(session, "service.version", version)
+	}
+	if entrypoint := sessionString(event.Attributes["entrypoint"]); entrypoint != "" {
+		observeSessionAttribute(session, "entrypoint", entrypoint)
+	}
+	if event.Tool == "codex" && strings.HasPrefix(event.SessionID, "codex:") {
+		observeSessionCorrelation(session, map[string]any{
+			"session_id_source":   "conversation.id",
+			"provider_prefix":     "codex:",
+			"provider_session_id": strings.TrimPrefix(event.SessionID, "codex:"),
+		})
+	}
+}
+
+func sessionResourceAttributes(event canonical.Event) map[string]any {
+	resource, ok := event.ProviderExtensions["resource_attributes"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	return resource
+}
+
+func observeSessionAttribute(session *canonical.Session, key, value string) {
+	if value == "" || value == "unavailable" {
+		return
+	}
+	if _, exists := session.Attributes[key]; exists {
+		return
+	}
+	session.Attributes[key] = value
+}
+
+func observeSessionResource(session *canonical.Session, key, value string) {
+	if value == "" || value == "unavailable" {
+		return
+	}
+	resource, _ := session.ProviderExtensions["resource_attributes"].(map[string]any)
+	if resource == nil {
+		resource = map[string]any{}
+		session.ProviderExtensions["resource_attributes"] = resource
+	}
+	if _, exists := resource[key]; !exists {
+		resource[key] = value
+	}
+}
+
+func observeSessionCorrelation(session *canonical.Session, values map[string]any) {
+	correlation, _ := session.ProviderExtensions["correlation"].(map[string]any)
+	if correlation == nil {
+		correlation = map[string]any{}
+		session.ProviderExtensions["correlation"] = correlation
+	}
+	for key, value := range values {
+		if _, exists := correlation[key]; !exists {
+			correlation[key] = value
+		}
+	}
+}
+
+func sessionEntrypoint(tool, serviceName string) string {
+	if tool != "codex" {
+		return ""
+	}
+	switch serviceName {
+	case "codex_cli_rs":
+		return "interactive"
+	case "codex_exec":
+		return "codex exec"
+	default:
+		return serviceName
+	}
+}
+
+func sessionString(value any) string {
+	text, ok := value.(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(text)
 }
 
 func upsertSession(ctx context.Context, tx *sql.Tx, session canonical.Session) error {

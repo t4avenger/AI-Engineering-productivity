@@ -80,8 +80,17 @@ call, so it remains an internal Codex/tool invocation rather than MCP inventory
 evidence. When a `conversation.id` is present, logs use the raw provider-native
 session identity `codex:<conversation.id>`. Records without that field fall back
 to a non-keyed content ID for uniqueness only (epic #87 — no ingest-time
-hiding). Prompt/response/source-code content is not captured by default; its
-configurable capture is tracked in #94.
+hiding). SQLite session reconstruction carries that identity forward under
+`provider_extensions.correlation` with `session_id_source=conversation.id` and
+keeps the raw provider session ID separate from the stable `codex:` prefix.
+
+Observed Codex resource metadata is also promoted into reconstructed sessions:
+`service.name` and `service.version` remain under
+`provider_extensions.resource_attributes`, while session attributes expose
+`service_name`, `service_version`, and the normalized entrypoint
+(`codex_cli_rs` -> `interactive`, `codex_exec` -> `codex exec`) for the sessions
+evidence browser. Prompt/response/source-code content is not captured by
+default; its configurable capture is tracked in #94.
 
 ## Model-interaction records
 

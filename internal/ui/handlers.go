@@ -66,19 +66,25 @@ type sessionRow struct {
 }
 
 type sessionDetailData struct {
-	Session      canonical.Session
-	SessionID    string
-	SessionPath  string
-	Availability []availabilityRow
-	Events       []timelineRow
-	NextCursor   string
-	Error        string
-	Confirm      bool
+	Session         canonical.Session
+	SessionID       string
+	SessionPath     string
+	Availability    []availabilityRow
+	SessionMetadata []metadataRow
+	Events          []timelineRow
+	NextCursor      string
+	Error           string
+	Confirm         bool
 }
 
 type availabilityRow struct {
 	Label string
 	State string
+}
+
+type metadataRow struct {
+	Label string
+	Value string
 }
 
 type timelineRow struct {
@@ -249,7 +255,7 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, next, err := s.loadTimeline(r, id, r.URL.Query().Get("cursor"))
-	data := sessionDetailData{Session: session, SessionID: id, SessionPath: sessionPath(id), Availability: sessionAvailability(session), Events: rows, NextCursor: next, Confirm: r.URL.Query().Get("confirm") == "1"}
+	data := sessionDetailData{Session: session, SessionID: id, SessionPath: sessionPath(id), Availability: sessionAvailability(session), SessionMetadata: sessionMetadata(session), Events: rows, NextCursor: next, Confirm: r.URL.Query().Get("confirm") == "1"}
 	if err != nil {
 		data.Error = "Unable to load timeline."
 	}
@@ -741,7 +747,34 @@ func sessionAvailability(session canonical.Session) []availabilityRow {
 		{Label: "Started", State: observedIf(!session.StartedAt.IsZero())},
 		{Label: "Completed", State: observedIf(session.CompletedAt != nil)},
 		{Label: "Model", State: modelAvailability(session)},
+		{Label: "Entrypoint", State: observedIf(sessionAttribute(session, "entrypoint") != "")},
+		{Label: "Tool version", State: observedIf(sessionAttribute(session, "service_version") != "")},
 	}
+}
+
+func sessionMetadata(session canonical.Session) []metadataRow {
+	rows := make([]metadataRow, 0, 3)
+	for _, field := range []struct {
+		label string
+		key   string
+	}{
+		{label: "Entrypoint", key: "entrypoint"},
+		{label: "Service", key: "service_name"},
+		{label: "Version", key: "service_version"},
+	} {
+		if value := sessionAttribute(session, field.key); value != "" {
+			rows = append(rows, metadataRow{Label: field.label, Value: value})
+		}
+	}
+	return rows
+}
+
+func sessionAttribute(session canonical.Session, key string) string {
+	value, ok := session.Attributes[key].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(value)
 }
 
 func observedIf(ok bool) string {
