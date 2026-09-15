@@ -145,6 +145,9 @@ strings.
 | `started_at` | Started | Session start timestamp. | Local time or RFC3339 in `title` | Show unavailable when missing. |
 | `completed_at` | Completed | Session completion timestamp. | Local time or RFC3339 in `title` | Show unavailable for active, abandoned, or missing completion. |
 | `model` | Model | Retained observed model attribute on the session or event. | Identifier | Show unavailable/unknown based on availability map. |
+| `entrypoint` | Entrypoint | Normalized tool entrypoint derived from retained provider service metadata, for example Codex `interactive` or `codex exec`. | Label | Show unavailable when no reviewed event carries entrypoint evidence; do not infer from session ID alone. |
+| `service_name` | Service | Provider-reported telemetry service name retained as operational environment evidence. | Identifier | Show unavailable when absent; do not substitute the tool name. |
+| `service_version` / `tool_version` | Version | Provider-reported tool/service version retained from telemetry resource metadata. | Version string | Show unavailable when absent; do not assume the installed local version. |
 | `observed_events` | Observed events | Count of retained events associated with the session. | Events | Show unavailable if event count was not retained. |
 | `token_usage` | Token usage | Session-level token availability summary. | Enum | `partial` means some token categories are available; do not fill missing categories with zero. |
 | `event_type` | Event type | Canonical event type for a timeline entry. | Identifier / label | Humanize common event types in templates while preserving raw value as secondary detail. |

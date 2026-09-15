@@ -84,12 +84,15 @@ hiding). SQLite session reconstruction carries that identity forward under
 `provider_extensions.correlation` with `session_id_source=conversation.id` and
 keeps the raw provider session ID separate from the stable `codex:` prefix.
 
-Observed Codex resource metadata is also promoted into reconstructed sessions:
-`service.name` and `service.version` remain under
-`provider_extensions.resource_attributes`, while session attributes expose
+Observed Codex resource metadata is also promoted into reconstructed sessions
+from both log `provider_extensions.resource_attributes` and metric
+`provider_extensions.resource`: `service.name` and `service.version` are mirrored
+under session `provider_extensions.resource_attributes`, while session attributes expose
 `service_name`, `service_version`, and the normalized entrypoint
 (`codex_cli_rs` -> `interactive`, `codex_exec` -> `codex exec`) for the sessions
-evidence browser. Prompt/response/source-code content is not captured by
+evidence browser. Only log-derived `codex:<conversation.id>` sessions get
+`session_id_source=conversation.id`; content-derived metric/trace IDs do not.
+Prompt/response/source-code content is not captured by
 default; its configurable capture is tracked in #94.
 
 ## Model-interaction records

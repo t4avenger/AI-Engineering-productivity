@@ -61,7 +61,10 @@ func codexSessionWithEnvironment(t *testing.T, name, service, version string) ca
 	}
 	defer func() { _ = repo.Close() }()
 	e := event(t, "codex-"+name, "codex:session-"+name, "session.active", "2026-01-02T09:00:00Z")
-	e.ProviderExtensions = map[string]any{"resource_attributes": map[string]any{"service.name": service, "service.version": version}}
+	e.ProviderExtensions = map[string]any{
+		"log_attributes":      map[string]any{"event.name": "codex.conversation_starts"},
+		"resource_attributes": map[string]any{"service.name": service, "service.version": version},
+	}
 	if err := repo.SaveEvents(context.Background(), []canonical.Event{e}); err != nil {
 		t.Fatal(err)
 	}
@@ -88,6 +91,27 @@ func assertSessionCorrelation(t *testing.T, session canonical.Session, providerS
 	correlation := session.ProviderExtensions["correlation"].(map[string]any)
 	if correlation["session_id_source"] != "conversation.id" || correlation["provider_session_id"] != providerSessionID {
 		t.Fatalf("session correlation = %#v", correlation)
+	}
+}
+
+func TestReconstructedCodexMetricSessionDoesNotFabricateConversationCorrelation(t *testing.T) {
+	repo, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = repo.Close() }()
+	e := event(t, "codex-token", "codex:token:synthetic", "codex.turn.token_usage", "2026-01-02T09:00:00Z")
+	e.ProviderExtensions = map[string]any{"resource": map[string]any{"service.name": "codex_exec", "service.version": "0.153.4"}}
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{e}); err != nil {
+		t.Fatal(err)
+	}
+	session, found, err := repo.Session(context.Background(), e.SessionID)
+	if err != nil || !found {
+		t.Fatalf("session = %v, %v", found, err)
+	}
+	assertSessionEnvironment(t, session, "codex_exec", "0.153.4", "codex exec")
+	if _, ok := session.ProviderExtensions["correlation"]; ok {
+		t.Fatalf("metric session must not fabricate conversation correlation: %#v", session.ProviderExtensions)
 	}
 }
 

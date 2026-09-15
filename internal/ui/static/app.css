@@ -157,7 +157,7 @@ section { margin: 1.5rem 0; }
 .availability-list li { align-items: center; display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .metadata-list { display: grid; gap: var(--space-2); margin: 0; }
 .metadata-list div { align-items: baseline; display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.metadata-list dt { color: var(--muted); font-weight: 600; }
+.metadata-list dt { color: var(--color-muted); font-weight: 600; }
 .metadata-list dd { margin: 0; }
 .timeline-facts { display: grid; gap: var(--space-2); grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); margin: var(--space-3) 0; }
 .timeline-facts div { min-width: 0; }

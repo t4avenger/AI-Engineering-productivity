@@ -27,13 +27,15 @@ shared cross-tool fields rendered by the dashboard: `provider`, `tool`,
 non-observed states as labelled cells, never as blanks or numeric zeroes.
 
 Reconstructed Codex sessions promote observed resource metadata from retained
-canonical events into session-level evidence: `attributes.entrypoint`,
-`attributes.service_name`, and `attributes.service_version`, with raw
-`service.name`/`service.version` mirrored under
-`provider_extensions.resource_attributes`. `codex_cli_rs` is displayed as
+canonical log or metric events into session-level evidence:
+`attributes.entrypoint`, `attributes.service_name`, and
+`attributes.service_version`, with raw `service.name`/`service.version` mirrored
+under `provider_extensions.resource_attributes`. `codex_cli_rs` is displayed as
 `interactive`; `codex_exec` is displayed as `codex exec`. When the session ID
-comes from `conversation.id`, the session provider extension records that source
-and the raw provider session ID with the stable `codex:` prefix separated.
+comes from log-backed `conversation.id`, the session provider extension records
+that source and the raw provider session ID with the stable `codex:` prefix
+separated. Content-derived Codex metric or trace session IDs must not be labelled
+as `conversation.id` evidence.
 
 Session event timeline entries include optional token fields for retained model
 signals: `input_token_count`, `output_token_count`, `cached_input_token_count`,

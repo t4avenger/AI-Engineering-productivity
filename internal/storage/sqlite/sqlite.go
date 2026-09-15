@@ -321,7 +321,10 @@ func (r *Repository) saveCostRecord(ctx context.Context, tx *sql.Tx, record cost
 	return nil
 }
 
-const timeFormat = "2006-01-02T15:04:05.999999999Z07:00"
+const (
+	timeFormat         = "2006-01-02T15:04:05.999999999Z07:00"
+	codexSessionPrefix = "codex:"
+)
 
 func (r *Repository) rebuildSession(ctx context.Context, tx *sql.Tx, id string) error {
 	events, err := loadSessionEvents(ctx, tx, id)
@@ -398,21 +401,31 @@ func attachSessionEnvironment(session *canonical.Session, event canonical.Event)
 	if entrypoint := sessionString(event.Attributes["entrypoint"]); entrypoint != "" {
 		observeSessionAttribute(session, "entrypoint", entrypoint)
 	}
-	if event.Tool == "codex" && strings.HasPrefix(event.SessionID, "codex:") {
+	if hasCodexLogSessionID(event) {
 		observeSessionCorrelation(session, map[string]any{
 			"session_id_source":   "conversation.id",
-			"provider_prefix":     "codex:",
-			"provider_session_id": strings.TrimPrefix(event.SessionID, "codex:"),
+			"provider_prefix":     codexSessionPrefix,
+			"provider_session_id": strings.TrimPrefix(event.SessionID, codexSessionPrefix),
 		})
 	}
 }
 
 func sessionResourceAttributes(event canonical.Event) map[string]any {
-	resource, ok := event.ProviderExtensions["resource_attributes"].(map[string]any)
-	if !ok {
-		return nil
+	for _, key := range []string{"resource_attributes", "resource"} {
+		resource, ok := event.ProviderExtensions[key].(map[string]any)
+		if ok {
+			return resource
+		}
 	}
-	return resource
+	return nil
+}
+
+func hasCodexLogSessionID(event canonical.Event) bool {
+	if event.Tool != "codex" || !strings.HasPrefix(event.SessionID, codexSessionPrefix) {
+		return false
+	}
+	_, ok := event.ProviderExtensions["log_attributes"].(map[string]any)
+	return ok
 }
 
 func observeSessionAttribute(session *canonical.Session, key, value string) {
