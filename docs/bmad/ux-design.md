@@ -66,6 +66,8 @@ Replace the React/Mantine SPA with a server-rendered local dashboard that helps 
 
 ## Information Architecture
 
+> **Enterprise-shaped IA (planned):** primary nav becomes **Home · Sessions · Governance · Integrations**. Insights folds into Home; Privacy and Costs leave the top nav but stay reachable. See [docs/ui/UI_PRODUCT_ROADMAP.md](../ui/UI_PRODUCT_ROADMAP.md) and epic [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148). Until that ships, the table below is the **current** local dashboard IA.
+
 | Route | Screen | One job |
 |-------|--------|---------|
 | `GET /unlock` | Unlock | Paste `make auth-token` once |
@@ -77,7 +79,8 @@ Replace the React/Mantine SPA with a server-rendered local dashboard that helps 
 | `GET /privacy` | Privacy | Defaults + DELETE ALL |
 | `GET /costs` | Costs | Secondary estimates only |
 
-Nav order: Home · Sessions · Insights · Integrations · Privacy · Costs (Costs last).
+Nav order (current): Home · Sessions · Insights · Integrations · Privacy · Costs (Costs last).  
+Nav order (roadmap V1): Home · Sessions · Governance · Integrations.
 
 ---
 
