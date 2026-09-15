@@ -35,39 +35,61 @@ func TestNormalizeSessionGovernanceContracts(t *testing.T) {
 		t.Fatalf("event count = %d, want 5", len(events))
 	}
 
-	var sawPlugin, sawBenignMode, sawBypassMode, sawAuthOK, sawAuthFail bool
+	seen := map[string]bool{}
 	for _, event := range events {
-		governance := requireGovernance(t, event)
-		switch event.EventType {
-		case eventPluginLoaded:
-			sawPlugin = true
-			assertPluginLoaded(t, governance)
-		case eventPermissionModeChanged:
-			if governance["to_mode"] == permissionModeBypass {
-				sawBypassMode = true
-				assertBool(t, governance, "bypass_permissions", true)
-			} else {
-				sawBenignMode = true
-				assertBool(t, governance, "bypass_permissions", false)
-			}
-		case eventAuth:
-			if governance["success"] == true {
-				sawAuthOK = true
-				if _, present := governance["status_code"]; present {
-					t.Fatalf("successful auth must not carry status_code: %#v", governance)
-				}
-			} else {
-				sawAuthFail = true
-				assertAuthFailure(t, governance)
-			}
-		default:
-			t.Fatalf("unexpected governance event type %q", event.EventType)
+		seen[checkGovernanceContract(t, event)] = true
+	}
+	for _, want := range []string{"plugin", "benign_mode", "bypass_mode", "auth_ok", "auth_fail"} {
+		if !seen[want] {
+			t.Fatalf("missing governance case %q; saw %v", want, seen)
 		}
 	}
-	if !sawPlugin || !sawBenignMode || !sawBypassMode || !sawAuthOK || !sawAuthFail {
-		t.Fatalf("missing a governance case: plugin=%v benignMode=%v bypassMode=%v authOK=%v authFail=%v",
-			sawPlugin, sawBenignMode, sawBypassMode, sawAuthOK, sawAuthFail)
+}
+
+// checkGovernanceContract asserts one event's governance contract and returns a
+// label identifying which case it exercised, so the caller can prove all five are
+// present without tracking a boolean per case.
+func checkGovernanceContract(t *testing.T, event canonical.Event) string {
+	t.Helper()
+	governance := requireGovernance(t, event)
+	switch event.EventType {
+	case eventPluginLoaded:
+		assertPluginLoaded(t, governance)
+		return "plugin"
+	case eventPermissionModeChanged:
+		return checkModeChange(t, governance)
+	case eventAuth:
+		return checkAuth(t, governance)
+	default:
+		t.Fatalf("unexpected governance event type %q", event.EventType)
+		return ""
 	}
+}
+
+// checkModeChange proves a bypassPermissions transition is flagged and a benign one
+// is not, returning the case label.
+func checkModeChange(t *testing.T, governance map[string]any) string {
+	t.Helper()
+	if governance["to_mode"] == permissionModeBypass {
+		assertBool(t, governance, "bypass_permissions", true)
+		return "bypass_mode"
+	}
+	assertBool(t, governance, "bypass_permissions", false)
+	return "benign_mode"
+}
+
+// checkAuth proves auth success carries no status_code and failure surfaces the
+// error attributes, returning the case label.
+func checkAuth(t *testing.T, governance map[string]any) string {
+	t.Helper()
+	if governance["success"] == true {
+		if _, present := governance["status_code"]; present {
+			t.Fatalf("successful auth must not carry status_code: %#v", governance)
+		}
+		return "auth_ok"
+	}
+	assertAuthFailure(t, governance)
+	return "auth_fail"
 }
 
 // TestNormalizeSessionGovernanceOTLPParity proves the raw-wire (/v1/logs) form and
