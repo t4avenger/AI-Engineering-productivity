@@ -1,21 +1,27 @@
 # Codex Normaliser
 
-Task 007 supports one deliberately narrow fixture shape: a reviewed, sanitised
-Codex OTLP trace wrapper with payload.resourceSpans[].scopeSpans[].spans[].
-Each span becomes one canonical event. The normaliser is deterministic: its
-event ID is codex:<traceId>:<spanId>, its session ID is codex:<traceId>, and
-it uses the OTLP startTimeUnixNano plus the fixture captured_at timestamp. It
-sorts spans by observed time plus stable identifiers, collapses duplicate
-trace/span IDs, and stores dedup, ordering, trace/span, parent-span, and
-task-boundary confidence evidence under `provider_extensions.correlation` (see
+Task 007 supports one deliberately narrow synthetic fixture shape: a reviewed,
+sanitised Codex OTLP trace wrapper with
+payload.resourceSpans[].scopeSpans[].spans[]. Each span becomes one canonical
+event when that fixture is replayed directly through `codex.Normalize`. This is
+fixture-only coverage, not evidence that live Codex emits traces. The F1 Codex
+CLI 0.153.4 capture observed no `/v1/traces` posts, so live ingest does not
+route Codex spans into persistence and the capability matrix records trace
+export as unsupported for that version (#112).
+
+For the synthetic fixture path, the normaliser is deterministic: its event ID is
+codex:<traceId>:<spanId>, its session ID is codex:<traceId>, and it uses the
+OTLP startTimeUnixNano plus the fixture captured_at timestamp. It sorts spans by
+observed time plus stable identifiers, collapses duplicate trace/span IDs, and
+stores dedup, ordering, trace/span, parent-span, and task-boundary confidence
+evidence under `provider_extensions.correlation` (see
 `docs/architecture/correlation.md`).
 
 The synthetic fixture is not evidence of any real Codex field beyond the shape
-it contains. Model, token, cache, tool-call, file-operation, command,
-approval, content, repository, task-outcome, and provider-cost fields are
-therefore listed in attributes.unavailable_fields. Actor and device IDs use
-the explicit string unavailable; unknown values are never represented as zero
-values.
+it contains. Model, token, cache, tool-call, file-operation, command, approval,
+content, repository, task-outcome, and provider-cost fields are therefore listed
+in attributes.unavailable_fields. Actor and device IDs use the explicit string
+unavailable; unknown values are never represented as zero values.
 
 Safe fields outside the supported OTLP mapping are preserved verbatim under
 provider_extensions.resource, provider_extensions.scope, or
