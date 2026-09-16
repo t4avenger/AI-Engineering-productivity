@@ -225,40 +225,61 @@ func assertClaudeCodeOutputEvents(t *testing.T, events []canonical.Event) {
 	counts := map[string]any{}
 	for _, event := range events {
 		assertNoIdentityLeak(t, event.ProviderExtensions["metric_attributes"].(map[string]any))
-		switch event.EventType {
-		case linesOfCodeMetric:
-			if event.Attributes["model"] != "claude-sonnet-5" {
-				t.Fatalf("lines_of_code event must promote model, got %#v", event.Attributes["model"])
-			}
-			for _, key := range []string{"lines_added_count", "lines_removed_count"} {
-				if value, ok := event.Attributes[key]; ok {
-					counts[key] = value
-				}
-			}
-		case commitMetric, pullRequestMetric:
-			if _, hasModel := event.Attributes["model"]; hasModel {
-				t.Fatalf("%s must not promote model (standard attrs only): %#v", event.EventType, event.Attributes)
-			}
-			key := "commit_count"
-			if event.EventType == pullRequestMetric {
-				key = "pull_request_count"
-			}
-			counts[key] = event.Attributes[key]
-		default:
-			t.Fatalf("unexpected event type %q", event.EventType)
-		}
+		collectCodeOutputCount(t, event, counts)
 	}
-	for key, want := range map[string]int64{
+	assertCountsEqual(t, counts, map[string]int64{
 		"lines_added_count":   128,
 		"lines_removed_count": 12,
 		"commit_count":        2,
 		"pull_request_count":  1,
-	} {
-		if counts[key] != want {
-			t.Fatalf("%s = %#v, want %d", key, counts[key], want)
+	})
+	assertAttribution(t, events, "code-reviewer", map[string]any{"skill.name": "code-reviewer", "agent.name": "general-purpose"})
+}
+
+// collectCodeOutputCount records the canonical count(s) carried by one code-output
+// event and enforces the model-promotion rule: lines_of_code promotes the observed
+// model, commit/pull_request carry standard attrs only.
+func collectCodeOutputCount(t *testing.T, event canonical.Event, counts map[string]any) {
+	t.Helper()
+	switch event.EventType {
+	case linesOfCodeMetric:
+		if event.Attributes["model"] != "claude-sonnet-5" {
+			t.Fatalf("lines_of_code event must promote model, got %#v", event.Attributes["model"])
+		}
+		for _, key := range []string{"lines_added_count", "lines_removed_count"} {
+			if value, ok := event.Attributes[key]; ok {
+				counts[key] = value
+			}
+		}
+	case commitMetric:
+		assertNoModelPromotion(t, event)
+		counts["commit_count"] = event.Attributes["commit_count"]
+	case pullRequestMetric:
+		assertNoModelPromotion(t, event)
+		counts["pull_request_count"] = event.Attributes["pull_request_count"]
+	default:
+		t.Fatalf("unexpected event type %q", event.EventType)
+	}
+}
+
+// assertNoModelPromotion proves a commit/pull_request event carries standard
+// attrs only, never a promoted model.
+func assertNoModelPromotion(t *testing.T, event canonical.Event) {
+	t.Helper()
+	if _, hasModel := event.Attributes["model"]; hasModel {
+		t.Fatalf("%s must not promote model (standard attrs only): %#v", event.EventType, event.Attributes)
+	}
+}
+
+// assertCountsEqual proves every expected canonical count landed with its exact
+// value.
+func assertCountsEqual(t *testing.T, counts map[string]any, want map[string]int64) {
+	t.Helper()
+	for key, value := range want {
+		if counts[key] != value {
+			t.Fatalf("%s = %#v, want %d", key, counts[key], value)
 		}
 	}
-	assertAttribution(t, events, "code-reviewer", map[string]any{"skill.name": "code-reviewer", "agent.name": "general-purpose"})
 }
 
 // TestNormalizeMetricsMalformedCodeOutputValueIsError proves the routing contract

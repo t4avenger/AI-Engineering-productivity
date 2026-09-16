@@ -44,6 +44,11 @@ const (
 	attrServiceVersion = "service.version"
 )
 
+// Datapoint attribute keys read from a Claude Code metrics payload. session.id
+// becomes the session identity on every metric event, so it is read (not
+// allow-listed into provider_extensions) by each datapoint builder.
+const attrSessionID = "session.id"
+
 // safeMetricAttributeKeys is the allow-list of datapoint/resource attribute keys
 // carried into provider_extensions. Ingest-time storage sanitising was removed
 // in #88, so this adapter is now the only guard: an allow-list (not a deny-list)
@@ -298,7 +303,7 @@ func tokenUsageEvent(point metricDataPoint, index int, ctx metricContext, unit s
 
 	occurredAt := metricTime(point.TimeUnixNano, ctx.receivedAt)
 	model, modelObserved := normalize.ObservedString(fields["model"])
-	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, "session.id"))
+	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, attrSessionID))
 	safeFields := safeMetricAttributes(fields)
 
 	// session.id is part of the event's semantic identity but is not in the
@@ -361,7 +366,7 @@ func costUsageEvent(point metricDataPoint, index int, ctx metricContext, unit st
 
 	occurredAt := metricTime(point.TimeUnixNano, ctx.receivedAt)
 	model, modelObserved := normalize.ObservedString(fields["model"])
-	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, "session.id"))
+	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, attrSessionID))
 	safeFields := safeMetricAttributes(fields)
 
 	// The formatted cost joins the identity so two same-timestamp cost points in
@@ -450,7 +455,7 @@ func buildCountEvent(metricName, countKey string, promoteModel bool, point metri
 
 	occurredAt := metricTime(point.TimeUnixNano, ctx.receivedAt)
 	model, modelObserved := normalize.ObservedString(fields["model"])
-	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, "session.id"))
+	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, attrSessionID))
 	safeFields := safeMetricAttributes(fields)
 
 	// countKey joins the identity so lines_added and lines_removed points that
