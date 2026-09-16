@@ -149,8 +149,10 @@ func (c *Calculator) Calculate(event canonical.Event) Record {
 	// Metric-derived token events are not priced here: they are per-interval
 	// delta samples (Codex/Claude/Cursor token.usage metrics), not authoritative
 	// per-request totals, so pricing them would double-count against request-level
-	// cost derived from api_request / ModelInteraction events.
-	if event.EventType == "codex.turn.token_usage" || event.EventType == "claude_code.token.usage" || event.EventType == "cursor.token.usage" {
+	// cost derived from api_request / ModelInteraction events. claude_code.cost.usage
+	// is the provider's own reported spend, kept as descriptive evidence only
+	// (PRODUCT_MAP §0 demotes cost); repricing it here would double-count too.
+	if event.EventType == "codex.turn.token_usage" || event.EventType == "claude_code.token.usage" || event.EventType == "claude_code.cost.usage" || event.EventType == "cursor.token.usage" {
 		return r
 	}
 	model, _ := event.Attributes["model"].(string)
