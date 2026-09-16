@@ -21,21 +21,24 @@ import (
 // skip a payload that belongs to another tool without treating it as an error.
 var ErrUnsupportedMetrics = errors.New("unsupported Claude Code metrics payload")
 
-// tokenUsageMetric, costUsageMetric and the code-output counters are the Claude
-// Code metrics mapped end-to-end: #89 landed token.usage, #97 (M10) added
-// cost.usage plus the per-datapoint attribution dimensions (which skill / MCP
-// tool / sub-agent / plugin burned the tokens and cost), and #98 (M11) adds the
-// three code-output counters (lines_of_code / commits / pull_requests) — the
-// direct outcome signals that answer whether a session actually produced code.
-// The remaining exported metrics (session/active-time/edit-decisions) are
-// route-tolerated — decoded without error but not yet mapped; their per-metric
-// canonical mapping is owned by the later M-phase issue (#99, M12).
+// These are the Claude Code metrics mapped end-to-end, completing the documented
+// eight-metric surface: #89 landed token.usage, #97 (M10) added cost.usage plus
+// the per-datapoint attribution dimensions (which skill / MCP tool / sub-agent /
+// plugin burned the tokens and cost), #98 (M11) added the three code-output
+// counters (lines_of_code / commits / pull_requests — did the session actually
+// produce code), and #99 (M12) adds the three engagement metrics: edit-decision
+// (the edit-acceptance rate), session.count and active-time (how the tool is
+// actually used over time). No documented Claude Code metric now routes-tolerated
+// unmapped; an undocumented future metric still route-tolerates (yields no event).
 const (
-	tokenUsageMetric  = "claude_code.token.usage"
-	costUsageMetric   = "claude_code.cost.usage"
-	linesOfCodeMetric = "claude_code.lines_of_code.count"
-	commitMetric      = "claude_code.commit.count"
-	pullRequestMetric = "claude_code.pull_request.count"
+	tokenUsageMetric   = "claude_code.token.usage"
+	costUsageMetric    = "claude_code.cost.usage"
+	linesOfCodeMetric  = "claude_code.lines_of_code.count"
+	commitMetric       = "claude_code.commit.count"
+	pullRequestMetric  = "claude_code.pull_request.count"
+	editDecisionMetric = "claude_code.code_edit_tool.decision"
+	sessionCountMetric = "claude_code.session.count"
+	activeTimeMetric   = "claude_code.active_time.total"
 )
 
 // OTLP resource attribute keys read from a Claude Code metrics payload.
@@ -83,6 +86,20 @@ var safeMetricAttributeKeys = map[string]struct{}{
 	"marketplace_name": {},
 	"speed":            {},
 	"effort":           {},
+	// Engagement-metric dimensions (#99, M12). These partition a single measure
+	// rather than naming distinct measures, so they survive as dimensions instead
+	// of selecting a count key: decision/tool_name/source/language slice the
+	// edit-acceptance rate (code_edit_tool.decision), start_type slices
+	// session.count. All are pre-redacted, non-identity behaviour enums. The
+	// active_time `type` (user/cli) is deliberately absent — it is promoted onto
+	// the event as activity_type, because token (type=input/output) and lines
+	// (type=added/removed) datapoints already carry `type` on the wire and
+	// allow-listing it would surface a duplicate in their metric_attributes.
+	"decision":   {},
+	"tool_name":  {},
+	"source":     {},
+	"start_type": {},
+	"language":   {},
 }
 
 type metricsPayload struct {
@@ -250,6 +267,12 @@ func metricEventsFromInstrument(item otlpMetric, ctx metricContext) ([]canonical
 		return datapointEvents(item, ctx, commitCountEvent)
 	case pullRequestMetric:
 		return datapointEvents(item, ctx, pullRequestCountEvent)
+	case editDecisionMetric:
+		return datapointEvents(item, ctx, editDecisionEvent)
+	case sessionCountMetric:
+		return datapointEvents(item, ctx, sessionCountEvent)
+	case activeTimeMetric:
+		return datapointEvents(item, ctx, activeTimeEvent)
 	default:
 		return nil, nil
 	}
@@ -439,13 +462,93 @@ func pullRequestCountEvent(point metricDataPoint, index int, ctx metricContext, 
 	return buildCountEvent(pullRequestMetric, "pull_request_count", false, point, index, ctx, unit)
 }
 
-// buildCountEvent maps one code-output count datapoint (lines_of_code, commit, or
-// pull_request; #98 M11) into a canonical event. These are direct outcome signals
-// — did the session actually produce code / commits / PRs — that complement token
-// spend for an efficiency/outcome view. A datapoint whose value cannot be parsed
-// as a non-negative count is a hard error per the routing contract, so the route
-// does not silently 202-accept and drop supported Claude data. promoteModel is
-// true only for lines_of_code, whose documented surface carries a model dimension.
+// editDecisionEvent maps one claude_code.code_edit_tool.decision datapoint (#99,
+// M12) — a user accepting or rejecting an Edit/Write/NotebookEdit — into a single
+// edit_decision_count. Its categoricals (decision, tool_name, source, language)
+// partition one measure rather than naming distinct measures, so they survive as
+// dimensions in metric_attributes (via the allow-list) instead of selecting a
+// count key; the edit-acceptance rate is then a group-by decision. Keeping them as
+// dims never drops an unforeseen decision/source value.
+func editDecisionEvent(point metricDataPoint, index int, ctx metricContext, unit string) (canonical.Event, bool, error) {
+	return buildCountEvent(editDecisionMetric, "edit_decision_count", false, point, index, ctx, unit)
+}
+
+// sessionCountEvent maps one claude_code.session.count datapoint (#99, M12). Its
+// start_type (fresh/resume/continue/agents_view) is a four-value slice of one
+// measure, so it survives as a dimension rather than fanning out into four keys.
+func sessionCountEvent(point metricDataPoint, index int, ctx metricContext, unit string) (canonical.Event, bool, error) {
+	return buildCountEvent(sessionCountMetric, "session_count", false, point, index, ctx, unit)
+}
+
+// activeTimeEvent maps one claude_code.active_time.total datapoint (#99, M12) —
+// active (non-idle) seconds, split by type into user (keyboard) vs cli (tool +
+// AI). Unlike the integer counters this is a duration, so it takes a float path
+// (optionalSeconds): a fractional or int-encoded second is accepted, only a
+// negative or unparseable value is the hard error, so a valid exporter double is
+// not dropped. The type dim is promoted onto activity_type (not allow-listed,
+// which would surface a duplicate `type` in the token/lines events that already
+// carry it on the wire) and folded into the identity so user/cli datapoints that
+// share a session/timestamp stay distinct under CorrelateEvents.
+func activeTimeEvent(point metricDataPoint, index int, ctx metricContext, unit string) (canonical.Event, bool, error) {
+	fields := attributeValues(point.Attributes)
+	seconds := optionalSeconds(dataPointValue(point))
+	if seconds == nil {
+		return canonical.Event{}, false, fmt.Errorf("claude %s datapoint has no parseable non-negative seconds value", activeTimeMetric)
+	}
+
+	occurredAt := metricTime(point.TimeUnixNano, ctx.receivedAt)
+	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, attrSessionID))
+	activityType, activityObserved := normalize.ObservedString(fields["type"])
+	safeFields := safeMetricAttributes(fields)
+
+	identity := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%s", activeTimeMetric, sessionID, activityType, point.TimeUnixNano, ctx.resourceIdentity, ctx.scopeName, index, strconv.FormatFloat(*seconds, 'f', -1, 64))
+	identity += "|" + stableJSON(safeFields)
+	eventID := contentID("claude-code:count:", []byte(identity))
+
+	attributes := map[string]any{
+		"unavailable_fields":  bareCounterUnavailableFields(),
+		"active_time_seconds": *seconds,
+	}
+	if activityObserved {
+		attributes["activity_type"] = activityType
+	}
+	extensions := map[string]any{
+		"correlation": metricCorrelation(eventID, occurredAt),
+		"metric": map[string]any{
+			"name": activeTimeMetric,
+			"unit": unit,
+		},
+		"resource":          ctx.safeResource,
+		"metric_attributes": safeFields,
+	}
+	return canonical.Event{
+		SchemaVersion:      canonicalSchemaVersion,
+		EventID:            eventID,
+		EventType:          activeTimeMetric,
+		OccurredAt:         occurredAt,
+		ReceivedAt:         ctx.receivedAt.UTC(),
+		Provider:           provider,
+		Tool:               tool,
+		SourceSchema:       sourceSchema,
+		SourceVersion:      ctx.version,
+		ActorID:            unavailable,
+		DeviceID:           unavailable,
+		SessionID:          sessionID,
+		PrivacyLevel:       "operational",
+		Attributes:         attributes,
+		ProviderExtensions: extensions,
+	}, true, nil
+}
+
+// buildCountEvent maps one integer-count datapoint into a canonical event: a
+// code-output counter (lines_of_code, commit, pull_request; #98 M11) or an
+// engagement counter (edit-decision, session; #99 M12). A datapoint whose value
+// cannot be parsed as a non-negative count is a hard error per the routing
+// contract, so the route does not silently 202-accept and drop supported Claude
+// data. promoteModel is true only for lines_of_code, whose documented surface
+// carries a model dimension; the engagement counters keep their categoricals
+// (decision/tool_name/source/language, start_type) as surviving dims via the
+// allow-list, which the safeFields identity term below keeps collision-safe.
 func buildCountEvent(metricName, countKey string, promoteModel bool, point metricDataPoint, index int, ctx metricContext, unit string) (canonical.Event, bool, error) {
 	fields := attributeValues(point.Attributes)
 	count := optionalCount(dataPointValue(point))
@@ -466,7 +569,7 @@ func buildCountEvent(metricName, countKey string, promoteModel bool, point metri
 	eventID := contentID("claude-code:count:", []byte(identity))
 
 	attributes := map[string]any{
-		"unavailable_fields": codeOutputUnavailableFields(),
+		"unavailable_fields": bareCounterUnavailableFields(),
 		countKey:             *count,
 	}
 	if promoteModel && modelObserved {
@@ -519,10 +622,13 @@ func costUnavailableFields() []string {
 	return []string{"token_usage", "tool_calls", "mcp_calls", "file_operations", "command_execution", "prompt_content", "response_content", "repository_context", "task_outcome", "trace_span_correlation"}
 }
 
-// codeOutputUnavailableFields lists the canonical fields a code-output count event
-// (lines_of_code / commit / pull_request) does not carry: it is a bare outcome
-// counter with no token, cost, or behaviour detail.
-func codeOutputUnavailableFields() []string {
+// bareCounterUnavailableFields lists the canonical fields a bare counter event
+// does not carry: a code-output count (lines_of_code / commit / pull_request; #98)
+// or an engagement counter (edit-decision / session / active-time; #99) is a plain
+// tally with no token, cost, or behaviour detail. The absent set is identical for
+// both, so one helper serves every counter routed through buildCountEvent and the
+// active-time event.
+func bareCounterUnavailableFields() []string {
 	return []string{"token_usage", "provider_cost", "tool_calls", "mcp_calls", "file_operations", "command_execution", "prompt_content", "response_content", "repository_context", "task_outcome", "trace_span_correlation"}
 }
 
@@ -635,6 +741,16 @@ func optionalCostUSD(value any) *float64 {
 // that reads correctly for a lines/commit/PR counter rather than a token count.
 func optionalCount(value any) *int64 {
 	return normalize.OptionalTokenCount(value)
+}
+
+// optionalSeconds parses an active_time.total datapoint value into a non-negative
+// *float64, mirroring optionalCostUSD's never-fabricate discipline (absent /
+// unparseable / NaN / Inf / negative -> nil, genuine 0 and fractional seconds
+// preserved). Seconds is a duration, not a count, so unlike optionalCount a
+// fractional value is kept rather than rejected — a valid exporter double must not
+// be dropped as a hard error.
+func optionalSeconds(value any) *float64 {
+	return optionalCostUSD(value)
 }
 
 func stableJSON(value any) string {

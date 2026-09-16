@@ -307,9 +307,30 @@ fixture `fixtures/claude/observed-sanitised/claude-code-2.1.268-code-output-metr
 → `fixtures/claude/expected/claude-code-2.1.268-code-output-metrics.events.json`;
 per-file LOC attribution stays out of scope (JSONL diffs, #105).
 
-The remaining exported metrics (session/active-time/edit-decisions) are
-route-tolerated — accepted without error but not yet mapped; their per-metric
-canonical mapping is owned by the later M-phase issue (#99, M12).
+The three **engagement** metrics complete the documented eight-metric surface
+(#99, M12) — the behaviour signals at the centre of the reorientation, not cost.
+`claude_code.code_edit_tool.decision` (an accept/reject on an Edit/Write/
+NotebookEdit) and `claude_code.session.count` land as a single canonical count
+each (`attributes.edit_decision_count` / `session_count`) with their categoricals
+kept as **surviving dimensions** in `provider_extensions.metric_attributes`
+(`decision`, `tool_name`, `source`, `language` / `start_type`, all allow-listed).
+This differs deliberately from `lines_of_code`: those categoricals *partition a
+single measure* rather than naming distinct measures, so the edit-acceptance rate
+is a group-by `decision`, and an unforeseen decision/start_type value is never
+dropped. `claude_code.active_time.total` is a **duration**, so it takes a float
+path (`optionalSeconds`, mirroring `optionalCostUSD`): a fractional or
+int-encoded second is kept, only a negative/unparseable value is the hard error,
+so a valid exporter double is not dropped. Its `type` (`user`/`cli`) is *promoted*
+onto `attributes.activity_type` rather than allow-listed — token
+(`type=input/output`) and lines (`type=added/removed`) datapoints already carry
+`type` on the wire, so allow-listing it would surface a duplicate in their
+`metric_attributes` — and is folded into the event-ID identity so the user/cli
+datapoints of one session/timestamp stay distinct. The surface is exercised by the
+synthetic fixture
+`fixtures/claude/observed-sanitised/claude-code-2.1.268-engagement-metrics.json`
+→ `fixtures/claude/expected/claude-code-2.1.268-engagement-metrics.events.json`.
+No documented Claude Code metric now routes-tolerated unmapped; an undocumented
+future metric still route-tolerates (yields no event).
 
 Because #88 removed storage-side sanitising, the adapter is the sole guard for
 metric attributes: it carries only an **allow-list** of safe keys into
@@ -322,7 +343,9 @@ tokens and cost — `skill.name`, `mcp_server.name`, `mcp_tool.name`,
 `agent.name`, `plugin.name`, `marketplace.name`, `speed`, and `effort` (each
 allow-listed in both its dotted wire form and the underscore variant so the same
 key survives whichever an exporter build emits; the match lower-cases and
-trims). These dims are pre-redacted behaviour metadata, not identities. Event
+trims), plus the M12 engagement dims `decision`, `tool_name`, `source`,
+`start_type`, and `language`. These dims are pre-redacted behaviour metadata, not
+identities. Event
 IDs are a content hash over the metric name, the per-metric count key (token type
 for token.usage, `lines_added`/`removed` for lines_of_code), model, timestamp,
 resource/scope identity, datapoint index, and value, so same-timestamp datapoints
@@ -398,6 +421,9 @@ committed. See "Prompt & response content path" above.
 - `fixtures/claude/expected/claude-code-2.1.268-code-output-metrics.events.json` —
   canonical lines_of_code/commit/pull_request events for the committed code-output
   `/v1/metrics` fixture (#98, M11).
+- `fixtures/claude/expected/claude-code-2.1.268-engagement-metrics.events.json` —
+  canonical edit-decision/session/active-time events for the committed engagement
+  `/v1/metrics` fixture (#99, M12).
 - `fixtures/claude/expected/claude-code-2.1.268-trace-spans.events.json` —
   canonical span events for the committed `/v1/traces` fixture.
 - `fixtures/claude/expected/claude-code-2.1.269-session-transcript.events.json` —
