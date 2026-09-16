@@ -38,47 +38,11 @@ const rawCodexOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
 // POST a raw OTLP log payload to /v1/logs, then prove the HTTP read API serves
 // the resulting session (tool, model) without leaking identity or secrets.
 func TestCodexLogsIngestEndToEnd(t *testing.T) {
-	repository, err := sqlite.Open(":memory:")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = repository.Close() })
-	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
-	t.Cleanup(server.Close)
-
-	response := postOTLPToPath(t, server.URL, "/v1/logs", []byte(rawCodexOTLPLogs), "application/json")
-	if response.StatusCode != http.StatusAccepted {
-		t.Fatalf("ingest status = %d", response.StatusCode)
-	}
-	closeBody(t, response)
-
-	sessions := fetchSessionList(t, server.URL+"/api/v1/sessions?limit=10")
-	if len(sessions.Data) != 1 {
-		t.Fatalf("expected 1 Codex session from read API, got %d: %#v", len(sessions.Data), sessions.Data)
-	}
-	session := sessions.Data[0]
-	if session.Provider != "openai" || session.Tool != "codex" {
-		t.Fatalf("session provider/tool = %q/%q", session.Provider, session.Tool)
-	}
-	if session.SessionID != "codex:synthetic-conversation" {
-		t.Fatalf("session id = %q, want native provider conversation ID", session.SessionID)
-	}
-	model, _ := session.Attributes["model"].(string)
-	if model != "tiq-live-codex-model" {
-		t.Fatalf("session model = %#v, want tiq-live-codex-model", session.Attributes["model"])
-	}
-	assertAvailabilityObserved(t, session.Availability, "model", "entrypoint", "tool_version")
-	assertCodexSessionEnvironment(t, session, "codex_cli_rs", "interactive", "0.145.0", "synthetic-conversation")
-	timeline := timelinePage(t, server.URL+"/api/v1/sessions/codex:synthetic-conversation/events?limit=10")
-	if len(timeline.Data) != 1 {
-		t.Fatalf("timeline events = %d, want 1: %#v", len(timeline.Data), timeline.Data)
-	}
-	if timeline.Data[0].CachedInputTokenCount == nil || *timeline.Data[0].CachedInputTokenCount != "21" {
-		t.Fatalf("cached input token count = %#v", timeline.Data[0].CachedInputTokenCount)
-	}
-	if timeline.Data[0].ReasoningTokenCount == nil || *timeline.Data[0].ReasoningTokenCount != "3" {
-		t.Fatalf("reasoning token count = %#v", timeline.Data[0].ReasoningTokenCount)
-	}
+	server, repository := newPersistentTestServer(t)
+	postCodexSessionAndMetrics(t, server)
+	sessions := assertCodexPrimarySession(t, server)
+	assertCodexSessionTimeline(t, server)
+	assertCodexTokenObservations(t, server)
 
 	canaries := []string{
 		"tiq-canary-argument-token",
@@ -95,6 +59,76 @@ func TestCodexLogsIngestEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertNoRawIdentifiers(t, canaries, marshalJSON(t, stored))
+}
+
+func postCodexSessionAndMetrics(t *testing.T, server *httptest.Server) {
+	t.Helper()
+	payloads := []struct {
+		path string
+		body []byte
+	}{
+		{path: "/v1/logs", body: []byte(rawCodexOTLPLogs)},
+		{path: "/v1/metrics", body: metricsFixturePayloadBytes(t, "codex-0.153.4-turn-token-usage-metrics.json")},
+	}
+	for _, payload := range payloads {
+		response := postOTLPToPath(t, server.URL, payload.path, payload.body, "application/json")
+		if response.StatusCode != http.StatusAccepted {
+			t.Fatalf("%s ingest status = %d", payload.path, response.StatusCode)
+		}
+		closeBody(t, response)
+	}
+}
+
+func assertCodexPrimarySession(t *testing.T, server *httptest.Server) sessionListResponse {
+	t.Helper()
+	sessions := fetchSessionList(t, server.URL+"/api/v1/sessions?limit=10")
+	if len(sessions.Data) != 1 {
+		t.Fatalf("expected 1 Codex session from read API, got %d: %#v", len(sessions.Data), sessions.Data)
+	}
+	session := sessions.Data[0]
+	if session.Provider != "openai" || session.Tool != "codex" {
+		t.Fatalf("session provider/tool = %q/%q", session.Provider, session.Tool)
+	}
+	if session.SessionID != "codex:synthetic-conversation" {
+		t.Fatalf("session id = %q, want native provider conversation ID", session.SessionID)
+	}
+	if session.IdentityScope != "provider" || session.IdentitySource != "conversation.id" {
+		t.Fatalf("session identity = %#v", session)
+	}
+	model, _ := session.Attributes["model"].(string)
+	if model != "tiq-live-codex-model" {
+		t.Fatalf("session model = %#v, want tiq-live-codex-model", session.Attributes["model"])
+	}
+	assertAvailabilityObserved(t, session.Availability, "model", "entrypoint", "tool_version")
+	assertCodexSessionEnvironment(t, session, "codex_cli_rs", "interactive", "0.145.0", "synthetic-conversation")
+	return sessions
+}
+
+func assertCodexSessionTimeline(t *testing.T, server *httptest.Server) {
+	t.Helper()
+	timeline := timelinePage(t, server.URL+"/api/v1/sessions/codex:synthetic-conversation/events?limit=10")
+	if len(timeline.Data) != 1 {
+		t.Fatalf("timeline events = %d, want 1: %#v", len(timeline.Data), timeline.Data)
+	}
+	if timeline.Data[0].CachedInputTokenCount == nil || *timeline.Data[0].CachedInputTokenCount != "21" {
+		t.Fatalf("cached input token count = %#v", timeline.Data[0].CachedInputTokenCount)
+	}
+	if timeline.Data[0].ReasoningTokenCount == nil || *timeline.Data[0].ReasoningTokenCount != "3" {
+		t.Fatalf("reasoning token count = %#v", timeline.Data[0].ReasoningTokenCount)
+	}
+}
+
+func assertCodexTokenObservations(t *testing.T, server *httptest.Server) {
+	t.Helper()
+	observations := fetchSessionList(t, server.URL+"/api/v1/sessions?limit=10&scope=observation")
+	if len(observations.Data) != 6 {
+		t.Fatalf("expected 6 retained token observations, got %d: %#v", len(observations.Data), observations.Data)
+	}
+	for _, observation := range observations.Data {
+		if observation.IdentityScope != "observation" || observation.IdentitySource != "content-derived" {
+			t.Fatalf("token observation identity = %#v", observation)
+		}
+	}
 }
 
 const rawCodexLifecycleOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[

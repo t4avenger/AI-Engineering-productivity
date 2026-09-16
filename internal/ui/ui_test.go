@@ -38,8 +38,19 @@ func (s *fullStub) Session(_ context.Context, id string) (canonical.Session, boo
 	return canonical.Session{}, false, nil
 }
 
-func (s *fullStub) ListSessions(_ context.Context, _ storage.SessionFilter) ([]canonical.Session, error) {
-	return s.sessions, nil
+func (s *fullStub) ListSessions(_ context.Context, filter storage.SessionFilter) ([]canonical.Session, error) {
+	result := make([]canonical.Session, 0, len(s.sessions))
+	for _, session := range s.sessions {
+		scope, _ := session.Attributes["identity_scope"].(string)
+		if filter.Scope == storage.SessionScopePrimary && scope == "observation" {
+			continue
+		}
+		if filter.Scope == storage.SessionScopeObservation && scope != "observation" {
+			continue
+		}
+		result = append(result, session)
+	}
+	return result, nil
 }
 
 func (s *fullStub) DeleteSession(_ context.Context, id string) error {
@@ -274,6 +285,39 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 	handler.ServeHTTP(rec, logout)
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("logout = %d", rec.Code)
+	}
+}
+
+func TestSessionViewsKeepObservationsInspectableWithoutCountingThemAsPrimary(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fullStub{sessions: []canonical.Session{
+		{
+			SessionID: "codex:provider-session", Provider: "openai", Tool: "codex", State: "completed", StartedAt: now,
+			Attributes: map[string]any{"identity_scope": "provider", "identity_source": "conversation.id"},
+		},
+		{
+			SessionID: "codex:token:observation", Provider: "openai", Tool: "codex", State: "failed", StartedAt: now,
+			Attributes: map[string]any{"identity_scope": "observation", "identity_source": "content-derived"},
+		},
+	}}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+
+	primary := getAuthed(t, handler, cookie, "/sessions").Body.String()
+	if !strings.Contains(primary, "codex:provider-session") || strings.Contains(primary, "codex:token:observation") {
+		t.Fatalf("primary session view = %q", primary)
+	}
+	observations := getAuthed(t, handler, cookie, "/sessions?scope=observation").Body.String()
+	if !strings.Contains(observations, "codex:token:observation") || !strings.Contains(observations, "Observation only") {
+		t.Fatalf("observation session view = %q", observations)
+	}
+	home := getAuthed(t, handler, cookie, "/").Body.String()
+	if !strings.Contains(home, "Successful 1 · Failed 0") {
+		t.Fatalf("home counts included observation-only row: %q", home)
 	}
 }
 

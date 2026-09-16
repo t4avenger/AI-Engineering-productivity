@@ -23,6 +23,13 @@ event store. Deletion requires an in-app confirmation before
 `POST /sessions/{id}/delete`; the repository removes the session and all retained
 events transactionally.
 
+The default Sessions view and Home counts use the primary identity scope:
+provider-backed sessions plus legacy rows whose boundary is not yet proven.
+Content-derived and trace-only rows remain retained and inspectable through the
+Sessions `Observations` view; `All retained rows` combines both scopes. The
+identity column labels the scope and evidence source. No view merges observations
+into a conversation without provider correlation evidence.
+
 In the local-only edition, session lists and details display the raw
 provider-native session, conversation, and request IDs with a stable provider
 prefix (`codex:`, `claude-code:`, `cursor-agent:`). Epic #87 removed ingest-time

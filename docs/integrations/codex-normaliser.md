@@ -89,6 +89,12 @@ to a non-keyed content ID for uniqueness only (epic #87 — no ingest-time
 hiding). SQLite session reconstruction carries that identity forward under
 `provider_extensions.correlation` with `session_id_source=conversation.id` and
 keeps the raw provider session ID separate from the stable `codex:` prefix.
+Reconstructed conversation-backed rows are labelled
+`identity_scope=provider`, `identity_source=conversation.id`. Content-derived
+`codex-log:*`, token, and skill rows are labelled `identity_scope=observation`
+and remain available in the observation/all list scopes. The normaliser and
+storage layer do not use time, model, or intake order to attach those rows to a
+conversation because the reviewed metric surface carries no join key.
 
 Observed Codex resource metadata is also promoted into reconstructed sessions
 from both log `provider_extensions.resource_attributes` and metric

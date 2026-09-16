@@ -19,6 +19,28 @@ The same value is used as the canonical `event_id` and is copied to `provider_ex
 
 Codex OTLP log records observed in 0.145.0 can carry `conversation.id`. Log-derived events and `canonical.ModelInteraction` records use the raw `codex:<conversation.id>` as the session ID. Records without a conversation ID fall back to a non-keyed content ID (epic #87 removed ingest-time hiding — no HMAC fingerprint). Their deduplication key remains the `request_id`, which is copied to `provider_extensions.correlation.dedup_key`.
 
+## Session identity scope
+
+SQLite reconstructs one retained row for every distinct event `session_id`; it
+does not merge rows unless provider evidence proves a shared identifier. Each
+reconstructed row records `attributes.identity_scope` and
+`attributes.identity_source`:
+
+- `provider` identifies a provider-backed conversation/session ID, with a source
+  such as `conversation.id`, `session.id`, or `cursor.conversation.id`.
+- `observation` identifies a content-derived or trace-only row that is useful as
+  evidence but is not proven to represent a whole coding session. This includes
+  `codex-log:*`, Codex token/skill metric IDs, Cursor token metric IDs, Claude
+  trace fallbacks, and provider `:unknown` fallbacks.
+- `unknown` / `unproven` preserves legacy or unfamiliar rows without asserting
+  either a provider session or an observation identity.
+
+This classification changes list scope only. Events and reconstructed rows are
+not deleted, aliased, or attached to a nearby provider session. In particular,
+Codex turn-token metrics currently carry no conversation ID, so timing, model,
+and arrival order must not be used to merge them into a conversation-backed
+row.
+
 ## Ordering
 
 Adapters must sort canonical events by:

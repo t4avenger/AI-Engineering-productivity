@@ -322,8 +322,13 @@ func (r *Repository) saveCostRecord(ctx context.Context, tx *sql.Tx, record cost
 }
 
 const (
-	timeFormat         = "2006-01-02T15:04:05.999999999Z07:00"
-	codexSessionPrefix = "codex:"
+	timeFormat          = "2006-01-02T15:04:05.999999999Z07:00"
+	codexSessionPrefix  = "codex:"
+	identityScopeKey    = "identity_scope"
+	identitySourceKey   = "identity_source"
+	identityProvider    = "provider"
+	identityObservation = "observation"
+	identityUnknown     = "unknown"
 )
 
 func (r *Repository) rebuildSession(ctx context.Context, tx *sql.Tx, id string) error {
@@ -382,7 +387,69 @@ func reconstructSession(id string, events []canonical.Event) canonical.Session {
 			}
 		}
 	}
+	scope, source := sessionIdentity(events)
+	session.Attributes[identityScopeKey] = scope
+	session.Attributes[identitySourceKey] = source
 	return session
+}
+
+func sessionIdentity(events []canonical.Event) (string, string) {
+	if len(events) == 0 {
+		return identityUnknown, "unproven"
+	}
+	first := events[0]
+	id := first.SessionID
+	if scope, source, ok := observationIdentity(id); ok {
+		return scope, source
+	}
+	switch {
+	case first.Tool == "codex" && hasCodexLogSessionID(first):
+		return identityProvider, "conversation.id"
+	case first.Tool == "claude-code" && strings.HasPrefix(id, "claude-code:"):
+		return identityProvider, "session.id"
+	case first.Tool == "cursor-agent" && strings.HasPrefix(id, "cursor-agent:"):
+		return identityProvider, "session_id"
+	case first.Tool == "cursor" && strings.HasPrefix(id, "cursor:"):
+		return identityProvider, "cursor.conversation.id"
+	default:
+		return identityUnknown, "unproven"
+	}
+}
+
+func observationIdentity(id string) (string, string, bool) {
+	switch {
+	case strings.HasPrefix(id, "codex-log:"), strings.HasPrefix(id, "codex:token:"),
+		strings.HasPrefix(id, "codex:skill:"), strings.HasPrefix(id, "codex:skill-turn:"),
+		strings.HasPrefix(id, "cursor:token:"):
+		return identityObservation, "content-derived", true
+	case strings.HasPrefix(id, "claude-code:trace:"):
+		return identityObservation, "trace.id", true
+	case strings.HasSuffix(id, ":unknown"):
+		return identityObservation, "provider-id-absent", true
+	default:
+		return "", "", false
+	}
+}
+
+func ensureSessionIdentity(session *canonical.Session) {
+	if session.Attributes == nil {
+		session.Attributes = map[string]any{}
+	}
+	_, hasScope := session.Attributes[identityScopeKey].(string)
+	_, hasSource := session.Attributes[identitySourceKey].(string)
+	if hasScope && hasSource {
+		return
+	}
+	scope, source, observed := observationIdentity(session.SessionID)
+	if !observed {
+		scope, source = identityUnknown, "unproven"
+	}
+	if !hasScope {
+		session.Attributes[identityScopeKey] = scope
+	}
+	if !hasSource {
+		session.Attributes[identitySourceKey] = source
+	}
 }
 
 func attachSessionEnvironment(session *canonical.Session, event canonical.Event) {
@@ -526,6 +593,9 @@ func (r *Repository) Session(ctx context.Context, id string) (canonical.Session,
 	}
 	var s canonical.Session
 	err = json.Unmarshal(data, &s)
+	if err == nil {
+		ensureSessionIdentity(&s)
+	}
 	return s, true, err
 }
 
@@ -558,6 +628,16 @@ func sessionListQuery(filter storage.SessionFilter) (string, []any, error) {
 	}
 	if filter.Outcome != "" {
 		appendCondition("json_extract(session_json, '$.state') = ?", filter.Outcome)
+	}
+	identityScopeExpression := "COALESCE(json_extract(session_json, '$.attributes.identity_scope'), CASE WHEN session_id GLOB 'codex-log:*' OR session_id GLOB 'codex:token:*' OR session_id GLOB 'codex:skill:*' OR session_id GLOB 'codex:skill-turn:*' OR session_id GLOB 'cursor:token:*' OR session_id GLOB 'claude-code:trace:*' OR session_id GLOB '*:unknown' THEN 'observation' ELSE 'unknown' END)"
+	switch filter.Scope {
+	case storage.SessionScopePrimary:
+		conditions = append(conditions, identityScopeExpression+" != 'observation'")
+	case storage.SessionScopeObservation:
+		conditions = append(conditions, identityScopeExpression+" = 'observation'")
+	case "":
+	default:
+		return "", nil, errors.New("session scope must be primary, observation, or empty")
 	}
 	if filter.Model != "" {
 		appendCondition("EXISTS (SELECT 1 FROM events WHERE events.session_id=sessions.session_id AND json_extract(events.event_json, '$.attributes.model') = ?)", filter.Model)
@@ -592,6 +672,7 @@ func decodeSessions(rows *sql.Rows, limit int) ([]canonical.Session, error) {
 		if err := json.Unmarshal(data, &session); err != nil {
 			return nil, err
 		}
+		ensureSessionIdentity(&session)
 		sessions = append(sessions, session)
 	}
 	if err := rows.Err(); err != nil {

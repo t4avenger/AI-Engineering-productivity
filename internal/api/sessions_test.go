@@ -64,6 +64,33 @@ func TestSessionAPIContract(t *testing.T) {
 	}
 }
 
+func TestSessionAPIDefaultHidesObservationsAndExposesScopedViews(t *testing.T) {
+	repo := sessionTestRepository(t)
+	observation := sessionTestEvent(t, "metric-event", "codex:token:metric-event", "codex", "unknown", "2026-01-02T12:00:00Z", "model-metric")
+	observation.EventType = "codex.turn.token_usage"
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{observation}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(NewHandler(slog.Default(), repo))
+	t.Cleanup(server.Close)
+
+	primary := getSessionList(t, server.URL+"/api/v1/sessions?limit=10")
+	if len(primary.Data) != 3 {
+		t.Fatalf("primary sessions = %#v", primary.Data)
+	}
+	observations := getSessionList(t, server.URL+"/api/v1/sessions?limit=10&scope=observation")
+	if len(observations.Data) != 1 || observations.Data[0].SessionID != observation.SessionID {
+		t.Fatalf("observations = %#v", observations.Data)
+	}
+	if observations.Data[0].IdentityScope != "observation" || observations.Data[0].IdentitySource != "content-derived" {
+		t.Fatalf("observation identity = %#v", observations.Data[0])
+	}
+	all := getSessionList(t, server.URL+"/api/v1/sessions?limit=10&scope=all")
+	if len(all.Data) != 4 {
+		t.Fatalf("all sessions = %#v", all.Data)
+	}
+}
+
 func TestSessionAPIReportsUnknownOutcomeAsUnknownAvailability(t *testing.T) {
 	session := canonical.Session{State: "unknown"}
 	availability := sessionAvailability(session)
@@ -181,7 +208,7 @@ func TestSessionAPIRejectsInvalidQueriesAndMissingSessions(t *testing.T) {
 	server := httptest.NewServer(NewHandler(slog.Default(), repo))
 	t.Cleanup(server.Close)
 
-	for _, path := range []string{"/api/v1/sessions?limit=0", "/api/v1/sessions?started_after=nope", "/api/v1/sessions?cursor=not-a-cursor"} {
+	for _, path := range []string{"/api/v1/sessions?limit=0", "/api/v1/sessions?started_after=nope", "/api/v1/sessions?cursor=not-a-cursor", "/api/v1/sessions?scope=nope"} {
 		assertInvalidSessionQuery(t, server.URL+path)
 	}
 

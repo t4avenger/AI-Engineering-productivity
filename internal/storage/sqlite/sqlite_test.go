@@ -113,6 +113,70 @@ func TestReconstructedCodexMetricSessionDoesNotFabricateConversationCorrelation(
 	if _, ok := session.ProviderExtensions["correlation"]; ok {
 		t.Fatalf("metric session must not fabricate conversation correlation: %#v", session.ProviderExtensions)
 	}
+	if session.Attributes[identityScopeKey] != identityObservation || session.Attributes[identitySourceKey] != "content-derived" {
+		t.Fatalf("metric session identity = %#v", session.Attributes)
+	}
+}
+
+func TestSessionIdentityScopesFilterWithoutDroppingRows(t *testing.T) {
+	repo, provider, observation, unknown := identityScopeRepository(t)
+	assertPrimaryIdentityScope(t, repo, provider, unknown)
+	assertObservationIdentityScope(t, repo, observation)
+	assertAllIdentityScopes(t, repo)
+	if _, err := repo.ListSessions(context.Background(), storage.SessionFilter{Limit: 10, Scope: "invalid"}); err == nil {
+		t.Fatal("expected invalid session scope error")
+	}
+}
+
+func identityScopeRepository(t *testing.T) (*Repository, canonical.Event, canonical.Event, canonical.Event) {
+	t.Helper()
+	repo, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = repo.Close() })
+	provider := event(t, "provider-event", "codex:provider-session", "session.active", "2026-01-02T11:00:00Z")
+	provider.ProviderExtensions = map[string]any{"log_attributes": map[string]any{"event.name": "codex.conversation_starts"}}
+	observation := event(t, "metric-event", "codex:token:metric-event", "codex.turn.token_usage", "2026-01-02T10:00:00Z")
+	unknown := event(t, "legacy-event", "legacy-session", "session.active", "2026-01-02T09:00:00Z")
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{provider, observation, unknown}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.db.Exec("UPDATE sessions SET session_json=json_remove(session_json, '$.attributes.identity_scope', '$.attributes.identity_source') WHERE session_id=?", observation.SessionID); err != nil {
+		t.Fatal(err)
+	}
+	return repo, provider, observation, unknown
+}
+
+func assertPrimaryIdentityScope(t *testing.T, repo *Repository, provider, unknown canonical.Event) {
+	t.Helper()
+	primary, err := repo.ListSessions(context.Background(), storage.SessionFilter{Limit: 10, Scope: storage.SessionScopePrimary})
+	if err != nil || len(primary) != 2 || primary[0].SessionID != provider.SessionID || primary[1].SessionID != unknown.SessionID {
+		t.Fatalf("primary sessions = %#v, %v", primary, err)
+	}
+}
+
+func assertObservationIdentityScope(t *testing.T, repo *Repository, observation canonical.Event) {
+	t.Helper()
+	observations, err := repo.ListSessions(context.Background(), storage.SessionFilter{Limit: 10, Scope: storage.SessionScopeObservation})
+	if err != nil || len(observations) != 1 || observations[0].SessionID != observation.SessionID {
+		t.Fatalf("observation sessions = %#v, %v", observations, err)
+	}
+	if observations[0].Attributes[identityScopeKey] != identityObservation || observations[0].Attributes[identitySourceKey] != "content-derived" {
+		t.Fatalf("legacy observation identity = %#v", observations[0].Attributes)
+	}
+	legacyDetail, found, err := repo.Session(context.Background(), observation.SessionID)
+	if err != nil || !found || legacyDetail.Attributes[identityScopeKey] != identityObservation {
+		t.Fatalf("legacy observation detail = %#v, %v, %v", legacyDetail, found, err)
+	}
+}
+
+func assertAllIdentityScopes(t *testing.T, repo *Repository) {
+	t.Helper()
+	all, err := repo.ListSessions(context.Background(), storage.SessionFilter{Limit: 10})
+	if err != nil || len(all) != 3 {
+		t.Fatalf("all sessions = %#v, %v", all, err)
+	}
 }
 
 func TestCostRecordsPersistAndDelete(t *testing.T) {
