@@ -267,23 +267,50 @@ fabricated absence); an unrecognised `type` is skipped so a future Claude token
 category does not fail the batch, while a recognised type with an unparseable
 value is a hard normalisation error rather than a silently dropped 202.
 
-Only `claude_code.token.usage` is mapped in #89. The other seven exported
-metrics (cost/session/active-time/lines-of-code/commits/PRs/edit-decisions) are
-route-tolerated — accepted without error but not yet mapped; their per-metric
-canonical mapping is owned by the M-phase issues (#97–#99). In particular this
-does **not** add cost support: `internal/cost/cost.go` keys on
-`codex.turn.token_usage`, so the new `claude_code.token.usage` event only
-preserves token evidence until #97 extends the cost logic.
+`claude_code.cost.usage` is also mapped end-to-end (#97, M10). It is the
+provider's own reported spend, decoded from the sum/gauge datapoint's numeric
+value (`asDouble`, or a numeric-string `asInt`) into a canonical event
+(`event_type = claude_code.cost.usage`) carrying the USD amount under
+`attributes.provider_cost`. Cost is **secondary/descriptive** (`PRODUCT_MAP.md`
+§0): the amount is preserved verbatim as evidence but is **never** fed into
+`cost.Calculate` — `internal/cost/cost.go` explicitly early-returns
+`claude_code.cost.usage` (alongside the `*.token.usage` metric families) so a
+provider-reported figure never double-counts against request-level pricing. A
+cost datapoint whose value is absent, non-numeric, negative, or non-finite
+(NaN/Inf) is dropped to nil by `optionalCostUSD` and, because a recognised
+cost.usage instrument is expected to carry a value, treated as a hard
+normalisation error rather than a silent 202 (same routing contract as
+token.usage). When a resource emits cost.usage, its sibling `token.usage` events
+stop declaring `provider_cost` unavailable — the correlated cost event carries
+it; a token-only resource keeps `provider_cost` in `unavailable_fields`.
+
+The remaining exported metrics (session/active-time/lines-of-code/commits/PRs/
+edit-decisions) are route-tolerated — accepted without error but not yet mapped;
+their per-metric canonical mapping is owned by the later M-phase issues
+(#98–#99).
 
 Because #88 removed storage-side sanitising, the adapter is the sole guard for
-metric attributes: it carries only an **allow-list** of safe keys
-(`query_source`, `host.arch`, `os.type`) into
+metric attributes: it carries only an **allow-list** of safe keys into
 `provider_extensions.metric_attributes`/`resource`, dropping operator/identity
 and any unforeseen attribute (`user.*`, `organization.*`, `terminal.*`,
-secrets, paths) by default. Event IDs are a content hash over the metric name,
-token type, model, timestamp, resource/scope identity, datapoint index, and
-value, so same-timestamp datapoints in one session stay distinct under
-`CorrelateEvents`.
+secrets, paths) by default. The allow-list carries `query_source`, `host.arch`,
+`os.type` and — the M10 attribution dimensions that answer the epic's central
+efficiency question, which skill / MCP tool / sub-agent / plugin burned the
+tokens and cost — `skill.name`, `mcp_server.name`, `mcp_tool.name`,
+`agent.name`, `plugin.name`, `marketplace.name`, `speed`, and `effort` (each
+allow-listed in both its dotted wire form and the underscore variant so the same
+key survives whichever an exporter build emits; the match lower-cases and
+trims). These dims are pre-redacted behaviour metadata, not identities. Event
+IDs are a content hash over the metric name, token type (token.usage only),
+model, timestamp, resource/scope identity, datapoint index, and value, so
+same-timestamp datapoints in one session stay distinct under `CorrelateEvents`.
+The attributed token.usage + cost.usage surface is exercised by the synthetic
+fixture `fixtures/claude/observed-sanitised/claude-code-2.1.268-cost-attribution-metrics.json`
+→ `fixtures/claude/expected/claude-code-2.1.268-cost-attribution-metrics.events.json`;
+live OTLP metrics carrying attribution dims were not reachable in the capture
+environment, so the fixture is shaped from the documented cost.usage surface
+(<https://code.claude.com/docs/en/monitoring-usage>) and marked
+`fixture_origin: synthetic`.
 
 ## Traces path — `NormalizeTraces`
 

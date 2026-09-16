@@ -1,10 +1,10 @@
 [
   {
     "schema_version": "0.1.0",
-    "event_id": "claude-code:token:1bc3c2f9fdb75372522483f3f56ab58d8589f8301fbfd85bd80b9d0c6631c00a",
+    "event_id": "claude-code:token:8387de0ecdb7c0f95b5dc96aeef541aa238fc87e4e093d72038188982c880c51",
     "event_type": "claude_code.token.usage",
     "occurred_at": "2026-09-11T07:50:30.911Z",
-    "received_at": "2026-09-11T08:50:31Z",
+    "received_at": "2026-09-16T08:50:31Z",
     "provider": "anthropic",
     "tool": "claude-code",
     "source_schema": "otel",
@@ -16,8 +16,8 @@
     "repository_id": null,
     "privacy_level": "operational",
     "attributes": {
-      "model": "claude-haiku-4-5-20251001",
-      "output_token_count": 42,
+      "input_token_count": 120,
+      "model": "claude-sonnet-5",
       "unavailable_fields": [
         "tool_calls",
         "mcp_calls",
@@ -27,69 +27,13 @@
         "response_content",
         "repository_context",
         "task_outcome",
-        "provider_cost",
         "trace_span_correlation"
       ]
     },
     "provider_extensions": {
       "correlation": {
-        "dedup_key": "claude-code:token:1bc3c2f9fdb75372522483f3f56ab58d8589f8301fbfd85bd80b9d0c6631c00a",
-        "ordering_key": "01789113030911000000:claude-code:token:1bc3c2f9fdb75372522483f3f56ab58d8589f8301fbfd85bd80b9d0c6631c00a",
-        "task_boundary": {
-          "confidence": "unknown",
-          "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
-        }
-      },
-      "metric": {
-        "name": "claude_code.token.usage",
-        "token_type": "output",
-        "unit": "tokens"
-      },
-      "metric_attributes": {
-        "query_source": "main"
-      },
-      "resource": {
-        "host.arch": "amd64",
-        "os.type": "linux"
-      }
-    }
-  },
-  {
-    "schema_version": "0.1.0",
-    "event_id": "claude-code:token:205cdb21103c9187692f40705e019d699e2426dcf914aaae6309bd0e41d79fda",
-    "event_type": "claude_code.token.usage",
-    "occurred_at": "2026-09-11T07:50:30.911Z",
-    "received_at": "2026-09-11T08:50:31Z",
-    "provider": "anthropic",
-    "tool": "claude-code",
-    "source_schema": "otel",
-    "source_version": "2.1.268",
-    "actor_id": "unavailable",
-    "device_id": "unavailable",
-    "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
-    "task_id": null,
-    "repository_id": null,
-    "privacy_level": "operational",
-    "attributes": {
-      "input_token_count": 10,
-      "model": "claude-haiku-4-5-20251001",
-      "unavailable_fields": [
-        "tool_calls",
-        "mcp_calls",
-        "file_operations",
-        "command_execution",
-        "prompt_content",
-        "response_content",
-        "repository_context",
-        "task_outcome",
-        "provider_cost",
-        "trace_span_correlation"
-      ]
-    },
-    "provider_extensions": {
-      "correlation": {
-        "dedup_key": "claude-code:token:205cdb21103c9187692f40705e019d699e2426dcf914aaae6309bd0e41d79fda",
-        "ordering_key": "01789113030911000000:claude-code:token:205cdb21103c9187692f40705e019d699e2426dcf914aaae6309bd0e41d79fda",
+        "dedup_key": "claude-code:token:8387de0ecdb7c0f95b5dc96aeef541aa238fc87e4e093d72038188982c880c51",
+        "ordering_key": "01789113030911000000:claude-code:token:8387de0ecdb7c0f95b5dc96aeef541aa238fc87e4e093d72038188982c880c51",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
@@ -101,7 +45,11 @@
         "unit": "tokens"
       },
       "metric_attributes": {
-        "query_source": "main"
+        "agent.name": "general-purpose",
+        "effort": "high",
+        "query_source": "main",
+        "skill.name": "code-reviewer",
+        "speed": "fast"
       },
       "resource": {
         "host.arch": "amd64",
@@ -111,10 +59,10 @@
   },
   {
     "schema_version": "0.1.0",
-    "event_id": "claude-code:token:40b026bfa288dd829076fe1900dd202869693a80931f4157d0b9d63ae484d65b",
+    "event_id": "claude-code:token:a2956243a6ad9a15cc5c04a1a9fe5090868dcb77b186b971a30a71e29bebf137",
     "event_type": "claude_code.token.usage",
-    "occurred_at": "2026-09-11T07:50:30.911Z",
-    "received_at": "2026-09-11T08:50:31Z",
+    "occurred_at": "2026-09-11T07:50:30.912Z",
+    "received_at": "2026-09-16T08:50:31Z",
     "provider": "anthropic",
     "tool": "claude-code",
     "source_schema": "otel",
@@ -126,8 +74,8 @@
     "repository_id": null,
     "privacy_level": "operational",
     "attributes": {
-      "cache_write_input_token_count": 18856,
-      "model": "claude-haiku-4-5-20251001",
+      "model": "claude-sonnet-5",
+      "output_token_count": 340,
       "unavailable_fields": [
         "tool_calls",
         "mcp_calls",
@@ -137,14 +85,13 @@
         "response_content",
         "repository_context",
         "task_outcome",
-        "provider_cost",
         "trace_span_correlation"
       ]
     },
     "provider_extensions": {
       "correlation": {
-        "dedup_key": "claude-code:token:40b026bfa288dd829076fe1900dd202869693a80931f4157d0b9d63ae484d65b",
-        "ordering_key": "01789113030911000000:claude-code:token:40b026bfa288dd829076fe1900dd202869693a80931f4157d0b9d63ae484d65b",
+        "dedup_key": "claude-code:token:a2956243a6ad9a15cc5c04a1a9fe5090868dcb77b186b971a30a71e29bebf137",
+        "ordering_key": "01789113030912000000:claude-code:token:a2956243a6ad9a15cc5c04a1a9fe5090868dcb77b186b971a30a71e29bebf137",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
@@ -152,10 +99,14 @@
       },
       "metric": {
         "name": "claude_code.token.usage",
-        "token_type": "cacheCreation",
+        "token_type": "output",
         "unit": "tokens"
       },
       "metric_attributes": {
+        "marketplace.name": "acme-marketplace",
+        "mcp_server.name": "github",
+        "mcp_tool.name": "create_issue",
+        "plugin.name": "review-suite",
         "query_source": "main"
       },
       "resource": {
@@ -166,10 +117,10 @@
   },
   {
     "schema_version": "0.1.0",
-    "event_id": "claude-code:token:47c7fecee2ed178767beda13c424b2b6211d9f0e2c3d3bf239730f82f49770ad",
-    "event_type": "claude_code.token.usage",
-    "occurred_at": "2026-09-11T07:50:30.911Z",
-    "received_at": "2026-09-11T08:50:31Z",
+    "event_id": "claude-code:cost:d1f120f0dcb232badd8197e5831c3af06152a72049e37655b66d39d1b1803734",
+    "event_type": "claude_code.cost.usage",
+    "occurred_at": "2026-09-11T07:50:30.913Z",
+    "received_at": "2026-09-16T08:50:31Z",
     "provider": "anthropic",
     "tool": "claude-code",
     "source_schema": "otel",
@@ -181,9 +132,10 @@
     "repository_id": null,
     "privacy_level": "operational",
     "attributes": {
-      "cached_input_token_count": 0,
-      "model": "claude-haiku-4-5-20251001",
+      "model": "claude-sonnet-5",
+      "provider_cost": 0.0123,
       "unavailable_fields": [
+        "token_usage",
         "tool_calls",
         "mcp_calls",
         "file_operations",
@@ -192,25 +144,83 @@
         "response_content",
         "repository_context",
         "task_outcome",
-        "provider_cost",
         "trace_span_correlation"
       ]
     },
     "provider_extensions": {
       "correlation": {
-        "dedup_key": "claude-code:token:47c7fecee2ed178767beda13c424b2b6211d9f0e2c3d3bf239730f82f49770ad",
-        "ordering_key": "01789113030911000000:claude-code:token:47c7fecee2ed178767beda13c424b2b6211d9f0e2c3d3bf239730f82f49770ad",
+        "dedup_key": "claude-code:cost:d1f120f0dcb232badd8197e5831c3af06152a72049e37655b66d39d1b1803734",
+        "ordering_key": "01789113030913000000:claude-code:cost:d1f120f0dcb232badd8197e5831c3af06152a72049e37655b66d39d1b1803734",
         "task_boundary": {
           "confidence": "unknown",
           "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
         }
       },
       "metric": {
-        "name": "claude_code.token.usage",
-        "token_type": "cacheRead",
-        "unit": "tokens"
+        "name": "claude_code.cost.usage",
+        "unit": "USD"
       },
       "metric_attributes": {
+        "agent.name": "general-purpose",
+        "query_source": "main",
+        "skill.name": "code-reviewer"
+      },
+      "resource": {
+        "host.arch": "amd64",
+        "os.type": "linux"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:cost:a3f85239fbbfa0d1952a89f1027926e87209cc096b98d8dcd6285825c19a6f06",
+    "event_type": "claude_code.cost.usage",
+    "occurred_at": "2026-09-11T07:50:30.914Z",
+    "received_at": "2026-09-16T08:50:31Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.268",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "model": "claude-sonnet-5",
+      "provider_cost": 0.0045,
+      "unavailable_fields": [
+        "token_usage",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "command_execution",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "trace_span_correlation"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:cost:a3f85239fbbfa0d1952a89f1027926e87209cc096b98d8dcd6285825c19a6f06",
+        "ordering_key": "01789113030914000000:claude-code:cost:a3f85239fbbfa0d1952a89f1027926e87209cc096b98d8dcd6285825c19a6f06",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "name": "claude_code.cost.usage",
+        "unit": "USD"
+      },
+      "metric_attributes": {
+        "marketplace.name": "acme-marketplace",
+        "mcp_server.name": "github",
+        "mcp_tool.name": "create_issue",
+        "plugin.name": "review-suite",
         "query_source": "main"
       },
       "resource": {

@@ -89,6 +89,124 @@ func assertClaudeTokenAttribute(t *testing.T, events []canonical.Event, key stri
 	t.Fatalf("missing token attribute %s in %#v", key, events)
 }
 
+func TestNormalizeMetricsCostAttributionGolden(t *testing.T) {
+	payload := metricsFixturePayload(t, "claude-code-2.1.268-cost-attribution-metrics.json")
+	receivedAt := time.Date(2026, 9, 16, 8, 50, 31, 0, time.UTC)
+
+	first, err := NormalizeMetrics(payload, receivedAt)
+	if err != nil {
+		t.Fatalf("first: %v", err)
+	}
+	second, err := NormalizeMetrics(payload, receivedAt)
+	if err != nil {
+		t.Fatalf("second: %v", err)
+	}
+	if !reflect.DeepEqual(first, second) {
+		t.Fatal("normalisation must be deterministic")
+	}
+	assertClaudeCostAttributionEvents(t, first)
+	assertMatchesGolden(t, "claude-code-2.1.268-cost-attribution-metrics.events.json", first)
+}
+
+// assertClaudeCostAttributionEvents proves the M10 outcome: the attribution dims
+// survive into provider_extensions.metric_attributes on both token.usage and
+// cost.usage events, the provider-reported USD cost is carried under
+// provider_cost, and — because cost.usage is captured on the same resource — the
+// token events no longer declare provider_cost unavailable.
+func assertClaudeCostAttributionEvents(t *testing.T, events []canonical.Event) {
+	t.Helper()
+	var tokenEvents, costEvents int
+	for _, event := range events {
+		switch event.EventType {
+		case tokenUsageMetric:
+			tokenEvents++
+			assertProviderCostAvailable(t, event)
+		case costUsageMetric:
+			costEvents++
+			assertPositiveProviderCost(t, event)
+		default:
+			t.Fatalf("unexpected event type %q", event.EventType)
+		}
+		assertNoIdentityLeak(t, event.ProviderExtensions["metric_attributes"].(map[string]any))
+	}
+	if tokenEvents != 2 || costEvents != 2 {
+		t.Fatalf("event mix = %d token / %d cost, want 2/2", tokenEvents, costEvents)
+	}
+	assertAttribution(t, events, "code-reviewer", map[string]any{"skill.name": "code-reviewer", "agent.name": "general-purpose"})
+	assertAttribution(t, events, "review-suite", map[string]any{"mcp_server.name": "github", "mcp_tool.name": "create_issue", "plugin.name": "review-suite", "marketplace.name": "acme-marketplace"})
+}
+
+// assertProviderCostAvailable proves a token.usage event does not mark
+// provider_cost unavailable when a sibling cost.usage datapoint is captured on
+// the same resource.
+func assertProviderCostAvailable(t *testing.T, event canonical.Event) {
+	t.Helper()
+	for _, field := range event.Attributes["unavailable_fields"].([]string) {
+		if field == "provider_cost" {
+			t.Fatalf("token event must not mark provider_cost unavailable when cost.usage is captured: %#v", event.Attributes)
+		}
+	}
+}
+
+// assertPositiveProviderCost proves a cost.usage event carries the provider USD
+// amount under provider_cost.
+func assertPositiveProviderCost(t *testing.T, event canonical.Event) {
+	t.Helper()
+	cost, ok := event.Attributes["provider_cost"].(float64)
+	if !ok || cost <= 0 {
+		t.Fatalf("cost event must carry a positive provider_cost, got %#v", event.Attributes["provider_cost"])
+	}
+}
+
+// assertNoIdentityLeak proves the allow-list dropped identity-bearing attributes
+// from provider_extensions.metric_attributes.
+func assertNoIdentityLeak(t *testing.T, attrs map[string]any) {
+	t.Helper()
+	for _, blocked := range []string{"user.id", "user.email", "session.id"} {
+		if _, leaked := attrs[blocked]; leaked {
+			t.Fatalf("identity attribute %q leaked into metric_attributes: %#v", blocked, attrs)
+		}
+	}
+}
+
+// assertAttribution finds an event whose metric_attributes carry the marker
+// value and asserts every expected attribution dim is present and equal.
+func assertAttribution(t *testing.T, events []canonical.Event, marker string, want map[string]any) {
+	t.Helper()
+	for _, event := range events {
+		attrs := event.ProviderExtensions["metric_attributes"].(map[string]any)
+		matched := false
+		for _, value := range attrs {
+			if value == marker {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			continue
+		}
+		for key, value := range want {
+			if attrs[key] != value {
+				t.Fatalf("attribution dim %q = %#v, want %#v (event %s)", key, attrs[key], value, event.EventType)
+			}
+		}
+		return
+	}
+	t.Fatalf("no event carried attribution marker %q", marker)
+}
+
+// TestNormalizeMetricsMalformedCostValueIsError proves the routing contract for
+// cost.usage: a Claude cost datapoint with an unparseable USD value is a real
+// error, NOT the skip sentinel, so the route does not silently 202-accept and
+// drop supported Claude cost data.
+func TestNormalizeMetricsMalformedCostValueIsError(t *testing.T) {
+	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeMetrics":[{"metrics":[{"name":"claude_code.cost.usage","sum":{"dataPoints":[{"attributes":[{"key":"model","value":{"stringValue":"claude-sonnet-5"}}],"asDouble":-0.5,"timeUnixNano":"1789042160000000000"}]}}]}]}]}`)
+	_, err := NormalizeMetrics(payload, time.Now().UTC())
+	if err == nil || errors.Is(err, ErrUnsupportedMetrics) {
+		t.Fatalf("got %v, want a hard normalisation error for an unparseable cost value", err)
+	}
+}
+
 // TestNormalizeMetricsRejectsNonClaudeService proves a Codex metrics payload is
 // left for the Codex adapter (sentinel, not misattributed) so mixed-tool batches
 // are safe.
@@ -101,10 +219,12 @@ func TestNormalizeMetricsRejectsNonClaudeService(t *testing.T) {
 }
 
 // TestNormalizeMetricsUnmappedClaudeMetricIsTolerated proves a Claude resource
-// carrying only metrics #89 does not map (e.g. cost.usage) is accepted without a
-// hard error — it yields the skip sentinel so the route 202-accepts it.
+// carrying only a still-unmapped metric (e.g. claude_code.session.count, owned by
+// #98–#99) is accepted without a hard error — it yields the skip sentinel so the
+// route 202-accepts it. token.usage (#89) and cost.usage (#97) are now mapped, so
+// the tolerated example uses a metric neither issue claims.
 func TestNormalizeMetricsUnmappedClaudeMetricIsTolerated(t *testing.T) {
-	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeMetrics":[{"metrics":[{"name":"claude_code.cost.usage","sum":{"dataPoints":[{"attributes":[{"key":"model","value":{"stringValue":"claude-haiku-4-5-20251001"}}],"asDouble":0.01,"timeUnixNano":"1789042160000000000"}]}}]}]}]}`)
+	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeMetrics":[{"metrics":[{"name":"claude_code.session.count","sum":{"dataPoints":[{"attributes":[{"key":"model","value":{"stringValue":"claude-haiku-4-5-20251001"}}],"asDouble":1,"timeUnixNano":"1789042160000000000"}]}}]}]}]}`)
 	_, err := NormalizeMetrics(payload, time.Now().UTC())
 	if !errors.Is(err, ErrUnsupportedMetrics) {
 		t.Fatalf("got %v, want ErrUnsupportedMetrics for an unmapped Claude metric", err)

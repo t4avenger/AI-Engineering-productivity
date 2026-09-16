@@ -1,0 +1,308 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "synthetic",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.268",
+  "captured_at": "2026-09-16T00:00:00Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "resourceMetrics": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "host.arch",
+              "value": {
+                "stringValue": "amd64"
+              }
+            },
+            {
+              "key": "os.type",
+              "value": {
+                "stringValue": "linux"
+              }
+            },
+            {
+              "key": "os.version",
+              "value": {
+                "stringValue": "0.0.0-synthetic"
+              }
+            },
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "claude-code"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "2.1.268"
+              }
+            }
+          ],
+          "droppedAttributesCount": 0
+        },
+        "scopeMetrics": [
+          {
+            "scope": {
+              "name": "com.anthropic.claude_code",
+              "version": "2.1.268"
+            },
+            "metrics": [
+              {
+                "name": "claude_code.token.usage",
+                "description": "Number of tokens used",
+                "unit": "tokens",
+                "sum": {
+                  "aggregationTemporality": 1,
+                  "isMonotonic": true,
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        {
+                          "key": "user.id",
+                          "value": {
+                            "stringValue": "synthetic-user"
+                          }
+                        },
+                        {
+                          "key": "user.email",
+                          "value": {
+                            "stringValue": "synthetic@example.test"
+                          }
+                        },
+                        {
+                          "key": "session.id",
+                          "value": {
+                            "stringValue": "00000000-0000-4000-8000-000000000001"
+                          }
+                        },
+                        {
+                          "key": "model",
+                          "value": {
+                            "stringValue": "claude-sonnet-5"
+                          }
+                        },
+                        {
+                          "key": "query_source",
+                          "value": {
+                            "stringValue": "main"
+                          }
+                        },
+                        {
+                          "key": "skill.name",
+                          "value": {
+                            "stringValue": "code-reviewer"
+                          }
+                        },
+                        {
+                          "key": "agent.name",
+                          "value": {
+                            "stringValue": "general-purpose"
+                          }
+                        },
+                        {
+                          "key": "speed",
+                          "value": {
+                            "stringValue": "fast"
+                          }
+                        },
+                        {
+                          "key": "effort",
+                          "value": {
+                            "stringValue": "high"
+                          }
+                        },
+                        {
+                          "key": "type",
+                          "value": {
+                            "stringValue": "input"
+                          }
+                        }
+                      ],
+                      "startTimeUnixNano": "1789113030732000000",
+                      "timeUnixNano": "1789113030911000000",
+                      "asDouble": 120
+                    },
+                    {
+                      "attributes": [
+                        {
+                          "key": "user.id",
+                          "value": {
+                            "stringValue": "synthetic-user"
+                          }
+                        },
+                        {
+                          "key": "session.id",
+                          "value": {
+                            "stringValue": "00000000-0000-4000-8000-000000000001"
+                          }
+                        },
+                        {
+                          "key": "model",
+                          "value": {
+                            "stringValue": "claude-sonnet-5"
+                          }
+                        },
+                        {
+                          "key": "query_source",
+                          "value": {
+                            "stringValue": "main"
+                          }
+                        },
+                        {
+                          "key": "mcp_server.name",
+                          "value": {
+                            "stringValue": "github"
+                          }
+                        },
+                        {
+                          "key": "mcp_tool.name",
+                          "value": {
+                            "stringValue": "create_issue"
+                          }
+                        },
+                        {
+                          "key": "plugin.name",
+                          "value": {
+                            "stringValue": "review-suite"
+                          }
+                        },
+                        {
+                          "key": "marketplace.name",
+                          "value": {
+                            "stringValue": "acme-marketplace"
+                          }
+                        },
+                        {
+                          "key": "type",
+                          "value": {
+                            "stringValue": "output"
+                          }
+                        }
+                      ],
+                      "startTimeUnixNano": "1789113030732000000",
+                      "timeUnixNano": "1789113030912000000",
+                      "asDouble": 340
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "claude_code.cost.usage",
+                "description": "Cost of the Claude Code session",
+                "unit": "USD",
+                "sum": {
+                  "aggregationTemporality": 1,
+                  "isMonotonic": true,
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        {
+                          "key": "user.id",
+                          "value": {
+                            "stringValue": "synthetic-user"
+                          }
+                        },
+                        {
+                          "key": "session.id",
+                          "value": {
+                            "stringValue": "00000000-0000-4000-8000-000000000001"
+                          }
+                        },
+                        {
+                          "key": "model",
+                          "value": {
+                            "stringValue": "claude-sonnet-5"
+                          }
+                        },
+                        {
+                          "key": "query_source",
+                          "value": {
+                            "stringValue": "main"
+                          }
+                        },
+                        {
+                          "key": "skill.name",
+                          "value": {
+                            "stringValue": "code-reviewer"
+                          }
+                        },
+                        {
+                          "key": "agent.name",
+                          "value": {
+                            "stringValue": "general-purpose"
+                          }
+                        }
+                      ],
+                      "startTimeUnixNano": "1789113030732000000",
+                      "timeUnixNano": "1789113030913000000",
+                      "asDouble": 0.0123
+                    },
+                    {
+                      "attributes": [
+                        {
+                          "key": "user.id",
+                          "value": {
+                            "stringValue": "synthetic-user"
+                          }
+                        },
+                        {
+                          "key": "session.id",
+                          "value": {
+                            "stringValue": "00000000-0000-4000-8000-000000000001"
+                          }
+                        },
+                        {
+                          "key": "model",
+                          "value": {
+                            "stringValue": "claude-sonnet-5"
+                          }
+                        },
+                        {
+                          "key": "query_source",
+                          "value": {
+                            "stringValue": "main"
+                          }
+                        },
+                        {
+                          "key": "mcp_server.name",
+                          "value": {
+                            "stringValue": "github"
+                          }
+                        },
+                        {
+                          "key": "mcp_tool.name",
+                          "value": {
+                            "stringValue": "create_issue"
+                          }
+                        },
+                        {
+                          "key": "plugin.name",
+                          "value": {
+                            "stringValue": "review-suite"
+                          }
+                        },
+                        {
+                          "key": "marketplace.name",
+                          "value": {
+                            "stringValue": "acme-marketplace"
+                          }
+                        }
+                      ],
+                      "startTimeUnixNano": "1789113030732000000",
+                      "timeUnixNano": "1789113030914000000",
+                      "asDouble": 0.0045
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
