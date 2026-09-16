@@ -1,0 +1,330 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:count:41b045616d32e57c34be87364f21a79243d319cacebfd82b58ee0d3221746b45",
+    "event_type": "claude_code.code_edit_tool.decision",
+    "occurred_at": "2026-09-11T07:50:30.911Z",
+    "received_at": "2026-09-16T08:50:31Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.268",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "edit_decision_count": 5,
+      "unavailable_fields": [
+        "token_usage",
+        "provider_cost",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "command_execution",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "trace_span_correlation"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:count:41b045616d32e57c34be87364f21a79243d319cacebfd82b58ee0d3221746b45",
+        "ordering_key": "01789113030911000000:claude-code:count:41b045616d32e57c34be87364f21a79243d319cacebfd82b58ee0d3221746b45",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "name": "claude_code.code_edit_tool.decision",
+        "unit": "count"
+      },
+      "metric_attributes": {
+        "decision": "accept",
+        "language": "Go",
+        "source": "config",
+        "tool_name": "Edit"
+      },
+      "resource": {
+        "host.arch": "amd64",
+        "os.type": "linux"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:count:590fcbcc3631acc3585b5faeb0e0f875fa9bb948270a02cfaa2bacbc40faf254",
+    "event_type": "claude_code.code_edit_tool.decision",
+    "occurred_at": "2026-09-11T07:50:30.912Z",
+    "received_at": "2026-09-16T08:50:31Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.268",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "edit_decision_count": 1,
+      "unavailable_fields": [
+        "token_usage",
+        "provider_cost",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "command_execution",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "trace_span_correlation"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:count:590fcbcc3631acc3585b5faeb0e0f875fa9bb948270a02cfaa2bacbc40faf254",
+        "ordering_key": "01789113030912000000:claude-code:count:590fcbcc3631acc3585b5faeb0e0f875fa9bb948270a02cfaa2bacbc40faf254",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "name": "claude_code.code_edit_tool.decision",
+        "unit": "count"
+      },
+      "metric_attributes": {
+        "decision": "reject",
+        "language": "TypeScript",
+        "source": "user_reject",
+        "tool_name": "Write"
+      },
+      "resource": {
+        "host.arch": "amd64",
+        "os.type": "linux"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:count:736a620b6203347958cba660c4df570cf079778645967bdaf92045ae741aba80",
+    "event_type": "claude_code.session.count",
+    "occurred_at": "2026-09-11T07:50:30.913Z",
+    "received_at": "2026-09-16T08:50:31Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.268",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "session_count": 1,
+      "unavailable_fields": [
+        "token_usage",
+        "provider_cost",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "command_execution",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "trace_span_correlation"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:count:736a620b6203347958cba660c4df570cf079778645967bdaf92045ae741aba80",
+        "ordering_key": "01789113030913000000:claude-code:count:736a620b6203347958cba660c4df570cf079778645967bdaf92045ae741aba80",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "name": "claude_code.session.count",
+        "unit": "count"
+      },
+      "metric_attributes": {
+        "start_type": "fresh"
+      },
+      "resource": {
+        "host.arch": "amd64",
+        "os.type": "linux"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:count:5326ecb2b84f2bf8a8be2cd0cc96cb88a863ff791a60ac1e3aeba530df1872d9",
+    "event_type": "claude_code.session.count",
+    "occurred_at": "2026-09-11T07:50:30.914Z",
+    "received_at": "2026-09-16T08:50:31Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.268",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000002",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "session_count": 1,
+      "unavailable_fields": [
+        "token_usage",
+        "provider_cost",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "command_execution",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "trace_span_correlation"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:count:5326ecb2b84f2bf8a8be2cd0cc96cb88a863ff791a60ac1e3aeba530df1872d9",
+        "ordering_key": "01789113030914000000:claude-code:count:5326ecb2b84f2bf8a8be2cd0cc96cb88a863ff791a60ac1e3aeba530df1872d9",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "name": "claude_code.session.count",
+        "unit": "count"
+      },
+      "metric_attributes": {
+        "start_type": "resume"
+      },
+      "resource": {
+        "host.arch": "amd64",
+        "os.type": "linux"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:count:db3f376c4b81b0baccb22a8d1381ba2017ca67de640afa9481864c9a6b06415f",
+    "event_type": "claude_code.active_time.total",
+    "occurred_at": "2026-09-11T07:50:30.915Z",
+    "received_at": "2026-09-16T08:50:31Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.268",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "active_time_seconds": 42.5,
+      "activity_type": "user",
+      "unavailable_fields": [
+        "token_usage",
+        "provider_cost",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "command_execution",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "trace_span_correlation"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:count:db3f376c4b81b0baccb22a8d1381ba2017ca67de640afa9481864c9a6b06415f",
+        "ordering_key": "01789113030915000000:claude-code:count:db3f376c4b81b0baccb22a8d1381ba2017ca67de640afa9481864c9a6b06415f",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "name": "claude_code.active_time.total",
+        "unit": "s"
+      },
+      "metric_attributes": {},
+      "resource": {
+        "host.arch": "amd64",
+        "os.type": "linux"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:count:8fc134bf3cf44c08f583d62d4ce4a0eca19fc2c8747f3e7f9a21abeff453f909",
+    "event_type": "claude_code.active_time.total",
+    "occurred_at": "2026-09-11T07:50:30.916Z",
+    "received_at": "2026-09-16T08:50:31Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.268",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "active_time_seconds": 108,
+      "activity_type": "cli",
+      "unavailable_fields": [
+        "token_usage",
+        "provider_cost",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "command_execution",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "trace_span_correlation"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:count:8fc134bf3cf44c08f583d62d4ce4a0eca19fc2c8747f3e7f9a21abeff453f909",
+        "ordering_key": "01789113030916000000:claude-code:count:8fc134bf3cf44c08f583d62d4ce4a0eca19fc2c8747f3e7f9a21abeff453f909",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
+        }
+      },
+      "metric": {
+        "name": "claude_code.active_time.total",
+        "unit": "s"
+      },
+      "metric_attributes": {},
+      "resource": {
+        "host.arch": "amd64",
+        "os.type": "linux"
+      }
+    }
+  }
+]

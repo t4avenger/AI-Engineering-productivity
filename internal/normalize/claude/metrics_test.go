@@ -313,6 +313,122 @@ func TestNormalizeMetricsUnrecognisedLinesOfCodeTypeIsSkipped(t *testing.T) {
 	}
 }
 
+func TestNormalizeMetricsEngagementGolden(t *testing.T) {
+	payload := metricsFixturePayload(t, "claude-code-2.1.268-engagement-metrics.json")
+	receivedAt := time.Date(2026, 9, 16, 8, 50, 31, 0, time.UTC)
+
+	first, err := NormalizeMetrics(payload, receivedAt)
+	if err != nil {
+		t.Fatalf("first: %v", err)
+	}
+	second, err := NormalizeMetrics(payload, receivedAt)
+	if err != nil {
+		t.Fatalf("second: %v", err)
+	}
+	if !reflect.DeepEqual(first, second) {
+		t.Fatal("normalisation must be deterministic")
+	}
+	assertClaudeEngagementEvents(t, first)
+	assertMatchesGolden(t, "claude-code-2.1.268-engagement-metrics.events.json", first)
+}
+
+// assertClaudeEngagementEvents proves the M12 outcome: edit-decision and session
+// counts land on a single canonical key each, their categoricals survive as
+// dimensions in metric_attributes (so the edit-acceptance rate is a group-by
+// decision, never dropping an unforeseen value), active-time lands as float
+// seconds keyed by a promoted activity_type (never leaked back into
+// metric_attributes as raw `type`), and no identity attribute leaks anywhere.
+func assertClaudeEngagementEvents(t *testing.T, events []canonical.Event) {
+	t.Helper()
+	editByDecision := map[string]int64{}
+	sessionByStart := map[string]int64{}
+	activeByType := map[string]float64{}
+	for _, event := range events {
+		attrs := event.ProviderExtensions["metric_attributes"].(map[string]any)
+		assertNoIdentityLeak(t, attrs)
+		collectEngagementEvent(t, event, attrs, editByDecision, sessionByStart, activeByType)
+	}
+	if editByDecision["accept"] != 5 || editByDecision["reject"] != 1 {
+		t.Fatalf("edit_decision_count by decision = %#v, want accept:5 reject:1", editByDecision)
+	}
+	if sessionByStart["fresh"] != 1 || sessionByStart["resume"] != 1 {
+		t.Fatalf("session_count by start_type = %#v, want fresh:1 resume:1", sessionByStart)
+	}
+	if activeByType["user"] != 42.5 || activeByType["cli"] != 108 {
+		t.Fatalf("active_time_seconds by type = %#v, want user:42.5 cli:108", activeByType)
+	}
+}
+
+// collectEngagementEvent routes one engagement event into its by-category tally,
+// proving the per-type invariants along the way: edit-decision and session.count
+// keep their categoricals as surviving dims (never a model promotion), and
+// active_time carries a promoted activity_type while its raw wire `type` never
+// leaks back into metric_attributes.
+func collectEngagementEvent(t *testing.T, event canonical.Event, attrs map[string]any, editByDecision, sessionByStart map[string]int64, activeByType map[string]float64) {
+	t.Helper()
+	assertNoModelPromotion(t, event)
+	switch event.EventType {
+	case editDecisionMetric:
+		assertSurvivingDims(t, "edit-decision", attrs, "decision", "tool_name", "source", "language")
+		editByDecision[attrs["decision"].(string)] = event.Attributes["edit_decision_count"].(int64)
+	case sessionCountMetric:
+		assertSurvivingDims(t, "session.count", attrs, "start_type")
+		sessionByStart[attrs["start_type"].(string)] = event.Attributes["session_count"].(int64)
+	case activeTimeMetric:
+		if _, leaked := attrs["type"]; leaked {
+			t.Fatalf("active_time raw type must not leak into metric_attributes: %#v", attrs)
+		}
+		activeByType[event.Attributes["activity_type"].(string)] = event.Attributes["active_time_seconds"].(float64)
+	default:
+		t.Fatalf("unexpected event type %q", event.EventType)
+	}
+}
+
+// assertSurvivingDims fails unless every named dim key is present in attrs.
+func assertSurvivingDims(t *testing.T, kind string, attrs map[string]any, dims ...string) {
+	t.Helper()
+	for _, dim := range dims {
+		if _, ok := attrs[dim]; !ok {
+			t.Fatalf("%s must keep %q as a surviving dim: %#v", kind, dim, attrs)
+		}
+	}
+}
+
+// TestNormalizeMetricsMalformedEngagementValueIsError proves the M12 routing
+// contract: an edit-decision/session/active-time datapoint with a negative or
+// unparseable value is a real error, NOT the skip sentinel, so the route does not
+// silently 202-accept and drop supported Claude engagement data.
+func TestNormalizeMetricsMalformedEngagementValueIsError(t *testing.T) {
+	cases := map[string]string{
+		"edit_decision": `{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeMetrics":[{"metrics":[{"name":"claude_code.code_edit_tool.decision","sum":{"dataPoints":[{"attributes":[{"key":"decision","value":{"stringValue":"accept"}}],"asDouble":-2,"timeUnixNano":"1789042160000000000"}]}}]}]}]}`,
+		"session":       `{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeMetrics":[{"metrics":[{"name":"claude_code.session.count","sum":{"dataPoints":[{"attributes":[{"key":"start_type","value":{"stringValue":"fresh"}}],"asDouble":1.5,"timeUnixNano":"1789042160000000000"}]}}]}]}]}`,
+		"active_time":   `{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeMetrics":[{"metrics":[{"name":"claude_code.active_time.total","unit":"s","sum":{"dataPoints":[{"attributes":[{"key":"type","value":{"stringValue":"user"}}],"asDouble":-0.5,"timeUnixNano":"1789042160000000000"}]}}]}]}]}`,
+	}
+	for name, payload := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := NormalizeMetrics([]byte(payload), time.Now().UTC())
+			if err == nil || errors.Is(err, ErrUnsupportedMetrics) {
+				t.Fatalf("got %v, want a hard normalisation error for an unparseable %s value", err, name)
+			}
+		})
+	}
+}
+
+// TestNormalizeMetricsActiveTimeFractionalSecondsAccepted proves active_time takes
+// the float duration path: a fractional second is preserved, not rejected as the
+// integer counters reject a non-integer value — a valid exporter double must not
+// be dropped.
+func TestNormalizeMetricsActiveTimeFractionalSecondsAccepted(t *testing.T) {
+	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeMetrics":[{"metrics":[{"name":"claude_code.active_time.total","unit":"s","sum":{"dataPoints":[{"attributes":[{"key":"type","value":{"stringValue":"cli"}}],"asDouble":12.75,"timeUnixNano":"1789042160000000000"}]}}]}]}]}`)
+	events, err := NormalizeMetrics(payload, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("fractional active_time must be accepted, got %v", err)
+	}
+	if len(events) != 1 || events[0].Attributes["active_time_seconds"] != 12.75 {
+		t.Fatalf("active_time_seconds = %#v, want a single 12.75 event", events)
+	}
+}
+
 // TestNormalizeMetricsMalformedCostValueIsError proves the routing contract for
 // cost.usage: a Claude cost datapoint with an unparseable USD value is a real
 // error, NOT the skip sentinel, so the route does not silently 202-accept and
@@ -337,13 +453,12 @@ func TestNormalizeMetricsRejectsNonClaudeService(t *testing.T) {
 }
 
 // TestNormalizeMetricsUnmappedClaudeMetricIsTolerated proves a Claude resource
-// carrying only a still-unmapped metric (e.g. claude_code.session.count, owned by
-// #99 / M12) is accepted without a hard error — it yields the skip sentinel so the
-// route 202-accepts it. token.usage (#89), cost.usage (#97) and the code-output
-// counters (#98) are now mapped, so the tolerated example uses a metric none of
-// those issues claim.
+// carrying only an unmapped metric is accepted without a hard error — it yields
+// the skip sentinel so the route 202-accepts it. Every documented Claude Code
+// metric is now mapped (token/cost #89/#97, code-output #98, engagement #99), so
+// the tolerated example uses a deliberately hypothetical future metric name.
 func TestNormalizeMetricsUnmappedClaudeMetricIsTolerated(t *testing.T) {
-	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeMetrics":[{"metrics":[{"name":"claude_code.session.count","sum":{"dataPoints":[{"attributes":[{"key":"model","value":{"stringValue":"claude-haiku-4-5-20251001"}}],"asDouble":1,"timeUnixNano":"1789042160000000000"}]}}]}]}]}`)
+	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeMetrics":[{"metrics":[{"name":"claude_code.future_unmapped.count","sum":{"dataPoints":[{"attributes":[{"key":"model","value":{"stringValue":"claude-haiku-4-5-20251001"}}],"asDouble":1,"timeUnixNano":"1789042160000000000"}]}}]}]}]}`)
 	_, err := NormalizeMetrics(payload, time.Now().UTC())
 	if !errors.Is(err, ErrUnsupportedMetrics) {
 		t.Fatalf("got %v, want ErrUnsupportedMetrics for an unmapped Claude metric", err)
