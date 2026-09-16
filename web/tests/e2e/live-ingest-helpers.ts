@@ -42,6 +42,10 @@ export function codexOTLPLogs(model: string): string {
                     key: 'event.name',
                     value: { stringValue: 'codex.sse_event' },
                   },
+                  {
+                    key: 'conversation.id',
+                    value: { stringValue: 'tiq-live-e2e-codex-session' },
+                  },
                   { key: 'model', value: { stringValue: model } },
                   {
                     key: 'input_token_count',
@@ -52,6 +56,58 @@ export function codexOTLPLogs(model: string): string {
                     value: { stringValue: '3' },
                   },
                 ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
+
+// Codex token metrics do not carry a conversation identifier in the observed
+// 0.153.4 surface. They must remain inspectable observations without inflating
+// the primary session list.
+export function codexTurnTokenOTLPMetrics(): string {
+  const tokenTypes: Array<[string, string]> = [
+    ['input', '1200'],
+    ['cached_input', '300'],
+    ['cache_write_input', '75'],
+    ['output', '144'],
+    ['reasoning_output', '55'],
+    ['total', '1774'],
+  ];
+  return JSON.stringify({
+    resourceMetrics: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'codex_exec' } },
+            { key: 'service.version', value: { stringValue: '0.153.4' } },
+          ],
+        },
+        scopeMetrics: [
+          {
+            metrics: [
+              {
+                name: 'codex.turn.token_usage',
+                histogram: {
+                  dataPoints: tokenTypes.map(([tokenType, sum], index) => ({
+                    attributes: [
+                      {
+                        key: 'model',
+                        value: { stringValue: 'gpt-5-codex-live' },
+                      },
+                      {
+                        key: 'token_type',
+                        value: { stringValue: tokenType },
+                      },
+                    ],
+                    count: '1',
+                    sum,
+                    timeUnixNano: `178904216000000000${index}`,
+                  })),
+                },
               },
             ],
           },

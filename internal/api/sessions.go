@@ -54,6 +54,8 @@ type publicSession struct {
 	Attributes         map[string]any    `json:"attributes"`
 	ProviderExtensions map[string]any    `json:"provider_extensions"`
 	Availability       map[string]string `json:"availability"`
+	IdentityScope      string            `json:"identity_scope"`
+	IdentitySource     string            `json:"identity_source"`
 }
 
 type sessionErrorResponse struct {
@@ -150,6 +152,10 @@ func (a sessionAPI) delete(w http.ResponseWriter, r *http.Request) {
 
 func parseSessionListQuery(r *http.Request) (storage.SessionFilter, int, *sessionCursor, error) {
 	query := r.URL.Query()
+	scope, err := parseSessionScope(query.Get("scope"))
+	if err != nil {
+		return storage.SessionFilter{}, 0, nil, err
+	}
 	limit, err := parseSessionLimit(query.Get("limit"))
 	if err != nil {
 		return storage.SessionFilter{}, 0, nil, err
@@ -169,7 +175,20 @@ func parseSessionListQuery(r *http.Request) (storage.SessionFilter, int, *sessio
 	if err != nil {
 		return storage.SessionFilter{}, 0, nil, err
 	}
-	return storage.SessionFilter{Tool: query.Get("tool"), Model: query.Get("model"), Outcome: query.Get("outcome"), StartedAfter: after, StartedBefore: before}, limit, cursor, nil
+	return storage.SessionFilter{Tool: query.Get("tool"), Model: query.Get("model"), Outcome: query.Get("outcome"), Scope: scope, StartedAfter: after, StartedBefore: before}, limit, cursor, nil
+}
+
+func parseSessionScope(raw string) (storage.SessionScope, error) {
+	switch raw {
+	case "", string(storage.SessionScopePrimary):
+		return storage.SessionScopePrimary, nil
+	case string(storage.SessionScopeObservation):
+		return storage.SessionScopeObservation, nil
+	case "all":
+		return "", nil
+	default:
+		return "", sessionQueryError("scope must be primary, observation, or all")
+	}
 }
 
 func parseSessionLimit(raw string) (int, error) {
@@ -252,7 +271,17 @@ func newPublicSession(session canonical.Session) publicSession {
 		Attributes:         session.Attributes,
 		ProviderExtensions: session.ProviderExtensions,
 		Availability:       sessionAvailability(session),
+		IdentityScope:      sessionIdentityValue(session, "identity_scope", "unknown"),
+		IdentitySource:     sessionIdentityValue(session, "identity_source", "unproven"),
 	}
+}
+
+func sessionIdentityValue(session canonical.Session, key, fallback string) string {
+	value, ok := session.Attributes[key].(string)
+	if !ok || strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
 }
 
 func sessionAvailability(session canonical.Session) map[string]string {

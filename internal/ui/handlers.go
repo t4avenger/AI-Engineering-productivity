@@ -49,6 +49,7 @@ type homeData struct {
 
 type sessionsData struct {
 	Sessions []sessionRow
+	Scope    string
 	Error    string
 }
 
@@ -63,6 +64,8 @@ type sessionRow struct {
 	StartedAt         string
 	StartedAtTitle    string
 	ModelAvailability string
+	IdentityScope     string
+	IdentitySource    string
 }
 
 type sessionDetailData struct {
@@ -191,7 +194,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	data := homeData{}
-	sessions, err := s.listAllSessions(r)
+	sessions, err := s.listAllSessions(r, storage.SessionScopePrimary)
 	if err != nil {
 		s.render(w, tmplHome, layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(r), Error: "Unable to load sessions.", Content: data})
 		return
@@ -231,8 +234,9 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) sessionsList(w http.ResponseWriter, r *http.Request) {
-	sessions, err := s.listAllSessions(r)
-	data := sessionsData{Sessions: sessionRows(sessions)}
+	scope, label := dashboardSessionScope(r.URL.Query().Get("scope"))
+	sessions, err := s.listAllSessions(r, scope)
+	data := sessionsData{Sessions: sessionRows(sessions), Scope: label}
 	if err != nil {
 		data.Error = "Unable to load sessions."
 	}
@@ -327,7 +331,7 @@ func (s *Server) insightsPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) integrationsPage(w http.ResponseWriter, r *http.Request) {
-	sessions, err := s.listAllSessions(r)
+	sessions, err := s.listAllSessions(r, "")
 	data := integrationsData{
 		CursorEnterprise: cursorEnterpriseStatus{Status: "unavailable"},
 	}
@@ -482,14 +486,14 @@ func (s *Server) healthLabel(r *http.Request) healthStatus {
 	return healthStatus{Text: "Healthy", State: "ok"}
 }
 
-func (s *Server) listAllSessions(r *http.Request) ([]canonical.Session, error) {
+func (s *Server) listAllSessions(r *http.Request, scope storage.SessionScope) ([]canonical.Session, error) {
 	if s.sessions == nil {
 		return nil, errUnavailable
 	}
 	var all []canonical.Session
 	var cursor *storage.SessionCursor
 	for {
-		page, err := s.sessions.ListSessions(r.Context(), storage.SessionFilter{Limit: 100, Cursor: cursor})
+		page, err := s.sessions.ListSessions(r.Context(), storage.SessionFilter{Limit: 100, Cursor: cursor, Scope: scope})
 		if err != nil {
 			return nil, err
 		}
@@ -511,7 +515,7 @@ func (s *Server) insightEvents(r *http.Request) ([]canonical.Event, error) {
 	if s.sessions == nil || s.events == nil {
 		return nil, errUnavailable
 	}
-	sessions, err := s.listAllSessions(r)
+	sessions, err := s.listAllSessions(r, "")
 	if err != nil {
 		return nil, err
 	}
@@ -653,9 +657,41 @@ func sessionRows(sessions []canonical.Session) []sessionRow {
 			StartedAt:         started,
 			StartedAtTitle:    formatTimestamp(session.StartedAt),
 			ModelAvailability: modelAvailability(session),
+			IdentityScope:     identityScopeLabel(session),
+			IdentitySource:    sessionIdentityAttribute(session, "identity_source", "unproven"),
 		}
 	}
 	return rows
+}
+
+func dashboardSessionScope(raw string) (storage.SessionScope, string) {
+	switch raw {
+	case "observation":
+		return storage.SessionScopeObservation, "Observations"
+	case "all":
+		return "", "All retained rows"
+	default:
+		return storage.SessionScopePrimary, "Primary sessions"
+	}
+}
+
+func identityScopeLabel(session canonical.Session) string {
+	switch sessionIdentityAttribute(session, "identity_scope", "unknown") {
+	case "provider":
+		return "Provider session"
+	case "observation":
+		return "Observation only"
+	default:
+		return "Identity unproven"
+	}
+}
+
+func sessionIdentityAttribute(session canonical.Session, key, fallback string) string {
+	value, ok := session.Attributes[key].(string)
+	if !ok || strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
 }
 
 func attrString(value any) string {

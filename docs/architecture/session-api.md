@@ -12,12 +12,20 @@ Responses use stable JSON envelopes: list responses contain `data` and
 `error.message`. List responses are reverse chronological, with session ID as a
 deterministic tie-breaker, and use opaque cursors rather than offset paging.
 
-The list supports `tool`, `model`, `outcome`, `started_after`, and
-`started_before` filters. Dates are RFC3339; `started_after` is inclusive and
+The list supports `tool`, `model`, `outcome`, `started_after`, `started_before`,
+and `scope` filters. `scope=primary` is the default and returns provider-backed
+sessions plus legacy/unproven rows while excluding proven observation-only
+rows. `scope=observation` returns only content-derived/trace-only observations;
+`scope=all` returns both. Dates are RFC3339; `started_after` is inclusive and
 `started_before` is exclusive. A `model` filter matches only a retained,
 observed event attribute named `model`. Sessions whose model is unavailable do
 not match, preserving the distinction between unknown and zero or fabricated
 values.
+
+List and detail rows expose `identity_scope` and `identity_source`. These fields
+describe the evidence for the row's correlation boundary; they do not imply that
+observation rows were merged into a provider session. Direct session detail and
+event access remain available for every retained row.
 
 Session list and detail responses include an `availability` object for the
 shared cross-tool fields rendered by the dashboard: `provider`, `tool`,

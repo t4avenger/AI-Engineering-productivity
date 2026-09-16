@@ -10,18 +10,31 @@ import (
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
-// SessionFilter constrains a session query. Empty fields do not filter results.
+// SessionFilter constrains a session query. Empty fields do not filter results,
+// including Scope: repository-internal callers retain access to every row.
 // Model matching uses observed model metadata only; sessions with unavailable
 // model information never match a model filter.
 type SessionFilter struct {
 	Tool          string
 	Model         string
 	Outcome       string
+	Scope         SessionScope
 	StartedAfter  *time.Time
 	StartedBefore *time.Time
 	Cursor        *SessionCursor
 	Limit         int
 }
+
+// SessionScope controls whether reconstructed provider sessions or
+// observation-only rows are returned. The empty value keeps the repository's
+// backwards-compatible all-sessions behaviour; public list surfaces choose an
+// explicit scope.
+type SessionScope string
+
+const (
+	SessionScopePrimary     SessionScope = "primary"
+	SessionScopeObservation SessionScope = "observation"
+)
 
 // SessionCursor identifies the last session returned by a reverse-chronological
 // session page.

@@ -14,7 +14,9 @@ func TestCursorEnterpriseOTELIngestEndToEnd(t *testing.T) {
 	postCursorOTLPAccepted(t, server, "/v1/metrics", "cursor-otel-0.1.0-token-usage-metrics.json")
 
 	sessions := fetchSessionList(t, server.URL+"/api/v1/sessions?limit=50")
-	assertCursorEnterpriseSessionsOnReadAPI(t, sessions)
+	assertCursorPrimarySession(t, sessions)
+	observations := fetchSessionList(t, server.URL+"/api/v1/sessions?limit=50&scope=observation")
+	assertCursorTokenObservations(t, observations)
 
 	canaries := []string{"424242", "434343", "cursor.team.id", "cursor.user.id", "tiq-probe"}
 	assertNoRawIdentifiers(t, canaries, marshalJSON(t, sessions))
@@ -26,10 +28,9 @@ func TestCursorEnterpriseOTELIngestEndToEnd(t *testing.T) {
 	assertNoRawIdentifiers(t, canaries, marshalJSON(t, events))
 }
 
-func assertCursorEnterpriseSessionsOnReadAPI(t *testing.T, sessions sessionListResponse) {
+func assertCursorPrimarySession(t *testing.T, sessions sessionListResponse) {
 	t.Helper()
 	var foundAPIRequest bool
-	var foundTokenMetric bool
 	for _, session := range sessions.Data {
 		if session.Tool != "cursor" {
 			continue
@@ -41,14 +42,23 @@ func assertCursorEnterpriseSessionsOnReadAPI(t *testing.T, sessions sessionListR
 				t.Fatalf("api.request session model = %#v", session.Attributes["model"])
 			}
 		}
-		if session.Attributes["model"] == "Auto" {
-			foundTokenMetric = true
-		}
 	}
 	if !foundAPIRequest {
 		t.Fatalf("expected cursor conversation session from api.request logs, got %#v", sessions.Data)
 	}
-	if !foundTokenMetric {
-		t.Fatalf("expected cursor token metric session with model Auto, got %#v", sessions.Data)
+	for _, session := range sessions.Data {
+		if session.Attributes["model"] == "Auto" {
+			t.Fatalf("default session list included a token-metric observation: %#v", sessions.Data)
+		}
 	}
+}
+
+func assertCursorTokenObservations(t *testing.T, sessions sessionListResponse) {
+	t.Helper()
+	for _, session := range sessions.Data {
+		if session.Tool == "cursor" && session.Attributes["model"] == "Auto" {
+			return
+		}
+	}
+	t.Fatalf("expected cursor token metric session with model Auto, got %#v", sessions.Data)
 }

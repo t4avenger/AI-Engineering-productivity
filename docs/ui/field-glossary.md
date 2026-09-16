@@ -139,6 +139,8 @@ strings.
 | Machine field | Plain label | Definition | Units | When unavailable |
 | --- | --- | --- | --- | --- |
 | `session_id` | Session ID | Stable provider-prefixed local correlation key. | Identifier | Old rows may remain opaque until deleted or re-ingested. |
+| `identity_scope` | Identity | Whether the row is a provider-backed session (`provider`), an evidence-only row (`observation`), or has an unproven legacy boundary (`unknown`). | Enum | Show `Identity unproven`; do not infer a session merge. |
+| `identity_source` | Identity source | Provider field or fallback that established the boundary, such as `conversation.id`, `session.id`, `content-derived`, `trace.id`, or `unproven`. | Identifier | Show `unproven`; do not substitute timing/model heuristics. |
 | `provider` | Provider | Model or tool vendor namespace, for example `openai` or `anthropic`. | Identifier | Show availability label if missing. |
 | `tool` | Tool | AI coding tool name, for example `codex`, `claude-code`, or `cursor-agent`. | Identifier | Show availability label if missing. |
 | `state` / `outcome` | Session state | Session lifecycle state, not a model-performance outcome contract. | Enum | `unknown` stays unknown; do not use it for scorecard outcomes. |

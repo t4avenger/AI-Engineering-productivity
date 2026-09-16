@@ -123,6 +123,12 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   color: var(--color-accent);
   font-weight: 700;
 }
+.secondary-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
 
 /* Daemon health — honest state, colour is never the sole cue (the word is). */
 .health { font-weight: 700; margin: 0; }
@@ -153,6 +159,7 @@ section { margin: 1.5rem 0; }
 
 .mono { font-family: var(--font-mono); }
 .session-primary { display: block; font-weight: 700; margin-bottom: var(--space-1); }
+.session-identity-source { display: block; margin-top: var(--space-1); }
 .availability-list { display: grid; gap: var(--space-2); list-style: none; padding-left: 0; }
 .availability-list li { align-items: center; display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .metadata-list { display: grid; gap: var(--space-2); margin: 0; }
