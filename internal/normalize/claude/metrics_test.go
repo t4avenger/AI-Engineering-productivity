@@ -117,38 +117,56 @@ func assertClaudeCostAttributionEvents(t *testing.T, events []canonical.Event) {
 	t.Helper()
 	var tokenEvents, costEvents int
 	for _, event := range events {
-		attrs := event.ProviderExtensions["metric_attributes"].(map[string]any)
 		switch event.EventType {
 		case tokenUsageMetric:
 			tokenEvents++
-			// provider_cost must NOT be listed unavailable when a sibling
-			// cost.usage datapoint is captured on the same resource.
-			for _, field := range event.Attributes["unavailable_fields"].([]string) {
-				if field == "provider_cost" {
-					t.Fatalf("token event must not mark provider_cost unavailable when cost.usage is captured: %#v", event.Attributes)
-				}
-			}
+			assertProviderCostAvailable(t, event)
 		case costUsageMetric:
 			costEvents++
-			cost, ok := event.Attributes["provider_cost"].(float64)
-			if !ok || cost <= 0 {
-				t.Fatalf("cost event must carry a positive provider_cost, got %#v", event.Attributes["provider_cost"])
-			}
+			assertPositiveProviderCost(t, event)
 		default:
 			t.Fatalf("unexpected event type %q", event.EventType)
 		}
-		// Identity attributes are never carried through the allow-list.
-		for _, blocked := range []string{"user.id", "user.email", "session.id"} {
-			if _, leaked := attrs[blocked]; leaked {
-				t.Fatalf("identity attribute %q leaked into metric_attributes: %#v", blocked, attrs)
-			}
-		}
+		assertNoIdentityLeak(t, event.ProviderExtensions["metric_attributes"].(map[string]any))
 	}
 	if tokenEvents != 2 || costEvents != 2 {
 		t.Fatalf("event mix = %d token / %d cost, want 2/2", tokenEvents, costEvents)
 	}
 	assertAttribution(t, events, "code-reviewer", map[string]any{"skill.name": "code-reviewer", "agent.name": "general-purpose"})
 	assertAttribution(t, events, "review-suite", map[string]any{"mcp_server.name": "github", "mcp_tool.name": "create_issue", "plugin.name": "review-suite", "marketplace.name": "acme-marketplace"})
+}
+
+// assertProviderCostAvailable proves a token.usage event does not mark
+// provider_cost unavailable when a sibling cost.usage datapoint is captured on
+// the same resource.
+func assertProviderCostAvailable(t *testing.T, event canonical.Event) {
+	t.Helper()
+	for _, field := range event.Attributes["unavailable_fields"].([]string) {
+		if field == "provider_cost" {
+			t.Fatalf("token event must not mark provider_cost unavailable when cost.usage is captured: %#v", event.Attributes)
+		}
+	}
+}
+
+// assertPositiveProviderCost proves a cost.usage event carries the provider USD
+// amount under provider_cost.
+func assertPositiveProviderCost(t *testing.T, event canonical.Event) {
+	t.Helper()
+	cost, ok := event.Attributes["provider_cost"].(float64)
+	if !ok || cost <= 0 {
+		t.Fatalf("cost event must carry a positive provider_cost, got %#v", event.Attributes["provider_cost"])
+	}
+}
+
+// assertNoIdentityLeak proves the allow-list dropped identity-bearing attributes
+// from provider_extensions.metric_attributes.
+func assertNoIdentityLeak(t *testing.T, attrs map[string]any) {
+	t.Helper()
+	for _, blocked := range []string{"user.id", "user.email", "session.id"} {
+		if _, leaked := attrs[blocked]; leaked {
+			t.Fatalf("identity attribute %q leaked into metric_attributes: %#v", blocked, attrs)
+		}
+	}
 }
 
 // assertAttribution finds an event whose metric_attributes carry the marker
