@@ -47,6 +47,23 @@ func TestCalculatePricesCodexCachedAndReasoningTokens(t *testing.T) {
 	}
 }
 
+func TestCalculatePricesClaudeRequestTokens(t *testing.T) {
+	calculator := &Calculator{catalog: Catalog{SchemaVersion: schemaVersion, CatalogVersion: "test", Currency: "USD", Records: []PriceRecord{{ID: "anthropic", Provider: "anthropic", ModelMatcher: "claude-*", EffectiveAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Source: "test", RatesMicrousdPM: map[string]int64{"input": 1000000, "cached_input": 500000, "output": 2000000}}}}}
+	event := canonical.Event{EventID: "claude-request", EventType: "api_request", SessionID: "claude-code:session", Provider: "anthropic", OccurredAt: time.Date(2026, 9, 6, 8, 40, 0, 0, time.UTC), ReceivedAt: time.Now(), Attributes: map[string]any{"model": "claude-opus-4-8", "input_token_count": int64(1200), "cached_input_token_count": int64(500), "output_token_count": int64(340)}}
+	r := calculator.Calculate(event)
+	if r.Status != "calculated" || r.AmountMicrousd == nil || *r.AmountMicrousd != 2130 {
+		t.Fatalf("record=%#v", r)
+	}
+	for category, want := range map[string]int64{"input": 1200, "cached_input": 500, "output": 340} {
+		if got := r.ObservedTokens[category]; got != want {
+			t.Fatalf("observed %s = %d, want %d in %#v", category, got, want, r.ObservedTokens)
+		}
+	}
+	if _, fabricated := r.ObservedTokens["reasoning"]; fabricated {
+		t.Fatalf("absent reasoning tokens fabricated: %#v", r.ObservedTokens)
+	}
+}
+
 func TestCalculateSkipsCodexMetricTokenUsage(t *testing.T) {
 	calculator := &Calculator{catalog: Catalog{SchemaVersion: schemaVersion, CatalogVersion: "test", Currency: "USD", Records: []PriceRecord{{ID: "one", Provider: "openai", ModelMatcher: "model-*", EffectiveAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Source: "test", RatesMicrousdPM: map[string]int64{"input": 1000000}}}}}
 	event := canonical.Event{EventID: "metric", EventType: "codex.turn.token_usage", SessionID: "s", Provider: "openai", OccurredAt: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC), ReceivedAt: time.Now(), Attributes: map[string]any{"model": "model-a", "input_token_count": "100"}}

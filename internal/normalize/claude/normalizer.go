@@ -124,6 +124,7 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 		extensions["request_id"] = nativeSessionPrefix + *requestID
 	}
 	attributes := map[string]any{"unavailable_fields": unavailableFields(name)}
+	attachPriceableRequestAttributes(attributes, raw, name)
 	attachSkillDetection(extensions, raw, name)
 	attachOutcomeContract(extensions, raw, name)
 	attachGovernanceContext(extensions, raw, name)
@@ -136,6 +137,33 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 		Attributes:         attributes,
 		ProviderExtensions: extensions,
 	}, nil
+}
+
+// attachPriceableRequestAttributes promotes observed provider-completion token
+// primitives onto canonical event attributes using the shared request-level
+// spelling consumed by the cost calculator and session APIs. It only stamps
+// values the event itself reports; absent values stay absent, never zero.
+func attachPriceableRequestAttributes(attributes, raw map[string]any, eventName string) {
+	switch eventName {
+	case eventAPIRequest, eventAPIError, eventAPIRefusal:
+	default:
+		return
+	}
+	if model := firstString(raw, "model"); model != "" {
+		attributes["model"] = model
+	}
+	for _, mapping := range []struct {
+		source string
+		target string
+	}{
+		{source: "input_tokens", target: "input_token_count"},
+		{source: "output_tokens", target: "output_token_count"},
+		{source: "cache_read_tokens", target: "cached_input_token_count"},
+	} {
+		if count := normalize.OptionalTokenCount(raw[mapping.source]); count != nil {
+			attributes[mapping.target] = *count
+		}
+	}
 }
 
 // attachToolDecision stamps canonical approval attributes and a raw-preserving
