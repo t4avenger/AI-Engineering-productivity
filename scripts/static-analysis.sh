@@ -13,7 +13,7 @@ go vet "${go_packages[@]}"
 if command -v staticcheck >/dev/null 2>&1; then
   staticcheck "${go_packages[@]}"
 else
-  echo "staticcheck: not installed; install honnef.co/go/tools/cmd/staticcheck@v0.6.1"
+  echo "staticcheck: not installed; install honnef.co/go/tools/cmd/staticcheck@v0.8.1"
 fi
 
 if command -v golangci-lint >/dev/null 2>&1; then
@@ -25,5 +25,5 @@ fi
 if command -v govulncheck >/dev/null 2>&1; then
   govulncheck "${go_packages[@]}"
 else
-  echo "govulncheck: not installed; install golang.org/x/vuln/cmd/govulncheck@v1.1.4"
+  echo "govulncheck: not installed; install golang.org/x/vuln/cmd/govulncheck@v1.8.0"
 fi
