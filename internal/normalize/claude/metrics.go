@@ -21,16 +21,21 @@ import (
 // skip a payload that belongs to another tool without treating it as an error.
 var ErrUnsupportedMetrics = errors.New("unsupported Claude Code metrics payload")
 
-// tokenUsageMetric and costUsageMetric are the Claude Code metrics mapped
-// end-to-end: #89 landed token.usage, #97 (M10) adds cost.usage plus the
-// per-datapoint attribution dimensions (which skill / MCP tool / sub-agent /
-// plugin burned the tokens and cost). The remaining exported metrics
-// (session/active-time/lines-of-code/commits/PRs/edit-decisions) are
+// tokenUsageMetric, costUsageMetric and the code-output counters are the Claude
+// Code metrics mapped end-to-end: #89 landed token.usage, #97 (M10) added
+// cost.usage plus the per-datapoint attribution dimensions (which skill / MCP
+// tool / sub-agent / plugin burned the tokens and cost), and #98 (M11) adds the
+// three code-output counters (lines_of_code / commits / pull_requests) — the
+// direct outcome signals that answer whether a session actually produced code.
+// The remaining exported metrics (session/active-time/edit-decisions) are
 // route-tolerated — decoded without error but not yet mapped; their per-metric
-// canonical mapping is owned by the later M-phase issues (#98–#99).
+// canonical mapping is owned by the later M-phase issue (#99, M12).
 const (
-	tokenUsageMetric = "claude_code.token.usage"
-	costUsageMetric  = "claude_code.cost.usage"
+	tokenUsageMetric  = "claude_code.token.usage"
+	costUsageMetric   = "claude_code.cost.usage"
+	linesOfCodeMetric = "claude_code.lines_of_code.count"
+	commitMetric      = "claude_code.commit.count"
+	pullRequestMetric = "claude_code.pull_request.count"
 )
 
 // OTLP resource attribute keys read from a Claude Code metrics payload.
@@ -38,6 +43,11 @@ const (
 	attrServiceName    = "service.name"
 	attrServiceVersion = "service.version"
 )
+
+// Datapoint attribute keys read from a Claude Code metrics payload. session.id
+// becomes the session identity on every metric event, so it is read (not
+// allow-listed into provider_extensions) by each datapoint builder.
+const attrSessionID = "session.id"
 
 // safeMetricAttributeKeys is the allow-list of datapoint/resource attribute keys
 // carried into provider_extensions. Ingest-time storage sanitising was removed
@@ -234,6 +244,12 @@ func metricEventsFromInstrument(item otlpMetric, ctx metricContext) ([]canonical
 		return datapointEvents(item, ctx, tokenUsageEvent)
 	case costUsageMetric:
 		return datapointEvents(item, ctx, costUsageEvent)
+	case linesOfCodeMetric:
+		return datapointEvents(item, ctx, linesOfCodeEvent)
+	case commitMetric:
+		return datapointEvents(item, ctx, commitCountEvent)
+	case pullRequestMetric:
+		return datapointEvents(item, ctx, pullRequestCountEvent)
 	default:
 		return nil, nil
 	}
@@ -287,7 +303,7 @@ func tokenUsageEvent(point metricDataPoint, index int, ctx metricContext, unit s
 
 	occurredAt := metricTime(point.TimeUnixNano, ctx.receivedAt)
 	model, modelObserved := normalize.ObservedString(fields["model"])
-	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, "session.id"))
+	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, attrSessionID))
 	safeFields := safeMetricAttributes(fields)
 
 	// session.id is part of the event's semantic identity but is not in the
@@ -350,7 +366,7 @@ func costUsageEvent(point metricDataPoint, index int, ctx metricContext, unit st
 
 	occurredAt := metricTime(point.TimeUnixNano, ctx.receivedAt)
 	model, modelObserved := normalize.ObservedString(fields["model"])
-	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, "session.id"))
+	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, attrSessionID))
 	safeFields := safeMetricAttributes(fields)
 
 	// The formatted cost joins the identity so two same-timestamp cost points in
@@ -395,6 +411,95 @@ func costUsageEvent(point metricDataPoint, index int, ctx metricContext, unit st
 	}, true, nil
 }
 
+// linesOfCodeEvent maps one claude_code.lines_of_code.count datapoint (#98, M11).
+// The wire type (added/removed) selects the canonical count key, mirroring how a
+// token type selects its count key; an unrecognised type is skipped (ok=false) so
+// a future category does not fail the batch, while a recognised type whose value
+// cannot be parsed is a hard error per the routing contract.
+func linesOfCodeEvent(point metricDataPoint, index int, ctx metricContext, unit string) (canonical.Event, bool, error) {
+	fields := attributeValues(point.Attributes)
+	lineType := strings.TrimSpace(stringAttr(fields, "type"))
+	countKey, ok := linesOfCodeAttribute(lineType)
+	if !ok {
+		return canonical.Event{}, false, nil
+	}
+	return buildCountEvent(linesOfCodeMetric, countKey, true, point, index, ctx, unit)
+}
+
+// commitCountEvent maps one claude_code.commit.count datapoint (#98, M11). The
+// metric carries standard attrs only (no model dimension), so model is not
+// promoted onto the event.
+func commitCountEvent(point metricDataPoint, index int, ctx metricContext, unit string) (canonical.Event, bool, error) {
+	return buildCountEvent(commitMetric, "commit_count", false, point, index, ctx, unit)
+}
+
+// pullRequestCountEvent maps one claude_code.pull_request.count datapoint (#98,
+// M11); like commit.count it carries standard attrs only.
+func pullRequestCountEvent(point metricDataPoint, index int, ctx metricContext, unit string) (canonical.Event, bool, error) {
+	return buildCountEvent(pullRequestMetric, "pull_request_count", false, point, index, ctx, unit)
+}
+
+// buildCountEvent maps one code-output count datapoint (lines_of_code, commit, or
+// pull_request; #98 M11) into a canonical event. These are direct outcome signals
+// — did the session actually produce code / commits / PRs — that complement token
+// spend for an efficiency/outcome view. A datapoint whose value cannot be parsed
+// as a non-negative count is a hard error per the routing contract, so the route
+// does not silently 202-accept and drop supported Claude data. promoteModel is
+// true only for lines_of_code, whose documented surface carries a model dimension.
+func buildCountEvent(metricName, countKey string, promoteModel bool, point metricDataPoint, index int, ctx metricContext, unit string) (canonical.Event, bool, error) {
+	fields := attributeValues(point.Attributes)
+	count := optionalCount(dataPointValue(point))
+	if count == nil {
+		return canonical.Event{}, false, fmt.Errorf("claude %s datapoint has no parseable count value", metricName)
+	}
+
+	occurredAt := metricTime(point.TimeUnixNano, ctx.receivedAt)
+	model, modelObserved := normalize.ObservedString(fields["model"])
+	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, attrSessionID))
+	safeFields := safeMetricAttributes(fields)
+
+	// countKey joins the identity so lines_added and lines_removed points that
+	// share a session/timestamp stay distinct under CorrelateEvents, mirroring the
+	// token.usage/cost.usage collision-safety.
+	identity := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%d|%d", metricName, countKey, sessionID, model, point.TimeUnixNano, ctx.resourceIdentity, ctx.scopeName, index, *count)
+	identity += "|" + stableJSON(safeFields)
+	eventID := contentID("claude-code:count:", []byte(identity))
+
+	attributes := map[string]any{
+		"unavailable_fields": codeOutputUnavailableFields(),
+		countKey:             *count,
+	}
+	if promoteModel && modelObserved {
+		attributes["model"] = model
+	}
+	extensions := map[string]any{
+		"correlation": metricCorrelation(eventID, occurredAt),
+		"metric": map[string]any{
+			"name": metricName,
+			"unit": unit,
+		},
+		"resource":          ctx.safeResource,
+		"metric_attributes": safeFields,
+	}
+	return canonical.Event{
+		SchemaVersion:      canonicalSchemaVersion,
+		EventID:            eventID,
+		EventType:          metricName,
+		OccurredAt:         occurredAt,
+		ReceivedAt:         ctx.receivedAt.UTC(),
+		Provider:           provider,
+		Tool:               tool,
+		SourceSchema:       sourceSchema,
+		SourceVersion:      ctx.version,
+		ActorID:            unavailable,
+		DeviceID:           unavailable,
+		SessionID:          sessionID,
+		PrivacyLevel:       "operational",
+		Attributes:         attributes,
+		ProviderExtensions: extensions,
+	}, true, nil
+}
+
 // tokenUnavailableFields lists the canonical fields a token.usage event does not
 // carry. provider_cost is included only when no sibling cost.usage datapoint was
 // captured on the same resource; when cost is captured, the correlated
@@ -412,6 +517,27 @@ func tokenUnavailableFields(costCaptured bool) []string {
 // counts or behaviour signals.
 func costUnavailableFields() []string {
 	return []string{"token_usage", "tool_calls", "mcp_calls", "file_operations", "command_execution", "prompt_content", "response_content", "repository_context", "task_outcome", "trace_span_correlation"}
+}
+
+// codeOutputUnavailableFields lists the canonical fields a code-output count event
+// (lines_of_code / commit / pull_request) does not carry: it is a bare outcome
+// counter with no token, cost, or behaviour detail.
+func codeOutputUnavailableFields() []string {
+	return []string{"token_usage", "provider_cost", "tool_calls", "mcp_calls", "file_operations", "command_execution", "prompt_content", "response_content", "repository_context", "task_outcome", "trace_span_correlation"}
+}
+
+// linesOfCodeAttribute maps the lines_of_code.count type (added/removed) onto the
+// canonical count keys, mirroring tokenUsageAttribute. An unrecognised type yields
+// false so a future category is skipped rather than failing the batch.
+func linesOfCodeAttribute(lineType string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(lineType)) {
+	case "added":
+		return "lines_added_count", true
+	case "removed":
+		return "lines_removed_count", true
+	default:
+		return "", false
+	}
 }
 
 // tokenUsageAttribute maps Claude Code's observed token categories (camelCase on
@@ -501,6 +627,14 @@ func optionalCostUSD(value any) *float64 {
 		return nil
 	}
 	return &cost
+}
+
+// optionalCount parses a code-output count datapoint value into a non-negative
+// *int64, reusing OptionalTokenCount's never-fabricate discipline (absent /
+// unparseable / non-integer / negative -> nil, genuine 0 preserved) under a name
+// that reads correctly for a lines/commit/PR counter rather than a token count.
+func optionalCount(value any) *int64 {
+	return normalize.OptionalTokenCount(value)
 }
 
 func stableJSON(value any) string {
