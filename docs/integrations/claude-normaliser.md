@@ -284,10 +284,29 @@ token.usage). When a resource emits cost.usage, its sibling `token.usage` events
 stop declaring `provider_cost` unavailable — the correlated cost event carries
 it; a token-only resource keeps `provider_cost` in `unavailable_fields`.
 
-The remaining exported metrics (session/active-time/lines-of-code/commits/PRs/
-edit-decisions) are route-tolerated — accepted without error but not yet mapped;
-their per-metric canonical mapping is owned by the later M-phase issues
-(#98–#99).
+The three **code-output** counters are mapped end-to-end (#98, M11): they are the
+direct outcome signals — did the session actually produce code, commits, or PRs —
+that complete the spend-vs-output view alongside token/cost.
+`claude_code.lines_of_code.count` carries a `type` dimension (`added`/`removed`)
+that selects the canonical key exactly as a token type does
+(`added → lines_added_count`, `removed → lines_removed_count`) and promotes
+`model`; `claude_code.commit.count` and `claude_code.pull_request.count` carry
+standard attrs only, so their counts land under `attributes.commit_count` /
+`pull_request_count` with no `model`. All three share the count-parsing discipline
+of `optionalCount` (a thin alias over `OptionalTokenCount`): a genuine `0` is
+kept, and an absent/non-integer/negative value is a hard normalisation error per
+the routing contract (never a silent 202) — while an unrecognised `lines_of_code`
+`type` is skipped so a future category does not fail the batch. The
+`lines_of_code` attribution dims (`skill.name`, `agent.name`, …) survive into
+`provider_extensions.metric_attributes`, so produced code is attributable to the
+skill/sub-agent that produced it. The surface is exercised by the synthetic
+fixture `fixtures/claude/observed-sanitised/claude-code-2.1.268-code-output-metrics.json`
+→ `fixtures/claude/expected/claude-code-2.1.268-code-output-metrics.events.json`;
+per-file LOC attribution stays out of scope (JSONL diffs, #105).
+
+The remaining exported metrics (session/active-time/edit-decisions) are
+route-tolerated — accepted without error but not yet mapped; their per-metric
+canonical mapping is owned by the later M-phase issue (#99, M12).
 
 Because #88 removed storage-side sanitising, the adapter is the sole guard for
 metric attributes: it carries only an **allow-list** of safe keys into
@@ -301,9 +320,10 @@ tokens and cost — `skill.name`, `mcp_server.name`, `mcp_tool.name`,
 allow-listed in both its dotted wire form and the underscore variant so the same
 key survives whichever an exporter build emits; the match lower-cases and
 trims). These dims are pre-redacted behaviour metadata, not identities. Event
-IDs are a content hash over the metric name, token type (token.usage only),
-model, timestamp, resource/scope identity, datapoint index, and value, so
-same-timestamp datapoints in one session stay distinct under `CorrelateEvents`.
+IDs are a content hash over the metric name, the per-metric count key (token type
+for token.usage, `lines_added`/`removed` for lines_of_code), model, timestamp,
+resource/scope identity, datapoint index, and value, so same-timestamp datapoints
+in one session stay distinct under `CorrelateEvents`.
 The attributed token.usage + cost.usage surface is exercised by the synthetic
 fixture `fixtures/claude/observed-sanitised/claude-code-2.1.268-cost-attribution-metrics.json`
 → `fixtures/claude/expected/claude-code-2.1.268-cost-attribution-metrics.events.json`;
@@ -372,6 +392,9 @@ committed. See "Prompt & response content path" above.
   model-interaction records for the same input.
 - `fixtures/claude/expected/claude-code-2.1.268-token-usage-metrics.events.json` —
   canonical token-usage events for the committed `/v1/metrics` fixture.
+- `fixtures/claude/expected/claude-code-2.1.268-code-output-metrics.events.json` —
+  canonical lines_of_code/commit/pull_request events for the committed code-output
+  `/v1/metrics` fixture (#98, M11).
 - `fixtures/claude/expected/claude-code-2.1.268-trace-spans.events.json` —
   canonical span events for the committed `/v1/traces` fixture.
 - `fixtures/claude/expected/claude-code-2.1.269-session-transcript.events.json` —
