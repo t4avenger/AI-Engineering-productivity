@@ -24,7 +24,10 @@ string `unavailable`.
 
 Every signal the event does not carry is listed in `attributes.unavailable_fields`
 so an absent signal is explicit, never silently missing. The `api_request` event
-carries model and token identity; the `mcp_server_connection` event carries neither
+carries model and token identity and promotes observed request-level tokens to
+`model`, `input_token_count`, `output_token_count`, and
+`cached_input_token_count` attributes for session APIs and cost calculation; the
+`mcp_server_connection` event carries neither
 and additionally lists `model`, `token_usage`, and `cache_usage` as unavailable.
 Neither event proves an executed tool call, an MCP **call** invocation, a file
 operation, a task outcome, or trace/span correlation. Skill identity is reported

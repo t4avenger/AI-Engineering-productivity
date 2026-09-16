@@ -68,6 +68,10 @@
     "repository_id": null,
     "privacy_level": "operational",
     "attributes": {
+      "cached_input_token_count": 0,
+      "input_token_count": 2,
+      "model": "claude-opus-4-8",
+      "output_token_count": 4,
       "unavailable_fields": [
         "tool_calls",
         "mcp_calls",

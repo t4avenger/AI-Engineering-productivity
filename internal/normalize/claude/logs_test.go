@@ -71,6 +71,36 @@ func TestNormalizeLogsMapsClaudeWireEventsAndSkipsOtherServices(t *testing.T) {
 	}
 }
 
+func TestNormalizeLogsPromotesPriceableRequestAttributes(t *testing.T) {
+	events, err := NormalizeLogs([]byte(rawClaudeLogs), time.Unix(0, 0).UTC())
+	if err != nil {
+		t.Fatalf("normalise: %v", err)
+	}
+	var request *canonical.Event
+	for i := range events {
+		if events[i].EventType == eventAPIRequest {
+			request = &events[i]
+			break
+		}
+	}
+	if request == nil {
+		t.Fatal("api_request event missing")
+	}
+	for key, want := range map[string]any{
+		"model":                    "claude-opus-4-8",
+		"input_token_count":        int64(1200),
+		"output_token_count":       int64(340),
+		"cached_input_token_count": int64(500),
+	} {
+		if got := request.Attributes[key]; got != want {
+			t.Fatalf("attribute %s = %#v, want %#v; attrs=%#v", key, got, want, request.Attributes)
+		}
+	}
+	if _, fabricated := request.Attributes["reasoning_token_count"]; fabricated {
+		t.Fatalf("absent reasoning tokens fabricated: %#v", request.Attributes)
+	}
+}
+
 func TestNormalizeLogsKeepsNativeSessionAndDropsOperatorFields(t *testing.T) {
 	events, err := NormalizeLogs([]byte(rawClaudeLogs), time.Unix(0, 0).UTC())
 	if err != nil {
