@@ -29,22 +29,34 @@ When implementation and documentation conflict, stop and report the conflict. Do
 
 ## Privacy invariants
 
-- Prompts are not persisted by default.
-- Responses are not persisted by default.
-- Source code is not persisted by default.
-- Raw command arguments are not persisted by default.
-- Redaction occurs before persistence and diagnostics.
-- Sensitive values must never be logged.
+- Raw capture is the default (epic #87, PRODUCT_MAP §11.3). Prompts, responses,
+  source content, file paths, and raw command lines are captured verbatim at the
+  ingest boundary — nothing is dropped, tokenised, hashed, or disguised. A
+  normaliser must not drop or reduce a provider field citing an earlier adapter's
+  choice or a "not persisted by default" default; those defaults are superseded
+  by this stance.
+- What (if anything) to hide is a downstream visibility policy layered *over* the
+  retained raw data, deferred to a later policy stage or customer/enterprise
+  configuration — never an ingest-time amputation. Governance classifiers
+  (`privacy.ClassifyPath` / `privacy.ClassifyCommandAccess`) run over the raw
+  stored value to add a class + boundary as an additional signal, not a
+  replacement.
+- Sensitive values must never be logged to diagnostics or stderr (distinct from
+  the captured governance record).
 - Diagnostic exports must be sanitised.
-- Tests use synthetic data only.
+- Tests use synthetic data only (git hygiene — no real credentials in history);
+  field names and shapes are captured and asserted raw.
 - Local APIs bind to loopback by default.
 - Unknown values must not be represented as zero.
-- Provider-native session/conversation IDs may be retained and displayed in the
-  local-only edition with a stable provider prefix; this exception does not
-  apply to account identifiers, email, hostnames, API keys, tokens, prompts,
-  responses, source code, raw command arguments, or raw secret-bearing paths.
+- Provider-native session/conversation/request IDs, file paths, and command
+  lines are retained and displayed raw in the local-only edition with a stable
+  provider prefix for namespacing; account identifiers and email remain dropped
+  at the wire boundary in this edition.
+- Cloud, team, or cross-device sharing is a separate trust boundary and must
+  re-evaluate every field before any upload or aggregation; the no-hiding stance
+  above applies to the local-only single-user edition.
 
-Any proposed change that weakens these invariants must be rejected unless the product specification is explicitly revised.
+Any proposed change that weakens these invariants must be rejected unless the product specification is explicitly revised. This section reflects the epic #87 revision.
 
 ## Provider integration rules
 
