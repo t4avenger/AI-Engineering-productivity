@@ -12,7 +12,10 @@ import (
 	"time"
 )
 
-const maxBodyBytes = 16 << 20
+const (
+	maxBodyBytes         = 16 << 20
+	captureFailureReason = "capture failed"
+)
 
 type requestMetadata struct {
 	CapturedAt      time.Time         `json:"captured_at"`
@@ -44,7 +47,7 @@ func main() {
 		base := fmt.Sprintf("%03d", id)
 		bodyName := base + ".body"
 		if err := os.WriteFile(filepath.Join(destination, bodyName), body, 0o600); err != nil {
-			http.Error(w, "capture failed", http.StatusInternalServerError)
+			http.Error(w, captureFailureReason, http.StatusInternalServerError)
 			return
 		}
 		headers := make(map[string]string)
@@ -65,11 +68,11 @@ func main() {
 		}
 		encoded, err := json.MarshalIndent(metadata, "", "  ")
 		if err != nil {
-			http.Error(w, "capture failed", http.StatusInternalServerError)
+			http.Error(w, captureFailureReason, http.StatusInternalServerError)
 			return
 		}
 		if err := os.WriteFile(filepath.Join(destination, base+".json"), encoded, 0o600); err != nil {
-			http.Error(w, "capture failed", http.StatusInternalServerError)
+			http.Error(w, captureFailureReason, http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusAccepted)

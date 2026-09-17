@@ -114,36 +114,58 @@ type fixtureDocument struct {
 }
 
 func normaliseSpan(document fixtureDocument, capturedAt time.Time, resource, scope, span map[string]any) (canonical.Event, error) {
-	traceID, err := normalize.RequiredString(span, "traceId")
+	fields, err := requiredTraceSpanFields(span)
 	if err != nil {
 		return canonical.Event{}, err
 	}
-	spanID, err := normalize.RequiredString(span, "spanId")
-	if err != nil {
-		return canonical.Event{}, err
-	}
-	name, err := normalize.RequiredString(span, "name")
-	if err != nil {
-		return canonical.Event{}, err
-	}
-	occurredAt, err := unixNanoTime(span, "startTimeUnixNano")
-	if err != nil {
-		return canonical.Event{}, err
-	}
-	parentSpanID := normalize.OptionalString(span, "parentSpanId")
-	eventID := "codex:" + traceID + ":" + spanID
 	return canonical.Event{
-		SchemaVersion: canonicalSchemaVersion, EventID: eventID, EventType: name,
-		OccurredAt: occurredAt, ReceivedAt: capturedAt, Provider: document.Provider, Tool: document.Tool,
+		SchemaVersion: canonicalSchemaVersion, EventID: fields.eventID, EventType: fields.name,
+		OccurredAt: fields.occurredAt, ReceivedAt: capturedAt, Provider: document.Provider, Tool: document.Tool,
 		SourceSchema: sourceSchema, SourceVersion: document.ToolVersion, ActorID: unavailable, DeviceID: unavailable,
-		SessionID: "codex:" + traceID, TaskID: nil, RepositoryID: nil, PrivacyLevel: "operational",
+		SessionID: "codex:" + fields.traceID, TaskID: nil, RepositoryID: nil, PrivacyLevel: "operational",
 		Attributes: map[string]any{"unavailable_fields": []string{"model", "token_usage", "cache_usage", "tool_calls", "file_operations", "command_execution", "approvals", "prompt_content", "response_content", "repository_context", "task_outcome", "provider_cost"}},
 		ProviderExtensions: map[string]any{
-			"correlation": traceCorrelation(eventID, traceID, spanID, parentSpanID, occurredAt),
+			"correlation": traceCorrelation(fields.eventID, fields.traceID, fields.spanID, fields.parentSpanID, fields.occurredAt),
 			"resource":    normalize.UnknownFields(resource, "scopeSpans"),
 			"scope":       normalize.UnknownFields(scope, "spans"),
 			"span":        normalize.UnknownFields(span, "traceId", "spanId", "parentSpanId", "name", "startTimeUnixNano"),
 		},
+	}, nil
+}
+
+type traceSpanFields struct {
+	traceID      string
+	spanID       string
+	name         string
+	occurredAt   time.Time
+	parentSpanID *string
+	eventID      string
+}
+
+func requiredTraceSpanFields(span map[string]any) (traceSpanFields, error) {
+	traceID, err := normalize.RequiredString(span, "traceId")
+	if err != nil {
+		return traceSpanFields{}, err
+	}
+	spanID, err := normalize.RequiredString(span, "spanId")
+	if err != nil {
+		return traceSpanFields{}, err
+	}
+	name, err := normalize.RequiredString(span, "name")
+	if err != nil {
+		return traceSpanFields{}, err
+	}
+	occurredAt, err := unixNanoTime(span, "startTimeUnixNano")
+	if err != nil {
+		return traceSpanFields{}, err
+	}
+	return traceSpanFields{
+		traceID:      traceID,
+		spanID:       spanID,
+		name:         name,
+		occurredAt:   occurredAt,
+		parentSpanID: normalize.OptionalString(span, "parentSpanId"),
+		eventID:      "codex:" + traceID + ":" + spanID,
 	}, nil
 }
 

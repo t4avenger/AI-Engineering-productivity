@@ -103,32 +103,18 @@ func normalizeLiveTraceScope(resourceIndex, scopeIndex int, value any, resource,
 }
 
 func normalizeLiveTraceSpan(resource, scope, span, resourceAttributes map[string]any, version string, receivedAt time.Time) (canonical.Event, error) {
-	traceID, err := normalize.RequiredString(span, "traceId")
+	fields, err := requiredTraceSpanFields(span)
 	if err != nil {
 		return canonical.Event{}, err
 	}
-	spanID, err := normalize.RequiredString(span, "spanId")
-	if err != nil {
-		return canonical.Event{}, err
-	}
-	name, err := normalize.RequiredString(span, "name")
-	if err != nil {
-		return canonical.Event{}, err
-	}
-	occurredAt, err := unixNanoTime(span, "startTimeUnixNano")
-	if err != nil {
-		return canonical.Event{}, err
-	}
-	parentSpanID := normalize.OptionalString(span, "parentSpanId")
-	eventID := "codex:" + traceID + ":" + spanID
 	spanAttributes := traceAttributeValues(span["attributes"])
 	attributes := codexTraceAttributes(spanAttributes)
 
 	return canonical.Event{
 		SchemaVersion: canonicalSchemaVersion,
-		EventID:       eventID,
-		EventType:     name,
-		OccurredAt:    occurredAt,
+		EventID:       fields.eventID,
+		EventType:     fields.name,
+		OccurredAt:    fields.occurredAt,
 		ReceivedAt:    receivedAt,
 		Provider:      "openai",
 		Tool:          "codex",
@@ -136,11 +122,11 @@ func normalizeLiveTraceSpan(resource, scope, span, resourceAttributes map[string
 		SourceVersion: version,
 		ActorID:       unavailable,
 		DeviceID:      unavailable,
-		SessionID:     "codex:trace:" + traceID,
+		SessionID:     "codex:trace:" + fields.traceID,
 		PrivacyLevel:  "operational",
 		Attributes:    attributes,
 		ProviderExtensions: map[string]any{
-			"correlation":         liveTraceCorrelation(eventID, traceID, spanID, parentSpanID, occurredAt),
+			"correlation":         liveTraceCorrelation(fields),
 			"resource_attributes": resourceAttributes,
 			"resource":            normalize.UnknownFields(resource, "scopeSpans"),
 			"scope":               normalize.UnknownFields(scope, "spans"),
@@ -186,8 +172,8 @@ func removeTraceUnavailable(values []string, target string) []string {
 	return result
 }
 
-func liveTraceCorrelation(eventID, traceID, spanID string, parentSpanID *string, occurredAt time.Time) map[string]any {
-	correlation := traceCorrelation(eventID, traceID, spanID, parentSpanID, occurredAt)
+func liveTraceCorrelation(fields traceSpanFields) map[string]any {
+	correlation := traceCorrelation(fields.eventID, fields.traceID, fields.spanID, fields.parentSpanID, fields.occurredAt)
 	correlation["session_id_source"] = "trace.id"
 	return correlation
 }
