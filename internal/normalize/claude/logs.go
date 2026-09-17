@@ -220,6 +220,50 @@ func attributeValue(value map[string]any) (any, bool) {
 	return nil, false
 }
 
+// arrayAttributeValues finds attribute key among OTLP attributes and decodes its
+// arrayValue string members into a []string. It complements attributeValues,
+// which reads only scalar values: Claude Code encodes gen_ai.response.finish_reasons
+// as an OTLP arrayValue that the scalar attributeValue decoder cannot read (so it
+// was silently dropped before #100). The scalar decoder is left untouched so the
+// logs/metrics goldens do not shift. Returns nil when the key is absent or carries
+// no non-empty string members, so a genuine absence never becomes an empty slice.
+func arrayAttributeValues(attributes []otlpAttribute, key string) []string {
+	for _, attribute := range attributes {
+		if attribute.Key == key {
+			return decodeStringArray(attribute.Value)
+		}
+	}
+	return nil
+}
+
+// decodeStringArray decodes an OTLP arrayValue attribute value into its non-empty
+// string members, returning nil when the value is not a string array or carries no
+// non-empty members so a genuine absence never becomes an empty slice.
+func decodeStringArray(value map[string]any) []string {
+	array, ok := value["arrayValue"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	rawValues, ok := array["values"].([]any)
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(rawValues))
+	for _, item := range rawValues {
+		member, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if text, ok := member["stringValue"].(string); ok && strings.TrimSpace(text) != "" {
+			result = append(result, strings.TrimSpace(text))
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
 func fallbackString(value, fallback string) string {
 	if strings.TrimSpace(value) == "" {
 		return fallback

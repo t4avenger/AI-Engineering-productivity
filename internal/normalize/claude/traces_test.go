@@ -85,6 +85,81 @@ func assertClaudeSpanTree(t *testing.T, events []canonical.Event) {
 	if attrs, _ := llm.ProviderExtensions["span_attributes"].(map[string]any); attrs["stop_reason"] != "end_turn" {
 		t.Fatalf("llm_request stop_reason not preserved: %#v", llm.ProviderExtensions["span_attributes"])
 	}
+
+	assertTypedSpanFields(t, interaction, llm)
+}
+
+// assertTypedSpanFields proves the #100 typed field mapping on the two per-prompt
+// span types: the interaction root's raised task boundary and prompt-shape block,
+// and the llm_request child's unchanged boundary plus its decoded finish_reasons
+// and latency/token/outcome block.
+func assertTypedSpanFields(t *testing.T, interaction, llm canonical.Event) {
+	t.Helper()
+	// The interaction root is a genuine task boundary, so #100 raises its
+	// confidence above the deferred "unknown"; the llm_request child is not
+	// itself a boundary and stays "unknown".
+	if got := boundaryConfidence(t, interaction); got != "observed" {
+		t.Fatalf("interaction task_boundary confidence = %q, want observed (per-prompt root)", got)
+	}
+	if got := boundaryConfidence(t, llm); got != "unknown" {
+		t.Fatalf("llm_request task_boundary confidence = %q, want unknown (not a boundary)", got)
+	}
+
+	// The typed interaction block carries prompt-shape/queueing signals only —
+	// never tokens or the prompt text.
+	interactionBlock, ok := interaction.Attributes["interaction"].(map[string]any)
+	if !ok {
+		t.Fatalf("interaction span missing typed interaction block: %#v", interaction.Attributes)
+	}
+	assertBlockFields(t, "interaction", interactionBlock, map[string]any{
+		"sequence":           int64(1),
+		"duration_ms":        int64(2600),
+		"user_prompt_length": int64(33),
+		"queued_sends":       int64(0),
+		"parent_source":      "none",
+	})
+
+	// The typed llm_request block carries decoded finish_reasons (the OTLP
+	// arrayValue the scalar decoder cannot read) plus latency/token/outcome.
+	llmBlock, ok := llm.Attributes["llm_request"].(map[string]any)
+	if !ok {
+		t.Fatalf("llm_request span missing typed llm_request block: %#v", llm.Attributes)
+	}
+	if reasons, _ := llmBlock["finish_reasons"].([]string); !reflect.DeepEqual(reasons, []string{"end_turn"}) {
+		t.Fatalf("llm_request finish_reasons = %#v, want [end_turn] (arrayValue decoded)", llmBlock["finish_reasons"])
+	}
+	assertBlockFields(t, "llm_request", llmBlock, map[string]any{
+		"stop_reason":  "end_turn",
+		"context":      "interaction",
+		"input_tokens": int64(10),
+		"ttft_ms":      int64(1918),
+		"success":      true,
+	})
+}
+
+// assertBlockFields fails if any want entry is missing or unequal in block.
+func assertBlockFields(t *testing.T, name string, block map[string]any, want map[string]any) {
+	t.Helper()
+	for key, value := range want {
+		if block[key] != value {
+			t.Fatalf("%s.%s = %#v, want %#v", name, key, block[key], value)
+		}
+	}
+}
+
+// boundaryConfidence reads provider_extensions.correlation.task_boundary.confidence.
+func boundaryConfidence(t *testing.T, event canonical.Event) string {
+	t.Helper()
+	correlation, ok := event.ProviderExtensions["correlation"].(map[string]any)
+	if !ok {
+		t.Fatalf("event %q missing correlation extension: %#v", event.EventType, event.ProviderExtensions)
+	}
+	boundary, ok := correlation["task_boundary"].(map[string]any)
+	if !ok {
+		t.Fatalf("event %q missing task_boundary: %#v", event.EventType, correlation)
+	}
+	confidence, _ := boundary["confidence"].(string)
+	return confidence
 }
 
 func spanField(t *testing.T, event canonical.Event, key string) string {
@@ -196,5 +271,102 @@ func TestNormalizeTracesFiltersSensitiveAttributes(t *testing.T) {
 	}
 	if _, present := spanAttributes["user.email"]; present {
 		t.Fatalf("identity attribute user.email must be dropped: %#v", spanAttributes)
+	}
+}
+
+// llmRequestBlock extracts the typed llm_request block from the single event a
+// one-span payload produces, failing if the span was not mapped as llm_request.
+func llmRequestBlock(t *testing.T, payload string) map[string]any {
+	t.Helper()
+	events, err := NormalizeTraces([]byte(payload), time.Now().UTC())
+	if err != nil {
+		t.Fatalf("NormalizeTraces: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("event count = %d, want 1", len(events))
+	}
+	block, ok := events[0].Attributes["llm_request"].(map[string]any)
+	if !ok {
+		t.Fatalf("event missing typed llm_request block: %#v", events[0].Attributes)
+	}
+	return block
+}
+
+// spanPayload wraps one claude-code llm_request span carrying attrsJSON so the
+// synthetic tests below stay to the attribute list under test.
+func spanPayload(attrsJSON string) string {
+	return `{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}},{"key":"service.version","value":{"stringValue":"2.1.268"}}]},"scopeSpans":[{"scope":{"name":"com.anthropic.claude_code.tracing"},"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","name":"claude_code.llm_request","startTimeUnixNano":"1789117549650000000","attributes":[{"key":"span.type","value":{"stringValue":"llm_request"}}` + attrsJSON + `]}]}]}]}`
+}
+
+// TestNormalizeTracesFinishReasonsMultiValue proves the arrayValue decoder reads
+// every string member, not just the first, so a multi-reason response survives.
+func TestNormalizeTracesFinishReasonsMultiValue(t *testing.T) {
+	block := llmRequestBlock(t, spanPayload(`,{"key":"gen_ai.response.finish_reasons","value":{"arrayValue":{"values":[{"stringValue":"tool_use"},{"stringValue":"max_tokens"}]}}}`))
+	reasons, _ := block["finish_reasons"].([]string)
+	if !reflect.DeepEqual(reasons, []string{"tool_use", "max_tokens"}) {
+		t.Fatalf("finish_reasons = %#v, want [tool_use max_tokens]", block["finish_reasons"])
+	}
+}
+
+// TestNormalizeTracesResponseHasToolCall proves the tool-calling signal is mapped
+// present-only as a bool: true when observed, absent (not false) when unobserved.
+func TestNormalizeTracesResponseHasToolCall(t *testing.T) {
+	withCall := llmRequestBlock(t, spanPayload(`,{"key":"response.has_tool_call","value":{"boolValue":true}}`))
+	if withCall["response_has_tool_call"] != true {
+		t.Fatalf("response_has_tool_call = %#v, want true", withCall["response_has_tool_call"])
+	}
+	without := llmRequestBlock(t, spanPayload(`,{"key":"stop_reason","value":{"stringValue":"end_turn"}}`))
+	if _, present := without["response_has_tool_call"]; present {
+		t.Fatalf("absent response.has_tool_call must be omitted, not fabricated: %#v", without)
+	}
+}
+
+// TestNormalizeTracesLLMRequestErrorRetry proves a failed, retried request maps
+// the bounded outcome fields (attempt, success, status_code, error_class) while
+// the raw free-text error message is never surfaced (it is prompt/response-adjacent
+// content, epic #87).
+func TestNormalizeTracesLLMRequestErrorRetry(t *testing.T) {
+	payload := spanPayload(`,{"key":"attempt","value":{"intValue":2}},{"key":"success","value":{"boolValue":false}},{"key":"status_code","value":{"intValue":529}},{"key":"error_class","value":{"stringValue":"server_overload"}},{"key":"error","value":{"stringValue":"tiq-canary-error-detail: upstream connection reset"}}`)
+	block := llmRequestBlock(t, payload)
+	for key, want := range map[string]any{
+		"attempt":     int64(2),
+		"success":     false,
+		"status_code": int64(529),
+		"error_class": "server_overload",
+	} {
+		if block[key] != want {
+			t.Fatalf("llm_request.%s = %#v, want %#v", key, block[key], want)
+		}
+	}
+	if _, present := block["error"]; present {
+		t.Fatalf("raw free-text error message must never be mapped: %#v", block)
+	}
+	events, _ := NormalizeTraces([]byte(payload), time.Now().UTC())
+	encoded, _ := json.Marshal(events)
+	if strings.Contains(string(encoded), "tiq-canary-error-detail") {
+		t.Fatalf("raw error message leaked in %s", encoded)
+	}
+}
+
+// TestNormalizeTracesSubAgentWorkflowPresentOnly proves sub-agent workflow
+// correlation (agent_id/parent_agent_id/workflow.*) is mapped when present and
+// omitted (not fabricated) on a main-session request that carries none.
+func TestNormalizeTracesSubAgentWorkflowPresentOnly(t *testing.T) {
+	sub := llmRequestBlock(t, spanPayload(`,{"key":"agent_id","value":{"stringValue":"agent_child"}},{"key":"parent_agent_id","value":{"stringValue":"agent_root"}},{"key":"workflow.run_id","value":{"stringValue":"wf_synthetic0001"}},{"key":"workflow.name","value":{"stringValue":"custom"}}`))
+	for key, want := range map[string]any{
+		"agent_id":        "agent_child",
+		"parent_agent_id": "agent_root",
+		"workflow_run_id": "wf_synthetic0001",
+		"workflow_name":   "custom",
+	} {
+		if sub[key] != want {
+			t.Fatalf("llm_request.%s = %#v, want %#v", key, sub[key], want)
+		}
+	}
+	main := llmRequestBlock(t, spanPayload(`,{"key":"stop_reason","value":{"stringValue":"end_turn"}}`))
+	for _, key := range []string{"agent_id", "parent_agent_id", "workflow_run_id", "workflow_name"} {
+		if _, present := main[key]; present {
+			t.Fatalf("main-session request must omit %s, not fabricate it: %#v", key, main)
+		}
 	}
 }

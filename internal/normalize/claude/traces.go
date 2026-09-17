@@ -20,20 +20,21 @@ import (
 var ErrUnsupportedTraces = errors.New("unsupported Claude Code traces payload")
 
 // safeSpanAttributeKeys is the allow-list of span attributes carried verbatim
-// into provider_extensions.span_attributes. Ingest-time storage sanitising was
-// removed in #88, so this adapter is the sole guard: an allow-list (not a
-// deny-list) drops an unforeseen identity- or secret-bearing attribute by
-// default. session.id becomes the canonical session identity and model is
-// promoted onto the event, so neither is repeated here. Operator/machine
-// identity (user.*, organization.*, terminal.*) and the redacted user_prompt
-// are deliberately absent so they never reach provider_extensions. Detailed
-// per-span-type field mapping is owned by the T-phase issues (#100–#103); this
-// list carries the low-risk behaviour signals proven by the F3 fixture.
-// gen_ai.response.finish_reasons is deliberately absent: Claude Code emits it as
-// an OTLP arrayValue, which the shared scalar attributeValue decoder does not
-// read, so allow-listing it would silently drop it. Its structured mapping is
-// owned by the T-phase (#100–#103) alongside array-value decoding; carrying the
-// scalar stop_reason here keeps the F3 skeleton honest about what it captures.
+// into provider_extensions.span_attributes, alongside the typed per-span-type
+// blocks in attributes.interaction / attributes.llm_request (#100). Ingest-time
+// storage sanitising was removed in #88, so this adapter is the sole guard: an
+// allow-list (not a deny-list) drops an unforeseen identity- or secret-bearing
+// attribute by default. session.id becomes the canonical session identity and
+// model is promoted onto the event, so neither is repeated here. Operator/machine
+// identity (user.*, organization.*, terminal.*), the redacted user_prompt, and
+// the free-text `error` message are deliberately absent so they never reach
+// provider_extensions — only the bounded error_class describes a failure.
+// agent_id/parent_agent_id/workflow.* are sub-agent workflow correlation, not
+// operator identity, so they are safe. gen_ai.response.finish_reasons is not
+// listed here because Claude Code emits it as an OTLP arrayValue the scalar
+// attributeValue decoder cannot read; it is decoded and surfaced in the typed
+// llm_request block instead (arrayAttributeValues in logs.go). Tool/hook/sub-agent
+// span-type field mapping remains owned by the later T-phase issues (#101–#103).
 var safeSpanAttributeKeys = map[string]struct{}{
 	"span.type":               {},
 	"gen_ai.system":           {},
@@ -53,6 +54,13 @@ var safeSpanAttributeKeys = map[string]struct{}{
 	"cache_read_tokens":       {},
 	"cache_creation_tokens":   {},
 	"request_id":              {},
+	"status_code":             {},
+	"error_class":             {},
+	"response.has_tool_call":  {},
+	"agent_id":                {},
+	"parent_agent_id":         {},
+	"workflow.run_id":         {},
+	"workflow.name":           {},
 	"interaction.sequence":    {},
 	"interaction.duration_ms": {},
 	"parent.source":           {},
@@ -201,6 +209,7 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 	fields := attributeValues(span.Attributes)
 	sessionID := spanSessionID(fields, traceID)
 	model, modelObserved := normalize.ObservedString(fields["model"])
+	spanType := fallbackString(stringAttr(fields, "span.type"), unavailable)
 
 	// trace_id + span_id is globally unique; the resource identity is folded in
 	// so two resources cannot collide on one event ID and have one silently
@@ -210,13 +219,25 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 
 	attributes := map[string]any{
 		"unavailable_fields": []string{"tool_io", "mcp_calls", "file_operations", "command_execution", "prompt_content", "response_content", "repository_context", "provider_cost"},
-		"span_type":          fallbackString(stringAttr(fields, "span.type"), unavailable),
+		"span_type":          spanType,
 	}
 	if modelObserved {
 		attributes["model"] = model
 	}
+	// Dispatch on span.type so the two per-prompt span types gain typed,
+	// present-only field blocks (#100). Other span types (tool/hook/sub-agent)
+	// keep the generic passthrough until the later T-phase issues (#101–#103) map
+	// them. unavailable_fields is unchanged per type: the structured blocks add
+	// latency/token/outcome signals that were never in that set, which enumerates
+	// the tool/file/command/content/cost surfaces traces do not carry at all.
+	switch spanType {
+	case "interaction":
+		attributes["interaction"] = interactionAttributes(fields)
+	case "llm_request":
+		attributes["llm_request"] = llmRequestAttributes(fields, span.Attributes)
+	}
 	extensions := map[string]any{
-		"correlation": spanCorrelation(eventID, occurredAt, traceID, spanID, parentSpanID),
+		"correlation": spanCorrelation(eventID, occurredAt, traceID, spanID, parentSpanID, spanType),
 		"span": map[string]any{
 			"trace_id":        traceID,
 			"span_id":         spanID,
@@ -253,17 +274,29 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 // spanCorrelation carries the span-tree linkage (trace/span/parent) alongside
 // the dedup/ordering keys, so downstream consumers can rebuild the interaction
 // → llm_request/tool/hook hierarchy that spans expose and logs do not.
-func spanCorrelation(eventID string, occurredAt time.Time, traceID, spanID string, parentSpanID any) map[string]any {
+func spanCorrelation(eventID string, occurredAt time.Time, traceID, spanID string, parentSpanID any, spanType string) map[string]any {
+	// The interaction span is the per-user-prompt root — a genuine, observed task
+	// boundary — so its confidence is raised (#100). The llm_request span is a
+	// child of that root (one model request within the prompt), not itself a
+	// boundary, so it stays "unknown"; tool/hook/sub-agent span boundaries are
+	// deferred to the later T-phase issues (#101–#103).
+	boundary := map[string]any{
+		"confidence": "unknown",
+		"reason":     "Claude Code trace spans: per-span task-boundary mapping deferred to T-phase (#101–#103)",
+	}
+	if spanType == "interaction" {
+		boundary = map[string]any{
+			"confidence": "observed",
+			"reason":     "Claude Code interaction span is the per-user-prompt root, a genuine task boundary",
+		}
+	}
 	return map[string]any{
 		"dedup_key":      eventID,
 		"ordering_key":   fmt.Sprintf("%020d:%s", occurredAt.UnixNano(), eventID),
 		"trace_id":       traceID,
 		"span_id":        spanID,
 		"parent_span_id": parentSpanID,
-		"task_boundary": map[string]any{
-			"confidence": "unknown",
-			"reason":     "Claude Code trace spans: per-span task-boundary mapping deferred to T-phase (#100–#103)",
-		},
+		"task_boundary":  boundary,
 	}
 }
 
@@ -292,6 +325,86 @@ func spanSessionID(fields map[string]any, traceID string) string {
 		return normalize.ProviderNativeSessionID(nativeSessionPrefix, raw)
 	}
 	return "claude-code:trace:" + traceID
+}
+
+// interactionAttributes maps the claude_code.interaction span (the per-user-prompt
+// root) into structured, present-only fields. The interaction span carries no
+// tokens or latency of its own — those live on its llm_request children — only
+// prompt-shape and queueing metadata. Every field is present-only: a genuinely
+// absent attribute is omitted, never fabricated. user_prompt_length is a length
+// only; the prompt text is never emitted here (and is dropped regardless, #87).
+func interactionAttributes(fields map[string]any) map[string]any {
+	block := map[string]any{}
+	putSpanInt(block, fields, "sequence", "interaction.sequence")
+	putSpanInt(block, fields, "duration_ms", "interaction.duration_ms")
+	putSpanInt(block, fields, "user_prompt_length", "user_prompt_length")
+	putSpanInt(block, fields, "queued_sends", "queued_sends")
+	putSpanString(block, fields, "parent_source", "parent.source")
+	return block
+}
+
+// llmRequestAttributes maps the claude_code.llm_request span (one model request
+// under an interaction) into structured, present-only fields: identity/model,
+// latency, token counts, outcome, and correlation to any sub-agent workflow. All
+// fields are present-only. The raw free-text `error` message is deliberately not
+// mapped — it is prompt/response-adjacent content (#87); only the bounded
+// error_class, status_code, and success flag describe a failed request. context
+// comes from llm_request.context (query_source is a metrics-only dimension, not a
+// span attribute, so it is never invented here). finish_reasons is decoded from
+// the OTLP arrayValue that the scalar attribute decoder cannot read.
+func llmRequestAttributes(fields map[string]any, attributes []otlpAttribute) map[string]any {
+	block := map[string]any{}
+	putSpanString(block, fields, "model", "model")
+	putSpanString(block, fields, "gen_ai_system", "gen_ai.system")
+	putSpanString(block, fields, "gen_ai_request_model", "gen_ai.request.model")
+	putSpanString(block, fields, "gen_ai_response_id", "gen_ai.response.id")
+	putSpanString(block, fields, "request_id", "request_id")
+	putSpanString(block, fields, "context", "llm_request.context")
+	putSpanString(block, fields, "query_source_safe", "query_source_safe")
+	putSpanString(block, fields, "speed", "speed")
+	putSpanString(block, fields, "stop_reason", "stop_reason")
+	putSpanString(block, fields, "error_class", "error_class")
+	putSpanString(block, fields, "agent_id", "agent_id")
+	putSpanString(block, fields, "parent_agent_id", "parent_agent_id")
+	putSpanString(block, fields, "workflow_run_id", "workflow.run_id")
+	putSpanString(block, fields, "workflow_name", "workflow.name")
+	putSpanInt(block, fields, "duration_ms", "duration_ms")
+	putSpanInt(block, fields, "ttft_ms", "ttft_ms")
+	putSpanInt(block, fields, "first_content_ms", "first_content_ms")
+	putSpanInt(block, fields, "input_tokens", "input_tokens")
+	putSpanInt(block, fields, "output_tokens", "output_tokens")
+	putSpanInt(block, fields, "cache_read_tokens", "cache_read_tokens")
+	putSpanInt(block, fields, "cache_creation_tokens", "cache_creation_tokens")
+	putSpanInt(block, fields, "attempt", "attempt")
+	putSpanInt(block, fields, "status_code", "status_code")
+	if value, ok := optionalBool(fields, "success"); ok {
+		block["success"] = value
+	}
+	if value, ok := optionalBool(fields, "response.has_tool_call"); ok {
+		block["response_has_tool_call"] = value
+	}
+	if reasons := arrayAttributeValues(attributes, "gen_ai.response.finish_reasons"); reasons != nil {
+		block["finish_reasons"] = reasons
+	}
+	return block
+}
+
+// putSpanString sets dst on block from the src span attribute only when a
+// non-empty string was observed, so an absent value is omitted (never fabricated).
+func putSpanString(block, fields map[string]any, dst, src string) {
+	if value, ok := normalize.ObservedString(fields[src]); ok {
+		block[dst] = value
+	}
+}
+
+// putSpanInt sets dst on block from the src span attribute only when a
+// non-negative integer was observed. It reuses OptionalTokenCount (as the
+// outcome-contract mapping does for duration_ms), so an absent or unparseable
+// value is omitted rather than defaulted to a fabricated 0.
+func putSpanInt(block, fields map[string]any, dst, src string) {
+	if value := normalize.OptionalTokenCount(fields[src]); value != nil {
+		block[dst] = *value
+	}
 }
 
 // safeSpanAttributes reduces span attributes to the allow-listed safe keys,

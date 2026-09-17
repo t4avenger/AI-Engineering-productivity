@@ -388,15 +388,34 @@ by `CorrelateEvents`. A supported claude-code span missing a required structural
 field (`traceId`, `spanId`, `name`, or a positive `startTimeUnixNano`) is a hard
 normalisation error, never a silently dropped or schema-invalid event.
 
-Per-span-type field mapping (interaction/llm_request/tool/hook/sub-agent) is
-deliberately **out of scope** for F3 — it is owned by the T-phase issues
-(#100–#103) — so `provider_extensions.correlation.task_boundary` is stamped with
-`confidence: unknown` until then. As with metrics, #88 removed storage-side
-sanitising, so the adapter is the sole guard: span attributes are reduced to an
-**allow-list** (`safeSpanAttributeKeys`, e.g. `span.type`, `gen_ai.*`,
-`stop_reason`, token counts, `duration_ms`), dropping operator/identity and any
-unforeseen or secret-bearing attribute (`user.*`, `session.id`, `authorization`,
-the redacted `user_prompt`) by default.
+Issue #100 (T13) maps the two **per-prompt** span types into typed, present-only
+field blocks on `attributes`: `attributes.interaction` (`sequence`, `duration_ms`,
+`user_prompt_length` — a length, never the prompt text — `parent_source`,
+`queued_sends`) and `attributes.llm_request` (`model`, `gen_ai.*`, `context` from
+`llm_request.context`, latency `duration_ms`/`ttft_ms`/`first_content_ms`, the four
+token counts, `attempt`/`success`/`status_code`, `stop_reason`,
+`finish_reasons`, `response_has_tool_call`, and sub-agent workflow correlation
+`agent_id`/`parent_agent_id`/`workflow_run_id`/`workflow_name`). Every field is
+present-only — a genuinely absent attribute is omitted, never fabricated.
+`gen_ai.response.finish_reasons` is a Claude Code OTLP **arrayValue** the scalar
+attribute decoder cannot read (so F3 silently dropped it); a sibling
+`arrayAttributeValues` decoder (`logs.go`) now surfaces it in the `llm_request`
+block. The interaction span is the per-user-prompt root — a genuine task
+boundary — so `provider_extensions.correlation.task_boundary.confidence` is raised
+to `observed` for it; the llm_request child is not itself a boundary and stays
+`unknown`. The raw free-text `error` message is **not** mapped (it is
+prompt/response-adjacent content, #87) — only the bounded `error_class`,
+`status_code`, and `success` describe a failure. `query_source` is a metrics-only
+dimension, not a span attribute, so it is never invented here. Tool/hook/sub-agent
+span-type mapping remains owned by the later T-phase issues (#101–#103).
+
+As with metrics, #88 removed storage-side sanitising, so the adapter is the sole
+guard: span attributes are also reduced to an **allow-list**
+(`safeSpanAttributeKeys`, e.g. `span.type`, `gen_ai.*`, `stop_reason`, token
+counts, `duration_ms`, `error_class`, `agent_id`/`workflow.*`), dropping
+operator/identity and any unforeseen or secret-bearing attribute (`user.*`,
+`session.id`, `authorization`, the redacted `user_prompt`, the free-text `error`)
+by default.
 
 ## Privacy
 
@@ -425,7 +444,8 @@ committed. See "Prompt & response content path" above.
   canonical edit-decision/session/active-time events for the committed engagement
   `/v1/metrics` fixture (#99, M12).
 - `fixtures/claude/expected/claude-code-2.1.268-trace-spans.events.json` —
-  canonical span events for the committed `/v1/traces` fixture.
+  canonical span events for the committed `/v1/traces` fixture, with the typed
+  `interaction`/`llm_request` field blocks and decoded `finish_reasons` (#100).
 - `fixtures/claude/expected/claude-code-2.1.269-session-transcript.events.json` —
   canonical `assistant_message` events for the committed session JSONL transcript
   fixture (`claude-code-2.1.269-session-transcript.json`).
