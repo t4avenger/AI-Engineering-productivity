@@ -16,6 +16,13 @@
     "repository_id": null,
     "privacy_level": "operational",
     "attributes": {
+      "interaction": {
+        "duration_ms": 2600,
+        "parent_source": "none",
+        "queued_sends": 0,
+        "sequence": 1,
+        "user_prompt_length": 33
+      },
       "span_type": "interaction",
       "unavailable_fields": [
         "tool_io",
@@ -35,8 +42,8 @@
         "parent_span_id": null,
         "span_id": "0000000000000002",
         "task_boundary": {
-          "confidence": "unknown",
-          "reason": "Claude Code trace spans: per-span task-boundary mapping deferred to T-phase (#100–#103)"
+          "confidence": "observed",
+          "reason": "Claude Code interaction span is the per-user-prompt root, a genuine task boundary"
         },
         "trace_id": "00000000000000000000000000000001"
       },
@@ -82,6 +89,29 @@
     "repository_id": null,
     "privacy_level": "operational",
     "attributes": {
+      "llm_request": {
+        "attempt": 1,
+        "cache_creation_tokens": 18854,
+        "cache_read_tokens": 0,
+        "context": "interaction",
+        "duration_ms": 2499,
+        "finish_reasons": [
+          "end_turn"
+        ],
+        "first_content_ms": 2171,
+        "gen_ai_request_model": "claude-haiku-4-5-20251001",
+        "gen_ai_response_id": "req_synthetic00000000000001",
+        "gen_ai_system": "anthropic",
+        "input_tokens": 10,
+        "model": "claude-haiku-4-5-20251001",
+        "output_tokens": 46,
+        "query_source_safe": "sdk",
+        "request_id": "req_synthetic00000000000001",
+        "speed": "normal",
+        "stop_reason": "end_turn",
+        "success": true,
+        "ttft_ms": 1918
+      },
       "model": "claude-haiku-4-5-20251001",
       "span_type": "llm_request",
       "unavailable_fields": [
@@ -103,7 +133,7 @@
         "span_id": "0000000000000001",
         "task_boundary": {
           "confidence": "unknown",
-          "reason": "Claude Code trace spans: per-span task-boundary mapping deferred to T-phase (#100–#103)"
+          "reason": "Claude Code trace spans: per-span task-boundary mapping deferred to T-phase (#101–#103)"
         },
         "trace_id": "00000000000000000000000000000001"
       },
