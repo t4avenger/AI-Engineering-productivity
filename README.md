@@ -53,13 +53,15 @@ reviewed Codex `codex.skill.injected` datapoints, Claude Code
 metrics are accepted so exporters can flush, but are not turned into insight
 rows.
 
-`POST /v1/traces` accepts OTLP JSON `resourceSpans` (JSON-only today) and
+`POST /v1/traces` accepts OTLP `resourceSpans` as JSON or
+`application/x-protobuf` and
 persists Claude Code's enhanced-telemetry beta span tree
 (`claude_code.interaction` -> `claude_code.llm_request`) as canonical span
-events, resolving the former `501`. Codex CLI 0.153.4 did not emit `/v1/traces`
-payloads in the reviewed F1 capture, so Codex trace export is documented as
-unsupported for that version. If a Codex-shaped spans payload arrives anyway, it
-is accepted so exporters can flush, but is not persisted.
+events. Codex CLI 0.154.0 also emits trace batches through the separate
+`otel.trace_exporter`; recognized `codex_exec` and `codex_cli_rs` resources are
+persisted with their trace/span/parent relationships and observed turn-token
+attributes. The 0.153.4 no-trace result remains the historical verdict for that
+version.
 
 The raw OTLP envelope is never logged or persisted verbatim. The supported,
 observed Codex and Claude Code OTLP shapes are normalised into canonical events
@@ -100,10 +102,11 @@ TELEMETRYIQ_DAEMON=http://localhost:8080 scripts/cursor-agent-tiq "say ok"
 
 ## Codex fixture normalisation
 
-The Codex adapter supports reviewed trace fixtures and the observed Codex CLI
-0.145.0 OTLP log shape. It retains model and available token metadata, uses the
+The Codex adapter supports the observed Codex CLI 0.154.0 trace surface and the
+observed Codex CLI 0.145.0 OTLP log shape. It retains model and available token metadata, uses the
 raw provider-native `codex:<conversation.id>` as the session ID when present, and
-explicitly marks unavailable lifecycle and capability data. Canonical events are
+uses `codex:trace:<traceId>` observation identities for trace-only spans without
+an explicit conversation join. Canonical events are
 persisted to SQLite verbatim — epic #87 removed the ingest-time sanitizer, so raw
 provider-native IDs, paths, and commands are stored as normalised.
 

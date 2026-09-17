@@ -422,6 +422,8 @@ func observationIdentity(id string) (string, string, bool) {
 		strings.HasPrefix(id, "codex:skill:"), strings.HasPrefix(id, "codex:skill-turn:"),
 		strings.HasPrefix(id, "cursor:token:"):
 		return identityObservation, "content-derived", true
+	case strings.HasPrefix(id, "codex:trace:"):
+		return identityObservation, "trace.id", true
 	case strings.HasPrefix(id, "claude-code:trace:"):
 		return identityObservation, "trace.id", true
 	case strings.HasSuffix(id, ":unknown"):
@@ -629,7 +631,7 @@ func sessionListQuery(filter storage.SessionFilter) (string, []any, error) {
 	if filter.Outcome != "" {
 		appendCondition("json_extract(session_json, '$.state') = ?", filter.Outcome)
 	}
-	identityScopeExpression := "COALESCE(json_extract(session_json, '$.attributes.identity_scope'), CASE WHEN session_id GLOB 'codex-log:*' OR session_id GLOB 'codex:token:*' OR session_id GLOB 'codex:skill:*' OR session_id GLOB 'codex:skill-turn:*' OR session_id GLOB 'cursor:token:*' OR session_id GLOB 'claude-code:trace:*' OR session_id GLOB '*:unknown' THEN 'observation' ELSE 'unknown' END)"
+	identityScopeExpression := "COALESCE(json_extract(session_json, '$.attributes.identity_scope'), CASE WHEN session_id GLOB 'codex-log:*' OR session_id GLOB 'codex:token:*' OR session_id GLOB 'codex:skill:*' OR session_id GLOB 'codex:skill-turn:*' OR session_id GLOB 'codex:trace:*' OR session_id GLOB 'cursor:token:*' OR session_id GLOB 'claude-code:trace:*' OR session_id GLOB '*:unknown' THEN 'observation' ELSE 'unknown' END)"
 	switch filter.Scope {
 	case storage.SessionScopePrimary:
 		conditions = append(conditions, identityScopeExpression+" != 'observation'")

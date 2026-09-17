@@ -8,6 +8,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/storage"
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
 )
@@ -33,6 +34,100 @@ const rawCodexOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
      {"key":"user.email","value":{"stringValue":"synthetic@example.test"}},
      {"key":"conversation.id","value":{"stringValue":"synthetic-conversation"}}],
     "body":{"stringValue":"synthetic body"}}]}]}]}`
+
+// rawCodexOTLPTraces is a wire-shaped subset of the observed Codex CLI 0.154.0
+// trace exporter surface. It deliberately contains no prompt body: the capture
+// ran with log_user_prompt=false, so the prompt canary never crossed the wire.
+const rawCodexOTLPTraces = `{"resourceSpans":[{"resource":{"attributes":[
+  {"key":"service.name","value":{"stringValue":"codex_exec"}},
+  {"key":"service.version","value":{"stringValue":"0.154.0"}},
+  {"key":"env","value":{"stringValue":"telemetryiq-synthetic"}}]},
+ "scopeSpans":[{"scope":{"name":"codex_exec"},"spans":[
+   {"traceId":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","spanId":"1111111111111111","parentSpanId":"","name":"turn/start","startTimeUnixNano":"1789671946326852067","endTimeUnixNano":"1789671946357351775","attributes":[],"status":{"code":0}},
+   {"traceId":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","spanId":"2222222222222222","parentSpanId":"1111111111111111","name":"session_task.turn","startTimeUnixNano":"1789671946355925969","endTimeUnixNano":"1789671953383319471","attributes":[
+     {"key":"codex.turn.token_usage.input_tokens","value":{"intValue":"1200"}},
+     {"key":"codex.turn.token_usage.cached_input_tokens","value":{"intValue":"800"}},
+     {"key":"codex.turn.token_usage.output_tokens","value":{"intValue":"12"}},
+     {"key":"codex.turn.token_usage.reasoning_output_tokens","value":{"intValue":"3"}},
+     {"key":"codex.unknown.observed","value":{"stringValue":"retained"}}],"status":{"code":0}}
+ ]}]}]}`
+
+func TestCodexTracesIngestEndToEndJSONAndProtobuf(t *testing.T) {
+	server, repository := newPersistentTestServer(t)
+	postCodexTraceTransports(t, server)
+	session := assertCodexTraceObservation(t, server)
+	assertCodexTraceTimeline(t, server, session.SessionID)
+	assertCodexTraceStorage(t, repository, session)
+}
+
+func postCodexTraceTransports(t *testing.T, server *httptest.Server) {
+	t.Helper()
+	for _, test := range []struct {
+		name, contentType string
+		body              []byte
+	}{
+		{name: "json", contentType: otlpContentTypeJSON, body: []byte(rawCodexOTLPTraces)},
+		{name: "protobuf", contentType: otlpContentTypeProtobuf, body: mustJSONOTLPToProtobuf(t, rawCodexOTLPTraces, "resourceSpans")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			response := postOTLPToPath(t, server.URL, "/v1/traces", test.body, test.contentType)
+			if response.StatusCode != http.StatusAccepted {
+				t.Fatalf("trace ingest status = %d", response.StatusCode)
+			}
+			closeBody(t, response)
+		})
+	}
+}
+
+func assertCodexTraceObservation(t *testing.T, server *httptest.Server) publicSession {
+	t.Helper()
+	observations := fetchSessionList(t, server.URL+"/api/v1/sessions?scope=observation&limit=10")
+	if len(observations.Data) != 1 {
+		t.Fatalf("trace observations = %d, want 1: %#v", len(observations.Data), observations.Data)
+	}
+	session := observations.Data[0]
+	if session.SessionID != "codex:trace:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" || session.IdentityScope != "observation" || session.IdentitySource != "trace.id" {
+		t.Fatalf("trace observation identity = %#v", session)
+	}
+	if session.Attributes["service_name"] != "codex_exec" || session.Attributes["entrypoint"] != "codex exec" || session.Attributes["service_version"] != "0.154.0" {
+		t.Fatalf("trace session environment = %#v", session.Attributes)
+	}
+	resource, ok := session.ProviderExtensions["resource_attributes"].(map[string]any)
+	if !ok || resource["service.name"] != "codex_exec" || resource["service.version"] != "0.154.0" {
+		t.Fatalf("trace resource metadata = %#v", session.ProviderExtensions)
+	}
+	if _, hasCorrelation := session.ProviderExtensions["correlation"]; hasCorrelation {
+		t.Fatalf("trace-only observation must not fabricate conversation correlation: %#v", session.ProviderExtensions)
+	}
+	return session
+}
+
+func assertCodexTraceTimeline(t *testing.T, server *httptest.Server, sessionID string) {
+	t.Helper()
+	timeline := timelinePage(t, server.URL+"/api/v1/sessions/"+sessionID+"/events?limit=10")
+	if len(timeline.Data) != 2 {
+		t.Fatalf("trace timeline events = %d, want 2: %#v", len(timeline.Data), timeline.Data)
+	}
+	if timeline.Data[1].InputTokenCount == nil || *timeline.Data[1].InputTokenCount != "1200" || timeline.Data[1].CachedInputTokenCount == nil || *timeline.Data[1].CachedInputTokenCount != "800" {
+		t.Fatalf("trace token evidence = %#v", timeline.Data[1])
+	}
+}
+
+func assertCodexTraceStorage(t *testing.T, repository storage.Repository, session publicSession) {
+	t.Helper()
+	stored, err := repository.ListEvents(t.Context(), storage.EventFilter{SessionID: session.SessionID, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != 2 {
+		t.Fatalf("stored trace events = %d, want 2", len(stored))
+	}
+	encoded := marshalJSON(t, struct {
+		Session publicSession
+		Events  []canonical.Event
+	}{session, stored})
+	assertNoRawIdentifiers(t, []string{"TRACE_CAPTURE_COMPLETE", "INTERACTIVE_TRACE_CAPTURE_COMPLETE"}, encoded)
+}
 
 // TestCodexLogsIngestEndToEnd is the Codex counterpart of the Claude live gate:
 // POST a raw OTLP log payload to /v1/logs, then prove the HTTP read API serves

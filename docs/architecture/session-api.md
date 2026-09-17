@@ -85,13 +85,14 @@ Live OTLP persistence accepts `POST /v1/logs` (provider log events and reviewed 
 `POST /v1/metrics` path that persists reviewed Codex `codex.skill.injected`,
 Claude Code `claude_code.token.usage`, and Cursor Enterprise
 `cursor.token.usage` datapoints as canonical events, and a
-`POST /v1/traces` path that persists Claude Code's enhanced-telemetry beta span
-tree (`claude_code.interaction` → `claude_code.llm_request`) as canonical span
-events. Cursor Enterprise `cursor.api.request` logs are also persisted via
+`POST /v1/traces` path that accepts JSON and protobuf and persists Claude Code's
+enhanced-telemetry beta span tree plus the observed Codex CLI 0.154.0 trace
+surface as canonical span events. Codex spans without an explicit provider
+session join use `codex:trace:<traceId>` observation identities. Cursor
+Enterprise `cursor.api.request` logs are also persisted via
 `/v1/logs`. Other metrics and spans are accepted with HTTP 202 so exporters
-flush, but are not turned into insight rows. Codex trace export is specifically
-unsupported for the reviewed CLI 0.153.4 evidence (#112); Codex-shaped spans are
-accepted but not persisted unless future fixture evidence proves support.
+flush, but are not turned into insight rows. The Codex CLI 0.153.4 no-trace
+evidence remains historical; 0.154.0 support is fixture-backed (#172).
 
 `POST /v1/claude/transcript` accepts Claude Code session JSONL (`application/x-ndjson`
 or `application/jsonl`, 32 MiB cap) and persists normalised `assistant_message`

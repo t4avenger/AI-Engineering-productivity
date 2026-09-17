@@ -32,6 +32,32 @@ temporary home, and sanitise any locally captured observation before attempting
 to create an `observed-sanitised` fixture. Never use a normal working repository
 or normal Codex configuration for this test.
 
+## Trace exporter capture
+
+Codex CLI 0.154.0 adds a separate `otel.trace_exporter`. Capture it against a
+raw receiver before testing TelemetryIQ normalization so an accepted-but-dropped
+payload cannot create false evidence. The repository includes a loopback-only
+receiver that omits authorization headers and writes mode-0600 bodies to a
+caller-selected directory outside the repository:
+
+```bash
+TIQ_CAPTURE_DIR=/tmp/tiq-codex-traces go run ./test-harness/codex-trace-capture
+```
+
+Use an isolated temporary `CODEX_HOME`, keep `log_user_prompt=false`, and set
+only `trace_exporter` to `http://127.0.0.1:4318/v1/traces`. Probe both
+`protocol="json"` and `protocol="binary"`, both `codex exec` and a PTY-backed
+interactive session, and shut the client down cleanly so the asynchronous
+exporter flushes. The 0.154.0 capture produced both JSON and protobuf from
+`codex_exec`; interactive Codex flushed multiple protobuf batches. Never commit
+the raw bodies or copied authentication material. Reduce the capture to a
+reviewed structural fixture with synthetic identifiers and values.
+
+Committed evidence:
+
+- `fixtures/codex/observed-sanitised/codex-0.154.0-trace-spans-otlp.json`
+- `fixtures/codex/expected/codex-0.154.0-trace-spans.events.json`
+
 ## Skill injection capture
 
 To raise Skill invocations above `unknown`, add a synthetic skill under the

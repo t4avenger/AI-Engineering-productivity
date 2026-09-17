@@ -21,6 +21,7 @@ import (
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -80,8 +81,11 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	}
 	closeBody(t, protobufMetrics)
 
-	protobufTracesRejected := postOTLPToPath(t, server.URL, "/v1/traces", mustMarshalOTLPLogsProtobuf(t), otlpContentTypeProtobuf)
-	assertIngestError(t, protobufTracesRejected, http.StatusUnsupportedMediaType, "unsupported_media_type")
+	protobufTraces := postOTLPToPath(t, server.URL, "/v1/traces", mustJSONOTLPToProtobuf(t, rawCodexOTLPTraces, "resourceSpans"), otlpContentTypeProtobuf)
+	if protobufTraces.StatusCode != http.StatusAccepted {
+		t.Fatalf("expected protobuf traces status 202, got %d", protobufTraces.StatusCode)
+	}
+	closeBody(t, protobufTraces)
 
 	extraField := postOTLPToPath(t, server.URL, "/v1/logs", []byte(`{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"stringValue":"x"}}]}]}],"unexpected":true}`), "application/json")
 	assertIngestError(t, extraField, http.StatusBadRequest, "invalid_payload")
@@ -102,19 +106,16 @@ func TestOTLPHTTPIngestProof(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&counters); err != nil {
 		t.Fatalf("decode counters: %v", err)
 	}
-	// 1 JSON log + 1 JSON metrics + 1 JSON traces + 1 protobuf log + 1 protobuf metrics + 1 gzip protobuf log
-	// + 7 validation rejects (malformed JSON, invalid, oversized, text/plain, malformed protobuf, protobuf-on-traces, extra field)
-	if counters.AcceptedPayloads != 6 || counters.RejectedPayloads != 7 {
+	// 1 JSON log + 1 JSON metrics + 1 JSON traces + 1 protobuf log + 1 protobuf metrics + 1 protobuf trace + 1 gzip protobuf log
+	// + 6 validation rejects (malformed JSON, invalid, oversized, text/plain, malformed protobuf, extra field)
+	if counters.AcceptedPayloads != 7 || counters.RejectedPayloads != 6 {
 		t.Fatalf("unexpected counters: %+v", counters)
 	}
 }
 
-// TestOTLPTracesValidatedThenAcceptedForUnsupportedCodex proves the /v1/traces
-// route validates OTLP shape but does not invent Codex trace support (#112): a
-// body with no resourceSpans array is a validation error, while a well-formed
-// Codex-service spans payload is accepted (so exporters flush) yet persists no
-// events until an observed Codex trace fixture exists.
-func TestOTLPTracesValidatedThenAcceptedForUnsupportedCodex(t *testing.T) {
+// TestOTLPTracesRejectMalformedRecognizedCodex proves a recognized Codex
+// resource cannot receive a silent 202 when one of its spans is malformed.
+func TestOTLPTracesRejectMalformedRecognizedCodex(t *testing.T) {
 	repository, err := sqlite.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -127,14 +128,55 @@ func TestOTLPTracesValidatedThenAcceptedForUnsupportedCodex(t *testing.T) {
 	assertIngestError(t, invalid, http.StatusBadRequest, "invalid_payload")
 
 	traces := postOTLPToPath(t, server.URL, "/v1/traces", []byte(`{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}]},"scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","name":"codex.turn"}]}]}]}`), "application/json")
-	if traces.StatusCode != http.StatusAccepted {
-		t.Fatalf("expected traces status 202, got %d", traces.StatusCode)
-	}
-	closeBody(t, traces)
+	assertIngestError(t, traces, http.StatusUnprocessableEntity, "normalization_failed")
 
 	sessions := fetchSessionList(t, server.URL+"/api/v1/sessions?limit=10")
 	if len(sessions.Data) != 0 {
-		t.Fatalf("Codex traces must not persist sessions without observed support, got %#v", sessions.Data)
+		t.Fatalf("malformed Codex traces must not persist sessions, got %#v", sessions.Data)
+	}
+}
+
+func TestMixedTraceBatchMalformedSupportedResourceIsAtomic(t *testing.T) {
+	repository, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = repository.Close() })
+	server := httptest.NewServer(NewPersistentHandler(slog.Default(), repository))
+	t.Cleanup(server.Close)
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(rawCodexOTLPTraces), &payload); err != nil {
+		t.Fatal(err)
+	}
+	resources := payload["resourceSpans"].([]any)
+	resources = append(resources, map[string]any{
+		"resource": map[string]any{
+			"attributes": []any{
+				map[string]any{"key": "service.name", "value": map[string]any{"stringValue": "claude-code"}},
+			},
+		},
+		"scopeSpans": []any{
+			map[string]any{
+				"spans": []any{
+					map[string]any{
+						"traceId": "cccccccccccccccccccccccccccccccc", "name": "claude_code.interaction", "startTimeUnixNano": "1789671946326852067",
+					},
+				},
+			},
+		},
+	})
+	payload["resourceSpans"] = resources
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := postOTLPToPath(t, server.URL, "/v1/traces", body, otlpContentTypeJSON)
+	assertIngestError(t, response, http.StatusUnprocessableEntity, "normalization_failed")
+
+	sessions := fetchSessionList(t, server.URL+"/api/v1/sessions?scope=all&limit=10")
+	if len(sessions.Data) != 0 {
+		t.Fatalf("mixed malformed trace batch partially persisted: %#v", sessions.Data)
 	}
 }
 
@@ -651,6 +693,8 @@ func mustJSONOTLPToProtobuf(t *testing.T, jsonPayload, resourceField string) []b
 		message = &logspb.LogsData{}
 	case "resourceMetrics":
 		message = &metricspb.MetricsData{}
+	case "resourceSpans":
+		message = &tracepb.TracesData{}
 	default:
 		t.Fatalf("unsupported resource field %q", resourceField)
 	}

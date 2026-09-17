@@ -1,16 +1,21 @@
 # Codex Capability Matrix
 
-Observed with Codex CLI 0.153.4 in isolated synthetic sessions on 2026-09-10. The capture used a temporary `CODEX_HOME`, prompt logging disabled, a loopback OTLP HTTP/JSON receiver, non-interactive `codex_exec` probes, and a PTY-backed interactive `codex_cli_rs` probe. Raw captures stayed in `/tmp` and were not committed.
+Observed with Codex CLI 0.153.4 in isolated synthetic sessions on 2026-09-10,
+then revalidated with CLI 0.154.0 on 2026-09-17 after the separate
+`otel.trace_exporter` appeared. Both captures used a temporary `CODEX_HOME`,
+prompt logging disabled, a raw loopback receiver, non-interactive `codex_exec`,
+and PTY-backed `codex_cli_rs`. Raw captures stayed in `/tmp` and were not
+committed.
 
 | Capability | State | Evidence |
 |---|---|---|
 | OTLP log export | supported | `/v1/logs` accepted current payloads from both `codex_exec` and `codex_cli_rs`; see log signal fixtures below. |
 | OTLP metric export | supported | `/v1/metrics` accepted 74 current metric instruments from `codex_exec` and `codex_cli_rs`; see metric signal fixtures below. |
-| OTLP trace export | unsupported | No `/v1/traces` POSTs were observed during the same current-CLI capture; see `fixtures/codex/observed-sanitised/current-0.153.4-surface/codex-0.153.4-traces-endpoint.json`. |
-| Tool version | supported | `service.version` reported `0.153.4` in current log and metric resource attributes. |
+| OTLP trace export | version-dependent | CLI 0.153.4 emitted no `/v1/traces` POSTs; CLI 0.154.0 emitted both OTLP/HTTP JSON and binary protobuf from `codex_exec`, and PTY-backed `codex_cli_rs` flushed binary batches on shutdown. Sanitized evidence: `fixtures/codex/observed-sanitised/codex-0.154.0-trace-spans-otlp.json`. |
+| Tool version | supported | `service.version` reported `0.153.4` in the log/metric capture and `0.154.0` in the trace resource. |
 | Log exporter service.name | supported | Current fixtures include `codex_exec` and `codex_cli_rs`. |
 | Model identity | supported | `model` remains present on current `codex.sse_event`, `codex.api_request`, `codex.tool_decision`, `codex.tool_result`, and related log signals. |
-| Token usage | supported | `codex.turn.token_usage` metric exposes `token_type` values `input`, `output`, `cached_input`, `cache_write_input`, `reasoning_output`, and `total`; `NormalizeMetrics` now maps that metric with replay evidence from `fixtures/codex/observed-sanitised/codex-0.153.4-turn-token-usage-metrics.json` and golden output `fixtures/codex/expected/codex-0.153.4-turn-token-usage-metrics.events.json`. Log `codex.sse_event` carries `input_token_count`, `output_token_count`, `cached_token_count`, and `reasoning_token_count`; the log normaliser promotes those to canonical token-count attributes when present. |
+| Token usage | supported | In addition to the existing log/metric evidence, the 0.154.0 `session_task.turn` span reports `codex.turn.token_usage.{input,cached_input,cache_write_input,non_cached_input,output,reasoning_output,total}_tokens`; stable categories are promoted to canonical event attributes and the complete raw set remains in `provider_extensions.span_attributes`. |
 | Session lifecycle & identifier | partial | Current log signals retain `conversation.id` as a provider-native local session identifier. `codex.conversation_starts` is mapped to canonical `session.active`; `codex.startup_phase` and `codex.websocket_connect` retain safe lifecycle/governance metadata. Current `codex.turn.token_usage` and skill metric fixtures do not carry `conversation.id`; their content-derived rows are therefore labelled observation-only and excluded from the default Sessions list, never inferred into a nearby conversation. No reviewed session-end signal was observed, and task boundaries remain unknown without a reviewed provider task-boundary signal. |
 | Tool execution | partial | `codex.tool_result` logs now map to first-class tool-call signals and `canonical.Operation` records with evidence from `fixtures/codex/observed-sanitised/codex-0.153.4-outcome-contracts-otlp.json` and golden output `fixtures/codex/expected/codex-0.153.4-tool-result.operations.json`; `codex.sandbox_outcome` logs now map to command-execution operation signals with evidence from `fixtures/codex/observed-sanitised/codex-0.153.4-sandbox-outcome-otlp.json` and golden output `fixtures/codex/expected/codex-0.153.4-sandbox-outcome.operations.json`; metric-only tool counters remain follow-up surfaces. |
 | Approval / permission decisions | supported | `codex.tool_decision` logs map to event-level approval signals with evidence from `fixtures/codex/observed-sanitised/codex-0.153.4-tool-decision-otlp.json` and golden output `fixtures/codex/expected/codex-0.153.4-tool-decision.events.json`; prompt, response, command args, output, account identifiers, emails, hostnames, and slug values remain unretained. |

@@ -114,7 +114,7 @@ func (i *otlpHTTPIngest) parseOTLPMediaType(w http.ResponseWriter, r *http.Reque
 		return mediaType, true
 	case otlpContentTypeProtobuf:
 		if !otlpAcceptsProtobuf(resourceField) {
-			i.reject(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Content-Type application/x-protobuf is supported on /v1/logs and /v1/metrics only")
+			i.reject(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Content-Type application/x-protobuf is not supported for this signal")
 			return "", false
 		}
 		return mediaType, true
@@ -274,16 +274,16 @@ func (i *otlpHTTPIngest) persistMetrics(request *http.Request, payload map[strin
 
 // persistTraces routes a raw OTLP traces payload through every per-tool traces
 // adapter. Each adapter normalises only the resources whose service.name it
-// recognises (Claude Code: claude-code) and returns ErrUnsupportedTraces for a
+// recognises (Codex: codex_cli_rs/codex_exec; Claude Code: claude-code) and returns ErrUnsupportedTraces for a
 // payload with none of its own, so a payload from an unknown tool — or one
 // mixing tools — is handled safely rather than misattributed. A non-sentinel
 // error aborts the whole batch: a malformed span never lets half a mixed batch
 // persist, so the route never silently 202-accepts and drops supported Claude
-// trace data (#50/#49). Codex trace ingest is tracked separately (#112); this
-// path keeps the multi-adapter shape so it can slot in. The payload is
+// trace data (#50/#49/#172). The payload is
 // normalised verbatim — no ingest-time hiding is applied (epic #87).
 func (i *otlpHTTPIngest) persistTraces(request *http.Request, payload map[string]json.RawMessage) error {
 	return i.persistWithAdapters(request, payload,
+		adapterPass{fn: codex.NormalizeTraces, unsupported: codex.ErrUnsupportedTraces},
 		adapterPass{fn: claude.NormalizeTraces, unsupported: claude.ErrUnsupportedTraces},
 	)
 }
