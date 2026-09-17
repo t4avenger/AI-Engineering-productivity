@@ -66,7 +66,7 @@ Replace the React/Mantine SPA with a server-rendered local dashboard that helps 
 
 ## Information Architecture
 
-> **Enterprise-shaped IA (planned):** primary nav becomes **Home · Sessions · Governance · Integrations**. Insights folds into Home; Privacy and Costs leave the top nav but stay reachable. See [docs/ui/UI_PRODUCT_ROADMAP.md](../ui/UI_PRODUCT_ROADMAP.md) and epic [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148). Until that ships, the table below is the **current** local dashboard IA.
+> **Enterprise-shaped IA:** primary nav is **Home · Sessions · Governance · Integrations**. Insights remains directly reachable during its move to Home; Privacy and Costs are secondary destinations, with no cost link on Home. See [docs/ui/UI_PRODUCT_ROADMAP.md](../ui/UI_PRODUCT_ROADMAP.md) and epic [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148).
 
 | Route | Screen | One job |
 |-------|--------|---------|
@@ -74,13 +74,14 @@ Replace the React/Mantine SPA with a server-rendered local dashboard that helps 
 | `GET /` | Home | Orchestration snapshot |
 | `GET /sessions` | Sessions | Find and open readable session evidence |
 | `GET /sessions/{id}` | Session detail | Timeline evidence + provenance + delete |
+| `GET /governance` | Governance | Honest transition shell pending findings UI in #151 |
 | `GET /insights` | Insights | Educate on MCP + skills |
 | `GET /integrations` | Integrations | Observed tools + Cursor Enterprise OTEL setup/status |
 | `GET /privacy` | Privacy | Defaults + DELETE ALL |
 | `GET /costs` | Costs | Secondary estimates only |
 
-Nav order (current): Home · Sessions · Insights · Integrations · Privacy · Costs (Costs last).  
-Nav order (roadmap V1): Home · Sessions · Governance · Integrations.
+Primary nav order: Home · Sessions · Governance · Integrations.  
+Secondary destinations: Privacy; Costs outside Home.
 
 ---
 
@@ -122,7 +123,7 @@ See [user-flow.md](user-flow.md) for full paths. Primary flows:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ TelemetryIQ Local          Daemon: Healthy              │
-│ Home Sessions Insights Integrations Privacy             │
+│ Home Sessions Governance Integrations                   │
 ├─────────────────────────────────────────────────────────┤
 │ Orchestration overview                                  │
 │ Privacy mode: local-only · Retention: 30 days           │

@@ -230,6 +230,8 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 		{"/insights", "Model performance"},
 		{"/insights", "1234 ms"},
 		{"/insights", "Context pressure"},
+		{"/governance", "Governance findings are not available in this dashboard view yet."},
+		{"/governance", "does not imply that policies are enforced"},
 		{"/integrations", "codex"},
 		{"/integrations", "Cursor Enterprise OpenTelemetry Export"},
 		{"/integrations", "Team Settings"},
@@ -360,9 +362,8 @@ func TestUnlockAndHome(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(body, "Orchestration overview") || !strings.Contains(body, "codex") {
 		t.Fatalf("home = %d %q", rec.Code, body)
 	}
-	// Issue #76 adds a global "Costs" nav link (last), so the link itself now
-	// legitimately appears on Home. "Never on Home" is about cost *figures*:
-	// Home must still not surface any calculated/estimated cost content.
+	// Home must not surface any calculated or estimated cost content. Issue #149
+	// also removes the former global Costs link from this page.
 	for _, forbidden := range []string{"Calculated amount", "Cost estimates", "Secondary estimates"} {
 		if strings.Contains(body, forbidden) {
 			t.Fatalf("home must not surface cost figures %q", forbidden)
@@ -370,9 +371,54 @@ func TestUnlockAndHome(t *testing.T) {
 	}
 }
 
-// TestHomeShellControls covers the issue #76 app-shell affordances on an
-// authenticated page: the Costs nav link ordered last, a visible logout
-// control, and an honest daemon health badge.
+func navigationSection(t *testing.T, body, label string) string {
+	t.Helper()
+	start := strings.Index(body, `<nav aria-label="`+label+`"`)
+	if start < 0 {
+		t.Fatalf("page must have labelled %s: %q", label, body)
+	}
+	end := strings.Index(body[start:], `</nav>`)
+	if end < 0 {
+		t.Fatalf("%s must close: %q", label, body[start:])
+	}
+	return body[start : start+end]
+}
+
+func assertPrimaryNavigation(t *testing.T, body string) {
+	t.Helper()
+	primary := navigationSection(t, body, "Primary navigation")
+	if got := strings.Count(primary, `class="nav-link`); got != 4 {
+		t.Fatalf("primary navigation link count = %d, want 4: %q", got, primary)
+	}
+	previous := -1
+	for _, href := range []string{`href="/"`, `href="/sessions"`, `href="/governance"`, `href="/integrations"`} {
+		index := strings.Index(primary, href)
+		if index <= previous {
+			t.Fatalf("primary navigation must contain four ordered destinations; %s index=%d previous=%d: %q", href, index, previous, primary)
+		}
+		previous = index
+	}
+	for _, legacy := range []string{`href="/insights"`, `href="/privacy"`, `href="/costs"`} {
+		if strings.Contains(primary, legacy) {
+			t.Fatalf("primary navigation must not contain %s: %q", legacy, primary)
+		}
+	}
+}
+
+func assertSecondaryNavigation(t *testing.T, body string, wantCosts bool) {
+	t.Helper()
+	secondary := navigationSection(t, body, "Secondary navigation")
+	if !strings.Contains(secondary, `href="/privacy"`) {
+		t.Fatalf("secondary navigation must keep Privacy reachable: %q", secondary)
+	}
+	hasCosts := strings.Contains(secondary, `href="/costs"`)
+	if hasCosts != wantCosts {
+		t.Fatalf("secondary navigation Costs presence = %t, want %t: %q", hasCosts, wantCosts, secondary)
+	}
+}
+
+// TestHomeShellControls covers the enterprise-shaped issue #149 shell while
+// preserving the existing logout and honest daemon health affordances.
 func TestHomeShellControls(t *testing.T) {
 	repo := &fullStub{sessions: []canonical.Session{{
 		SessionID: "s1", Provider: "openai", Tool: "codex",
@@ -386,21 +432,33 @@ func TestHomeShellControls(t *testing.T) {
 	cookie := unlock(t, handler)
 	body := getAuthed(t, handler, cookie, "/").Body.String()
 
-	// Costs is present and ordered last (after Privacy). Require both indices
-	// to be found so a missing Privacy link cannot pass the ordering check.
-	privacy := strings.Index(body, `href="/privacy"`)
-	costs := strings.Index(body, `href="/costs"`)
-	if privacy < 0 || costs < 0 {
-		t.Fatalf("home nav must link both Privacy and Costs: privacy=%d costs=%d", privacy, costs)
+	assertPrimaryNavigation(t, body)
+	assertSecondaryNavigation(t, body, false)
+	if strings.Contains(body, `href="/costs"`) {
+		t.Fatalf("Home must not surface a Costs link: %q", body)
 	}
-	if privacy > costs {
-		t.Fatalf("Costs nav link must come last, after Privacy")
-	}
+	sessionsBody := getAuthed(t, handler, cookie, "/sessions").Body.String()
+	assertSecondaryNavigation(t, sessionsBody, true)
 	if !strings.Contains(body, `action="/logout"`) {
 		t.Fatalf("authenticated home must show a logout control: %q", body)
 	}
 	if !strings.Contains(body, "Daemon: Healthy") || !strings.Contains(body, `class="health ok"`) {
 		t.Fatalf("home must show honest healthy daemon badge: %q", body)
+	}
+
+	governance := getAuthed(t, handler, cookie, "/governance")
+	if governance.Code != http.StatusOK || !strings.Contains(governance.Body.String(), `class="nav-link active" href="/governance" aria-current="page"`) {
+		t.Fatalf("governance must render as the active primary destination: status=%d body=%q", governance.Code, governance.Body.String())
+	}
+	insights := getAuthed(t, handler, cookie, "/insights")
+	if insights.Code != http.StatusOK || !strings.Contains(insights.Body.String(), "MCP inventory") {
+		t.Fatalf("direct Insights route must remain available: status=%d body=%q", insights.Code, insights.Body.String())
+	}
+	request := httptest.NewRequest(http.MethodGet, "/governance", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusSeeOther || recorder.Header().Get("Location") != "/unlock" {
+		t.Fatalf("unauthenticated governance = %d %s", recorder.Code, recorder.Header().Get("Location"))
 	}
 }
 

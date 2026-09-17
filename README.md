@@ -117,11 +117,14 @@ provider-native IDs, paths, and commands are stored as normalised.
 
 ## Local dashboard
 
-The Go/HTMX dashboard provides Home, Sessions, Session Detail, Insights,
-Integrations, Privacy, and Costs pages on the daemon origin. Home emphasises
-orchestration usage (not cost). Missing data is labelled unavailable,
-integrations appear only after local session data has been observed, and the
-Privacy page uses a typed confirmation before bulk deletion.
+The Go/HTMX dashboard provides Home, Sessions, Session Detail, Governance,
+Integrations, Insights, Privacy, and Costs pages on the daemon origin. Its
+primary navigation is Home, Sessions, Governance, and Integrations; Privacy and
+Costs remain secondary destinations, and the legacy `/insights` page remains
+available while its content is folded into Home. Home emphasises orchestration
+usage and contains no cost link or estimate. Missing data is labelled
+unavailable, integrations appear only after local session data has been
+observed, and the Privacy page uses a typed confirmation before bulk deletion.
 
 ## Privacy pipeline
 

@@ -129,6 +129,14 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   gap: var(--space-3);
   margin: var(--space-4) 0;
 }
+.app-footer {
+  border-top: 1px solid var(--color-border);
+  margin-top: var(--space-6);
+}
+.secondary-link.active {
+  color: var(--color-accent);
+  font-weight: 700;
+}
 
 /* Daemon health — honest state, colour is never the sole cue (the word is). */
 .health { font-weight: 700; margin: 0; }

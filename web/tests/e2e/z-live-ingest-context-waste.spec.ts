@@ -30,11 +30,7 @@ test('renders context-waste insight for live cached-token logs', async ({
   expect(body.data.totals.triggered_sessions).toBeGreaterThanOrEqual(1);
 
   await unlockDashboard(page, authToken);
-  await page
-    .getByLabel('Primary navigation')
-    .getByRole('link', { name: 'Insights' })
-    .click();
+  await page.goto('/insights');
   await expect(page.getByRole('heading', { name: 'Context pressure' })).toBeVisible();
   await expect(page.getByText('Triggered').first()).toBeVisible();
 });
-

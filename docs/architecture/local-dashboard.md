@@ -1,10 +1,16 @@
 # Local dashboard
 
 The local dashboard is served by the TelemetryIQ daemon using Go `html/template`
-and HTMX (ADR 0002). It provides Home, Sessions, Session Detail, Insights,
-Integrations, Privacy, and Costs pages over the same loopback origin as the
-JSON API and OTLP intake. It does not send analytics or dashboard data to third
-parties.
+and HTMX (ADR 0002). It provides Home, Sessions, Session Detail, Governance,
+Integrations, Insights, Privacy, and Costs pages over the same loopback origin
+as the JSON API and OTLP intake. It does not send analytics or dashboard data
+to third parties.
+
+Primary navigation is Home, Sessions, Governance, and Integrations. Privacy is
+available from secondary navigation; Costs is also secondary but is omitted
+from Home because PRODUCT_MAP section 17.1 forbids cost labels and links there.
+The `/insights` route remains directly available during the transition to the
+Home-based insight surface in issue #150.
 
 Browser authentication uses `POST /unlock` with the token from `make auth-token`.
 A successful unlock sets an httpOnly **Secure** session cookie. Use the
@@ -42,8 +48,14 @@ from observed local sessions: with none observed it says `Awaiting telemetry`,
 rather than claiming that a provider has been detected.
 
 Home emphasises orchestration usage (sessions today, tools observed, insight
-highlights) and does not surface cost labels or links. Costs remain a secondary
-page available at `/costs`, outside the primary navigation.
+highlights) and does not surface cost labels or links. Costs remains a secondary
+page available at `/costs` from other authenticated pages, outside the primary
+navigation.
+
+The Governance primary destination is an authenticated, explicitly temporary
+placeholder until issue #151 renders existing risky-access and unapproved-MCP
+findings. It makes no enforcement claim; the local edition remains
+detect-and-report only.
 
 The Insights page reads MCP inventory, skill usage, model-performance, and
 context-pressure summaries from retained canonical events. It renders the raw
