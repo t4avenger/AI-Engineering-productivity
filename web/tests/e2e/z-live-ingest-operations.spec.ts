@@ -36,10 +36,7 @@ test('renders operation stats for data ingested through the live daemon', async 
   ).toBe(true);
 
   await unlockDashboard(page, authToken);
-  await page
-    .getByLabel('Primary navigation')
-    .getByRole('link', { name: 'Insights' })
-    .click();
+  await page.goto('/insights');
   await expect(page.getByRole('heading', { name: 'Operations' })).toBeVisible();
   await expect(page.getByText('Total operations 2')).toBeVisible();
   await expect(page.getByRole('cell', { name: 'shell command' })).toBeVisible();

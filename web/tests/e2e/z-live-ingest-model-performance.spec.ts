@@ -41,10 +41,7 @@ test('renders model-performance scorecard for live outcome contracts', async ({
   );
 
   await unlockDashboard(page, authToken);
-  await page
-    .getByLabel('Primary navigation')
-    .getByRole('link', { name: 'Insights' })
-    .click();
+  await page.goto('/insights');
   await expect(
     page.getByRole('heading', { name: 'Model performance' }),
   ).toBeVisible();

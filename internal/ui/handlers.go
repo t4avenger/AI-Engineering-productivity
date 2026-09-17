@@ -330,6 +330,10 @@ func (s *Server) insightsPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, tmplInsights, layoutData{Title: "Insights", Nav: "insights", Health: s.healthLabel(r), Content: data})
 }
 
+func (s *Server) governancePage(w http.ResponseWriter, r *http.Request) {
+	s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r)})
+}
+
 func (s *Server) integrationsPage(w http.ResponseWriter, r *http.Request) {
 	sessions, err := s.listAllSessions(r, "")
 	data := integrationsData{

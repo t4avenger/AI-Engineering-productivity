@@ -16,9 +16,9 @@
 
 **Entry Points:**
 - Open `http://localhost:8080/` (or configured loopback addr)
-- Deep link to `/sessions/{id}`, `/insights`, etc. (redirects to unlock if unauthenticated)
+- Deep link to `/sessions/{id}`, `/governance`, `/insights`, etc. (redirects to unlock if unauthenticated)
 
-**Success Criteria:** Authenticated user can complete Home → Sessions → Detail and Insights journeys; destructive deletes require confirmation.
+**Success Criteria:** Authenticated user can use the four primary destinations, complete Home → Sessions → Detail and direct Insights journeys, and reach secondary Privacy/Costs pages; destructive deletes require confirmation.
 
 **Estimated Time:** Unlock &lt;1 min; browse session evidence 1–3 min
 

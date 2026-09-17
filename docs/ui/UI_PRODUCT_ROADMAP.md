@@ -37,12 +37,14 @@ Source of truth for product behaviour remains [PRODUCT_MAP.md](../../PRODUCT_MAP
 |-------|--------|
 | `/` Home | Implemented — orchestration overview |
 | `/sessions`, `/sessions/{id}` | Implemented — list + flat timeline |
-| `/insights` | Implemented — MCP, skills, model, context, operations |
+| `/insights` | Implemented transition route — retained until #150 folds content into Home |
 | `/integrations` | Light — observed tools + Cursor Enterprise status |
 | `/privacy`, `/costs` | Implemented |
-| `/governance` | **Missing** (engine + JSON APIs only) |
+| `/governance` | Transition shell — #151 adds engine-backed findings |
 
-Nav: [internal/ui/templates/partials.html](../../internal/ui/templates/partials.html).
+Primary nav: Home · Sessions · Governance · Integrations. Privacy and Costs are
+secondary destinations; Home omits the Costs link. See
+[internal/ui/templates/partials.html](../../internal/ui/templates/partials.html).
 
 ### 2.2 Data & APIs
 
@@ -205,7 +207,7 @@ Epic: [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148
 
 ## 10. Next implementation step
 
-1. Merge [#163](https://github.com/t4avenger/AI-Engineering-productivity/issues/163), which separates provider-backed primary sessions from retained observation-only rows without inventing correlation.
-2. Then V1 UI order: **#149** (shell) → **#151** (Governance findings) → **#152** (allowlist Save) → **#150** / **#153** / **#154** → **#155** (e2e).
+1. Implement [#151](https://github.com/t4avenger/AI-Engineering-productivity/issues/151), replacing the Governance transition shell with engine-backed findings.
+2. Then V1 UI order: **#152** (allowlist Save) → **#150** / **#153** / **#154** → **#155** (e2e).
 
 Highest enterprise signal for least new telemetry remains Governance findings + allowlist Save; Sessions density work should not ship on top of an unfiltered orphan list.

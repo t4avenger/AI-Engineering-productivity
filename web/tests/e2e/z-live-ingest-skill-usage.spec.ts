@@ -53,7 +53,7 @@ test('renders explicit skill usage for data ingested through the live daemon', a
   ).toBe(true);
 
   await unlockDashboard(page, authToken);
-  await page.getByLabel('Primary navigation').getByRole('link', { name: 'Insights' }).click();
+  await page.goto('/insights');
   await expect(page.getByRole('heading', { name: 'Skill usage' })).toBeVisible();
   await expect(page.getByText('tiq-probe').first()).toBeVisible();
   await expect(page.getByText('claude-code').first()).toBeVisible();
