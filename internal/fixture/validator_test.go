@@ -25,8 +25,7 @@ func TestValidateRejectsLikelySecretsAndProhibitedFields(t *testing.T) {
 		{name: "bearer", payload: `{"note":"Bearer token-value-that-must-never-be-committed"}`, want: "payload.note", secret: "token-value-that-must-never-be-committed"},
 		{name: "dash key", payload: `{"note":"` + "sk-" + strings.Repeat("x", 20) + `"}`, want: "payload.note", secret: "sk-" + strings.Repeat("x", 20)},
 		{name: "entropy", payload: `{"note":"q1w2E3r4T5y6U7i8O9p0AaBbCcDdEeFf"}`, want: "payload.note", secret: "q1w2E3r4T5y6U7i8O9p0AaBbCcDdEeFf"},
-		{name: "path", payload: `{"file_path":"/tmp/project/.env"}`, want: "payload.file_path", secret: "/tmp/project/.env"},
-		{name: "command", payload: `{"command_arguments":"cat .env"}`, want: "payload.command_arguments", secret: "cat .env"},
+		{name: "secret value under file_path", payload: `{"file_path":"sk-` + strings.Repeat("x", 20) + `"}`, want: "payload.file_path", secret: "sk-" + strings.Repeat("x", 20)},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			err := Validate([]byte(fixtureWithPayload("codex", test.payload)))
@@ -54,6 +53,23 @@ func TestValidateAcceptsPromptAndResponseFieldNames(t *testing.T) {
 	} {
 		if err := Validate([]byte(fixtureWithPayload("claude-code", payload))); err != nil {
 			t.Fatalf("prompt/response field name must be accepted, got %v", err)
+		}
+	}
+}
+
+// TestValidateAcceptsPathAndCommandFieldNames proves the epic #87 raw-capture
+// direction (#101): fields named file_path/full_command/command are no longer
+// prohibited by name — TelemetryIQ captures raw paths and command lines as
+// first-class governance data — while the value-based likelySecret scan still
+// guards every string, so no real credential can ride under them.
+func TestValidateAcceptsPathAndCommandFieldNames(t *testing.T) {
+	for _, payload := range []string{
+		`{"file_path":"internal/foo.go"}`,
+		`{"full_command":"go test ./..."}`,
+		`{"command":"npm run build"}`,
+	} {
+		if err := Validate([]byte(fixtureWithPayload("claude-code", payload))); err != nil {
+			t.Fatalf("path/command field name must be accepted, got %v", err)
 		}
 	}
 }

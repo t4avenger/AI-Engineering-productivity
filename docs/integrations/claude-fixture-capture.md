@@ -119,6 +119,41 @@ Committed evidence:
 - `fixtures/claude/expected/claude-code-2.1.268-trace-spans.events.json`
   (golden canonical span events)
 
+### Tool-span capture (`claude_code.tool` / `tool.execution` / `tool.blocked_on_user`, T14/#101)
+
+The three tool span types require **tool execution** under the traces exporter,
+plus `OTEL_LOG_TOOL_DETAILS=1` to retain the gated `file_path`/`full_command`/
+`error`. Live capture was attempted first, in an isolated throwaway workspace
+against a loopback `/v1/traces` sink (enhanced-telemetry beta,
+`OTEL_TRACES_EXPORTER=otlp`), and it **partially succeeded**: the
+`claude_code.interaction` and `claude_code.llm_request` spans were captured live,
+confirming the pipeline and the short-form `span.type` values (`interaction`,
+`llm_request`, and by extension `tool`, `tool.execution`, `tool.blocked_on_user` —
+**not** the fully-qualified `claude_code.*` forms the docs table describes
+loosely). The tool spans themselves could not be captured:
+
+- Non-interactive tool execution needs `--dangerously-skip-permissions`, which the
+  capture harness blocks as an unsafe nested agent — so no `claude_code.tool` /
+  `tool.execution` span was emitted in a scripted run.
+- `claude_code.tool.blocked_on_user` needs an interactive permission prompt (a TUI
+  approve/deny), which a `-p` print session cannot elicit.
+
+Because the only remaining lever was disabling permission safety, the tool-span
+fixture is `fixture_origin: "synthetic"`, reproduced from the documented schema at
+`https://code.claude.com/docs/en/monitoring-usage` (attributes verified
+2026-09-17), carrying the gated `file_path`/`full_command`/`error` **raw** with
+synthetic values. Its `capture_note` records this provenance. If a real tool-span
+trace is ever captured (an interactive session against a loopback sink), re-label
+it `observed-sanitised` and record the tool version actually used.
+
+Committed evidence:
+
+- `fixtures/claude/observed-sanitised/claude-code-2.1.268-tool-spans-otlp.json`
+  (docs-shaped synthetic tool spans: a Read with raw `file_path`, and a Bash that
+  waits on a user permission then fails with a raw `error`)
+- `fixtures/claude/expected/claude-code-2.1.268-tool-spans.events.json`
+  (golden canonical tool-span events)
+
 ## Outcome-contract capture
 
 To raise Task outcome above `unknown`, capture provider-completion signals without

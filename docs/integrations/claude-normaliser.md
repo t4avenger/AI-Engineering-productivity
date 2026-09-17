@@ -403,19 +403,52 @@ attribute decoder cannot read (so F3 silently dropped it); a sibling
 block. The interaction span is the per-user-prompt root — a genuine task
 boundary — so `provider_extensions.correlation.task_boundary.confidence` is raised
 to `observed` for it; the llm_request child is not itself a boundary and stays
-`unknown`. The raw free-text `error` message is **not** mapped (it is
-prompt/response-adjacent content, #87) — only the bounded `error_class`,
-`status_code`, and `success` describe a failure. `query_source` is a metrics-only
-dimension, not a span attribute, so it is never invented here. Tool/hook/sub-agent
-span-type mapping remains owned by the later T-phase issues (#101–#103).
+`unknown`. The raw free-text `error` message is captured **raw** (epic #87 — a
+governance/timeline product needs the actual failure text; #101 aligned this with
+`tool.execution` rather than dropping it "for consistency" with the pre-#87
+default), alongside the bounded `error_class`, `status_code`, and `success`.
+`query_source` is a metrics-only dimension, not a span attribute, so it is never
+invented here.
+
+Issue #101 (T14) maps the three **tool** span types into typed, present-only
+blocks:
+
+- `attributes.tool` (`span.type = tool`): `tool_name`, `tool_name_safe`,
+  `bash_command_class`, `bash_argv0`, the OTEL_LOG_TOOL_DETAILS-gated `file_path`
+  and `full_command` captured **raw**, `skill_name`, `subagent_type`,
+  `tool_use_id`, `gen_ai.tool.call.id`, `agent_id`/`parent_agent_id`/`workflow.*`,
+  `duration_ms`, `result_tokens`.
+- `attributes.tool_execution` (`span.type = tool.execution`): `tool_use_id`,
+  `gen_ai.tool.call.id`, `success`, `error_class`, the gated free-text `error`
+  captured **raw**, `duration_ms`.
+- `attributes.tool_blocked_on_user` (`span.type = tool.blocked_on_user`):
+  `decision` (`accept`/`reject` — the denial shows only here, never on
+  `tool_result`), `source`, `duration_ms`.
+
+Every field is present-only. The raw `file_path`/`full_command`/`error` are the
+governance signal (epic #87 — captured verbatim; the per-field hide decision is
+deferred downstream), so they are emitted under their provider-native keys and the
+governance layer (`internal/governance/risky_access.go`) classifies over the raw
+value (`ClassifyPath`/`ClassifyCommandAccess`). Because tool spans now carry
+tool/file/command evidence, `spanUnavailableFields` drops `tool_io`,
+`file_operations`, and `command_execution` from their `unavailable_fields` — a tool
+span never falsely declares those surfaces unavailable. Tool spans are
+intra-interaction operations, so their `task_boundary.confidence` is `observed`
+with `TaskID` nil (not themselves boundaries); `tool_use_id`/`gen_ai.tool.call.id`
+are the join keys for a later cross-signal correlation with `tool_result` /
+`tool_decision` logs (#92/#93). Hook/sub-agent span-type mapping remains owned by
+#102–#103.
 
 As with metrics, #88 removed storage-side sanitising, so the adapter is the sole
 guard: span attributes are also reduced to an **allow-list**
 (`safeSpanAttributeKeys`, e.g. `span.type`, `gen_ai.*`, `stop_reason`, token
-counts, `duration_ms`, `error_class`, `agent_id`/`workflow.*`), dropping
-operator/identity and any unforeseen or secret-bearing attribute (`user.*`,
-`session.id`, `authorization`, the redacted `user_prompt`, the free-text `error`)
-by default.
+counts, `duration_ms`, `error_class`, `tool_name`, `tool_use_id`, `result_tokens`,
+`decision`/`source`, `agent_id`/`workflow.*`), dropping operator/identity and any
+unforeseen or secret-bearing attribute (`user.*`, `session.id`, `authorization`,
+the redacted `user_prompt`) by default. The raw `file_path`/`full_command`/`error`
+are **not** in the allow-list — they live only in their typed block (their
+canonical home, which governance walks), so they are never duplicated into
+`provider_extensions.span_attributes`.
 
 ## Privacy
 
@@ -425,9 +458,13 @@ by default.
 HMAC fingerprint and no fallback redaction. The fixture validator runs before
 mapping; it no longer prohibits the `prompt`/`response` field names — Claude
 prompt/response and raw API body content is now captured raw (#94), deferring the
-per-field visibility policy — but its value-based secret/entropy scan and the
-credential/path/command field-name blocks remain, so no real credential can be
-committed. See "Prompt & response content path" above.
+per-field visibility policy — and #101 likewise removed the `file_path` /
+`command` / `filename` field-name blocks so raw paths and command lines are
+committable governance evidence. Only credential field NAMES stay blocked
+(`password`, `token`, `secret`, `api_key`, `authorization`, `access_token`), and
+the value-based secret/entropy scan still runs on every string, so no real
+credential can be committed under any key. See "Prompt & response content path"
+above.
 
 ## Golden fixtures
 
@@ -446,6 +483,14 @@ committed. See "Prompt & response content path" above.
 - `fixtures/claude/expected/claude-code-2.1.268-trace-spans.events.json` —
   canonical span events for the committed `/v1/traces` fixture, with the typed
   `interaction`/`llm_request` field blocks and decoded `finish_reasons` (#100).
+- `fixtures/claude/expected/claude-code-2.1.268-tool-spans.events.json` —
+  canonical span events for the tool-span fixture
+  (`claude-code-2.1.268-tool-spans-otlp.json`), asserting the typed
+  `tool`/`tool_execution`/`tool_blocked_on_user` blocks with raw
+  `file_path`/`full_command`/`error` and the span-type-aware `unavailable_fields`
+  (#101). The interaction/llm_request tracing pipeline is live-captured; the tool
+  spans are a docs-shaped synthetic reproduction (see the fixture's `capture_note`
+  and `docs/integrations/claude-fixture-capture.md`).
 - `fixtures/claude/expected/claude-code-2.1.269-session-transcript.events.json` —
   canonical `assistant_message` events for the committed session JSONL transcript
   fixture (`claude-code-2.1.269-session-transcript.json`).
