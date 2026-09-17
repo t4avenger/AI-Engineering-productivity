@@ -19,6 +19,24 @@ import (
 // error.
 var ErrUnsupportedTraces = errors.New("unsupported Claude Code traces payload")
 
+// Span-type values from Claude Code's span.type attribute (#100/#101). Shared
+// across the dispatch switch, task-boundary mapping, and unavailable_fields so
+// Sonar S1192 does not fire on the repeated literals.
+const (
+	spanTypeTool            = "tool"
+	spanTypeToolExecution   = "tool.execution"
+	spanTypeToolBlockedUser = "tool.blocked_on_user"
+)
+
+// Span attribute keys shared between the allow-list and the typed attribute
+// mappers (llm_request / tool / tool.execution). Kept as named constants so the
+// wire key is defined once (go:S1192).
+const (
+	attrWorkflowRunID   = "workflow.run_id"
+	attrWorkflowName    = "workflow.name"
+	attrGenAIToolCallID = "gen_ai.tool.call.id"
+)
+
 // safeSpanAttributeKeys is the allow-list of span attributes carried verbatim
 // into provider_extensions.span_attributes, alongside the typed per-span-type
 // blocks in attributes.interaction / attributes.llm_request (#100). Ingest-time
@@ -64,14 +82,14 @@ var safeSpanAttributeKeys = map[string]struct{}{
 	"response.has_tool_call":  {},
 	"agent_id":                {},
 	"parent_agent_id":         {},
-	"workflow.run_id":         {},
-	"workflow.name":           {},
+	attrWorkflowRunID:         {},
+	attrWorkflowName:          {},
 	"tool_name":               {},
 	"tool_name_safe":          {},
 	"bash_command_class":      {},
 	"bash_argv0":              {},
 	"tool_use_id":             {},
-	"gen_ai.tool.call.id":     {},
+	attrGenAIToolCallID:       {},
 	"result_tokens":           {},
 	"skill_name":              {},
 	"subagent_type":           {},
@@ -253,11 +271,11 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 		attributes["interaction"] = interactionAttributes(fields)
 	case "llm_request":
 		attributes["llm_request"] = llmRequestAttributes(fields, span.Attributes)
-	case "tool":
+	case spanTypeTool:
 		attributes["tool"] = toolAttributes(fields)
-	case "tool.execution":
+	case spanTypeToolExecution:
 		attributes["tool_execution"] = toolExecutionAttributes(fields)
-	case "tool.blocked_on_user":
+	case spanTypeToolBlockedUser:
 		attributes["tool_blocked_on_user"] = toolBlockedOnUserAttributes(fields)
 	}
 	extensions := map[string]any{
@@ -315,7 +333,7 @@ func spanCorrelation(eventID string, occurredAt time.Time, traceID, spanID strin
 			"confidence": "observed",
 			"reason":     "Claude Code interaction span is the per-user-prompt root, a genuine task boundary",
 		}
-	case "tool", "tool.execution", "tool.blocked_on_user":
+	case spanTypeTool, spanTypeToolExecution, spanTypeToolBlockedUser:
 		boundary = map[string]any{
 			"confidence": "observed",
 			"reason":     "Claude Code tool spans are intra-interaction operations, not task boundaries",
@@ -400,8 +418,8 @@ func llmRequestAttributes(fields map[string]any, attributes []otlpAttribute) map
 	putSpanString(block, fields, "error", "error")
 	putSpanString(block, fields, "agent_id", "agent_id")
 	putSpanString(block, fields, "parent_agent_id", "parent_agent_id")
-	putSpanString(block, fields, "workflow_run_id", "workflow.run_id")
-	putSpanString(block, fields, "workflow_name", "workflow.name")
+	putSpanString(block, fields, "workflow_run_id", attrWorkflowRunID)
+	putSpanString(block, fields, "workflow_name", attrWorkflowName)
 	putSpanInt(block, fields, "duration_ms", "duration_ms")
 	putSpanInt(block, fields, "ttft_ms", "ttft_ms")
 	putSpanInt(block, fields, "first_content_ms", "first_content_ms")
@@ -431,7 +449,7 @@ func llmRequestAttributes(fields map[string]any, attributes []otlpAttribute) map
 // provider cost never ride on a span.
 func spanUnavailableFields(spanType string) []string {
 	switch spanType {
-	case "tool", "tool.execution", "tool.blocked_on_user":
+	case spanTypeTool, spanTypeToolExecution, spanTypeToolBlockedUser:
 		return []string{"mcp_calls", "prompt_content", "response_content", "repository_context", "provider_cost"}
 	default:
 		return []string{"tool_io", "mcp_calls", "file_operations", "command_execution", "prompt_content", "response_content", "repository_context", "provider_cost"}
@@ -454,11 +472,11 @@ func toolAttributes(fields map[string]any) map[string]any {
 	putSpanString(block, fields, "skill_name", "skill_name")
 	putSpanString(block, fields, "subagent_type", "subagent_type")
 	putSpanString(block, fields, "tool_use_id", "tool_use_id")
-	putSpanString(block, fields, "gen_ai_tool_call_id", "gen_ai.tool.call.id")
+	putSpanString(block, fields, "gen_ai_tool_call_id", attrGenAIToolCallID)
 	putSpanString(block, fields, "agent_id", "agent_id")
 	putSpanString(block, fields, "parent_agent_id", "parent_agent_id")
-	putSpanString(block, fields, "workflow_run_id", "workflow.run_id")
-	putSpanString(block, fields, "workflow_name", "workflow.name")
+	putSpanString(block, fields, "workflow_run_id", attrWorkflowRunID)
+	putSpanString(block, fields, "workflow_name", attrWorkflowName)
 	putSpanInt(block, fields, "duration_ms", "duration_ms")
 	putSpanInt(block, fields, "result_tokens", "result_tokens")
 	return block
@@ -471,7 +489,7 @@ func toolAttributes(fields map[string]any) map[string]any {
 func toolExecutionAttributes(fields map[string]any) map[string]any {
 	block := map[string]any{}
 	putSpanString(block, fields, "tool_use_id", "tool_use_id")
-	putSpanString(block, fields, "gen_ai_tool_call_id", "gen_ai.tool.call.id")
+	putSpanString(block, fields, "gen_ai_tool_call_id", attrGenAIToolCallID)
 	putSpanString(block, fields, "error_class", "error_class")
 	putSpanString(block, fields, "error", "error")
 	putSpanInt(block, fields, "duration_ms", "duration_ms")
