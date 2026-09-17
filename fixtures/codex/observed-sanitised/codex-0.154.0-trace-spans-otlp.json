@@ -1,0 +1,93 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "openai",
+  "tool": "codex",
+  "tool_version": "0.154.0",
+  "captured_at": "2026-09-17T19:05:53Z",
+  "sanitisation_reviewed": true,
+  "capture_note": "Reduced from an isolated synthetic codex exec OTLP/HTTP JSON trace capture. Trace/span IDs and token counts are synthetic; the observed resource, scope, span names, parent shape, and attribute keys are preserved.",
+  "payload": {
+    "resourceSpans": [
+      {
+        "resource": {
+          "attributes": [
+            {"key": "telemetry.sdk.version", "value": {"stringValue": "0.31.0"}},
+            {"key": "telemetry.sdk.name", "value": {"stringValue": "opentelemetry"}},
+            {"key": "service.name", "value": {"stringValue": "codex_exec"}},
+            {"key": "service.version", "value": {"stringValue": "0.154.0"}},
+            {"key": "env", "value": {"stringValue": "telemetryiq-synthetic"}},
+            {"key": "telemetry.sdk.language", "value": {"stringValue": "rust"}}
+          ],
+          "droppedAttributesCount": 0
+        },
+        "scopeSpans": [
+          {
+            "scope": {
+              "name": "codex_exec",
+              "version": "",
+              "attributes": [],
+              "droppedAttributesCount": 0
+            },
+            "spans": [
+              {
+                "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "spanId": "1111111111111111",
+                "parentSpanId": "",
+                "name": "turn/start",
+                "kind": 0,
+                "startTimeUnixNano": "1789671946326852067",
+                "endTimeUnixNano": "1789671946357351775",
+                "attributes": [],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "links": [],
+                "droppedLinksCount": 0,
+                "status": {"code": 0, "message": ""},
+                "flags": 1
+              },
+              {
+                "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "spanId": "2222222222222222",
+                "parentSpanId": "1111111111111111",
+                "name": "op.dispatch.turn_input",
+                "kind": 0,
+                "startTimeUnixNano": "1789671946328956125",
+                "endTimeUnixNano": "1789671946356633987",
+                "attributes": [
+                  {"key": "codex.op", "value": {"stringValue": "turn_input"}}
+                ],
+                "status": {"code": 0, "message": ""},
+                "flags": 1
+              },
+              {
+                "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "spanId": "3333333333333333",
+                "parentSpanId": "2222222222222222",
+                "name": "session_task.turn",
+                "kind": 0,
+                "startTimeUnixNano": "1789671946355925969",
+                "endTimeUnixNano": "1789671953383319471",
+                "attributes": [
+                  {"key": "codex.turn.token_usage.input_tokens", "value": {"intValue": "1200"}},
+                  {"key": "codex.turn.token_usage.cached_input_tokens", "value": {"intValue": "800"}},
+                  {"key": "codex.turn.token_usage.cache_write_input_tokens", "value": {"intValue": "0"}},
+                  {"key": "codex.turn.token_usage.non_cached_input_tokens", "value": {"intValue": "400"}},
+                  {"key": "codex.turn.token_usage.output_tokens", "value": {"intValue": "12"}},
+                  {"key": "codex.turn.token_usage.reasoning_output_tokens", "value": {"intValue": "3"}},
+                  {"key": "codex.turn.token_usage.total_tokens", "value": {"intValue": "1212"}},
+                  {"key": "codex.custom.observed", "value": {"stringValue": "retained"}}
+                ],
+                "status": {"code": 0, "message": ""},
+                "flags": 1
+              }
+            ],
+            "schemaUrl": ""
+          }
+        ],
+        "schemaUrl": ""
+      }
+    ]
+  }
+}

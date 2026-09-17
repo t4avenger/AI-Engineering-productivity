@@ -6,6 +6,7 @@ import (
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -16,10 +17,11 @@ const (
 )
 
 // decodeOTLPProtobuf unmarshals an OTLP/HTTP Export*ServiceRequest body.
-// ExportLogsServiceRequest / ExportMetricsServiceRequest are wire-compatible
-// with LogsData / MetricsData (field 1 = repeated resource_*); we decode via
-// the data messages to avoid pulling collector gRPC stubs. Cursor Enterprise
-// OpenTelemetry Export sends this encoding only (#129).
+// ExportLogsServiceRequest / ExportMetricsServiceRequest /
+// ExportTraceServiceRequest are wire-compatible with their signal data
+// messages (field 1 = repeated resource_*); we decode via the data messages to
+// avoid pulling collector gRPC stubs. Cursor Enterprise OpenTelemetry Export
+// and Codex trace_exporter can send this encoding (#129 / #172).
 func decodeOTLPProtobuf(body []byte, resourceField string) (map[string]json.RawMessage, error) {
 	var message proto.Message
 	switch resourceField {
@@ -27,6 +29,8 @@ func decodeOTLPProtobuf(body []byte, resourceField string) (map[string]json.RawM
 		message = &logspb.LogsData{}
 	case "resourceMetrics":
 		message = &metricspb.MetricsData{}
+	case "resourceSpans":
+		message = &tracepb.TracesData{}
 	default:
 		return nil, fmt.Errorf("protobuf ingest is not supported for %s", resourceField)
 	}
@@ -50,5 +54,5 @@ func decodeOTLPProtobuf(body []byte, resourceField string) (map[string]json.RawM
 }
 
 func otlpAcceptsProtobuf(resourceField string) bool {
-	return resourceField == "resourceLogs" || resourceField == "resourceMetrics"
+	return resourceField == "resourceLogs" || resourceField == "resourceMetrics" || resourceField == "resourceSpans"
 }

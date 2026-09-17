@@ -117,6 +117,64 @@ export function codexTurnTokenOTLPMetrics(): string {
   });
 }
 
+// Codex CLI 0.154.0 was observed exporting this resource/scope/span shape via
+// the separate otel.trace_exporter. The prompt used during capture is absent
+// because log_user_prompt=false.
+export function codexOTLPTraces(): string {
+  return JSON.stringify({
+    resourceSpans: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'codex_exec' } },
+            { key: 'service.version', value: { stringValue: '0.154.0' } },
+            {
+              key: 'env',
+              value: { stringValue: 'telemetryiq-synthetic' },
+            },
+          ],
+        },
+        scopeSpans: [
+          {
+            scope: { name: 'codex_exec' },
+            spans: [
+              {
+                traceId: 'dddddddddddddddddddddddddddddddd',
+                spanId: '1111111111111111',
+                parentSpanId: '',
+                name: 'turn/start',
+                startTimeUnixNano: '1789671946326852067',
+                endTimeUnixNano: '1789671946357351775',
+                attributes: [],
+                status: { code: 0 },
+              },
+              {
+                traceId: 'dddddddddddddddddddddddddddddddd',
+                spanId: '2222222222222222',
+                parentSpanId: '1111111111111111',
+                name: 'session_task.turn',
+                startTimeUnixNano: '1789671946355925969',
+                endTimeUnixNano: '1789671953383319471',
+                attributes: [
+                  {
+                    key: 'codex.turn.token_usage.input_tokens',
+                    value: { intValue: '1200' },
+                  },
+                  {
+                    key: 'codex.turn.token_usage.output_tokens',
+                    value: { intValue: '12' },
+                  },
+                ],
+                status: { code: 0 },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
+
 type OTLPLogRecord = {
   attributes: OTLPAttribute[];
   body?: { stringValue: string };
@@ -337,6 +395,16 @@ export async function ingestOTLPLogs(body: string): Promise<void> {
 // ingestOTLPMetrics POSTs a raw OTLP metrics payload to /v1/metrics.
 export async function ingestOTLPMetrics(body: string): Promise<void> {
   const ingest = await fetch(`${daemonBase}/v1/metrics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  });
+  expect(ingest.status).toBe(202);
+}
+
+// ingestOTLPTraces POSTs a raw OTLP trace payload to /v1/traces.
+export async function ingestOTLPTraces(body: string): Promise<void> {
+  const ingest = await fetch(`${daemonBase}/v1/traces`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body,

@@ -1,40 +1,34 @@
 # Codex Normaliser
 
-Task 007 supports one deliberately narrow synthetic fixture shape: a reviewed,
-sanitised Codex OTLP trace wrapper with
-payload.resourceSpans[].scopeSpans[].spans[]. Each span becomes one canonical
-event when that fixture is replayed directly through `codex.Normalize`. This is
-fixture-only coverage, not evidence that live Codex emits traces. The F1 Codex
-CLI 0.153.4 capture observed no `/v1/traces` posts, so live ingest does not
-route Codex spans into persistence and the capability matrix records trace
-export as unsupported for that version (#112).
+`codex.NormalizeTraces` ingests the observed Codex CLI 0.154.0 OTLP trace
+surface from `codex_exec` and `codex_cli_rs`. Both OTLP/HTTP JSON and binary
+protobuf feed the same adapter. Recognized resources are hard-fail normalized:
+a malformed supported span returns `422` for the whole batch instead of being
+accepted and silently dropped. The CLI 0.153.4 no-trace result remains valid
+for that version (#112); trace export is therefore version-dependent.
 
-For the synthetic fixture path, the normaliser is deterministic: its event ID is
-codex:<traceId>:<spanId>, its session ID is codex:<traceId>, and it uses the
-OTLP startTimeUnixNano plus the fixture captured_at timestamp. It sorts spans by
+For live traces, the event ID is `codex:<traceId>:<spanId>` and the trace-only
+session ID is `codex:trace:<traceId>`. Trace-only rows are observations with
+`identity_source=trace.id`; they are not fabricated conversation joins. The
+adapter uses OTLP `startTimeUnixNano` plus receipt time and sorts spans by
 observed time plus stable identifiers, collapses duplicate trace/span IDs, and
 stores dedup, ordering, trace/span, parent-span, and task-boundary confidence
 evidence under `provider_extensions.correlation` (see
 `docs/architecture/correlation.md`).
 
-The synthetic fixture is not evidence of any real Codex field beyond the shape
-it contains. Model, token, cache, tool-call, file-operation, command, approval,
-content, repository, task-outcome, and provider-cost fields are therefore listed
-in attributes.unavailable_fields. Actor and device IDs use the explicit string
-unavailable; unknown values are never represented as zero values.
+The observed `session_task.turn` span promotes input, cached-input,
+cache-write-input, output, and reasoning-output token counts when present.
+Other span attributes remain provider-specific evidence; model, tool, file,
+command, approval, content, repository, task-outcome, and provider-cost
+semantics are not inferred from internal span names.
 
-Safe fields outside the supported OTLP mapping are preserved verbatim under
-provider_extensions.resource, provider_extensions.scope, or
-provider_extensions.span. The fixture validator runs before normalisation, so
-prohibited field names and likely secrets are rejected without exposing their
-values. The normaliser neither logs nor persists fixture data. Task 008 must
-apply the privacy pipeline before canonical events cross a storage or
-diagnostics boundary.
+Resource, scope, span, and unknown attribute fields are preserved under
+`provider_extensions`; the adapter does not log them. Committed fixtures remain
+sanitized synthetic-only evidence even though the local ingest path retains the
+raw values it receives under epic #87.
 
-fixtures/codex/expected/fixture-001.canonical.json is the golden output for
-the checked-in synthetic input. Adding a real observed fixture requires the
-Task 006 capture procedure, a recorded tool version, an expected canonical
-fixture, and a review of any newly evidenced capabilities.
+`fixtures/codex/expected/codex-0.154.0-trace-spans.events.json` is the golden
+output for the version-pinned observed-sanitized trace fixture.
 
 ## Observed log support
 

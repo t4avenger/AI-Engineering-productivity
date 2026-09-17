@@ -128,6 +128,25 @@ func TestSessionIdentityScopesFilterWithoutDroppingRows(t *testing.T) {
 	}
 }
 
+func TestCodexTraceSessionIsObservation(t *testing.T) {
+	repo, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = repo.Close() })
+	e := event(t, "codex-trace", "codex:trace:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "turn/start", "2026-09-17T19:05:53Z")
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{e}); err != nil {
+		t.Fatal(err)
+	}
+	session, found, err := repo.Session(context.Background(), e.SessionID)
+	if err != nil || !found {
+		t.Fatalf("session = %v, %v", found, err)
+	}
+	if session.Attributes[identityScopeKey] != identityObservation || session.Attributes[identitySourceKey] != "trace.id" {
+		t.Fatalf("trace session identity = %#v", session.Attributes)
+	}
+}
+
 func identityScopeRepository(t *testing.T) (*Repository, canonical.Event, canonical.Event, canonical.Event) {
 	t.Helper()
 	repo, err := Open(":memory:")
