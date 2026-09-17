@@ -199,8 +199,9 @@ var pathFieldKeys = map[string]struct{}{
 }
 
 // commandFieldKeys name event attributes that carry a raw shell command line.
+// full_command is Claude Code's native key on tool spans (#101).
 var commandFieldKeys = map[string]struct{}{
-	"command": {}, "command_line": {}, "cmd": {},
+	"command": {}, "command_line": {}, "cmd": {}, "full_command": {},
 }
 
 // collectAccesses walks an event's attributes and provider extensions

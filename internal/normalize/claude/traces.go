@@ -26,15 +26,20 @@ var ErrUnsupportedTraces = errors.New("unsupported Claude Code traces payload")
 // allow-list (not a deny-list) drops an unforeseen identity- or secret-bearing
 // attribute by default. session.id becomes the canonical session identity and
 // model is promoted onto the event, so neither is repeated here. Operator/machine
-// identity (user.*, organization.*, terminal.*), the redacted user_prompt, and
-// the free-text `error` message are deliberately absent so they never reach
-// provider_extensions — only the bounded error_class describes a failure.
+// identity (user.*, organization.*, terminal.*) and the redacted user_prompt are
+// absent so they never reach provider_extensions. The free-text `error` message is
+// captured raw (epic #87) but lives in the typed llm_request/tool_execution block
+// (its canonical home, which governance walks), not in this allow-list, so it is
+// not duplicated into span_attributes.
 // agent_id/parent_agent_id/workflow.* are sub-agent workflow correlation, not
 // operator identity, so they are safe. gen_ai.response.finish_reasons is not
 // listed here because Claude Code emits it as an OTLP arrayValue the scalar
 // attributeValue decoder cannot read; it is decoded and surfaced in the typed
-// llm_request block instead (arrayAttributeValues in logs.go). Tool/hook/sub-agent
-// span-type field mapping remains owned by the later T-phase issues (#101–#103).
+// llm_request block instead (arrayAttributeValues in logs.go). Bounded tool-span
+// identifiers (tool_name, tool_use_id, gen_ai.tool.call.id, result_tokens, …) are
+// allow-listed for verbatim passthrough (#101); the raw file_path/full_command/error
+// content lives only in the typed tool block (its canonical home, which governance
+// walks), so it is not duplicated here. Hook/sub-agent mapping is owned by #102–#103.
 var safeSpanAttributeKeys = map[string]struct{}{
 	"span.type":               {},
 	"gen_ai.system":           {},
@@ -61,6 +66,17 @@ var safeSpanAttributeKeys = map[string]struct{}{
 	"parent_agent_id":         {},
 	"workflow.run_id":         {},
 	"workflow.name":           {},
+	"tool_name":               {},
+	"tool_name_safe":          {},
+	"bash_command_class":      {},
+	"bash_argv0":              {},
+	"tool_use_id":             {},
+	"gen_ai.tool.call.id":     {},
+	"result_tokens":           {},
+	"skill_name":              {},
+	"subagent_type":           {},
+	"decision":                {},
+	"source":                  {},
 	"interaction.sequence":    {},
 	"interaction.duration_ms": {},
 	"parent.source":           {},
@@ -218,23 +234,31 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 	eventID := contentID("claude-code:span:", []byte(identity))
 
 	attributes := map[string]any{
-		"unavailable_fields": []string{"tool_io", "mcp_calls", "file_operations", "command_execution", "prompt_content", "response_content", "repository_context", "provider_cost"},
+		"unavailable_fields": spanUnavailableFields(spanType),
 		"span_type":          spanType,
 	}
 	if modelObserved {
 		attributes["model"] = model
 	}
-	// Dispatch on span.type so the two per-prompt span types gain typed,
-	// present-only field blocks (#100). Other span types (tool/hook/sub-agent)
-	// keep the generic passthrough until the later T-phase issues (#101–#103) map
-	// them. unavailable_fields is unchanged per type: the structured blocks add
-	// latency/token/outcome signals that were never in that set, which enumerates
-	// the tool/file/command/content/cost surfaces traces do not carry at all.
+	// Dispatch on span.type so each span type gains a typed, present-only field
+	// block: the per-prompt interaction/llm_request spans (#100) and the tool /
+	// tool.execution / tool.blocked_on_user spans (#101). Every documented field
+	// is captured raw, including the gated file_path/full_command/error — this is
+	// a governance/timeline product and the raw values are the signal (epic #87);
+	// the per-field hide decision is deferred downstream. Tool spans carry
+	// file/command/tool_io surfaces, so spanUnavailableFields drops those from
+	// their unavailable set. Hook/sub-agent span mapping stays deferred (#102–#103).
 	switch spanType {
 	case "interaction":
 		attributes["interaction"] = interactionAttributes(fields)
 	case "llm_request":
 		attributes["llm_request"] = llmRequestAttributes(fields, span.Attributes)
+	case "tool":
+		attributes["tool"] = toolAttributes(fields)
+	case "tool.execution":
+		attributes["tool_execution"] = toolExecutionAttributes(fields)
+	case "tool.blocked_on_user":
+		attributes["tool_blocked_on_user"] = toolBlockedOnUserAttributes(fields)
 	}
 	extensions := map[string]any{
 		"correlation": spanCorrelation(eventID, occurredAt, traceID, spanID, parentSpanID, spanType),
@@ -278,16 +302,23 @@ func spanCorrelation(eventID string, occurredAt time.Time, traceID, spanID strin
 	// The interaction span is the per-user-prompt root — a genuine, observed task
 	// boundary — so its confidence is raised (#100). The llm_request span is a
 	// child of that root (one model request within the prompt), not itself a
-	// boundary, so it stays "unknown"; tool/hook/sub-agent span boundaries are
-	// deferred to the later T-phase issues (#101–#103).
+	// boundary, so it stays "unknown". Tool spans are intra-interaction operations,
+	// observed to not be task boundaries (#101); hook/sub-agent boundaries remain
+	// deferred to #102–#103.
 	boundary := map[string]any{
 		"confidence": "unknown",
-		"reason":     "Claude Code trace spans: per-span task-boundary mapping deferred to T-phase (#101–#103)",
+		"reason":     "Claude Code trace spans: per-span task-boundary mapping deferred to T-phase (#102–#103)",
 	}
-	if spanType == "interaction" {
+	switch spanType {
+	case "interaction":
 		boundary = map[string]any{
 			"confidence": "observed",
 			"reason":     "Claude Code interaction span is the per-user-prompt root, a genuine task boundary",
+		}
+	case "tool", "tool.execution", "tool.blocked_on_user":
+		boundary = map[string]any{
+			"confidence": "observed",
+			"reason":     "Claude Code tool spans are intra-interaction operations, not task boundaries",
 		}
 	}
 	return map[string]any{
@@ -346,12 +377,14 @@ func interactionAttributes(fields map[string]any) map[string]any {
 // llmRequestAttributes maps the claude_code.llm_request span (one model request
 // under an interaction) into structured, present-only fields: identity/model,
 // latency, token counts, outcome, and correlation to any sub-agent workflow. All
-// fields are present-only. The raw free-text `error` message is deliberately not
-// mapped — it is prompt/response-adjacent content (#87); only the bounded
-// error_class, status_code, and success flag describe a failed request. context
-// comes from llm_request.context (query_source is a metrics-only dimension, not a
-// span attribute, so it is never invented here). finish_reasons is decoded from
-// the OTLP arrayValue that the scalar attribute decoder cannot read.
+// fields are present-only. The raw free-text `error` message is captured raw too
+// (epic #87 — a governance/timeline product needs the actual failure text, and the
+// per-field hide decision is deferred downstream; this now matches tool.execution
+// rather than dropping it "for consistency" with the pre-#87 default), alongside
+// the bounded error_class, status_code, and success flag. context comes from
+// llm_request.context (query_source is a metrics-only dimension, not a span
+// attribute, so it is never invented here). finish_reasons is decoded from the
+// OTLP arrayValue that the scalar attribute decoder cannot read.
 func llmRequestAttributes(fields map[string]any, attributes []otlpAttribute) map[string]any {
 	block := map[string]any{}
 	putSpanString(block, fields, "model", "model")
@@ -364,6 +397,7 @@ func llmRequestAttributes(fields map[string]any, attributes []otlpAttribute) map
 	putSpanString(block, fields, "speed", "speed")
 	putSpanString(block, fields, "stop_reason", "stop_reason")
 	putSpanString(block, fields, "error_class", "error_class")
+	putSpanString(block, fields, "error", "error")
 	putSpanString(block, fields, "agent_id", "agent_id")
 	putSpanString(block, fields, "parent_agent_id", "parent_agent_id")
 	putSpanString(block, fields, "workflow_run_id", "workflow.run_id")
@@ -386,6 +420,75 @@ func llmRequestAttributes(fields map[string]any, attributes []otlpAttribute) map
 	if reasons := arrayAttributeValues(attributes, "gen_ai.response.finish_reasons"); reasons != nil {
 		block["finish_reasons"] = reasons
 	}
+	return block
+}
+
+// spanUnavailableFields lists the canonical surfaces a span genuinely cannot
+// carry, per span type. Tool spans carry tool/file/command evidence (#101), so
+// those surfaces are removed from their list rather than falsely declared
+// unavailable (the provider rule forbids marking a signal unavailable merely
+// because capturing it elsewhere is possible). prompt/response content and
+// provider cost never ride on a span.
+func spanUnavailableFields(spanType string) []string {
+	switch spanType {
+	case "tool", "tool.execution", "tool.blocked_on_user":
+		return []string{"mcp_calls", "prompt_content", "response_content", "repository_context", "provider_cost"}
+	default:
+		return []string{"tool_io", "mcp_calls", "file_operations", "command_execution", "prompt_content", "response_content", "repository_context", "provider_cost"}
+	}
+}
+
+// toolAttributes maps a claude_code.tool span into a present-only block. Per the
+// raw-capture stance (epic #87), every documented field is captured verbatim,
+// including the OTEL_LOG_TOOL_DETAILS-gated file_path and full_command. Those two
+// use their provider-native keys so the governance layer (internal/governance)
+// reaches them and classifies over the raw value.
+func toolAttributes(fields map[string]any) map[string]any {
+	block := map[string]any{}
+	putSpanString(block, fields, "tool_name", "tool_name")
+	putSpanString(block, fields, "tool_name_safe", "tool_name_safe")
+	putSpanString(block, fields, "bash_command_class", "bash_command_class")
+	putSpanString(block, fields, "bash_argv0", "bash_argv0")
+	putSpanString(block, fields, "file_path", "file_path")
+	putSpanString(block, fields, "full_command", "full_command")
+	putSpanString(block, fields, "skill_name", "skill_name")
+	putSpanString(block, fields, "subagent_type", "subagent_type")
+	putSpanString(block, fields, "tool_use_id", "tool_use_id")
+	putSpanString(block, fields, "gen_ai_tool_call_id", "gen_ai.tool.call.id")
+	putSpanString(block, fields, "agent_id", "agent_id")
+	putSpanString(block, fields, "parent_agent_id", "parent_agent_id")
+	putSpanString(block, fields, "workflow_run_id", "workflow.run_id")
+	putSpanString(block, fields, "workflow_name", "workflow.name")
+	putSpanInt(block, fields, "duration_ms", "duration_ms")
+	putSpanInt(block, fields, "result_tokens", "result_tokens")
+	return block
+}
+
+// toolExecutionAttributes maps a claude_code.tool.execution span. success is the
+// bounded outcome and error_class the bounded failure category; the free-text
+// error message is captured raw as well — a governance/timeline product needs the
+// actual error, and the per-field hide decision is deferred downstream (epic #87).
+func toolExecutionAttributes(fields map[string]any) map[string]any {
+	block := map[string]any{}
+	putSpanString(block, fields, "tool_use_id", "tool_use_id")
+	putSpanString(block, fields, "gen_ai_tool_call_id", "gen_ai.tool.call.id")
+	putSpanString(block, fields, "error_class", "error_class")
+	putSpanString(block, fields, "error", "error")
+	putSpanInt(block, fields, "duration_ms", "duration_ms")
+	if value, ok := optionalBool(fields, "success"); ok {
+		block["success"] = value
+	}
+	return block
+}
+
+// toolBlockedOnUserAttributes maps a claude_code.tool.blocked_on_user span — the
+// wall-clock time a tool call spent waiting on a user permission decision, the
+// decision itself (accept/reject), and its source.
+func toolBlockedOnUserAttributes(fields map[string]any) map[string]any {
+	block := map[string]any{}
+	putSpanString(block, fields, "decision", "decision")
+	putSpanString(block, fields, "source", "source")
+	putSpanInt(block, fields, "duration_ms", "duration_ms")
 	return block
 }
 

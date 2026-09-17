@@ -155,16 +155,20 @@ func scan(value any, path string) error {
 	return nil
 }
 
-// prohibitedField blocks field NAMES that can only carry credentials, raw
-// commands, or filesystem paths — data the epic never captures. Prompt and
-// response content is deliberately NOT blocked: epic #87 (#94) captures it raw,
-// deferring the per-field visibility decision to a later policy. The value-based
-// likelySecret scan still runs on every string, so no real credential can be
-// committed under a prompt/response key either.
+// prohibitedField blocks field NAMES that can only be credentials — never
+// legitimate telemetry. It no longer blocks paths, command lines, or source:
+// TelemetryIQ is a governance/timeline product that captures those raw as
+// first-class data (epic #87), so blocking them by name fought the product and
+// kept real observed evidence out of fixtures. The value-based likelySecret scan
+// still runs on every string, so a real credential (key, token, PEM body, or any
+// high-entropy secret) cannot be committed under ANY key — that, not the field
+// name, is the guard against real secrets entering git history. Committed
+// fixtures use synthetic values by policy; a synthetic path or command is
+// ordinary data, not a secret.
 func prohibitedField(key string) bool {
 	normalized := strings.NewReplacer("_", "", "-", "", " ", "").Replace(strings.ToLower(key))
 	switch normalized {
-	case "sourcecode", "command", "commandline", "commandarguments", "commandargs", "filepath", "filepaths", "filename", "filenames", "password", "token", "accesstoken", "apikey", "authorization", "secret":
+	case "password", "token", "accesstoken", "apikey", "authorization", "secret":
 		return true
 	default:
 		return false

@@ -1,0 +1,414 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "synthetic",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.268",
+  "captured_at": "2026-09-17T10:05:50Z",
+  "sanitisation_reviewed": true,
+  "capture_note": "Tool spans (claude_code.tool / tool.execution / tool.blocked_on_user) could not be captured live in this environment: non-interactive tool execution requires --dangerously-skip-permissions (blocked by the harness unsafe-agent classifier), and tool.blocked_on_user needs an interactive permission prompt. The interaction/llm_request tracing pipeline WAS exercised live (enhanced-telemetry beta, OTEL_TRACES_EXPORTER=otlp) and its span.type values are the short forms used here. These tool spans are reproduced from the documented schema at https://code.claude.com/docs/en/monitoring-usage (attributes verified 2026-09-17), with OTEL_LOG_TOOL_DETAILS-gated file_path/full_command/error present raw. All values are synthetic (#101, epic #87).",
+  "payload": {
+    "resourceSpans": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "host.arch",
+              "value": {
+                "stringValue": "amd64"
+              }
+            },
+            {
+              "key": "os.type",
+              "value": {
+                "stringValue": "linux"
+              }
+            },
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "claude-code"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "2.1.268"
+              }
+            }
+          ],
+          "droppedAttributesCount": 0
+        },
+        "scopeSpans": [
+          {
+            "scope": {
+              "name": "com.anthropic.claude_code.tracing",
+              "version": "1.0.0"
+            },
+            "spans": [
+              {
+                "traceId": "00000000000000000000000000000101",
+                "spanId": "0000000000000a01",
+                "name": "claude_code.interaction",
+                "kind": 1,
+                "startTimeUnixNano": "1789117600000000000",
+                "endTimeUnixNano": "1789117606000000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000101"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "interaction"
+                    }
+                  },
+                  {
+                    "key": "interaction.sequence",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "interaction.duration_ms",
+                    "value": {
+                      "intValue": 6000
+                    }
+                  },
+                  {
+                    "key": "user_prompt_length",
+                    "value": {
+                      "intValue": 42
+                    }
+                  },
+                  {
+                    "key": "queued_sends",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "parent.source",
+                    "value": {
+                      "stringValue": "none"
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 0
+                }
+              },
+              {
+                "traceId": "00000000000000000000000000000101",
+                "spanId": "0000000000000a02",
+                "parentSpanId": "0000000000000a01",
+                "name": "claude_code.tool",
+                "kind": 1,
+                "startTimeUnixNano": "1789117600500000000",
+                "endTimeUnixNano": "1789117600700000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000101"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Read"
+                    }
+                  },
+                  {
+                    "key": "tool_name_safe",
+                    "value": {
+                      "stringValue": "Read"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_read_0001"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_read_0001"
+                    }
+                  },
+                  {
+                    "key": "file_path",
+                    "value": {
+                      "stringValue": "internal/service/handler.go"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 200
+                    }
+                  },
+                  {
+                    "key": "result_tokens",
+                    "value": {
+                      "intValue": 512
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 0
+                }
+              },
+              {
+                "traceId": "00000000000000000000000000000101",
+                "spanId": "0000000000000a03",
+                "parentSpanId": "0000000000000a02",
+                "name": "claude_code.tool.execution",
+                "kind": 1,
+                "startTimeUnixNano": "1789117600550000000",
+                "endTimeUnixNano": "1789117600690000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000101"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.execution"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_read_0001"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_read_0001"
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 140
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 0
+                }
+              },
+              {
+                "traceId": "00000000000000000000000000000101",
+                "spanId": "0000000000000a04",
+                "parentSpanId": "0000000000000a01",
+                "name": "claude_code.tool",
+                "kind": 1,
+                "startTimeUnixNano": "1789117601000000000",
+                "endTimeUnixNano": "1789117604000000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000101"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Bash"
+                    }
+                  },
+                  {
+                    "key": "tool_name_safe",
+                    "value": {
+                      "stringValue": "Bash"
+                    }
+                  },
+                  {
+                    "key": "bash_command_class",
+                    "value": {
+                      "stringValue": "other"
+                    }
+                  },
+                  {
+                    "key": "bash_argv0",
+                    "value": {
+                      "stringValue": "cat"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_bash_0002"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_bash_0002"
+                    }
+                  },
+                  {
+                    "key": "full_command",
+                    "value": {
+                      "stringValue": "cat config/app.yaml"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 3000
+                    }
+                  },
+                  {
+                    "key": "result_tokens",
+                    "value": {
+                      "intValue": 8
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 0
+                }
+              },
+              {
+                "traceId": "00000000000000000000000000000101",
+                "spanId": "0000000000000a05",
+                "parentSpanId": "0000000000000a04",
+                "name": "claude_code.tool.blocked_on_user",
+                "kind": 1,
+                "startTimeUnixNano": "1789117601000000000",
+                "endTimeUnixNano": "1789117603000000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000101"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.blocked_on_user"
+                    }
+                  },
+                  {
+                    "key": "decision",
+                    "value": {
+                      "stringValue": "accept"
+                    }
+                  },
+                  {
+                    "key": "source",
+                    "value": {
+                      "stringValue": "user_permanent"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 2000
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 0
+                }
+              },
+              {
+                "traceId": "00000000000000000000000000000101",
+                "spanId": "0000000000000a06",
+                "parentSpanId": "0000000000000a04",
+                "name": "claude_code.tool.execution",
+                "kind": 1,
+                "startTimeUnixNano": "1789117603000000000",
+                "endTimeUnixNano": "1789117603900000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000101"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.execution"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_bash_0002"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_bash_0002"
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": false
+                    }
+                  },
+                  {
+                    "key": "error_class",
+                    "value": {
+                      "stringValue": "ShellError"
+                    }
+                  },
+                  {
+                    "key": "error",
+                    "value": {
+                      "stringValue": "cat: config/app.yaml: No such file or directory"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 900
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 2
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

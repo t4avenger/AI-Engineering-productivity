@@ -133,7 +133,7 @@
         "span_id": "0000000000000001",
         "task_boundary": {
           "confidence": "unknown",
-          "reason": "Claude Code trace spans: per-span task-boundary mapping deferred to T-phase (#101–#103)"
+          "reason": "Claude Code trace spans: per-span task-boundary mapping deferred to T-phase (#102–#103)"
         },
         "trace_id": "00000000000000000000000000000001"
       },

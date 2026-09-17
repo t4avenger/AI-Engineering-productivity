@@ -88,6 +88,42 @@ func TestRiskyAccessIndeterminateWhenVisibilityAbsent(t *testing.T) {
 	}
 }
 
+// TestRiskyAccessFlagsToolSpanFilePathAndFullCommand proves the #101 tool-span
+// mapping is reachable by governance: a claude_code.tool span nests its raw
+// file_path/full_command inside the typed "tool" block, and full_command is the
+// Bash tool's native command key (newly registered in commandFieldKeys). A
+// credential file_path read and a `cat .env` full_command must each surface a
+// finding, classified over the raw value the normaliser stored.
+func TestRiskyAccessFlagsToolSpanFilePathAndFullCommand(t *testing.T) {
+	report := RiskyAccessFromEvents([]canonical.Event{
+		eventWithAttributes(map[string]any{"tool": map[string]any{
+			"tool_name": "Read",
+			"file_path": "/home/dev/app/.env",
+		}}),
+		eventWithAttributes(map[string]any{"tool": map[string]any{
+			"tool_name":    "Bash",
+			"full_command": "cat .env",
+		}}),
+	})
+
+	if report.Outcome != OutcomeViolation {
+		t.Fatalf("expected violation, got %q", report.Outcome)
+	}
+	if len(report.Findings) != 2 {
+		t.Fatalf("expected two findings (filesystem_read + shell_command), got %#v", report.Findings)
+	}
+	classByMethod := map[AccessMethod]string{}
+	for _, finding := range report.Findings {
+		classByMethod[finding.AccessMethod] = finding.Class
+	}
+	if classByMethod[AccessFilesystemRead] != string(privacy.PathDotenv) {
+		t.Fatalf("nested file_path finding class = %q, want dotenv", classByMethod[AccessFilesystemRead])
+	}
+	if _, ok := classByMethod[AccessShellCommand]; !ok {
+		t.Fatalf("full_command must be classified as a shell-command access: %#v", report.Findings)
+	}
+}
+
 func TestRiskyAccessFindingsCarryRawEvidence(t *testing.T) {
 	// Issue #88 removed ingest-time hiding: governance classifies the raw stored
 	// path/command, and the finding reference carries that raw value so an
