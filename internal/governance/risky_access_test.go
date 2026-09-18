@@ -21,6 +21,7 @@ func eventWithAttributes(attributes map[string]any) canonical.Event {
 	return canonical.Event{
 		SchemaVersion:      "0.1.0",
 		EventID:            "synthetic",
+		SessionID:          "session-synthetic-001",
 		OccurredAt:         time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC),
 		Attributes:         attributes,
 		ProviderExtensions: map[string]any{},
@@ -38,6 +39,9 @@ func TestRiskyAccessFlagsDotenvReadViaTool(t *testing.T) {
 	}
 	if report.Findings[0].Class != string(privacy.PathDotenv) {
 		t.Fatalf("expected dotenv class, got %q", report.Findings[0].Class)
+	}
+	if report.Findings[0].SessionID != "session-synthetic-001" {
+		t.Fatalf("expected session id retained on finding, got %q", report.Findings[0].SessionID)
 	}
 }
 
@@ -146,6 +150,21 @@ func TestRiskyAccessFindingsCarryRawEvidence(t *testing.T) {
 	}
 	if !strings.Contains(string(serialized), "/home/dev/app/.env") {
 		t.Fatalf("raw path evidence must be retained in the finding, got %s", serialized)
+	}
+	if !strings.Contains(string(serialized), `"session_id":"session-synthetic-001"`) {
+		t.Fatalf("session id must be retained on findings for UI links, got %s", serialized)
+	}
+}
+
+func TestRiskyAccessFindingOmitsSessionIDWhenAbsent(t *testing.T) {
+	event := eventWithAttributes(map[string]any{"file_path": ".env"})
+	event.SessionID = ""
+	report := RiskyAccessFromEvents([]canonical.Event{event})
+	if len(report.Findings) != 1 {
+		t.Fatalf("expected one finding, got %#v", report.Findings)
+	}
+	if report.Findings[0].SessionID != "" {
+		t.Fatalf("empty source session must not invent a session id, got %q", report.Findings[0].SessionID)
 	}
 }
 

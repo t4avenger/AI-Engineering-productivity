@@ -60,6 +60,17 @@ strings.
 | `calculated` | Calculated estimate | Pricing data was available and an amount was calculated. | Currency / micro-USD internally | Not applicable. |
 | `unknown_price` | Price unknown | The usage was retained but no matching price was available. | Count/status | Show unknown price, never `$0`. |
 | `not_calculable` | Not calculable | Required usage or currency inputs were missing for cost calculation. | Count/status | Show not calculable, never `$0`. |
+| `violation` | Violation | A detect-and-report policy found a matching observation. | None | Not applicable when outcome is indeterminate. |
+| `not_violation` | Not a violation | Observed telemetry supported a verdict and no matching risk was found. | None | Do not use when visibility is absent. |
+| `indeterminate` | Indeterminate | Telemetry or policy configuration is insufficient for a verdict. | None | Prefer this over a fabricated clean result. |
+| `policy_unconfigured` | Allowlist not configured | `governance.mcp_allowlist` is empty so MCP approval cannot be decided. | None | Keep outcome indeterminate. |
+| `high` | High | High-confidence classification for a governance finding. | None | Show with evidence; colour is never the sole cue. |
+| `medium` | Medium | Medium-confidence classification for a governance finding. | None | Show with evidence. |
+| `low` | Low | Low-confidence classification for a governance finding. | None | Show with evidence. |
+| `unapproved` | Unapproved | Observed MCP server name is absent from the configured allowlist. | None | Not applicable when allowlist is empty. |
+| `unidentified` | Unidentified | MCP telemetry lacked a provider-reported server name. | None | Keep parent outcome indeterminate. |
+| `filesystem_read` | Filesystem read | Credential/secret path reached via a filesystem read attribute. | None | Not applicable. |
+| `shell_command` | Shell command | Credential/secret path reached via a shell command attribute. | None | Not applicable. |
 
 ## MCP Inventory Fields
 

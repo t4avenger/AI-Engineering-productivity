@@ -21,7 +21,7 @@ func NewAuthenticatedPersistentDevelopmentHandler(logger *slog.Logger, repositor
 }
 
 func wrapUI(token string, repository storage.Repository, thresholds InsightThresholds, next http.Handler) http.Handler {
-	dashboard, err := ui.New(token, repository, thresholds.ContextWaste)
+	dashboard, err := ui.New(token, repository, thresholds.ContextWaste, thresholds.MCPAllowlist)
 	if err != nil {
 		panic("ui templates: " + err.Error())
 	}

@@ -52,10 +52,13 @@ highlights) and does not surface cost labels or links. Costs remains a secondary
 page available at `/costs` from other authenticated pages, outside the primary
 navigation.
 
-The Governance primary destination is an authenticated, explicitly temporary
-placeholder until issue #151 renders existing risky-access and unapproved-MCP
-findings. It makes no enforcement claim; the local edition remains
-detect-and-report only.
+The Governance primary destination renders detect-and-report findings from the
+existing risky-access and unapproved-MCP engines over retained events. Each
+section shows outcome and visibility badges, evidence tables (raw path/command
+or MCP server name), and session links when a finding carries a session id.
+An empty MCP allowlist is labelled allowlist-not-configured / indeterminate.
+The page makes no enforcement claim; the local edition remains detect-and-report
+only. MCP allowlist Save lands in issue #152.
 
 The Insights page reads MCP inventory, skill usage, model-performance, and
 context-pressure summaries from retained canonical events. It renders the raw
