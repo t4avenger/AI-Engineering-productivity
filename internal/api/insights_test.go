@@ -14,6 +14,12 @@ import (
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
+type testMCPAllowlistSource struct{ names []string }
+
+func (s *testMCPAllowlistSource) MCPAllowlist() []string {
+	return append([]string(nil), s.names...)
+}
+
 func TestMCPInventoryInsightAPI(t *testing.T) {
 	repo := sessionTestRepository(t)
 	request := sessionTestEvent(t, "mcp-request", "mcp-session", "claude-code", "active", "2026-01-04T09:00:00Z", "")
@@ -164,6 +170,32 @@ func TestUnapprovedMCPInsightAPIIndeterminateWhenUnconfigured(t *testing.T) {
 	}
 	if body.Data.Visibility != "policy_unconfigured" {
 		t.Fatalf("expected policy_unconfigured visibility, got %q", body.Data.Visibility)
+	}
+}
+
+func TestUnapprovedMCPInsightAPIReadsUpdatedAllowlistSource(t *testing.T) {
+	repo := sessionTestRepository(t)
+	connected := sessionTestEvent(t, "mcp-live", "mcp-live-session", "claude-code", "active", "2026-01-04T09:00:00Z", "")
+	connected.Provider = "anthropic"
+	connected.EventType = "mcp_server_connection"
+	connected.ProviderExtensions = map[string]any{"event": map[string]any{"server_name": "filesystem", "status": "connected"}}
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{connected}); err != nil {
+		t.Fatal(err)
+	}
+	source := &testMCPAllowlistSource{names: []string{"git"}}
+	thresholds := DefaultInsightThresholds()
+	thresholds.MCPAllowlistSource = source
+	server := httptest.NewServer(newHandler(slog.Default(), nil, repo, repo, thresholds))
+	t.Cleanup(server.Close)
+
+	before := getInsightJSON[unapprovedMCPResponse](t, server.URL+"/api/v1/insights/unapproved-mcp")
+	if before.Data.Outcome != governance.OutcomeViolation {
+		t.Fatalf("before update outcome = %q", before.Data.Outcome)
+	}
+	source.names = []string{"filesystem"}
+	after := getInsightJSON[unapprovedMCPResponse](t, server.URL+"/api/v1/insights/unapproved-mcp")
+	if after.Data.Outcome != governance.OutcomeNotViolation {
+		t.Fatalf("after update outcome = %q", after.Data.Outcome)
 	}
 }
 

@@ -108,6 +108,7 @@ func TestValidateRejectsUnsafeOrUnsupportedSettings(t *testing.T) {
 }
 
 func TestLoadFromEnvDefaultsToLoopback(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("TELEMETRYIQ_CONFIG", "")
 	t.Setenv("TELEMETRYIQ_HOST", "")
 	t.Setenv("TELEMETRYIQ_PORT", "")
@@ -129,6 +130,7 @@ func TestFromEnvUsesServerOverrides(t *testing.T) {
 }
 
 func TestLoadFromEnvRejectsNonLoopbackHost(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("TELEMETRYIQ_CONFIG", "")
 	t.Setenv("TELEMETRYIQ_HOST", "0.0.0.0")
 	_, err := LoadFromEnv()
@@ -138,6 +140,7 @@ func TestLoadFromEnvRejectsNonLoopbackHost(t *testing.T) {
 }
 
 func TestLoadFromEnvAcceptsLocalhost(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("TELEMETRYIQ_CONFIG", "")
 	t.Setenv("TELEMETRYIQ_HOST", "localhost")
 	t.Setenv("TELEMETRYIQ_PORT", "")
@@ -151,6 +154,7 @@ func TestLoadFromEnvAcceptsLocalhost(t *testing.T) {
 }
 
 func TestLoadFromEnvRejectsInvalidPort(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("TELEMETRYIQ_CONFIG", "")
 	t.Setenv("TELEMETRYIQ_PORT", "70000")
 	_, err := LoadFromEnv()

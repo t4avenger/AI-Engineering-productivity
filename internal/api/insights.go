@@ -103,7 +103,7 @@ func (a sessionAPI) unapprovedMCP(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	writeSessionJSON(w, http.StatusOK, unapprovedMCPResponse{Data: governance.UnapprovedMCPFromEvents(events, a.thresholds.MCPAllowlist)})
+	writeSessionJSON(w, http.StatusOK, unapprovedMCPResponse{Data: governance.UnapprovedMCPFromEvents(events, a.thresholds.currentMCPAllowlist())})
 }
 
 // loadInsightEvents returns retained events for an insight handler, or writes

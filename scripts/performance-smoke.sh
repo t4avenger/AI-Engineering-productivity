@@ -14,7 +14,7 @@ cleanup() {
 trap cleanup EXIT
 
 go build -o "$tmpdir/telemetryiq" ./cmd/telemetryiq
-TELEMETRYIQ_PORT="$port" "$tmpdir/telemetryiq" >"$tmpdir/daemon.log" 2>&1 &
+XDG_CONFIG_HOME="$tmpdir/config" TELEMETRYIQ_PORT="$port" "$tmpdir/telemetryiq" >"$tmpdir/daemon.log" 2>&1 &
 pid="$!"
 
 for _ in $(seq 1 40); do

@@ -748,6 +748,34 @@ export function claudeContextWasteOTLPLogs(): string {
   ]);
 }
 
+/** Claude MCP lifecycle event carrying a provider-reported server identity. */
+export function claudeMCPConnectionOTLPLogs(serverName: string): string {
+  return claudeOTLPLogs([
+    {
+      attributes: [
+        {
+          key: 'event.name',
+          value: { stringValue: 'mcp_server_connection' },
+        },
+        {
+          key: 'event.timestamp',
+          value: { stringValue: '2026-09-06T19:05:00.000Z' },
+        },
+        { key: 'event.sequence', value: { intValue: '2' } },
+        {
+          key: 'session.id',
+          value: { stringValue: 'tiq-live-e2e-mcp-policy-session' },
+        },
+        { key: 'status', value: { stringValue: 'connected' } },
+        { key: 'transport_type', value: { stringValue: 'stdio' } },
+        { key: 'server_scope', value: { stringValue: 'user' } },
+        { key: 'is_plugin', value: { boolValue: false } },
+        { key: 'server_name', value: { stringValue: serverName } },
+      ],
+    },
+  ]);
+}
+
 /** Claude api_request carrying raw .env path/command evidence for Governance (#151). */
 export function claudeRiskyAccessOTLPLogs(): string {
   return JSON.stringify({

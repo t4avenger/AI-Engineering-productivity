@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import {
   authToken,
+  claudeMCPConnectionOTLPLogs,
   claudeRiskyAccessOTLPLogs,
   ingestOTLPLogs,
   resetDaemonBetweenTests,
@@ -51,4 +52,45 @@ test('renders risky-access findings after live OTLP ingest', async ({
   await expect(
     page.getByText('does not enforce or publish', { exact: false }),
   ).toBeVisible();
+});
+
+test('saves an observed MCP server and reloads findings without mocks', async ({
+  page,
+}) => {
+  const serverName = 'tiq-live-filesystem';
+  await ingestOTLPLogs(claudeMCPConnectionOTLPLogs(serverName));
+
+  const before = await fetch(
+    'http://localhost:18080/api/v1/insights/unapproved-mcp',
+    { headers: { Authorization: `Bearer ${authToken}` } },
+  );
+  expect(before.status).toBe(200);
+  expect((await before.json()) as unknown).toMatchObject({
+    data: { outcome: 'indeterminate', visibility: 'policy_unconfigured' },
+  });
+
+  await unlockDashboard(page, authToken);
+  await page.goto('/governance');
+  const checkbox = page.getByRole('checkbox', { name: serverName });
+  await expect(checkbox).toBeVisible();
+  await checkbox.check();
+  await page.getByRole('button', { name: 'Save allowlist' }).click();
+
+  await expect(page).toHaveURL(/\/governance\?saved=1$/);
+  await expect(page.getByRole('status')).toContainText('MCP allowlist saved');
+  await expect(page.getByText('All identifiable observed MCP servers')).toBeVisible();
+  await expect(checkbox).toBeChecked();
+
+  const after = await fetch(
+    'http://localhost:18080/api/v1/insights/unapproved-mcp',
+    { headers: { Authorization: `Bearer ${authToken}` } },
+  );
+  expect(after.status).toBe(200);
+  expect((await after.json()) as unknown).toMatchObject({
+    data: { outcome: 'not_violation', visibility: 'observed' },
+  });
+
+  await checkbox.uncheck();
+  await page.getByRole('button', { name: 'Save allowlist' }).click();
+  await expect(page.getByRole('status')).toContainText('MCP allowlist saved');
 });

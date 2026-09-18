@@ -2,9 +2,12 @@ package ui_test
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,6 +21,28 @@ import (
 var defaultContextWasteThresholds = insights.ContextWasteThresholds{
 	CachedContextRatioThreshold: 0.75,
 	InputTokenGrowthThreshold:   2.0,
+}
+
+type testAllowlistController struct {
+	mu      sync.RWMutex
+	names   []string
+	saveErr error
+}
+
+func (c *testAllowlistController) MCPAllowlist() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return append([]string(nil), c.names...)
+}
+
+func (c *testAllowlistController) SaveMCPAllowlist(names []string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.saveErr != nil {
+		return c.saveErr
+	}
+	c.names = append([]string(nil), names...)
+	return nil
 }
 
 type fullStub struct {
@@ -1062,6 +1087,102 @@ func TestGovernanceFindingsPage(t *testing.T) {
 			t.Fatalf("configured allowlist must not show policy_unconfigured: %q", body)
 		}
 	})
+}
+
+func TestGovernanceAllowlistSaveRoundTrip(t *testing.T) {
+	repo := governanceFindingsFixture(t)
+	controller := &testAllowlistController{names: []string{"configured-only"}}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, controller.MCPAllowlist(), controller)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+
+	initial := getAuthed(t, handler, cookie, "/governance").Body.String()
+	assertContainsAll(t, initial, []string{
+		`value="configured-only" checked`,
+		"Configured; not currently observed",
+		`value="rogue-tool"`,
+		"Observed",
+		"Save allowlist",
+	})
+
+	response := postAllowlist(t, handler, cookie, url.Values{
+		"mcp_server": {"configured-only", "rogue-tool"},
+	})
+	if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/governance?saved=1" {
+		t.Fatalf("save response = %d location %q", response.Code, response.Header().Get("Location"))
+	}
+	if got := controller.MCPAllowlist(); !equalStrings(got, []string{"configured-only", "rogue-tool"}) {
+		t.Fatalf("saved allowlist = %#v", got)
+	}
+
+	saved := getAuthed(t, handler, cookie, "/governance?saved=1").Body.String()
+	assertContainsAll(t, saved, []string{"MCP allowlist saved", "All identifiable observed MCP servers are on the allowlist."})
+
+	response = postAllowlist(t, handler, cookie, url.Values{})
+	if response.Code != http.StatusSeeOther {
+		t.Fatalf("empty save response = %d", response.Code)
+	}
+	if got := controller.MCPAllowlist(); len(got) != 0 {
+		t.Fatalf("empty selection did not clear allowlist: %#v", got)
+	}
+}
+
+func TestGovernanceAllowlistRejectsUnknownServerWithoutSaving(t *testing.T) {
+	repo := governanceFindingsFixture(t)
+	controller := &testAllowlistController{names: []string{"configured-only"}}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, controller.MCPAllowlist(), controller)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+
+	response := postAllowlist(t, handler, cookie, url.Values{"mcp_server": {"injected-server"}})
+	if response.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("unknown save response = %d, want 422", response.Code)
+	}
+	if !strings.Contains(response.Body.String(), "unknown server") {
+		t.Fatalf("missing actionable validation error: %q", response.Body.String())
+	}
+	if got := controller.MCPAllowlist(); !equalStrings(got, []string{"configured-only"}) {
+		t.Fatalf("rejected save changed allowlist: %#v", got)
+	}
+}
+
+func TestGovernanceAllowlistWriteFailureKeepsActivePolicy(t *testing.T) {
+	repo := governanceFindingsFixture(t)
+	controller := &testAllowlistController{names: []string{"configured-only"}, saveErr: errors.New("disk full")}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, controller.MCPAllowlist(), controller)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+
+	response := postAllowlist(t, handler, cookie, url.Values{"mcp_server": {"rogue-tool"}})
+	if response.Code != http.StatusInternalServerError || !strings.Contains(response.Body.String(), "active policy was not changed") {
+		t.Fatalf("write failure response = %d: %q", response.Code, response.Body.String())
+	}
+	if got := controller.MCPAllowlist(); !equalStrings(got, []string{"configured-only"}) {
+		t.Fatalf("failed write changed allowlist: %#v", got)
+	}
+}
+
+func postAllowlist(t *testing.T, handler http.Handler, cookie *http.Cookie, values url.Values) *httptest.ResponseRecorder {
+	t.Helper()
+	request := httptest.NewRequest(http.MethodPost, "/governance/mcp-allowlist", strings.NewReader(values.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	return response
+}
+
+func equalStrings(left, right []string) bool {
+	return strings.Join(left, "\x00") == strings.Join(right, "\x00")
 }
 
 func governanceFindingsFixture(t *testing.T) *fullStub {

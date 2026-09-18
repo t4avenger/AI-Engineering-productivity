@@ -57,8 +57,10 @@ existing risky-access and unapproved-MCP engines over retained events. Each
 section shows outcome and visibility badges, evidence tables (raw path/command
 or MCP server name), and session links when a finding carries a session id.
 An empty MCP allowlist is labelled allowlist-not-configured / indeterminate.
-The page makes no enforcement claim; the local edition remains detect-and-report
-only. MCP allowlist Save lands in issue #152.
+Named observed MCP servers and configured-only entries are rendered as
+checkboxes. An authenticated Save atomically writes the validated local YAML and
+reloads both HTML and JSON findings in-process. The page makes no enforcement
+claim; the local edition remains detect-and-report only.
 
 The Insights page reads MCP inventory, skill usage, model-performance, and
 context-pressure summaries from retained canonical events. It renders the raw
@@ -76,5 +78,6 @@ response, or source-code retention by default (configurable capture tracked in
 #94); raw provider-native IDs, file paths, and command lines retained and shown
 (epic #87 — no ingest-time hiding); no sharing; and a default 30-day retention
 period. These values are
-not editable in the dashboard because configuration remains file-based and is
-validated by the daemon. Bulk deletion requires typing `DELETE ALL`.
+not editable in the dashboard except for the MCP allowlist, which remains
+file-backed and validated by the daemon. Bulk deletion requires typing
+`DELETE ALL`.

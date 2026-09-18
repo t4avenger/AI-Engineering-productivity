@@ -137,7 +137,7 @@ The local-only edition does not capture prompts, responses, or source code by de
 
 The safe, local-only defaults use schema version `0.1.0`: operational collection, 30-day local retention, and no diagnostics or analytics sharing. Prompts, responses, and source code are always disabled in this configuration version; raw file paths and command lines are retained (epic #87 — no ingest-time hiding).
 
-Set `TELEMETRYIQ_CONFIG` to load an explicit YAML file:
+When `TELEMETRYIQ_CONFIG` is unset, the daemon loads and manages `{UserConfigDir}/telemetryiq/config.yaml`; the file is created with mode `0600` on the first Governance allowlist save. Set `TELEMETRYIQ_CONFIG` to use an explicit YAML path instead:
 
 ```yaml
 schema_version: "0.1.0"
@@ -156,6 +156,10 @@ sharing:
   diagnostics: false
   anonymous_analytics: false
   research_sessions: explicit-only
+governance:
+  mcp_allowlist: []
 ```
+
+The authenticated Governance page can update `governance.mcp_allowlist`. Saves validate and atomically replace the complete local YAML before the in-process HTML and JSON findings adopt the change; a failed write leaves both disk and active policy unchanged. This remains detect-and-report only and an empty allowlist remains indeterminate.
 
 The daemon rejects unknown fields, unsupported schema versions, content capture, non-local storage, unsafe sharing, non-loopback hosts, and invalid ports with actionable startup errors. `TELEMETRYIQ_HOST` (default `localhost`) and `TELEMETRYIQ_PORT` (default `8080`) override the loopback server address.

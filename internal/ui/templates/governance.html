@@ -68,8 +68,32 @@
       Status {{template "status-badge" (printf "%s" .UnapprovedMCP.Outcome)}}
       · Visibility {{template "status-badge" .UnapprovedMCP.Visibility}}
     </p>
+    {{if .Saved}}<output class="success">MCP allowlist saved. Findings now use the updated local policy.</output>{{end}}
+    <form method="post" action="/governance/mcp-allowlist" class="stack allowlist-form">
+      <fieldset>
+        <legend>Allowed MCP servers</legend>
+        {{if .MCPServers}}
+        <div class="allowlist-options">
+          {{range .MCPServers}}
+          <label class="allowlist-option">
+            <input type="checkbox" name="mcp_server" value="{{.Name}}"{{if .Checked}} checked{{end}}>
+            <code>{{.Name}}</code>
+            <span class="muted">{{if .Observed}}Observed{{else}}Configured; not currently observed{{end}}</span>
+          </label>
+          {{end}}
+        </div>
+        {{else}}
+        <p class="muted">No provider-reported MCP server names are available yet.</p>
+        {{end}}
+      </fieldset>
+      {{if .SaveAvailable}}
+      <button type="submit">Save allowlist</button>
+      {{else}}
+      <p class="muted">Saving is unavailable because no writable configuration controller is active.</p>
+      {{end}}
+    </form>
     {{if eq .UnapprovedMCP.Visibility "policy_unconfigured"}}
-    <p class="muted">The MCP allowlist is empty, so approval cannot be decided. Configure <code>governance.mcp_allowlist</code> locally (Save UI lands in a follow-up).</p>
+    <p class="muted">The MCP allowlist is empty, so approval cannot be decided. Select observed servers above and save the local policy.</p>
     {{else if .UnapprovedMCP.Findings}}
     <section class="table-wrap" aria-label="Unapproved MCP findings">
       <table>

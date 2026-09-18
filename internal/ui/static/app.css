@@ -154,6 +154,12 @@ input[type="password"], input[type="text"] {
   width: 100%;
 }
 .error { color: var(--color-danger); font-weight: 600; }
+.success { color: var(--color-ok); font-weight: 600; }
+.allowlist-form fieldset { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-4); }
+.allowlist-form legend { font-weight: 700; padding: 0 var(--space-1); }
+.allowlist-options { display: grid; gap: var(--space-3); }
+.allowlist-option { align-items: baseline; display: grid; gap: var(--space-2); grid-template-columns: auto minmax(8rem, auto) 1fr; }
+.allowlist-option input { margin: 0; }
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; }
 th, td { border-bottom: 1px solid var(--color-border); padding: 0.65rem 0.5rem; text-align: left; }

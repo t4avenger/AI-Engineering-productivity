@@ -28,6 +28,7 @@ const (
 	pathInsights       = "/insights"
 	pathEventsPrefix   = "/events/"
 	pathGovernance     = "/governance"
+	pathMCPAllowlist   = "/governance/mcp-allowlist"
 	pathIntegrations   = "/integrations"
 	pathPrivacy        = "/privacy"
 	pathPrivacyDelete  = "/privacy/delete-all"
@@ -49,6 +50,13 @@ const (
 //go:embed templates/*.html static/*
 var embedded embed.FS
 
+// MCPAllowlistController persists and exposes the current local policy input.
+// Implementations must be safe for concurrent requests.
+type MCPAllowlistController interface {
+	MCPAllowlist() []string
+	SaveMCPAllowlist([]string) error
+}
+
 // Server serves the local HTMX dashboard.
 type Server struct {
 	token                  string
@@ -60,14 +68,15 @@ type Server struct {
 	costs                  storage.CostReader
 	contextWasteThresholds insights.ContextWasteThresholds
 	mcpAllowlist           []string
+	mcpAllowlistController MCPAllowlistController
 	templates              *template.Template
 	static                 http.Handler
 }
 
 // New builds a dashboard server. sessions may be a full Repository.
-// mcpAllowlist is the configured governance.mcp_allowlist used by the
-// unapproved-MCP findings view (same source as the JSON insight API).
-func New(token string, sessions storage.SessionReader, contextWasteThresholds insights.ContextWasteThresholds, mcpAllowlist []string) (*Server, error) {
+// mcpAllowlist is the startup governance.mcp_allowlist snapshot. A controller
+// may be supplied by the daemon to enable atomic save and immediate reload.
+func New(token string, sessions storage.SessionReader, contextWasteThresholds insights.ContextWasteThresholds, mcpAllowlist []string, controllers ...MCPAllowlistController) (*Server, error) {
 	tmpl, err := template.New("").Funcs(template.FuncMap{
 		"avail":       availabilityLabel,
 		"statusLabel": statusLabel,
@@ -111,6 +120,10 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 	events, _ := sessions.(storage.EventReader)
 	operations, _ := sessions.(storage.OperationReader)
 	costs, _ := sessions.(storage.CostReader)
+	var controller MCPAllowlistController
+	if len(controllers) > 0 {
+		controller = controllers[0]
+	}
 	return &Server{
 		token:                  token,
 		expected:               sha256.Sum256([]byte(token)),
@@ -121,9 +134,17 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 		costs:                  costs,
 		contextWasteThresholds: contextWasteThresholds,
 		mcpAllowlist:           append([]string(nil), mcpAllowlist...),
+		mcpAllowlistController: controller,
 		templates:              tmpl,
 		static:                 http.FileServer(http.FS(staticRoot)),
 	}, nil
+}
+
+func (s *Server) currentMCPAllowlist() []string {
+	if s.mcpAllowlistController != nil {
+		return s.mcpAllowlistController.MCPAllowlist()
+	}
+	return append([]string(nil), s.mcpAllowlist...)
 }
 
 func (s *Server) authenticated(r *http.Request) bool {
