@@ -129,7 +129,18 @@ func Load(path string) (Config, error) {
 
 // LoadFromEnv loads TELEMETRYIQ_CONFIG and applies loopback server overrides.
 func LoadFromEnv() (Config, error) {
-	cfg, err := Load(os.Getenv("TELEMETRYIQ_CONFIG"))
+	path, explicit, err := PathFromEnv()
+	if err != nil {
+		return Config{}, err
+	}
+	cfg := Default()
+	if explicit {
+		cfg, err = Load(path)
+	} else if _, statErr := os.Stat(path); statErr == nil {
+		cfg, err = Load(path)
+	} else if !errors.Is(statErr, os.ErrNotExist) {
+		err = fmt.Errorf("inspect managed configuration: %w", statErr)
+	}
 	if err != nil {
 		return Config{}, err
 	}
@@ -139,6 +150,20 @@ func LoadFromEnv() (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// PathFromEnv resolves the writable configuration path. An explicit
+// TELEMETRYIQ_CONFIG path always wins; otherwise TelemetryIQ manages
+// config.yaml beside its other local application data.
+func PathFromEnv() (path string, explicit bool, err error) {
+	if path = os.Getenv("TELEMETRYIQ_CONFIG"); path != "" {
+		return path, true, nil
+	}
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", false, fmt.Errorf("locate application configuration directory: %w", err)
+	}
+	return filepath.Join(configDir, "telemetryiq", "config.yaml"), false, nil
 }
 
 // Validate preserves local-only privacy invariants and supported meanings.

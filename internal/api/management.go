@@ -10,18 +10,18 @@ import (
 
 // NewAuthenticatedPersistentHandler enables persistent ingestion and protects
 // management endpoints with a local bearer token or dashboard cookie.
-func NewAuthenticatedPersistentHandler(logger *slog.Logger, repository storage.Repository, token string, thresholds InsightThresholds) http.Handler {
-	return wrapUI(token, repository, thresholds, withManagementAuth(token, withBulkDelete(repository, thresholds, newHandler(logger, nil, repository, repository, thresholds))))
+func NewAuthenticatedPersistentHandler(logger *slog.Logger, repository storage.Repository, token string, thresholds InsightThresholds, controllers ...ui.MCPAllowlistController) http.Handler {
+	return wrapUI(token, repository, thresholds, withManagementAuth(token, withBulkDelete(repository, thresholds, newHandler(logger, nil, repository, repository, thresholds))), controllers...)
 }
 
 // NewAuthenticatedPersistentDevelopmentHandler retains the development-only
 // ingest inspector while protecting management endpoints.
-func NewAuthenticatedPersistentDevelopmentHandler(logger *slog.Logger, repository storage.Repository, token string, thresholds InsightThresholds) http.Handler {
-	return wrapUI(token, repository, thresholds, withManagementAuth(token, withBulkDelete(repository, thresholds, newHandler(logger, newIngestInspector(), repository, repository, thresholds))))
+func NewAuthenticatedPersistentDevelopmentHandler(logger *slog.Logger, repository storage.Repository, token string, thresholds InsightThresholds, controllers ...ui.MCPAllowlistController) http.Handler {
+	return wrapUI(token, repository, thresholds, withManagementAuth(token, withBulkDelete(repository, thresholds, newHandler(logger, newIngestInspector(), repository, repository, thresholds))), controllers...)
 }
 
-func wrapUI(token string, repository storage.Repository, thresholds InsightThresholds, next http.Handler) http.Handler {
-	dashboard, err := ui.New(token, repository, thresholds.ContextWaste, thresholds.MCPAllowlist)
+func wrapUI(token string, repository storage.Repository, thresholds InsightThresholds, next http.Handler, controllers ...ui.MCPAllowlistController) http.Handler {
+	dashboard, err := ui.New(token, repository, thresholds.ContextWaste, thresholds.currentMCPAllowlist(), controllers...)
 	if err != nil {
 		panic("ui templates: " + err.Error())
 	}

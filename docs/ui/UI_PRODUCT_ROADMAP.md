@@ -55,8 +55,8 @@ secondary destinations; Home omits the Costs link. See
 | Cost records | `cost_records` | Costs page only |
 | MCP inventory / skills / model / context / ops insights | `GET /api/v1/insights/*` | Insights page |
 | Risky access | `GET /api/v1/insights/risky-access` | Yes — `/governance` (#151) |
-| Unapproved MCP | `GET /api/v1/insights/unapproved-mcp` | Yes — `/governance` (#151); Save editor is #152 |
-| MCP allowlist config | `governance.mcp_allowlist` YAML (load-only) | Findings respect allowlist; **No editor; no Write** (#152) |
+| Unapproved MCP | `GET /api/v1/insights/unapproved-mcp` | Yes — `/governance`; Save reloads findings immediately (#151, #152) |
+| MCP allowlist config | `governance.mcp_allowlist` YAML | Checkbox editor atomically persists and reloads local policy (#152) |
 | File operations | Capability matrix mostly `unknown` | No Files lane |
 | OTEL span trees | Claude spans in event extensions (partial) | No span UI |
 | Conversation bodies | Privacy default: prompts/responses off | Intentionally absent |
@@ -163,7 +163,7 @@ Empty allowlist remains **indeterminate** (existing engine behaviour). This is d
 - [ ] Insights content reachable from Home; `/insights` redirects or canonicalises to Home sections.
 - [ ] Privacy and Costs remain reachable without top-nav slots.
 - [ ] `/governance` shows risky-access and unapproved-mcp with evidence and honest indeterminate.
-- [ ] MCP allowlist checkboxes + Save persist to local config and affect findings.
+- [x] MCP allowlist checkboxes + Save persist to local config and affect findings (#152).
 - [ ] Session timeline shows operation category/tool/duration/outcome when present (never invent zeros).
 - [ ] Integrations shows capability-backed status (addresses #79 intent).
 - [ ] Playwright live-data e2e covers Governance visibility + allowlist save round-trip + nav IA.
@@ -207,7 +207,6 @@ Epic: [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148
 
 ## 10. Next implementation step
 
-1. Implement [#152](https://github.com/t4avenger/AI-Engineering-productivity/issues/152) (MCP allowlist checkboxes + Save).
-2. Then V1 UI order: **#150** / **#153** / **#154** → **#155** (e2e).
+1. Continue V1 UI order: **#150** / **#153** / **#154** → **#155** (e2e).
 
-Highest enterprise signal remaining for least new telemetry is allowlist Save; Sessions density work should not ship on top of an unfiltered orphan list.
+With allowlist Save delivered, the remaining V1 work can deepen Home, Sessions, and Integrations before the consolidated e2e issue.

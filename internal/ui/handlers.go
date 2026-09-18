@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -133,7 +134,16 @@ type insightsData struct {
 type governanceData struct {
 	RiskyAccess   governance.RiskyAccess
 	UnapprovedMCP governance.UnapprovedMCP
+	MCPServers    []mcpAllowlistOption
+	SaveAvailable bool
+	Saved         bool
 	Error         string
+}
+
+type mcpAllowlistOption struct {
+	Name     string
+	Observed bool
+	Checked  bool
 }
 
 const (
@@ -339,7 +349,78 @@ func (s *Server) insightsPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) governancePage(w http.ResponseWriter, r *http.Request) {
-	data := governanceData{}
+	data := s.governancePageData(r, nil)
+	data.Saved = r.URL.Query().Get("saved") == "1"
+	s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
+}
+
+func (s *Server) governanceMCPAllowlistSave(w http.ResponseWriter, r *http.Request) {
+	if s.mcpAllowlistController == nil {
+		data := s.governancePageData(r, nil)
+		data.Error = "MCP allowlist saving is unavailable."
+		w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	if err := r.ParseForm(); err != nil {
+		data := s.governancePageData(r, nil)
+		data.Error = "Unable to read the MCP allowlist selection."
+		w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
+		return
+	}
+	selected := append([]string{}, r.Form["mcp_server"]...)
+	data := s.governancePageData(r, selected)
+	if data.Error != "" {
+		w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
+		return
+	}
+	known := make(map[string]struct{}, len(data.MCPServers))
+	configured := make(map[string]struct{})
+	for _, name := range s.currentMCPAllowlist() {
+		configured[strings.ToLower(strings.TrimSpace(name))] = struct{}{}
+	}
+	for _, server := range data.MCPServers {
+		key := strings.ToLower(strings.TrimSpace(server.Name))
+		if _, alreadyConfigured := configured[key]; server.Observed || alreadyConfigured {
+			known[key] = struct{}{}
+		}
+	}
+	for _, name := range selected {
+		key := strings.ToLower(strings.TrimSpace(name))
+		if key == "" {
+			data.Error = "MCP server names must not be blank."
+		} else if _, ok := known[key]; !ok {
+			data.Error = "The MCP allowlist contained an unknown server. Refresh and try again."
+		}
+		if data.Error != "" {
+			w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
+			return
+		}
+	}
+	if err := s.mcpAllowlistController.SaveMCPAllowlist(selected); err != nil {
+		data.Error = "Unable to save the MCP allowlist. The active policy was not changed."
+		w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
+		w.WriteHeader(http.StatusInternalServerError)
+		s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
+		return
+	}
+	http.Redirect(w, r, pathGovernance+"?saved=1", http.StatusSeeOther)
+}
+
+func (s *Server) governancePageData(r *http.Request, selected []string) governanceData {
+	allowlist := s.currentMCPAllowlist()
+	if selected != nil {
+		allowlist = selected
+	}
+	data := governanceData{SaveAvailable: s.mcpAllowlistController != nil}
 	events, err := s.insightEvents(r)
 	if err != nil {
 		data.Error = "Unable to load governance findings."
@@ -347,9 +428,43 @@ func (s *Server) governancePage(w http.ResponseWriter, r *http.Request) {
 		data.UnapprovedMCP = governance.UnapprovedMCP{Findings: []governance.MCPServerFinding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable"}
 	} else {
 		data.RiskyAccess = governance.RiskyAccessFromEvents(events)
-		data.UnapprovedMCP = governance.UnapprovedMCPFromEvents(events, s.mcpAllowlist)
+		data.UnapprovedMCP = governance.UnapprovedMCPFromEvents(events, allowlist)
+		data.MCPServers = mcpAllowlistOptions(insights.MCPInventoryFromEvents(events), allowlist)
 	}
-	s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
+	if data.MCPServers == nil {
+		data.MCPServers = mcpAllowlistOptions(insights.MCPInventory{}, allowlist)
+	}
+	return data
+}
+
+func mcpAllowlistOptions(inventory insights.MCPInventory, allowlist []string) []mcpAllowlistOption {
+	options := make(map[string]mcpAllowlistOption, len(inventory.Servers)+len(allowlist))
+	for _, name := range allowlist {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		options[strings.ToLower(name)] = mcpAllowlistOption{Name: name, Checked: true}
+	}
+	for _, server := range inventory.Servers {
+		name := strings.TrimSpace(server.ServerName)
+		if name == "" || server.IdentityState == "unavailable" {
+			continue
+		}
+		key := strings.ToLower(name)
+		option := options[key]
+		option.Name = name
+		option.Observed = true
+		options[key] = option
+	}
+	result := make([]mcpAllowlistOption, 0, len(options))
+	for _, option := range options {
+		result = append(result, option)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return strings.ToLower(result[i].Name) < strings.ToLower(result[j].Name)
+	})
+	return result
 }
 
 func (s *Server) integrationsPage(w http.ResponseWriter, r *http.Request) {

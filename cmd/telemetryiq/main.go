@@ -25,7 +25,7 @@ func main() {
 		return
 	}
 
-	cfg, err := config.LoadFromEnv()
+	configManager, cfg, err := config.LoadManagerFromEnv()
 	if err != nil {
 		logger.Error("invalid configuration", "error", err)
 		os.Exit(1)
@@ -58,12 +58,13 @@ func main() {
 			CachedContextRatioThreshold: cfg.Insights.ContextWaste.CachedContextRatioThreshold,
 			InputTokenGrowthThreshold:   cfg.Insights.ContextWaste.InputTokenGrowthThreshold,
 		},
-		MCPAllowlist: cfg.Governance.MCPAllowlist,
+		MCPAllowlist:       cfg.Governance.MCPAllowlist,
+		MCPAllowlistSource: configManager,
 	}
 
-	handler := api.NewAuthenticatedPersistentHandler(logger, repository, token, thresholds)
+	handler := api.NewAuthenticatedPersistentHandler(logger, repository, token, thresholds, configManager)
 	if os.Getenv("TELEMETRYIQ_DEVELOPMENT_INSPECTOR") == "1" {
-		handler = api.NewAuthenticatedPersistentDevelopmentHandler(logger, repository, token, thresholds)
+		handler = api.NewAuthenticatedPersistentDevelopmentHandler(logger, repository, token, thresholds, configManager)
 	}
 	server := &http.Server{
 		Addr:              cfg.Addr(),
