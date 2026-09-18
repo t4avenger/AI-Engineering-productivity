@@ -68,7 +68,7 @@
       Status {{template "status-badge" (printf "%s" .UnapprovedMCP.Outcome)}}
       · Visibility {{template "status-badge" .UnapprovedMCP.Visibility}}
     </p>
-    {{if .Saved}}<p class="success" role="status">MCP allowlist saved. Findings now use the updated local policy.</p>{{end}}
+    {{if .Saved}}<output class="success">MCP allowlist saved. Findings now use the updated local policy.</output>{{end}}
     <form method="post" action="/governance/mcp-allowlist" class="stack allowlist-form">
       <fieldset>
         <legend>Allowed MCP servers</legend>

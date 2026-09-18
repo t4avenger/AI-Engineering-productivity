@@ -2,9 +2,9 @@ package api
 
 import "github.com/wayne/telemetryiq/internal/insights"
 
-// MCPAllowlistSource exposes the current policy input. Implementations must be
+// MCPAllowlister exposes the current policy input. Implementations must be
 // safe for concurrent API and dashboard reads.
-type MCPAllowlistSource interface {
+type MCPAllowlister interface {
 	MCPAllowlist() []string
 }
 
@@ -19,7 +19,7 @@ type InsightThresholds struct {
 	MCPAllowlist []string
 	// MCPAllowlistSource, when set, supersedes the startup snapshot above so a
 	// successful local configuration save takes effect without daemon restart.
-	MCPAllowlistSource MCPAllowlistSource
+	MCPAllowlistSource MCPAllowlister
 }
 
 func (t InsightThresholds) currentMCPAllowlist() []string {
