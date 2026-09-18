@@ -118,7 +118,7 @@ func syntheticSession(id string, now time.Time) canonical.Session {
 
 func renderInsights(t *testing.T, repo *fullStub) string {
 	t.Helper()
-	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +200,7 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 			}(),
 		}},
 	}
-	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,8 +230,10 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 		{"/insights", "Model performance"},
 		{"/insights", "1234 ms"},
 		{"/insights", "Context pressure"},
-		{"/governance", "Governance findings are not available in this dashboard view yet."},
-		{"/governance", "does not imply that policies are enforced"},
+		{"/governance", "Risky access"},
+		{"/governance", "Unapproved MCP"},
+		{"/governance", "does not enforce or publish"},
+		{"/governance", "Indeterminate"},
 		{"/integrations", "codex"},
 		{"/integrations", "Cursor Enterprise OpenTelemetry Export"},
 		{"/integrations", "Team Settings"},
@@ -302,7 +304,7 @@ func TestSessionViewsKeepObservationsInspectableWithoutCountingThemAsPrimary(t *
 			Attributes: map[string]any{"identity_scope": "observation", "identity_source": "content-derived"},
 		},
 	}}
-	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,7 +333,7 @@ func TestUnlockAndHome(t *testing.T) {
 		State:     "completed",
 		StartedAt: time.Now().UTC(),
 	}}}
-	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -424,7 +426,7 @@ func TestHomeShellControls(t *testing.T) {
 		SessionID: "s1", Provider: "openai", Tool: "codex",
 		State: "completed", StartedAt: time.Now().UTC(),
 	}}}
-	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -541,7 +543,7 @@ func assertTimelineContains(t *testing.T, sessionID string, event canonical.Even
 		sessions: []canonical.Session{syntheticSession(sessionID, now)},
 		events:   map[string][]canonical.Event{sessionID: {event}},
 	}
-	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -572,7 +574,7 @@ func TestTimelineInvalidTokenStringIsUnavailable(t *testing.T) {
 			}},
 		},
 	}
-	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -588,7 +590,7 @@ func TestTimelineInvalidTokenStringIsUnavailable(t *testing.T) {
 }
 
 func TestSessionsEmptyStateExplainsIngestNextStep(t *testing.T) {
-	server, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds)
+	server, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -603,7 +605,7 @@ func TestSessionsEmptyStateExplainsIngestNextStep(t *testing.T) {
 }
 
 func TestHealthDegradesWhenStorageFails(t *testing.T) {
-	server, err := ui.New("test-token", errStub{}, defaultContextWasteThresholds)
+	server, err := ui.New("test-token", errStub{}, defaultContextWasteThresholds, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -616,7 +618,7 @@ func TestHealthDegradesWhenStorageFails(t *testing.T) {
 }
 
 func TestUnlockPageHidesLogout(t *testing.T) {
-	server, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds)
+	server, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -833,7 +835,7 @@ func TestContextWasteObservedFloatsRenderNumeric(t *testing.T) {
 			}},
 		},
 	}
-	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -865,7 +867,7 @@ func TestContextWasteObservedFloatsRenderNumeric(t *testing.T) {
 }
 
 func TestUnavailableNotZeroOnCosts(t *testing.T) {
-	server, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds)
+	server, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -888,7 +890,7 @@ func TestKnownZeroCostRendersZero(t *testing.T) {
 		Status:         "calculated",
 		AmountMicrousd: &zero,
 	}}}
-	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -902,7 +904,7 @@ func TestKnownZeroCostRendersZero(t *testing.T) {
 }
 
 func TestTimelinePartialRejectsInvalidSessionID(t *testing.T) {
-	server, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds)
+	server, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1015,7 +1017,7 @@ func TestIntegrationsCursorEnterpriseStatus(t *testing.T) {
 
 func assertIntegrationsBody(t *testing.T, repo storage.SessionReader, want, wantNone []string) {
 	t.Helper()
-	server, err := ui.New("test-token", repo, defaultContextWasteThresholds)
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1030,6 +1032,97 @@ func assertIntegrationsBody(t *testing.T, repo storage.SessionReader, want, want
 	for _, fragment := range wantNone {
 		if strings.Contains(body, fragment) {
 			t.Fatalf("unexpected %q in body: %q", fragment, body)
+		}
+	}
+}
+
+func TestGovernanceFindingsPage(t *testing.T) {
+	repo := governanceFindingsFixture(t)
+
+	t.Run("violation_with_session_link_and_unconfigured_allowlist", func(t *testing.T) {
+		body := renderGovernance(t, repo, nil)
+		assertContainsAll(t, body, []string{
+			"Risky access",
+			"Unapproved MCP",
+			"Violation",
+			"/home/dev/app/.env",
+			`href="/sessions/gov-session-1"`,
+			"Allowlist not configured",
+			"does not enforce or publish",
+		})
+		if strings.Contains(body, "Governance findings are not available") {
+			t.Fatalf("placeholder copy must be gone: %q", body)
+		}
+	})
+
+	t.Run("allowlist_flags_unapproved_server", func(t *testing.T) {
+		body := renderGovernance(t, repo, []string{"filesystem"})
+		assertContainsAll(t, body, []string{"Unapproved", "rogue-tool", "Violation"})
+		if strings.Contains(body, "Allowlist not configured") {
+			t.Fatalf("configured allowlist must not show policy_unconfigured: %q", body)
+		}
+	})
+}
+
+func governanceFindingsFixture(t *testing.T) *fullStub {
+	t.Helper()
+	now := time.Now().UTC()
+	return &fullStub{
+		sessions: []canonical.Session{{
+			SessionID: "gov-session-1",
+			Provider:  "anthropic",
+			Tool:      "claude-code",
+			State:     "completed",
+			StartedAt: now,
+		}},
+		events: map[string][]canonical.Event{
+			"gov-session-1": {{
+				EventID:    "gov-e1",
+				SessionID:  "gov-session-1",
+				EventType:  "api_request",
+				OccurredAt: now,
+				ReceivedAt: now,
+				Provider:   "anthropic",
+				Tool:       "claude-code",
+				Attributes: map[string]any{
+					"file_path": "/home/dev/app/.env",
+					"command":   "cat /home/dev/app/.env",
+				},
+			}, {
+				EventID:    "gov-e2",
+				SessionID:  "gov-session-1",
+				EventType:  "mcp_server_connection",
+				OccurredAt: now,
+				ReceivedAt: now,
+				Provider:   "anthropic",
+				Tool:       "claude-code",
+				ProviderExtensions: map[string]any{
+					"event": map[string]any{
+						"server_name": "rogue-tool",
+						"status":      "connected",
+					},
+				},
+			}},
+		},
+	}
+}
+
+func renderGovernance(t *testing.T, repo *fullStub, allowlist []string) string {
+	t.Helper()
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, allowlist)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	return getAuthed(t, handler, cookie, "/governance").Body.String()
+}
+
+func assertContainsAll(t *testing.T, body string, want []string) {
+	t.Helper()
+	for _, fragment := range want {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("missing %q in body: %q", fragment, body)
 		}
 	}
 }

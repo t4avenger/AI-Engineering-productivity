@@ -37,7 +37,13 @@ test('unlocks and walks the local dashboard journey', async ({ page }) => {
     page.getByRole('heading', { name: 'Governance', exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText('Governance findings are not available in this dashboard view yet.'),
+    page.getByRole('heading', { name: 'Risky access' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Unapproved MCP' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('does not enforce or publish', { exact: false }),
   ).toBeVisible();
 
   await page.getByRole('link', { name: 'Sessions', exact: true }).click();

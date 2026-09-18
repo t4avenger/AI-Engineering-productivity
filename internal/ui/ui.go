@@ -59,12 +59,15 @@ type Server struct {
 	operations             storage.OperationReader
 	costs                  storage.CostReader
 	contextWasteThresholds insights.ContextWasteThresholds
+	mcpAllowlist           []string
 	templates              *template.Template
 	static                 http.Handler
 }
 
 // New builds a dashboard server. sessions may be a full Repository.
-func New(token string, sessions storage.SessionReader, contextWasteThresholds insights.ContextWasteThresholds) (*Server, error) {
+// mcpAllowlist is the configured governance.mcp_allowlist used by the
+// unapproved-MCP findings view (same source as the JSON insight API).
+func New(token string, sessions storage.SessionReader, contextWasteThresholds insights.ContextWasteThresholds, mcpAllowlist []string) (*Server, error) {
 	tmpl, err := template.New("").Funcs(template.FuncMap{
 		"avail":       availabilityLabel,
 		"statusLabel": statusLabel,
@@ -117,6 +120,7 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 		operations:             operations,
 		costs:                  costs,
 		contextWasteThresholds: contextWasteThresholds,
+		mcpAllowlist:           append([]string(nil), mcpAllowlist...),
 		templates:              tmpl,
 		static:                 http.FileServer(http.FS(staticRoot)),
 	}, nil
@@ -213,14 +217,31 @@ var statusLabels = map[string]string{
 	"calculated":     "Calculated estimate",
 	"unknown_price":  "Price unknown",
 	"not_calculable": "Not calculable",
+	// Governance policy outcomes and visibility.
+	"violation":           "Violation",
+	"not_violation":       "Not a violation",
+	"indeterminate":       "Indeterminate",
+	"policy_unconfigured": "Allowlist not configured",
+	// Governance finding severity / MCP state.
+	"high":         "High",
+	"medium":       "Medium",
+	"low":          "Low",
+	"unapproved":   "Unapproved",
+	"unidentified": "Unidentified",
+	// Access methods.
+	"filesystem_read": "Filesystem read",
+	"shell_command":   "Shell command",
 }
 
 // availabilityBadgeClasses are the availability/detection states that have a
 // dedicated badge colour in app.css. Every other enum (MCP/outcome/cost) gets
 // the neutral "status-unknown" treatment until its surface (#77/#78) styles it.
+// Governance outcomes reuse availability colours where the meaning aligns.
 var availabilityBadgeClasses = map[string]bool{
 	"observed": true, "partial": true, "unavailable": true,
 	"unsupported": true, "unknown": true,
+	"violation": true, "not_violation": true, "indeterminate": true,
+	"policy_unconfigured": true,
 }
 
 // statusLabel maps a machine enum to the plain UI label documented in
@@ -238,9 +259,18 @@ func statusLabel(value string) string {
 }
 
 // statusClass maps an enum to its badge CSS class. Availability/detection
-// states get their dedicated class; everything else (including empty or
-// unrecognised values) uses the neutral "status-unknown" treatment.
+// states and governance outcomes get a dedicated class; everything else
+// (including empty or unrecognised values) uses the neutral "status-unknown"
+// treatment.
 func statusClass(value string) string {
+	switch value {
+	case "violation":
+		return "status-failed"
+	case "not_violation":
+		return "status-observed"
+	case "indeterminate", "policy_unconfigured":
+		return "status-unavailable"
+	}
 	if availabilityBadgeClasses[value] {
 		return "status-" + value
 	}

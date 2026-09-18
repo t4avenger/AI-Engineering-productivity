@@ -3,8 +3,101 @@
 {{template "nav" .}}
 <main id="main-content" class="page">
   <h1>Governance</h1>
-  <p>Governance findings are not available in this dashboard view yet.</p>
-  <p class="muted">TelemetryIQ remains detect-and-report only. This page does not imply that policies are enforced.</p>
+  <p>Detect-and-report findings from retained telemetry. TelemetryIQ does not enforce or publish policies in this local edition.</p>
+  <p class="muted">Missing signals are labelled <strong>Indeterminate</strong> — never as a fabricated clean result.</p>
+  {{with .Content}}
+  {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+
+  <section aria-labelledby="risky-access-heading">
+    <h2 id="risky-access-heading">Risky access</h2>
+    <p>Credential and secret file access observed via filesystem reads or shell commands.</p>
+    <p>
+      Status {{template "status-badge" (printf "%s" .RiskyAccess.Outcome)}}
+      · Visibility {{template "status-badge" .RiskyAccess.Visibility}}
+    </p>
+    {{if .RiskyAccess.Findings}}
+    <section class="table-wrap" aria-label="Risky access findings">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Severity</th>
+            <th scope="col">Method</th>
+            <th scope="col">Class</th>
+            <th scope="col">Evidence</th>
+            <th scope="col">Observed</th>
+            <th scope="col">Session</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .RiskyAccess.Findings}}
+          <tr>
+            <td>{{template "status-badge" .Confidence}}</td>
+            <td>{{template "status-badge" (printf "%s" .AccessMethod)}}</td>
+            <td>{{.Class}}</td>
+            <td><code>{{.Reference}}</code></td>
+            <td>{{.ObservedAt}}</td>
+            <td>
+              {{if .SessionID}}
+              <a href="{{sessionPath .SessionID}}">{{.SessionID}}</a>
+              {{else}}
+              {{template "status-badge" "unavailable"}}
+              {{end}}
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </section>
+    {{else}}
+    <p class="muted">
+      {{if eq .RiskyAccess.Outcome "not_violation"}}
+      Access telemetry was observed and no credential or secret file reads were flagged.
+      {{else if eq .RiskyAccess.Visibility "unavailable"}}
+      No filesystem-read or shell-command access was visible in retained events, so this check is indeterminate.
+      {{else}}
+      No risky-access findings in the current window.
+      {{end}}
+    </p>
+    {{end}}
+  </section>
+
+  <section aria-labelledby="unapproved-mcp-heading">
+    <h2 id="unapproved-mcp-heading">Unapproved MCP</h2>
+    <p>Observed MCP servers compared against the local <code>governance.mcp_allowlist</code> (detect-and-report only).</p>
+    <p>
+      Status {{template "status-badge" (printf "%s" .UnapprovedMCP.Outcome)}}
+      · Visibility {{template "status-badge" .UnapprovedMCP.Visibility}}
+    </p>
+    {{if eq .UnapprovedMCP.Visibility "policy_unconfigured"}}
+    <p class="muted">The MCP allowlist is empty, so approval cannot be decided. Configure <code>governance.mcp_allowlist</code> locally (Save UI lands in a follow-up).</p>
+    {{else if .UnapprovedMCP.Findings}}
+    <section class="table-wrap" aria-label="Unapproved MCP findings">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Status</th>
+            <th scope="col">Server</th>
+            <th scope="col">Identity evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .UnapprovedMCP.Findings}}
+          <tr>
+            <td>{{template "status-badge" (printf "%s" .State)}}</td>
+            <td>{{if .ServerName}}{{.ServerName}}{{else}}Unknown server{{end}}</td>
+            <td>{{template "status-badge" .IdentityState}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </section>
+    {{else if eq .UnapprovedMCP.Outcome "not_violation"}}
+    <p class="muted">All identifiable observed MCP servers are on the allowlist.</p>
+    {{else}}
+    <p class="muted">No MCP servers were observed in retained events, so this check is indeterminate.</p>
+    {{end}}
+  </section>
+  {{end}}
 </main>
 {{template "shell-end" .}}
 {{end}}

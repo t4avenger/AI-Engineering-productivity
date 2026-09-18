@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wayne/telemetryiq/internal/governance"
 	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/storage"
@@ -126,6 +127,13 @@ type insightsData struct {
 	Operations       insights.OperationStats
 	OperationErr     string
 	Error            string
+}
+
+// governanceData is the server-rendered Governance findings view (#151).
+type governanceData struct {
+	RiskyAccess   governance.RiskyAccess
+	UnapprovedMCP governance.UnapprovedMCP
+	Error         string
 }
 
 const (
@@ -331,7 +339,17 @@ func (s *Server) insightsPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) governancePage(w http.ResponseWriter, r *http.Request) {
-	s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r)})
+	data := governanceData{}
+	events, err := s.insightEvents(r)
+	if err != nil {
+		data.Error = "Unable to load governance findings."
+		data.RiskyAccess = governance.RiskyAccess{Findings: []governance.Finding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable"}
+		data.UnapprovedMCP = governance.UnapprovedMCP{Findings: []governance.MCPServerFinding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable"}
+	} else {
+		data.RiskyAccess = governance.RiskyAccessFromEvents(events)
+		data.UnapprovedMCP = governance.UnapprovedMCPFromEvents(events, s.mcpAllowlist)
+	}
+	s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
 }
 
 func (s *Server) integrationsPage(w http.ResponseWriter, r *http.Request) {

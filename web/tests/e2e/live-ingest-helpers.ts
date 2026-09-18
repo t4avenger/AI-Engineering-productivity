@@ -747,3 +747,62 @@ export function claudeContextWasteOTLPLogs(): string {
     },
   ]);
 }
+
+/** Claude api_request carrying raw .env path/command evidence for Governance (#151). */
+export function claudeRiskyAccessOTLPLogs(): string {
+  return JSON.stringify({
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'claude-code' } },
+            { key: 'service.version', value: { stringValue: '2.1.263' } },
+          ],
+        },
+        scopeLogs: [
+          {
+            logRecords: [
+              {
+                attributes: [
+                  {
+                    key: 'event.name',
+                    value: { stringValue: 'api_request' },
+                  },
+                  {
+                    key: 'event.timestamp',
+                    value: { stringValue: '2026-09-06T19:00:00.000Z' },
+                  },
+                  {
+                    key: 'event.sequence',
+                    value: { intValue: '1' },
+                  },
+                  {
+                    key: 'session.id',
+                    value: { stringValue: 'tiq-live-e2e-governance-session' },
+                  },
+                  {
+                    key: 'model',
+                    value: { stringValue: 'claude-opus-4-8' },
+                  },
+                  {
+                    key: 'file_path',
+                    value: {
+                      stringValue: '/home/dev/secret-app/.env',
+                    },
+                  },
+                  {
+                    key: 'command',
+                    value: {
+                      stringValue:
+                        'cat /home/dev/secret-app/.env --password s3cr3t-value',
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}

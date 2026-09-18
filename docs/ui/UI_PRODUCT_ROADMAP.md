@@ -40,7 +40,7 @@ Source of truth for product behaviour remains [PRODUCT_MAP.md](../../PRODUCT_MAP
 | `/insights` | Implemented transition route — retained until #150 folds content into Home |
 | `/integrations` | Light — observed tools + Cursor Enterprise status |
 | `/privacy`, `/costs` | Implemented |
-| `/governance` | Transition shell — #151 adds engine-backed findings |
+| `/governance` | Implemented — risky-access + unapproved-MCP findings (#151) |
 
 Primary nav: Home · Sessions · Governance · Integrations. Privacy and Costs are
 secondary destinations; Home omits the Costs link. See
@@ -54,9 +54,9 @@ secondary destinations; Home omits the Costs link. See
 | Operations | `operations` (~1.2k) + timeline projection | Partial (API richer than UI) |
 | Cost records | `cost_records` | Costs page only |
 | MCP inventory / skills / model / context / ops insights | `GET /api/v1/insights/*` | Insights page |
-| Risky access | `GET /api/v1/insights/risky-access` | **Not rendered** |
-| Unapproved MCP | `GET /api/v1/insights/unapproved-mcp` | **Not rendered** |
-| MCP allowlist config | `governance.mcp_allowlist` YAML (load-only) | **No editor; no Write** |
+| Risky access | `GET /api/v1/insights/risky-access` | Yes — `/governance` (#151) |
+| Unapproved MCP | `GET /api/v1/insights/unapproved-mcp` | Yes — `/governance` (#151); Save editor is #152 |
+| MCP allowlist config | `governance.mcp_allowlist` YAML (load-only) | Findings respect allowlist; **No editor; no Write** (#152) |
 | File operations | Capability matrix mostly `unknown` | No Files lane |
 | OTEL span trees | Claude spans in event extensions (partial) | No span UI |
 | Conversation bodies | Privacy default: prompts/responses off | Intentionally absent |
@@ -207,7 +207,7 @@ Epic: [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148
 
 ## 10. Next implementation step
 
-1. Implement [#151](https://github.com/t4avenger/AI-Engineering-productivity/issues/151), replacing the Governance transition shell with engine-backed findings.
-2. Then V1 UI order: **#152** (allowlist Save) → **#150** / **#153** / **#154** → **#155** (e2e).
+1. Implement [#152](https://github.com/t4avenger/AI-Engineering-productivity/issues/152) (MCP allowlist checkboxes + Save).
+2. Then V1 UI order: **#150** / **#153** / **#154** → **#155** (e2e).
 
-Highest enterprise signal for least new telemetry remains Governance findings + allowlist Save; Sessions density work should not ship on top of an unfiltered orphan list.
+Highest enterprise signal remaining for least new telemetry is allowlist Save; Sessions density work should not ship on top of an unfiltered orphan list.
