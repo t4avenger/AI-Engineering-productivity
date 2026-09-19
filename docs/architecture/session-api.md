@@ -6,6 +6,7 @@ The Phase 2 local management API provides authenticated session endpoints:
 - `GET /api/v1/sessions/{id}`
 - `GET /api/v1/sessions/{id}/events`
 - `GET /api/v1/sessions/{id}/files`
+- `GET /api/v1/sessions/{id}/conversation`
 - `DELETE /api/v1/sessions/{id}`
 - `GET /api/v1/costs/summary`, `GET /api/v1/sessions/{id}/costs`, `GET /api/v1/insights/mcp-inventory`, `GET /api/v1/insights/skill-usage`, `GET /api/v1/insights/model-performance`, `GET /api/v1/insights/context-waste`, `DELETE /api/v1/sessions`
 
@@ -88,6 +89,20 @@ inferred from tool names when a path is present; tool names never invent a path.
 Aggregate `lines_of_code` counters never fill per-file diffs. Codex currently
 proves write category without path; filesystem delete remains unavailable.
 Session detail HTML shares the same `insights.SessionFilesFromEvidence` reader.
+
+`GET /api/v1/sessions/{id}/conversation` is the additive retained-conversation
+projection (#188 / T03). It cursor-pages chronological `data` records keyed by
+the source `event_id`, with `event_type`, `occurred_at`, provider/tool/version
+provenance, `role` (`user`, `assistant`, or `unknown`), nullable inline `text`,
+and `content_availability`. `available`, `provider_redacted`, `length_only`,
+`body_reference`, and `unavailable` remain distinct; a missing body is never
+replaced with text. The currently reviewed surface is Claude Code OTLP logs:
+`user_prompt` and `assistant_response` map to user/assistant roles, while
+`api_request_body` and `api_response_body` remain unknown-role raw evidence.
+The API does not parse raw request/response payloads into duplicate messages,
+fetch provider data, or join records by time. Claude transcript, tool-body, and
+other prior adapter gaps remain unavailable and are tracked by #173, #104, and
+#105.
 
 Timeline entries can also include optional approval fields for reviewed
 authorization decisions: `approval_id`, `approval_decision`,

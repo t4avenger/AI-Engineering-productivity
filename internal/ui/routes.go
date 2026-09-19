@@ -70,6 +70,7 @@ var protectedRoutes = []route{
 	{match: exact(http.MethodGet, pathSessions), handle: (*Server).sessionsList},
 	{match: prefixSuffix(http.MethodPost, pathSessionsPrefix, "/delete"), handle: (*Server).sessionDelete},
 	{match: prefixSuffix(http.MethodGet, pathSessionsPrefix, "/timeline"), handle: (*Server).sessionTimelinePartial},
+	{match: prefixSuffix(http.MethodGet, pathSessionsPrefix, "/conversation"), handle: (*Server).sessionConversationPartial},
 	{match: prefix(http.MethodGet, pathSessionsPrefix), handle: (*Server).sessionDetail},
 	{match: exact(http.MethodGet, pathInsights), handle: (*Server).insightsPage},
 	{match: exact(http.MethodGet, pathModels), handle: (*Server).modelsPage},

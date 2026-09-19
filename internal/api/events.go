@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/wayne/telemetryiq/internal/conversation"
 	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/storage"
@@ -57,6 +58,23 @@ type eventCursor struct {
 	EventID    string `json:"event_id"`
 }
 
+type conversationRecord struct {
+	EventID             string  `json:"event_id"`
+	EventType           string  `json:"event_type"`
+	OccurredAt          string  `json:"occurred_at"`
+	Provider            string  `json:"provider"`
+	Tool                string  `json:"tool"`
+	SourceVersion       string  `json:"source_version"`
+	Role                string  `json:"role"`
+	Text                *string `json:"text"`
+	ContentAvailability string  `json:"content_availability"`
+}
+
+type conversationResponse struct {
+	Data       []conversationRecord `json:"data"`
+	Pagination eventPagination      `json:"pagination"`
+}
+
 func (a sessionAPI) events(w http.ResponseWriter, r *http.Request) {
 	id, limit, cursor, ok := a.requireSessionSubresource(w, r)
 	if !ok {
@@ -73,6 +91,42 @@ func (a sessionAPI) events(w http.ResponseWriter, r *http.Request) {
 		response.Data[index] = publicTimelineEvent(event)
 	}
 	writeSessionJSON(w, http.StatusOK, response)
+}
+
+// conversation returns reviewed retained content as evidence records. It never
+// fetches provider data or converts a raw API body into synthetic messages.
+func (a sessionAPI) conversation(w http.ResponseWriter, r *http.Request) {
+	id, limit, cursor, ok := a.requireSessionSubresource(w, r)
+	if !ok {
+		return
+	}
+	events, err := a.insightSessionEvents(r, id)
+	if err != nil {
+		writeSessionError(w, http.StatusInternalServerError, "conversation_query_failed", "unable to query session conversation")
+		return
+	}
+	cursorOccurredAt, cursorEventID := "", ""
+	if cursor != nil {
+		cursorOccurredAt, cursorEventID = cursor.OccurredAt, cursor.EventID
+	}
+	page, last := conversation.Page(conversation.Project(events), limit, cursorOccurredAt, cursorEventID)
+	var next *string
+	if last != nil {
+		next = encodeEventCursor(last.OccurredAt.UTC().Format(time.RFC3339Nano), last.EventID)
+	}
+	response := conversationResponse{Data: make([]conversationRecord, len(page)), Pagination: eventPagination{Limit: limit, NextCursor: next}}
+	for index, record := range page {
+		response.Data[index] = publicConversationRecord(record)
+	}
+	writeSessionJSON(w, http.StatusOK, response)
+}
+
+func publicConversationRecord(record conversation.Record) conversationRecord {
+	return conversationRecord{
+		EventID: record.EventID, EventType: record.EventType, OccurredAt: record.OccurredAt.UTC().Format(time.RFC3339Nano),
+		Provider: record.Provider, Tool: record.Tool, SourceVersion: record.SourceVersion, Role: record.Role,
+		Text: record.Text, ContentAvailability: record.ContentAvailability,
+	}
 }
 
 // requireSessionSubresource authenticates session existence and list query params

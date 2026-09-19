@@ -95,7 +95,7 @@ test('unlocks and walks the local dashboard journey', async ({ page }) => {
     .click();
   await expect(page.getByRole('heading', { name: 'Privacy' })).toBeVisible();
   await expect(
-    page.getByText('Prompts, responses, and source code are not retained'),
+    page.getByText('raw prompts, responses, source content, paths, and commands are retained locally', { exact: false }),
   ).toBeVisible();
   await page
     .getByLabel('Utility navigation')

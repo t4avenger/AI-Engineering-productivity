@@ -678,6 +678,42 @@ function claudeOTLPLogs(logRecords: Array<{ attributes: OTLPAttribute[] }>): str
   });
 }
 
+// claudeContentOTLPLogs uses the reviewed content-bearing Claude log shape.
+// Its values are synthetic and intentionally asserted as retained local content
+// by the #188 daemon-to-UI gate.
+export function claudeContentOTLPLogs(): string {
+  const sessionId = 'tiq-live-e2e-conversation-content';
+  return claudeOTLPLogs([
+    {
+      attributes: [
+        { key: 'event.name', value: { stringValue: 'user_prompt' } },
+        { key: 'event.timestamp', value: { stringValue: '2026-09-19T12:00:00Z' } },
+        { key: 'event.sequence', value: { intValue: '1' } },
+        { key: 'session.id', value: { stringValue: sessionId } },
+        { key: 'prompt', value: { stringValue: 'tiq-live-e2e retained user\nsecond line' } },
+      ],
+    },
+    {
+      attributes: [
+        { key: 'event.name', value: { stringValue: 'assistant_response' } },
+        { key: 'event.timestamp', value: { stringValue: '2026-09-19T12:00:01Z' } },
+        { key: 'event.sequence', value: { intValue: '2' } },
+        { key: 'session.id', value: { stringValue: sessionId } },
+        { key: 'response', value: { stringValue: '<REDACTED>' } },
+      ],
+    },
+    {
+      attributes: [
+        { key: 'event.name', value: { stringValue: 'api_response_body' } },
+        { key: 'event.timestamp', value: { stringValue: '2026-09-19T12:00:02Z' } },
+        { key: 'event.sequence', value: { intValue: '3' } },
+        { key: 'session.id', value: { stringValue: sessionId } },
+        { key: 'body', value: { stringValue: 'tiq-live-e2e raw API evidence' } },
+      ],
+    },
+  ]);
+}
+
 type ClaudeApiRequestOptions = {
   timestamp: string;
   sequence: string;
