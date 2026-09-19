@@ -103,12 +103,13 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 			}
 			return *v
 		},
-		"formatPercent":     formatPercent,
-		"formatMultiplier":  formatMultiplier,
-		"formatMillis":      formatMillis,
-		"formatOptionalInt": formatOptionalInt64,
-		"sessionPath":       sessionPath,
-		"microusd":          formatMicroUSD,
+		"formatPercent":       formatPercent,
+		"formatMultiplier":    formatMultiplier,
+		"formatMillis":        formatMillis,
+		"formatOptionalInt":   formatOptionalInt64,
+		"sessionPath":         sessionPath,
+		"governanceRulesPath": governanceRulesPath,
+		"microusd":            formatMicroUSD,
 	}).ParseFS(embedded, "templates/*.html")
 	if err != nil {
 		return nil, err

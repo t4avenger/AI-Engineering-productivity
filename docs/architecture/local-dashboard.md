@@ -54,13 +54,21 @@ navigation.
 
 The Governance primary destination renders detect-and-report findings from the
 existing risky-access and unapproved-MCP engines over retained events. Each
-section shows outcome and visibility badges, evidence tables (raw path/command
-or MCP server name), and session links when a finding carries a session id.
-An empty MCP allowlist is labelled allowlist-not-configured / indeterminate.
-Named observed MCP servers and configured-only entries are rendered as
-checkboxes. An authenticated Save atomically writes the validated local YAML and
-reloads both HTML and JSON findings in-process. The page makes no enforcement
-claim; the local edition remains detect-and-report only.
+finding section shows outcome and visibility badges, evidence tables (raw
+path/command or MCP server name), and session links when a finding carries a
+session id. An empty MCP allowlist is labelled allowlist-not-configured /
+indeterminate.
+
+Below Findings, an Access Rules tablist offers MCP servers, Skills, Files &
+Paths, and Prompt Keywords (`?rules=`). MCP servers is the only editable
+control: named observed MCP servers and configured-only entries are rendered as
+checkboxes, and an authenticated Save atomically writes the validated local YAML
+and reloads both HTML and JSON findings in-process. Skills, Files & Paths, and
+Prompt Keywords are honest unavailable shells until config schema keys
+(`governance.skills_allowlist`, `governance.path_rules`,
+`governance.prompt_keywords` or equivalents) and detectors exist — no fake
+allow/block counts and no Publish/Enforce controls. The page makes no
+enforcement claim; the local edition remains detect-and-report only.
 
 The Insights page reads MCP inventory, skill usage, model-performance, and
 context-pressure summaries from retained canonical events. It renders the raw

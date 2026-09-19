@@ -41,6 +41,30 @@ export async function expectFourTabPrimaryNav(page: Page): Promise<void> {
   ).toHaveCount(0);
 }
 
+/** Access Rules tab shells (#160): MCP editable; others honest unavailable. */
+export async function expectGovernanceAccessRulesShells(
+  page: Page,
+): Promise<void> {
+  await expect(
+    page.getByRole('heading', { name: 'Access Rules' }),
+  ).toBeVisible();
+  const tablist = page.getByRole('tablist', { name: 'Access Rules categories' });
+  await expect(tablist.getByRole('tab')).toHaveText([
+    'MCP servers',
+    'Skills',
+    'Files & Paths',
+    'Prompt Keywords',
+  ]);
+  await expect(page.getByRole('button', { name: 'Save allowlist' })).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Skills' }).click();
+  await expect(page).toHaveURL(/\/governance\?rules=skills$/);
+  await expect(page.getByText('No allow or block counts are shown')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save allowlist' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Publish' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Enforce' })).toHaveCount(0);
+}
+
 // codexOTLPLogs builds a raw codex_cli_rs OTLP/HTTP log payload carrying a
 // single sse_event that reports the given model, in the observed wire shape.
 export function codexOTLPLogs(model: string): string {

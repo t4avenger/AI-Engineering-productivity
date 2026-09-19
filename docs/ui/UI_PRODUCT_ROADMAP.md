@@ -40,7 +40,7 @@ Source of truth for product behaviour remains [PRODUCT_MAP.md](../../PRODUCT_MAP
 | `/insights` | Implemented detailed secondary route — Home carries headline content; this route preserves PRODUCT_MAP §17.3 evidence tables |
 | `/integrations` | Implemented — capability matrix headlines, last-seen tools, Cursor Enterprise status (#154) |
 | `/privacy`, `/costs` | Implemented |
-| `/governance` | Implemented — risky-access + unapproved-MCP findings (#151) |
+| `/governance` | Implemented — findings + Access Rules tabs (MCP editable; skills/paths/prompts unavailable shells) (#151, #152, #160) |
 
 Primary nav: Home · Sessions · Governance · Integrations. Privacy and Costs are
 secondary destinations; Home omits the Costs link. See
@@ -151,7 +151,7 @@ Empty allowlist remains **indeterminate** (existing engine behaviour). This is d
 | Files lane | Low | Low | V1.5 capture first |
 | Span tree | Medium (Claude) | Low | V1.5 projection + V2 UI |
 | Conversation replay | Low (privacy) | Low | Non-goal |
-| Skill/path/prompt policy CRUD | Low | Low | V2 shells only |
+| Skill/path/prompt policy CRUD | Low | Low | V2 shells only (#160); MCP allowlist remains the sole editable control |
 | Integrations management | Medium | Low | Deepen observe + setup |
 
 ---
@@ -206,12 +206,29 @@ Epic: [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148
 
 ## 10. Next implementation step
 
-V1 is closed (#149–#155). **#158** (session header metadata: branch / PR /
-entrypoint with availability vocabulary) is the V1.5 UI slice on session detail.
+V1 is closed (#149–#155). V1.5 UI slice **#158** (session header metadata) is
+closed. **#160** (Governance Access Rules tab shells: MCP editable; Skills /
+Files & Paths / Prompt Keywords unavailable) ships the first V2 Governance IA
+slice without Publish/Enforce.
 
 Remaining V1.5 capture work so Session Trace lanes can grow honestly:
 
 1. **#156** — File-operation fixtures + capability matrix (blocker for a Files lane).
 2. **#157** — Span-tree projection API for session UI.
 
-Then V2 (#159–#161).
+Remaining V2: **#159** multi-lane session trace; **#161** visual density /
+optional sidebar (ADR required if dark theme becomes default).
+
+### Access Rules schema follow-ons (shells only today)
+
+Editable policy for non-MCP tabs requires future config + detectors (not
+implemented in #160):
+
+| Tab | Suggested config key (or equivalent) | Detector dependency |
+|-----|--------------------------------------|---------------------|
+| Skills | `governance.skills_allowlist` | Explicit skill-identity telemetry |
+| Files & Paths | `governance.path_rules` | Path/command classifiers beyond risky-access findings |
+| Prompt Keywords | `governance.prompt_keywords` | Prompt-keyword detectors (privacy policy dependent) |
+
+Until those land, the UI must keep `unavailable` shells and must not invent
+allow/block counts.

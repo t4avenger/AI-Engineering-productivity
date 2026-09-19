@@ -8,118 +8,144 @@
   {{with .Content}}
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
 
-  <section aria-labelledby="risky-access-heading">
-    <h2 id="risky-access-heading">Risky access</h2>
-    <p>Credential and secret file access observed via filesystem reads or shell commands.</p>
-    <p>
-      Status {{template "status-badge" (printf "%s" .RiskyAccess.Outcome)}}
-      · Visibility {{template "status-badge" .RiskyAccess.Visibility}}
-    </p>
-    {{if .RiskyAccess.Findings}}
-    <section class="table-wrap" aria-label="Risky access findings">
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Severity</th>
-            <th scope="col">Method</th>
-            <th scope="col">Class</th>
-            <th scope="col">Evidence</th>
-            <th scope="col">Observed</th>
-            <th scope="col">Session</th>
-          </tr>
-        </thead>
-        <tbody>
-          {{range .RiskyAccess.Findings}}
-          <tr>
-            <td>{{template "status-badge" .Confidence}}</td>
-            <td>{{template "status-badge" (printf "%s" .AccessMethod)}}</td>
-            <td>{{.Class}}</td>
-            <td><code>{{.Reference}}</code></td>
-            <td>{{.ObservedAt}}</td>
-            <td>
-              {{if .SessionID}}
-              <a href="{{sessionPath .SessionID}}">{{.SessionID}}</a>
-              {{else}}
-              {{template "status-badge" "unavailable"}}
-              {{end}}
-            </td>
-          </tr>
-          {{end}}
-        </tbody>
-      </table>
-    </section>
-    {{else}}
-    <p class="muted">
-      {{if eq .RiskyAccess.Outcome "not_violation"}}
-      Access telemetry was observed and no credential or secret file reads were flagged.
-      {{else if eq .RiskyAccess.Visibility "unavailable"}}
-      No filesystem-read or shell-command access was visible in retained events, so this check is indeterminate.
+  <section aria-labelledby="findings-heading">
+    <h2 id="findings-heading">Findings</h2>
+
+    <section aria-labelledby="risky-access-heading">
+      <h3 id="risky-access-heading">Risky access</h3>
+      <p>Credential and secret file access observed via filesystem reads or shell commands.</p>
+      <p>
+        Status {{template "status-badge" (printf "%s" .RiskyAccess.Outcome)}}
+        · Visibility {{template "status-badge" .RiskyAccess.Visibility}}
+      </p>
+      {{if .RiskyAccess.Findings}}
+      <section class="table-wrap" aria-label="Risky access findings">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Severity</th>
+              <th scope="col">Method</th>
+              <th scope="col">Class</th>
+              <th scope="col">Evidence</th>
+              <th scope="col">Observed</th>
+              <th scope="col">Session</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .RiskyAccess.Findings}}
+            <tr>
+              <td>{{template "status-badge" .Confidence}}</td>
+              <td>{{template "status-badge" (printf "%s" .AccessMethod)}}</td>
+              <td>{{.Class}}</td>
+              <td><code>{{.Reference}}</code></td>
+              <td>{{.ObservedAt}}</td>
+              <td>
+                {{if .SessionID}}
+                <a href="{{sessionPath .SessionID}}">{{.SessionID}}</a>
+                {{else}}
+                {{template "status-badge" "unavailable"}}
+                {{end}}
+              </td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </section>
       {{else}}
-      No risky-access findings in the current window.
+      <p class="muted">
+        {{if eq .RiskyAccess.Outcome "not_violation"}}
+        Access telemetry was observed and no credential or secret file reads were flagged.
+        {{else if eq .RiskyAccess.Visibility "unavailable"}}
+        No filesystem-read or shell-command access was visible in retained events, so this check is indeterminate.
+        {{else}}
+        No risky-access findings in the current window.
+        {{end}}
+      </p>
       {{end}}
-    </p>
-    {{end}}
+    </section>
+
+    <section aria-labelledby="unapproved-mcp-heading">
+      <h3 id="unapproved-mcp-heading">Unapproved MCP</h3>
+      <p>Observed MCP servers compared against the local <code>governance.mcp_allowlist</code> (detect-and-report only).</p>
+      <p>
+        Status {{template "status-badge" (printf "%s" .UnapprovedMCP.Outcome)}}
+        · Visibility {{template "status-badge" .UnapprovedMCP.Visibility}}
+      </p>
+      {{if eq .UnapprovedMCP.Visibility "policy_unconfigured"}}
+      <p class="muted">The MCP allowlist is empty, so approval cannot be decided. Configure allowed servers under Access Rules.</p>
+      {{else if .UnapprovedMCP.Findings}}
+      <section class="table-wrap" aria-label="Unapproved MCP findings">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Status</th>
+              <th scope="col">Server</th>
+              <th scope="col">Identity evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .UnapprovedMCP.Findings}}
+            <tr>
+              <td>{{template "status-badge" (printf "%s" .State)}}</td>
+              <td>{{if .ServerName}}{{.ServerName}}{{else}}Unknown server{{end}}</td>
+              <td>{{template "status-badge" .IdentityState}}</td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </section>
+      {{else if eq .UnapprovedMCP.Outcome "not_violation"}}
+      <p class="muted">All identifiable observed MCP servers are on the allowlist.</p>
+      {{else}}
+      <p class="muted">No MCP servers were observed in retained events, so this check is indeterminate.</p>
+      {{end}}
+    </section>
   </section>
 
-  <section aria-labelledby="unapproved-mcp-heading">
-    <h2 id="unapproved-mcp-heading">Unapproved MCP</h2>
-    <p>Observed MCP servers compared against the local <code>governance.mcp_allowlist</code> (detect-and-report only).</p>
-    <p>
-      Status {{template "status-badge" (printf "%s" .UnapprovedMCP.Outcome)}}
-      · Visibility {{template "status-badge" .UnapprovedMCP.Visibility}}
-    </p>
-    {{if .Saved}}<output class="success">MCP allowlist saved. Findings now use the updated local policy.</output>{{end}}
-    <form method="post" action="/governance/mcp-allowlist" class="stack allowlist-form">
-      <fieldset>
-        <legend>Allowed MCP servers</legend>
-        {{if .MCPServers}}
-        <div class="allowlist-options">
-          {{range .MCPServers}}
-          <label class="allowlist-option">
-            <input type="checkbox" name="mcp_server" value="{{.Name}}"{{if .Checked}} checked{{end}}>
-            <code>{{.Name}}</code>
-            <span class="muted">{{if .Observed}}Observed{{else}}Configured; not currently observed{{end}}</span>
-          </label>
+  <section aria-labelledby="access-rules-heading">
+    <h2 id="access-rules-heading">Access Rules</h2>
+    <p>MCP allowlist is the only editable control in this local edition. Skills, path, and prompt-keyword policies remain unavailable until config schema and detectors exist.</p>
+    <div class="rules-tabs" role="tablist" aria-label="Access Rules categories">
+      <a class="rules-tab{{if eq .ActiveRulesTab "mcp"}} active{{end}}" role="tab" id="rules-tab-mcp" href="{{governanceRulesPath "mcp"}}" aria-controls="rules-panel-mcp" aria-selected="{{if eq .ActiveRulesTab "mcp"}}true{{else}}false{{end}}"{{if eq .ActiveRulesTab "mcp"}} aria-current="page"{{end}}>MCP servers</a>
+      <a class="rules-tab{{if eq .ActiveRulesTab "skills"}} active{{end}}" role="tab" id="rules-tab-skills" href="{{governanceRulesPath "skills"}}" aria-controls="rules-panel-skills" aria-selected="{{if eq .ActiveRulesTab "skills"}}true{{else}}false{{end}}"{{if eq .ActiveRulesTab "skills"}} aria-current="page"{{end}}>Skills</a>
+      <a class="rules-tab{{if eq .ActiveRulesTab "paths"}} active{{end}}" role="tab" id="rules-tab-paths" href="{{governanceRulesPath "paths"}}" aria-controls="rules-panel-paths" aria-selected="{{if eq .ActiveRulesTab "paths"}}true{{else}}false{{end}}"{{if eq .ActiveRulesTab "paths"}} aria-current="page"{{end}}>Files &amp; Paths</a>
+      <a class="rules-tab{{if eq .ActiveRulesTab "prompts"}} active{{end}}" role="tab" id="rules-tab-prompts" href="{{governanceRulesPath "prompts"}}" aria-controls="rules-panel-prompts" aria-selected="{{if eq .ActiveRulesTab "prompts"}}true{{else}}false{{end}}"{{if eq .ActiveRulesTab "prompts"}} aria-current="page"{{end}}>Prompt Keywords</a>
+    </div>
+
+    {{if eq .ActiveRulesTab "mcp"}}
+    <div class="rules-panel" role="tabpanel" id="rules-panel-mcp" aria-labelledby="rules-tab-mcp">
+      {{if .Saved}}<output class="success">MCP allowlist saved. Findings now use the updated local policy.</output>{{end}}
+      <form method="post" action="/governance/mcp-allowlist" class="stack allowlist-form">
+        <fieldset>
+          <legend>Allowed MCP servers</legend>
+          {{if .MCPServers}}
+          <div class="allowlist-options">
+            {{range .MCPServers}}
+            <label class="allowlist-option">
+              <input type="checkbox" name="mcp_server" value="{{.Name}}"{{if .Checked}} checked{{end}}>
+              <code>{{.Name}}</code>
+              <span class="muted">{{if .Observed}}Observed{{else}}Configured; not currently observed{{end}}</span>
+            </label>
+            {{end}}
+          </div>
+          {{else}}
+          <p class="muted">No provider-reported MCP server names are available yet.</p>
           {{end}}
-        </div>
+        </fieldset>
+        {{if .SaveAvailable}}
+        <button type="submit">Save allowlist</button>
         {{else}}
-        <p class="muted">No provider-reported MCP server names are available yet.</p>
+        <p class="muted">Saving is unavailable because no writable configuration controller is active.</p>
         {{end}}
-      </fieldset>
-      {{if .SaveAvailable}}
-      <button type="submit">Save allowlist</button>
-      {{else}}
-      <p class="muted">Saving is unavailable because no writable configuration controller is active.</p>
-      {{end}}
-    </form>
-    {{if eq .UnapprovedMCP.Visibility "policy_unconfigured"}}
-    <p class="muted">The MCP allowlist is empty, so approval cannot be decided. Select observed servers above and save the local policy.</p>
-    {{else if .UnapprovedMCP.Findings}}
-    <section class="table-wrap" aria-label="Unapproved MCP findings">
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Status</th>
-            <th scope="col">Server</th>
-            <th scope="col">Identity evidence</th>
-          </tr>
-        </thead>
-        <tbody>
-          {{range .UnapprovedMCP.Findings}}
-          <tr>
-            <td>{{template "status-badge" (printf "%s" .State)}}</td>
-            <td>{{if .ServerName}}{{.ServerName}}{{else}}Unknown server{{end}}</td>
-            <td>{{template "status-badge" .IdentityState}}</td>
-          </tr>
-          {{end}}
-        </tbody>
-      </table>
-    </section>
-    {{else if eq .UnapprovedMCP.Outcome "not_violation"}}
-    <p class="muted">All identifiable observed MCP servers are on the allowlist.</p>
-    {{else}}
-    <p class="muted">No MCP servers were observed in retained events, so this check is indeterminate.</p>
-    {{end}}
+      </form>
+    </div>
+    {{else}}{{with .RulesShell}}
+    <div class="rules-panel" role="tabpanel" id="{{.PanelID}}" aria-labelledby="{{.TabID}}">
+      <p>Status {{template "status-badge" "unavailable"}}</p>
+      <p class="muted">{{.Subject}} is unavailable. A <code>{{.SchemaKey}}</code> (or equivalent) config schema and detectors are required before this control can be edited. Tracked under epic <a href="https://github.com/t4avenger/AI-Engineering-productivity/issues/148">#148</a>; see the <a href="https://github.com/t4avenger/AI-Engineering-productivity/blob/main/docs/ui/UI_PRODUCT_ROADMAP.md">UI product roadmap</a>.</p>
+      <p class="muted">No allow or block counts are shown — detectors are not implemented.</p>
+    </div>
+    {{end}}{{end}}
   </section>
   {{end}}
 </main>

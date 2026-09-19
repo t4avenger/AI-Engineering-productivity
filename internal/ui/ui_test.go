@@ -1513,13 +1513,20 @@ func TestGovernanceFindingsPage(t *testing.T) {
 	t.Run("violation_with_session_link_and_unconfigured_allowlist", func(t *testing.T) {
 		body := renderGovernance(t, repo, nil)
 		assertContainsAll(t, body, []string{
+			"Findings",
 			"Risky access",
 			"Unapproved MCP",
+			"Access Rules",
 			"Violation",
 			"/home/dev/app/.env",
 			`href="/sessions/gov-session-1"`,
 			"Allowlist not configured",
 			"does not enforce or publish",
+			`role="tablist"`,
+			`aria-selected="true"`,
+			">MCP servers</a>",
+			`id="rules-panel-mcp"`,
+			"Allowed MCP servers",
 		})
 		if strings.Contains(body, "Governance findings are not available") {
 			t.Fatalf("placeholder copy must be gone: %q", body)
@@ -1533,6 +1540,74 @@ func TestGovernanceFindingsPage(t *testing.T) {
 			t.Fatalf("configured allowlist must not show policy_unconfigured: %q", body)
 		}
 	})
+}
+
+func TestGovernanceAccessRulesTabShells(t *testing.T) {
+	repo := governanceFindingsFixture(t)
+	controller := &testAllowlistController{names: nil}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, controller.MCPAllowlist(), controller)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+
+	t.Run("default_mcp_tab_is_editable", func(t *testing.T) {
+		body := getAuthed(t, handler, cookie, "/governance").Body.String()
+		assertContainsAll(t, body, []string{
+			`id="rules-panel-mcp"`,
+			"Save allowlist",
+			`href="/governance?rules=skills"`,
+			`href="/governance?rules=paths"`,
+			`href="/governance?rules=prompts"`,
+		})
+		assertOmitsAll(t, body, []string{
+			"No allow or block counts are shown",
+			`id="rules-panel-skills"`,
+			"Publish",
+			"Enforce",
+		})
+	})
+
+	for _, tc := range []struct {
+		path, panel, schema string
+	}{
+		{"/governance?rules=skills", "rules-panel-skills", "governance.skills_allowlist"},
+		{"/governance?rules=paths", "rules-panel-paths", "governance.path_rules"},
+		{"/governance?rules=prompts", "rules-panel-prompts", "governance.prompt_keywords"},
+		{"/governance?rules=UNKNOWN", "rules-panel-mcp", ""}, // clamps to mcp
+	} {
+		t.Run(strings.TrimPrefix(tc.path, "/governance"), func(t *testing.T) {
+			body := getAuthed(t, handler, cookie, tc.path).Body.String()
+			assertContainsAll(t, body, []string{`id="` + tc.panel + `"`})
+			if tc.schema == "" {
+				assertContainsAll(t, body, []string{"Save allowlist"})
+				assertOmitsAll(t, body, []string{"No allow or block counts are shown"})
+				return
+			}
+			assertContainsAll(t, body, []string{
+				tc.schema,
+				"No allow or block counts are shown",
+				"unavailable",
+				"#148",
+			})
+			assertOmitsAll(t, body, []string{
+				"Save allowlist",
+				`name="mcp_server"`,
+				"Publish",
+				"Enforce",
+			})
+		})
+	}
+}
+
+func assertOmitsAll(t *testing.T, body string, forbidden []string) {
+	t.Helper()
+	for _, fragment := range forbidden {
+		if strings.Contains(body, fragment) {
+			t.Fatalf("unexpected %q in body: %q", fragment, body)
+		}
+	}
 }
 
 func TestGovernanceAllowlistSaveRoundTrip(t *testing.T) {
