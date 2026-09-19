@@ -436,11 +436,13 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func unavailableGovernanceChecklist() (governance.RiskyAccess, governance.UnapprovedMCP) {
-	return governance.RiskyAccess{
+	riskyAccess := governance.RiskyAccess{
 		Findings: []governance.Finding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable",
-	}, governance.UnapprovedMCP{
+	}
+	unapprovedMCP := governance.UnapprovedMCP{
 		Findings: []governance.MCPServerFinding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable",
 	}
+	return riskyAccess, unapprovedMCP
 }
 
 func (s *Server) sessionTimelinePartial(w http.ResponseWriter, r *http.Request) {
