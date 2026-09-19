@@ -42,4 +42,12 @@ test('renders operation stats for data ingested through the live daemon', async 
   await expect(page.getByRole('cell', { name: 'shell command' })).toBeVisible();
   await expect(page.getByRole('cell', { name: '2 operations' }).first()).toBeVisible();
   await expect(page.getByText('tiq-canary-live-operation')).toHaveCount(0);
+
+  await page.goto('/sessions/codex:tiq-live-e2e-operation-codex');
+  const operation = page.getByLabel('Operation details');
+  await expect(operation).toBeVisible();
+  await expect(operation.getByText('shell command', { exact: true })).toBeVisible();
+  await expect(operation.getByText('functions/exec_command')).toBeVisible();
+  await expect(operation.getByText('92 ms')).toBeVisible();
+  await expect(operation.getByText('Succeeded')).toBeVisible();
 });

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -98,6 +99,9 @@ type sessionDetailData struct {
 	SessionMetadata []metadataRow
 	Events          []timelineRow
 	NextCursor      string
+	RiskyAccess     governance.RiskyAccess
+	UnapprovedMCP   governance.UnapprovedMCP
+	GovernanceError string
 	Error           string
 	Confirm         bool
 }
@@ -124,6 +128,12 @@ type timelineRow struct {
 	OutputTokens      tokenDisplay
 	CachedInputTokens tokenDisplay
 	ReasoningTokens   tokenDisplay
+	HasOperation      bool
+	OperationID       string
+	OperationCategory fieldDisplay
+	OperationTool     fieldDisplay
+	OperationDuration fieldDisplay
+	OperationOutcome  fieldDisplay
 	ApprovalDecision  string
 	ApprovalReason    string
 	ApprovalTool      string
@@ -135,6 +145,12 @@ type timelineRow struct {
 }
 
 type tokenDisplay struct {
+	Text     string
+	Observed bool
+	Machine  string
+}
+
+type fieldDisplay struct {
 	Text     string
 	Observed bool
 	Machine  string
@@ -408,7 +424,23 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		data.Error = "Unable to load timeline."
 	}
+	allEvents, governanceErr := s.listSessionEvents(r, id)
+	if governanceErr != nil {
+		data.GovernanceError = "Session governance checks are unavailable because retained events could not be loaded."
+		data.RiskyAccess, data.UnapprovedMCP = unavailableGovernanceChecklist()
+	} else {
+		data.RiskyAccess = governance.RiskyAccessFromEvents(allEvents)
+		data.UnapprovedMCP = governance.UnapprovedMCPFromEvents(allEvents, s.currentMCPAllowlist())
+	}
 	s.render(w, tmplSessionDetail, layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(r), Content: data})
+}
+
+func unavailableGovernanceChecklist() (governance.RiskyAccess, governance.UnapprovedMCP) {
+	return governance.RiskyAccess{
+		Findings: []governance.Finding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable",
+	}, governance.UnapprovedMCP{
+		Findings: []governance.MCPServerFinding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable",
+	}
 }
 
 func (s *Server) sessionTimelinePartial(w http.ResponseWriter, r *http.Request) {
@@ -875,6 +907,7 @@ func (s *Server) loadTimeline(r *http.Request, sessionID, cursorRaw string) ([]t
 	}
 	rows := make([]timelineRow, len(page))
 	for i, event := range page {
+		operationID, hasOperation := observedString(event.Attributes["operation_id"])
 		rows[i] = timelineRow{
 			EventID:           event.EventID,
 			Title:             eventTitle(event.EventType),
@@ -887,6 +920,12 @@ func (s *Server) loadTimeline(r *http.Request, sessionID, cursorRaw string) ([]t
 			OutputTokens:      tokenValue(event.Attributes["output_token_count"]),
 			CachedInputTokens: tokenValue(event.Attributes["cached_input_token_count"]),
 			ReasoningTokens:   tokenValue(event.Attributes["reasoning_token_count"]),
+			HasOperation:      hasOperation,
+			OperationID:       operationID,
+			OperationCategory: operationString(event.Attributes["category"], "unknown"),
+			OperationTool:     operationToolDisplay(event.Attributes, event.ProviderExtensions),
+			OperationDuration: operationDuration(event.Attributes["duration_ms"]),
+			OperationOutcome:  operationString(event.Attributes["outcome"], "unknown"),
 			ApprovalDecision:  attrString(event.Attributes["approval_decision"]),
 			ApprovalReason:    attrString(event.Attributes["approval_reason_class"]),
 			ApprovalTool:      approvalToolLabel(approvalToolQualifier(event.Attributes), event.Attributes["tool_name"]),
@@ -998,6 +1037,92 @@ func approvalToolLabel(namespace, name any) string {
 		return toolName
 	}
 	return toolNamespace + "/" + toolName
+}
+
+func observedString(value any) (string, bool) {
+	text, ok := value.(string)
+	text = strings.TrimSpace(text)
+	return text, ok && text != ""
+}
+
+func operationString(value any, missingState string) fieldDisplay {
+	if text, ok := observedString(value); ok {
+		return fieldDisplay{Text: text, Observed: true}
+	}
+	return fieldDisplay{Machine: missingState}
+}
+
+func operationToolDisplay(attributes, extensions map[string]any) fieldDisplay {
+	name, ok := observedString(attributes["tool_name"])
+	qualifier, hasQualifier := observedString(approvalToolQualifier(attributes))
+	if !ok {
+		name, qualifier, hasQualifier, ok = operationToolFromExtensions(extensions)
+	}
+	if !ok {
+		return fieldDisplay{Machine: "unavailable"}
+	}
+	if hasQualifier {
+		name = qualifier + "/" + name
+	}
+	return fieldDisplay{Text: name, Observed: true}
+}
+
+func operationToolFromExtensions(extensions map[string]any) (name, qualifier string, hasQualifier, observed bool) {
+	for _, key := range []string{"tool_call", "sandbox_outcome", "mcp_call", "event"} {
+		evidence, ok := extensions[key].(map[string]any)
+		if !ok {
+			continue
+		}
+		name, observed = observedString(evidence["tool_name"])
+		if !observed {
+			continue
+		}
+		qualifier, hasQualifier = observedString(approvalToolQualifier(evidence))
+		return name, qualifier, hasQualifier, true
+	}
+	return "", "", false, false
+}
+
+func operationDuration(value any) fieldDisplay {
+	duration, ok := durationMilliseconds(value)
+	if !ok {
+		return fieldDisplay{Machine: "unavailable"}
+	}
+	return fieldDisplay{Text: strconv.FormatFloat(duration, 'f', -1, 64) + " ms", Observed: true}
+}
+
+func durationMilliseconds(value any) (float64, bool) {
+	var duration float64
+	switch typed := value.(type) {
+	case string:
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 64)
+		if err != nil {
+			return 0, false
+		}
+		duration = parsed
+	case int:
+		duration = float64(typed)
+	case int32:
+		duration = float64(typed)
+	case int64:
+		duration = float64(typed)
+	case uint:
+		duration = float64(typed)
+	case uint32:
+		duration = float64(typed)
+	case uint64:
+		duration = float64(typed)
+	case float32:
+		duration = float64(typed)
+	case float64:
+		duration = typed
+	default:
+		return 0, false
+	}
+	if duration < 0 || math.IsNaN(duration) || math.IsInf(duration, 0) {
+		return 0, false
+	}
+	return duration, true
 }
 
 func tokenValue(value any) tokenDisplay {

@@ -36,7 +36,7 @@ Source of truth for product behaviour remains [PRODUCT_MAP.md](../../PRODUCT_MAP
 | Route | Status |
 |-------|--------|
 | `/` Home | Implemented — orchestration, behaviour, governance, and integration highlights (#150) |
-| `/sessions`, `/sessions/{id}` | Implemented — list + flat timeline |
+| `/sessions`, `/sessions/{id}` | Implemented — scoped list, operation-aware timeline, and session governance checklist (#153) |
 | `/insights` | Implemented detailed secondary route — Home carries headline content; this route preserves PRODUCT_MAP §17.3 evidence tables |
 | `/integrations` | Light — observed tools + Cursor Enterprise status |
 | `/privacy`, `/costs` | Implemented |
@@ -51,11 +51,11 @@ secondary destinations; Home omits the Costs link. See
 | Signal | SQLite / API | UI |
 |--------|--------------|-----|
 | Sessions / events | `sessions`, `events` (~7.3k / ~29k locally sampled) | Yes — #163 adds primary/observation scopes so content-derived evidence stays inspectable without dominating the default list |
-| Operations | `operations` (~1.2k) + timeline projection | Partial (API richer than UI) |
+| Operations | `operations` (~1.2k) + timeline projection | Yes — observed category, qualified tool, duration, and outcome render on operation timeline entries (#153) |
 | Cost records | `cost_records` | Costs page only |
 | MCP inventory / skills / model / context / ops insights | `GET /api/v1/insights/*` | Headline summaries on Home; detailed evidence on Insights (#150) |
-| Risky access | `GET /api/v1/insights/risky-access` | Yes — `/governance` (#151) |
-| Unapproved MCP | `GET /api/v1/insights/unapproved-mcp` | Yes — `/governance`; Save reloads findings immediately (#151, #152) |
+| Risky access | `GET /api/v1/insights/risky-access` | Yes — `/governance` plus a session-scoped checklist over the full retained session event set (#151, #153) |
+| Unapproved MCP | `GET /api/v1/insights/unapproved-mcp` | Yes — `/governance`; Save reloads findings immediately; session detail preserves unconfigured/indeterminate policy state (#151–#153) |
 | MCP allowlist config | `governance.mcp_allowlist` YAML | Checkbox editor atomically persists and reloads local policy (#152) |
 | File operations | Capability matrix mostly `unknown` | No Files lane |
 | OTEL span trees | Claude spans in event extensions (partial) | No span UI |
@@ -164,7 +164,7 @@ Empty allowlist remains **indeterminate** (existing engine behaviour). This is d
 - [ ] Privacy and Costs remain reachable without top-nav slots.
 - [ ] `/governance` shows risky-access and unapproved-mcp with evidence and honest indeterminate.
 - [x] MCP allowlist checkboxes + Save persist to local config and affect findings (#152).
-- [ ] Session timeline shows operation category/tool/duration/outcome when present (never invent zeros).
+- [x] Session timeline shows operation category/tool/duration/outcome when present (never invent zeros) and session governance stays scoped and honest (#153).
 - [ ] Integrations shows capability-backed status (addresses #79 intent).
 - [ ] Playwright live-data e2e covers Governance visibility + allowlist save round-trip + nav IA.
 - [ ] Privacy invariants and “no cost on Home” preserved.

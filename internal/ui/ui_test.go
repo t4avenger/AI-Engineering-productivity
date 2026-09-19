@@ -3,9 +3,11 @@ package ui_test
 import (
 	"context"
 	"errors"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -680,6 +682,264 @@ func TestTimelineRendersToolDecisionApprovals(t *testing.T) {
 			assertTimelineContains(t, tc.sessionID, event, want...)
 		})
 	}
+}
+
+func TestTimelineRendersObservedOperationDetails(t *testing.T) {
+	now := time.Now().UTC()
+	event := canonical.Event{
+		EventID: "operation-event", EventType: "operation", SessionID: "operation-session",
+		OccurredAt: now, ReceivedAt: now, Provider: "openai", Tool: "codex",
+		Attributes: map[string]any{
+			"operation_id":   "call-123",
+			"category":       "shell command",
+			"tool_namespace": "functions",
+			"tool_name":      "exec_command",
+			"duration_ms":    "92",
+			"outcome":        "success",
+		},
+	}
+	body := renderSessionDetail(t, &fullStub{
+		sessions: []canonical.Session{syntheticSession("operation-session", now)},
+		events:   map[string][]canonical.Event{"operation-session": {event}},
+	}, nil, "operation-session")
+	operation := timelineOperationSection(t, body)
+	assertContainsAll(t, operation, []string{
+		"Operation details", "call-123", "shell command", "functions/exec_command", "92 ms", "Succeeded",
+	})
+}
+
+func TestTimelineRendersOperationToolFromRetainedProviderEvidence(t *testing.T) {
+	now := time.Now().UTC()
+	event := canonical.Event{
+		EventID: "extension-operation", EventType: "codex.tool_result", SessionID: "extension-operation-session",
+		OccurredAt: now, ReceivedAt: now, Provider: "openai", Tool: "codex",
+		Attributes: map[string]any{"operation_id": "extension-call"},
+		ProviderExtensions: map[string]any{
+			"tool_call": map[string]any{"tool_name": "exec_command", "tool_namespace": "functions"},
+		},
+	}
+	body := renderSessionDetail(t, &fullStub{
+		sessions: []canonical.Session{syntheticSession("extension-operation-session", now)},
+		events:   map[string][]canonical.Event{"extension-operation-session": {event}},
+	}, nil, "extension-operation-session")
+	if operation := timelineOperationSection(t, body); !strings.Contains(operation, "functions/exec_command") {
+		t.Fatalf("retained operation tool evidence was not rendered: %q", operation)
+	}
+}
+
+func TestTimelineOperationDurationHonoursObservedNumericForms(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  any
+		want string
+	}{
+		{name: "string", raw: "92", want: "92 ms"},
+		{name: "integer", raw: int64(7), want: "7 ms"},
+		{name: "float", raw: 12.5, want: "12.5 ms"},
+		{name: "observed zero", raw: float64(0), want: "0 ms"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			now := time.Now().UTC()
+			event := canonical.Event{
+				EventID: "duration-event", EventType: "operation", SessionID: "duration-session",
+				OccurredAt: now, ReceivedAt: now, Provider: "openai", Tool: "codex",
+				Attributes: map[string]any{"operation_id": "duration-call", "duration_ms": tc.raw},
+			}
+			body := renderSessionDetail(t, &fullStub{
+				sessions: []canonical.Session{syntheticSession("duration-session", now)},
+				events:   map[string][]canonical.Event{"duration-session": {event}},
+			}, nil, "duration-session")
+			if operation := timelineOperationSection(t, body); !strings.Contains(operation, tc.want) {
+				t.Fatalf("operation duration missing %q: %q", tc.want, operation)
+			}
+		})
+	}
+}
+
+func TestTimelineOperationMissingOrMalformedFieldsStayUnavailable(t *testing.T) {
+	invalidDurations := []any{"not-a-number", -1, math.NaN(), math.Inf(1)}
+	for index, duration := range invalidDurations {
+		now := time.Now().UTC()
+		sessionID := "partial-operation-" + strconv.Itoa(index)
+		event := canonical.Event{
+			EventID: "partial-event", EventType: "operation", SessionID: sessionID,
+			OccurredAt: now, ReceivedAt: now, Provider: "openai", Tool: "codex",
+			Attributes: map[string]any{"operation_id": "partial-call", "duration_ms": duration},
+		}
+		body := renderSessionDetail(t, &fullStub{
+			sessions: []canonical.Session{syntheticSession(sessionID, now)},
+			events:   map[string][]canonical.Event{sessionID: {event}},
+		}, nil, sessionID)
+		operation := timelineOperationSection(t, body)
+		if strings.Count(operation, "Not proven yet") != 2 {
+			t.Fatalf("missing category/outcome must stay unknown: %q", operation)
+		}
+		if strings.Count(operation, "Not available from this provider") != 2 {
+			t.Fatalf("missing tool and invalid duration must stay unavailable: %q", operation)
+		}
+	}
+}
+
+func TestTimelineDoesNotInferOperationFromOtherSignals(t *testing.T) {
+	now := time.Now().UTC()
+	event := canonical.Event{
+		EventID: "not-operation", EventType: "tool_decision", SessionID: "not-operation-session",
+		OccurredAt: now, ReceivedAt: now, Provider: "openai", Tool: "codex",
+		Attributes: map[string]any{
+			"category": "shell command", "duration_ms": int64(9), "outcome": "success",
+			"approval_decision": "approved", "lifecycle_kind": "session_start",
+		},
+	}
+	body := renderSessionDetail(t, &fullStub{
+		sessions: []canonical.Session{syntheticSession("not-operation-session", now)},
+		events:   map[string][]canonical.Event{"not-operation-session": {event}},
+	}, nil, "not-operation-session")
+	if strings.Contains(body, "Operation details") {
+		t.Fatalf("timeline inferred an operation without operation_id: %q", body)
+	}
+}
+
+func TestSessionGovernanceChecklistIsScopedAndHonest(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fullStub{
+		sessions: []canonical.Session{
+			syntheticSession("selected-session", now),
+			syntheticSession("other-session", now),
+		},
+		events: map[string][]canonical.Event{
+			"selected-session": {
+				governanceEvent("selected-file", "selected-session", now, map[string]any{"file_path": "/workspace/readme.md"}, nil),
+				governanceEvent("selected-mcp", "selected-session", now, nil, map[string]any{"server_name": "filesystem", "status": "connected"}),
+			},
+			"other-session": {
+				governanceEvent("other-file", "other-session", now, map[string]any{"file_path": "/workspace/.env"}, nil),
+				governanceEvent("other-mcp", "other-session", now, nil, map[string]any{"server_name": "rogue-server", "status": "connected"}),
+			},
+		},
+	}
+	body := renderSessionDetail(t, repo, []string{"filesystem"}, "selected-session")
+	checklist := sessionGovernanceSection(t, body)
+	if strings.Count(checklist, "Not a violation") != 2 || strings.Count(checklist, "0 findings") != 2 {
+		t.Fatalf("session-scoped clean evidence rendered incorrectly: %q", checklist)
+	}
+	if strings.Contains(checklist, "Violation") {
+		t.Fatalf("events from another session contaminated the checklist: %q", checklist)
+	}
+
+	violation := renderSessionDetail(t, repo, []string{"filesystem"}, "other-session")
+	violationChecklist := sessionGovernanceSection(t, violation)
+	if strings.Count(violationChecklist, "Violation") != 2 || strings.Count(violationChecklist, "1 finding") != 2 {
+		t.Fatalf("session violations and counts missing: %q", violationChecklist)
+	}
+}
+
+func TestSessionGovernanceChecklistPreservesMissingEvidenceStates(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fullStub{
+		sessions: []canonical.Session{syntheticSession("empty-governance-session", now)},
+		events:   map[string][]canonical.Event{"empty-governance-session": {}},
+	}
+	body := renderSessionDetail(t, repo, nil, "empty-governance-session")
+	checklist := sessionGovernanceSection(t, body)
+	assertContainsAll(t, checklist, []string{"Indeterminate", "Not available from this provider", "Allowlist not configured", "0 findings"})
+}
+
+func TestSessionGovernanceChecklistUsesEventsBeyondTimelinePage(t *testing.T) {
+	now := time.Now().UTC()
+	events := make([]canonical.Event, 0, 51)
+	for index := range 50 {
+		events = append(events, governanceEvent(
+			"ordinary-"+strconv.Itoa(index),
+			"paged-governance-session",
+			now.Add(time.Duration(index)*time.Second),
+			map[string]any{"file_path": "/workspace/file.txt"},
+			nil,
+		))
+	}
+	events = append(events, governanceEvent(
+		"risky-after-page",
+		"paged-governance-session",
+		now.Add(50*time.Second),
+		map[string]any{"file_path": "/workspace/.env"},
+		nil,
+	))
+	repo := &fullStub{
+		sessions: []canonical.Session{syntheticSession("paged-governance-session", now)},
+		events:   map[string][]canonical.Event{"paged-governance-session": events},
+	}
+	body := renderSessionDetail(t, repo, []string{"filesystem"}, "paged-governance-session")
+	checklist := sessionGovernanceSection(t, body)
+	assertContainsAll(t, checklist, []string{"Risky access", "Violation", "1 finding"})
+	if !strings.Contains(body, "Load more") {
+		t.Fatalf("fixture did not exercise a paginated timeline: %q", body)
+	}
+}
+
+func TestSessionGovernanceReadFailureKeepsSessionMetadataVisible(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fullStub{
+		sessions: []canonical.Session{syntheticSession("governance-error-session", now)},
+		eventErr: errors.New("synthetic event read failure"),
+	}
+	body := renderSessionDetail(t, repo, []string{"filesystem"}, "governance-error-session")
+	assertContainsAll(t, body, []string{
+		"Session governance-error-session",
+		"anthropic",
+		"Session governance checks are unavailable because retained events could not be loaded.",
+		"Unable to load timeline.",
+	})
+	checklist := sessionGovernanceSection(t, body)
+	if strings.Count(checklist, "Indeterminate") != 2 || strings.Count(checklist, "Not available from this provider") != 2 {
+		t.Fatalf("failed event read must make both checks explicitly unavailable: %q", checklist)
+	}
+}
+
+func governanceEvent(eventID, sessionID string, now time.Time, attributes, extensionEvent map[string]any) canonical.Event {
+	event := canonical.Event{
+		EventID: eventID, EventType: "api_request", SessionID: sessionID,
+		OccurredAt: now, ReceivedAt: now, Provider: "anthropic", Tool: "claude-code",
+		Attributes: attributes,
+	}
+	if extensionEvent != nil {
+		event.EventType = "mcp_server_connection"
+		event.ProviderExtensions = map[string]any{"event": extensionEvent}
+	}
+	return event
+}
+
+func renderSessionDetail(t *testing.T, repo *fullStub, allowlist []string, sessionID string) string {
+	t.Helper()
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, allowlist)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	return getAuthed(t, handler, cookie, "/sessions/"+sessionID).Body.String()
+}
+
+func timelineOperationSection(t *testing.T, body string) string {
+	t.Helper()
+	return htmlSection(t, body, `<section class="timeline-operation"`)
+}
+
+func sessionGovernanceSection(t *testing.T, body string) string {
+	t.Helper()
+	return htmlSection(t, body, `<section aria-labelledby="session-governance-heading"`)
+}
+
+func htmlSection(t *testing.T, body, opening string) string {
+	t.Helper()
+	start := strings.Index(body, opening)
+	if start == -1 {
+		t.Fatalf("section %q missing from body: %q", opening, body)
+	}
+	end := strings.Index(body[start:], "</section>")
+	if end == -1 {
+		t.Fatalf("section %q did not close: %q", opening, body[start:])
+	}
+	return body[start : start+end]
 }
 
 func assertTimelineContains(t *testing.T, sessionID string, event canonical.Event, want ...string) {
