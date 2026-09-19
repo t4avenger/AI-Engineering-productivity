@@ -167,8 +167,9 @@ type mcpAllowlistOption struct {
 }
 
 const (
-	htmlContentTypeHeader = "Content-Type"
-	htmlContentTypeValue  = "text/html; charset=utf-8"
+	htmlContentTypeHeader  = "Content-Type"
+	htmlContentTypeValue   = "text/html; charset=utf-8"
+	homeInsightUnavailable = "Insight and governance highlights unavailable."
 )
 
 type integrationsData struct {
@@ -234,7 +235,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	data := homeData{}
 	sessions, err := s.listAllSessions(r, storage.SessionScopePrimary)
 	if err != nil {
-		data.InsightErr = "Insight and governance highlights unavailable."
+		data.InsightErr = homeInsightUnavailable
 		data.IntegrationErr = "Integration health unavailable."
 		s.render(w, tmplHome, layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(r), Error: "Unable to load sessions.", Content: data})
 		return
@@ -265,7 +266,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 
 	allSessions, err := s.listAllSessions(r, "")
 	if err != nil {
-		data.InsightErr = "Insight and governance highlights unavailable."
+		data.InsightErr = homeInsightUnavailable
 		data.IntegrationErr = "Integration health unavailable."
 		s.render(w, tmplHome, layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(r), Content: data})
 		return
@@ -273,7 +274,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	data.Integrations = homeIntegrationRows(allSessions, nil)
 	events, err := s.insightEventsForSessions(r, allSessions)
 	if err != nil {
-		data.InsightErr = "Insight and governance highlights unavailable."
+		data.InsightErr = homeInsightUnavailable
 	} else {
 		data.MCP = insights.MCPInventoryFromEvents(events)
 		data.Skills = insights.SkillUsageFromEvents(events)
