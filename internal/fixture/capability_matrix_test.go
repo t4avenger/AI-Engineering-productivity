@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/wayne/telemetryiq/internal/capabilities"
 )
 
 func TestCapabilityMatrixClaimsReferenceCommittedFixtureEvidence(t *testing.T) {
@@ -15,42 +17,38 @@ func TestCapabilityMatrixClaimsReferenceCommittedFixtureEvidence(t *testing.T) {
 		t.Fatalf("read capability matrix: %v", err)
 	}
 
-	for _, row := range capabilityRows(string(data)) {
-		cells := markdownCells(row)
-		if len(cells) != 5 || cells[0] == "Capability" {
-			continue
-		}
-		for _, cellIndex := range []int{1, 2, 3} {
-			state := cells[cellIndex]
-			if !validCapabilityState(state) {
-				t.Fatalf("invalid capability state %q in row %q", state, row)
-			}
-			if state == "unknown" {
+	matrix, err := capabilities.Parse(string(data))
+	if err != nil {
+		t.Fatalf("parse capability matrix: %v", err)
+	}
+
+	for _, row := range matrix.Rows {
+		for _, state := range []capabilities.State{row.Codex, row.Claude, row.Cursor} {
+			if state == capabilities.StateUnknown {
 				continue
 			}
-			if !strings.Contains(cells[4], "fixtures/") {
-				t.Fatalf("capability %q state %q must reference committed fixture evidence: %q", cells[0], state, cells[4])
+			// Notes column is only in the markdown; re-find the source line for evidence.
+			note := notesForCapability(string(data), row.Name)
+			if !strings.Contains(note, "fixtures/") {
+				t.Fatalf("capability %q state %q must reference committed fixture evidence: %q", row.Name, state, note)
 			}
-			for _, evidencePath := range fixtureEvidencePaths(cells[4]) {
+			for _, evidencePath := range fixtureEvidencePaths(note) {
 				if _, err := os.Stat(filepath.Join(root, evidencePath)); err != nil {
-					t.Fatalf("capability %q references missing evidence %q: %v", cells[0], evidencePath, err)
+					t.Fatalf("capability %q references missing evidence %q: %v", row.Name, evidencePath, err)
 				}
 			}
 		}
 	}
 }
 
-func capabilityRows(document string) []string {
-	marker := "## Capability matrix"
-	start := strings.Index(document, marker)
-	if start == -1 {
-		return nil
+func notesForCapability(document, name string) string {
+	for _, line := range strings.Split(document, "\n") {
+		cells := markdownCells(line)
+		if len(cells) == 5 && cells[0] == name {
+			return cells[4]
+		}
 	}
-	section := document[start+len(marker):]
-	if next := strings.Index(section, "\n## "); next >= 0 {
-		section = section[:next]
-	}
-	return strings.Split(section, "\n")
+	return ""
 }
 
 func markdownCells(row string) []string {
@@ -59,20 +57,15 @@ func markdownCells(row string) []string {
 		return nil
 	}
 	parts := strings.Split(strings.Trim(row, "|"), "|")
-	cells := make([]string, 0, len(parts))
-	for _, part := range parts {
-		cells = append(cells, strings.TrimSpace(part))
+	if len(parts) < 5 {
+		return nil
 	}
+	cells := make([]string, 5)
+	for i := 0; i < 4; i++ {
+		cells[i] = strings.TrimSpace(parts[i])
+	}
+	cells[4] = strings.TrimSpace(strings.Join(parts[4:], "|"))
 	return cells
-}
-
-func validCapabilityState(state string) bool {
-	switch state {
-	case "supported", "partial", "unsupported", "unknown", "version-dependent":
-		return true
-	default:
-		return false
-	}
 }
 
 func fixtureEvidencePaths(note string) []string {

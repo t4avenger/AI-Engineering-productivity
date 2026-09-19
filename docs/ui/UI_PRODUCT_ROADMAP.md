@@ -38,7 +38,7 @@ Source of truth for product behaviour remains [PRODUCT_MAP.md](../../PRODUCT_MAP
 | `/` Home | Implemented — orchestration, behaviour, governance, and integration highlights (#150) |
 | `/sessions`, `/sessions/{id}` | Implemented — scoped list, operation-aware timeline, and session governance checklist (#153) |
 | `/insights` | Implemented detailed secondary route — Home carries headline content; this route preserves PRODUCT_MAP §17.3 evidence tables |
-| `/integrations` | Light — observed tools + Cursor Enterprise status |
+| `/integrations` | Implemented — capability matrix headlines, last-seen tools, Cursor Enterprise status (#154) |
 | `/privacy`, `/costs` | Implemented |
 | `/governance` | Implemented — risky-access + unapproved-MCP findings (#151) |
 
@@ -165,7 +165,7 @@ Empty allowlist remains **indeterminate** (existing engine behaviour). This is d
 - [ ] `/governance` shows risky-access and unapproved-mcp with evidence and honest indeterminate.
 - [x] MCP allowlist checkboxes + Save persist to local config and affect findings (#152).
 - [x] Session timeline shows operation category/tool/duration/outcome when present (never invent zeros) and session governance stays scoped and honest (#153).
-- [ ] Integrations shows capability-backed status (addresses #79 intent).
+- [x] Integrations shows capability-backed status (addresses #79 intent).
 - [ ] Playwright live-data e2e covers Governance visibility + allowlist save round-trip + nav IA.
 - [ ] Privacy invariants and “no cost on Home” preserved.
 
@@ -207,6 +207,6 @@ Epic: [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148
 
 ## 10. Next implementation step
 
-1. Continue V1 UI order: **#153** / **#154** → **#155** (consolidated e2e).
+1. Close V1 with **#155** (consolidated Playwright e2e for IA + Governance + allowlist save).
 
-With allowlist Save and Home highlights delivered, the remaining V1 work can deepen Sessions and Integrations before the consolidated e2e issue.
+Integrations is capability-backed (#154). Remaining V1 gate is live-data e2e coverage on the four-tab shell and Governance Save path.

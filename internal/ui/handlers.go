@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wayne/telemetryiq/internal/capabilities"
 	"github.com/wayne/telemetryiq/internal/governance"
 	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
@@ -191,12 +192,22 @@ const (
 type integrationsData struct {
 	Tools            []integrationRow
 	Empty            bool
+	Capabilities     []capabilityRow
+	Providers        []string
 	CursorEnterprise cursorEnterpriseStatus
 }
 
 type integrationRow struct {
-	Tool     string
-	Provider string
+	Tool          string
+	Provider      string
+	LastSeen      string
+	LastSeenState string
+}
+
+// capabilityRow is one headline matrix capability for the Integrations table.
+type capabilityRow struct {
+	Name   string
+	States []string
 }
 
 // cursorEnterpriseStatus is honest ingest health for Cursor Enterprise OTEL
@@ -631,6 +642,8 @@ func mcpAllowlistOptions(inventory insights.MCPInventory, allowlist []string) []
 func (s *Server) integrationsPage(w http.ResponseWriter, r *http.Request) {
 	sessions, err := s.listAllSessions(r, "")
 	data := integrationsData{
+		Capabilities:     integrationCapabilityRows(),
+		Providers:        append([]string(nil), capabilities.Providers...),
 		CursorEnterprise: cursorEnterpriseStatus{Status: "unavailable"},
 	}
 	if err != nil {
@@ -638,17 +651,36 @@ func (s *Server) integrationsPage(w http.ResponseWriter, r *http.Request) {
 		s.render(w, tmplIntegrations, layoutData{Title: "Integrations", Nav: "integrations", Health: s.healthLabel(r), Error: "Unable to load integrations.", Content: data})
 		return
 	}
-	seen := map[string]integrationRow{}
+	byKey := map[string]homeIntegrationActivity{}
 	for _, session := range sessions {
-		key := session.Tool + "|" + session.Provider
-		seen[key] = integrationRow{Tool: session.Tool, Provider: session.Provider}
+		latest := s.sessionLastActivity(r, session)
+		recordHomeIntegrationActivity(byKey, session.Provider, session.Tool, latest)
 	}
-	for _, row := range seen {
-		data.Tools = append(data.Tools, row)
+	for _, activity := range homeIntegrationRowsFromActivities(byKey) {
+		data.Tools = append(data.Tools, integrationRow{
+			Tool:          activity.Tool,
+			Provider:      activity.Provider,
+			LastSeen:      activity.LastSeen,
+			LastSeenState: activity.LastSeenState,
+		})
 	}
 	data.Empty = len(data.Tools) == 0
 	data.CursorEnterprise = s.cursorEnterpriseFromSessions(r, sessions)
 	s.render(w, tmplIntegrations, layoutData{Title: "Integrations", Nav: "integrations", Health: s.healthLabel(r), Content: data})
+}
+
+func integrationCapabilityRows() []capabilityRow {
+	providers := capabilities.Providers
+	rows := capabilities.HeadlineMatrix()
+	out := make([]capabilityRow, 0, len(rows))
+	for _, row := range rows {
+		states := make([]string, 0, len(providers))
+		for _, provider := range providers {
+			states = append(states, string(row.StateFor(provider)))
+		}
+		out = append(out, capabilityRow{Name: row.Name, States: states})
+	}
+	return out
 }
 
 // cursorEnterpriseFromSessions derives Enterprise ingest status from retained

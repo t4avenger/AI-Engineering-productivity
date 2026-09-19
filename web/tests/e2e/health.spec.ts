@@ -46,6 +46,30 @@ test('unlocks and walks the local dashboard journey', async ({ page }) => {
     page.getByText('does not enforce or publish', { exact: false }),
   ).toBeVisible();
 
+  await primaryNavigation
+    .getByRole('link', { name: 'Integrations', exact: true })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Integrations', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Capability matrix' }),
+  ).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Codex' })).toBeVisible();
+  await expect(
+    page.getByRole('columnheader', { name: 'Claude Code' }),
+  ).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Cursor' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Tools observed' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Privacy', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Privacy', exact: true }).first(),
+  ).toBeVisible();
+
   await page.getByRole('link', { name: 'Sessions', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: 'Sessions', exact: true }),

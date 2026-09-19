@@ -43,10 +43,12 @@ strings.
 | Machine value | Plain label | Definition | Units | When unavailable |
 | --- | --- | --- | --- | --- |
 | `observed` | Seen in telemetry | The signal was present in retained canonical telemetry or provider evidence. | None | Not applicable. |
+| `supported` | Supported | The committed capability matrix marks this provider signal as supported with fixture evidence. | None | Not applicable when the matrix cell is not `supported`. |
 | `partial` | Partially seen | Some, but not all, expected parts of the signal are available for this provider/tool. | None | Render the available detail and label missing parts explicitly. |
 | `unavailable` | Not available from this provider | Reviewed telemetry shows the supported provider surface cannot emit this signal, or the current row has no value for an optional signal. | None | Use this label; do not infer or substitute zero. |
 | `unsupported` | Not supported | The product or provider capability matrix says this signal is outside the supported surface. | None | Use this label and avoid implying the feature exists. |
 | `unknown` | Not proven yet | No committed fixture or retained event proves whether the signal is available. | None | Use this label; schedule or reference fixture work rather than downgrading to unavailable. |
+| `version-dependent` | Version dependent | The matrix marks the signal as available only for some reviewed tool versions. | None | Show this label; do not claim uniform support across versions. |
 | `not_observed` | Not seen in telemetry | MCP invocation evidence was not seen for a known connected server. | None | If invocation telemetry itself is absent, use `usage_unavailable` instead. |
 | `connected_but_unused` | Connected, never invoked | A server connection was observed and no matching explicit invocation was observed. | None | If usage cannot be checked, use `usage_unavailable`. |
 | `used` | Invoked | Explicit MCP invocation evidence matched the server. | None | Not applicable. |

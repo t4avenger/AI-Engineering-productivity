@@ -201,7 +201,7 @@ func clearAuthCookie(w http.ResponseWriter) {
 
 func availabilityLabel(value string) string {
 	switch value {
-	case "observed", "partial", "unavailable", "unsupported", "unknown":
+	case "observed", "partial", "unavailable", "unsupported", "unknown", "supported", "version-dependent":
 		return value
 	case "":
 		return "unavailable"
@@ -221,6 +221,9 @@ var statusLabels = map[string]string{
 	"unavailable": "Not available from this provider",
 	"unsupported": "Not supported",
 	"unknown":     "Not proven yet",
+	// Capability-matrix states (docs/integrations/capability-matrix.md).
+	"supported":         "Supported",
+	"version-dependent": "Version dependent",
 	// MCP inventory states.
 	"not_observed":         "Not seen in telemetry",
 	"connected_but_unused": "Connected, never invoked",
@@ -261,6 +264,7 @@ var statusLabels = map[string]string{
 var availabilityBadgeClasses = map[string]bool{
 	"observed": true, "partial": true, "unavailable": true,
 	"unsupported": true, "unknown": true,
+	"supported": true, "version-dependent": true,
 	"violation": true, "not_violation": true, "indeterminate": true,
 	"policy_unconfigured": true,
 }
