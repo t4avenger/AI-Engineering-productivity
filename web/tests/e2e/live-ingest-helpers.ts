@@ -42,6 +42,22 @@ export async function expectFourTabPrimaryNav(page: Page): Promise<void> {
   await expect(
     primaryNavigation.getByRole('link', { name: 'Models', exact: true }),
   ).toHaveCount(0);
+  await expect(
+    primaryNavigation.getByRole('link', { name: 'Pull Requests', exact: true }),
+  ).toHaveCount(0);
+}
+
+/** Secondary destinations before #161 primary shell (#186 Models, #187 PRs). */
+export async function expectSecondaryDestinations(
+  page: Page,
+  opts: { costs?: boolean } = {},
+): Promise<void> {
+  const wantCosts = opts.costs !== false;
+  const secondaryNavigation = page.getByLabel('Secondary navigation');
+  const labels = wantCosts
+    ? ['Pull Requests', 'Models', 'Privacy', 'Costs']
+    : ['Pull Requests', 'Models', 'Privacy'];
+  await expect(secondaryNavigation.getByRole('link')).toHaveText(labels);
 }
 
 /** Access Rules tab shells (#160): MCP editable; others honest unavailable. */

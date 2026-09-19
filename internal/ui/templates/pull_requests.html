@@ -1,0 +1,44 @@
+{{define "pull_requests.html"}}
+{{template "shell-start" .}}
+{{template "nav" .}}
+<main id="main-content" class="page">
+  <h1>Pull Requests</h1>
+  <p>Groups retained HTTP(S) pull-request URLs from session <code>pr_link</code> evidence and lists distinct linked sessions. This is not a GitHub client; authenticated GitHub synchronisation is deferred. Provider URL capture proof is tracked in issues <a href="https://github.com/t4avenger/AI-Engineering-productivity/issues/183">#183</a> and <a href="https://github.com/t4avenger/AI-Engineering-productivity/issues/184">#184</a>.</p>
+  {{with .Content}}
+  {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{else}}
+  <form method="get" action="/pull-requests" role="search">
+    <label for="pull-requests-query">Search URL, repository, or branch</label>
+    <input id="pull-requests-query" name="q" type="search" value="{{.PullRequests.Query}}" />
+    <button type="submit">Search</button>
+  </form>
+  {{if .PullRequests.Notes}}
+  <h2>Evidence notes</h2>
+  <ul>{{range .PullRequests.Notes}}<li>{{.}}</li>{{end}}</ul>
+  {{end}}
+  {{if .PullRequests.Groups}}
+  <section aria-label="Retained pull requests">
+    {{range .PullRequests.Groups}}
+    <article class="panel">
+      <h2><a href="{{.URL}}" rel="noopener noreferrer">{{.URL}}</a></h2>
+      <p>{{.SessionCount}} linked session{{if ne .SessionCount 1}}s{{end}}</p>
+      <ul>
+        {{range .Sessions}}
+        <li>
+          <a href="{{sessionPath .SessionID}}">{{.SessionID}}</a>
+          — {{.Provider}} / {{.Tool}}
+          {{if .Repository}} · repository {{.Repository}}{{end}}
+          {{if .Branch}} · branch {{.Branch}}{{else}} · branch unavailable{{end}}
+        </li>
+        {{end}}
+      </ul>
+    </article>
+    {{end}}
+  </section>
+  {{else}}
+  <p>No retained HTTP(S) pull-request URLs yet. Missing <code>pr_link</code> is an evidence gap — branch names, timestamps, and <code>pull_request.count</code> never invent a PR row.</p>
+  {{end}}
+  {{end}}
+  {{end}}
+</main>
+{{template "shell-end" .}}
+{{end}}

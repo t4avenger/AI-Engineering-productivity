@@ -569,6 +569,9 @@ func assertPrimaryNavigation(t *testing.T, body string) {
 func assertSecondaryNavigation(t *testing.T, body string, wantCosts bool) {
 	t.Helper()
 	secondary := navigationSection(t, body, "Secondary navigation")
+	if !strings.Contains(secondary, `href="/pull-requests"`) {
+		t.Fatalf("secondary navigation must keep Pull Requests reachable: %q", secondary)
+	}
 	if !strings.Contains(secondary, `href="/models"`) {
 		t.Fatalf("secondary navigation must keep Models reachable: %q", secondary)
 	}
@@ -1319,6 +1322,117 @@ func TestModelsPageRendersScorecardAndUnlockGate(t *testing.T) {
 	emptyBody := getAuthed(t, emptyHandler, unlock(t, emptyHandler), "/models").Body.String()
 	if !strings.Contains(emptyBody, "No outcome-contract rows yet") {
 		t.Fatalf("empty models page missing unavailable copy: %q", emptyBody)
+	}
+}
+
+func TestPullRequestsPageRendersGroupsAndUnlockGate(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fullStub{
+		sessions: []canonical.Session{
+			{
+				SessionID: "pr-session-a",
+				Provider:  "anthropic",
+				Tool:      "claude-code",
+				State:     "completed",
+				StartedAt: now,
+				Attributes: map[string]any{
+					"pr_link":    "https://github.com/org/repo/pull/12",
+					"git_branch": "feature/pr-12",
+					"repository": "org/repo",
+				},
+			},
+			{
+				SessionID: "pr-session-b",
+				Provider:  "openai",
+				Tool:      "codex",
+				State:     "completed",
+				StartedAt: now,
+				Attributes: map[string]any{
+					"pr_link": "https://github.com/org/repo/pull/12",
+				},
+			},
+			{
+				SessionID: "unsafe-session",
+				Provider:  "openai",
+				Tool:      "codex",
+				State:     "completed",
+				StartedAt: now,
+				Attributes: map[string]any{
+					"pr_link": "javascript:alert(1)",
+				},
+			},
+			{
+				SessionID: "branch-only",
+				Provider:  "openai",
+				Tool:      "codex",
+				State:     "completed",
+				StartedAt: now,
+				Attributes: map[string]any{
+					"git_branch": "feature/no-url",
+				},
+			},
+		},
+	}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+
+	unauth := httptest.NewRequest(http.MethodGet, "/pull-requests", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, unauth)
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/unlock" {
+		t.Fatalf("unauthenticated /pull-requests = %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+
+	cookie := unlock(t, handler)
+	body := getAuthed(t, handler, cookie, "/pull-requests").Body.String()
+	assertContainsAll(t, body, []string{
+		"<h1>Pull Requests</h1>",
+		`class="secondary-link active" href="/pull-requests" aria-current="page"`,
+		`href="https://github.com/org/repo/pull/12"`,
+		"2 linked sessions",
+		`href="/sessions/pr-session-a"`,
+		`href="/sessions/pr-session-b"`,
+		"org/repo",
+		"feature/pr-12",
+		"#183",
+		"#184",
+		"Evidence notes",
+	})
+	if strings.Contains(body, "javascript:alert(1)") {
+		t.Fatalf("unsafe URL must not render as evidence link: %q", body)
+	}
+	if strings.Contains(body, "feature/no-url") {
+		t.Fatalf("branch-only session must not invent a PR group: %q", body)
+	}
+	assertPrimaryNavigation(t, body)
+	assertSecondaryNavigation(t, body, true)
+
+	filtered := getAuthed(t, handler, cookie, "/pull-requests?q=pr-session-missing").Body.String()
+	if !strings.Contains(filtered, "No retained HTTP(S) pull-request URLs yet") {
+		t.Fatalf("filtered empty state missing copy: %q", filtered)
+	}
+
+	emptyServer, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emptyHandler := emptyServer.Wrap(http.NotFoundHandler())
+	emptyBody := getAuthed(t, emptyHandler, unlock(t, emptyHandler), "/pull-requests").Body.String()
+	if !strings.Contains(emptyBody, "No retained HTTP(S) pull-request URLs yet") {
+		t.Fatalf("empty pull-requests page missing unavailable copy: %q", emptyBody)
+	}
+
+	errServer, err := ui.New("test-token", errStub{}, defaultContextWasteThresholds, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	errHandler := errServer.Wrap(http.NotFoundHandler())
+	errBody := getAuthed(t, errHandler, unlock(t, errHandler), "/pull-requests").Body.String()
+	if !strings.Contains(errBody, "Unable to load pull-request evidence.") {
+		t.Fatalf("reader error missing alert: %q", errBody)
 	}
 }
 

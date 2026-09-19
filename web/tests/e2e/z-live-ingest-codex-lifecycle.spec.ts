@@ -90,4 +90,12 @@ test('renders Codex lifecycle signals ingested through the live daemon', async (
   await expect(page.getByText('session_start')).toBeVisible();
   await expect(page.getByText('tiq-canary-live-lifecycle')).toHaveCount(0);
   await expect(page.getByText('lifecycle-live@example.test')).toHaveCount(0);
+
+  // #187 N02: live capture without pr_link stays an honest empty destination.
+  await page.goto('/pull-requests');
+  await expect(page.getByRole('heading', { name: 'Pull Requests' })).toBeVisible();
+  await expect(
+    page.getByText('No retained HTTP(S) pull-request URLs yet', { exact: false }),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: /github\.com/ })).toHaveCount(0);
 });
