@@ -22,6 +22,8 @@ func TestManagementAuthProtectsLocalData(t *testing.T) {
 		{name: "valid token", path: "/api/v1/sessions", token: "test-token", status: http.StatusNoContent},
 		{name: "event timeline missing token", path: "/api/v1/sessions/a/events", status: http.StatusUnauthorized},
 		{name: "event timeline valid token", path: "/api/v1/sessions/a/events", token: "test-token", status: http.StatusNoContent},
+		{name: "session files missing token", path: "/api/v1/sessions/a/files", status: http.StatusUnauthorized},
+		{name: "session files valid token", path: "/api/v1/sessions/a/files", token: "test-token", status: http.StatusNoContent},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			method := http.MethodGet

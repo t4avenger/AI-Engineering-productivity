@@ -129,9 +129,8 @@ Finishing local visual work cannot close these requirements.
 
 ## 6. Next smallest task
 
-With [#161](https://github.com/t4avenger/AI-Engineering-productivity/issues/161)
-delivered, prefer evidence projections
-[#156](https://github.com/t4avenger/AI-Engineering-productivity/issues/156) /
+With [#156](https://github.com/t4avenger/AI-Engineering-productivity/issues/156)
+delivered, prefer remaining evidence projections
 [#157](https://github.com/t4avenger/AI-Engineering-productivity/issues/157) /
 [#188](https://github.com/t4avenger/AI-Engineering-productivity/issues/188), or
 trace parts [#189](https://github.com/t4avenger/AI-Engineering-productivity/issues/189) /

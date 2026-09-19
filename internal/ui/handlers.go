@@ -100,11 +100,23 @@ type sessionDetailData struct {
 	SessionMetadata []metadataRow
 	Events          []timelineRow
 	NextCursor      string
+	FileEvidence    []fileEvidenceRow
+	FilesError      string
 	RiskyAccess     governance.RiskyAccess
 	UnapprovedMCP   governance.UnapprovedMCP
 	GovernanceError string
 	Error           string
 	Confirm         bool
+}
+
+type fileEvidenceRow struct {
+	EventID     string
+	Path        string
+	PathState   string
+	Action      string
+	ActionState string
+	Duration    string
+	OperationID string
 }
 
 type availabilityRow struct {
@@ -474,9 +486,21 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 	if governanceErr != nil {
 		data.GovernanceError = "Session governance checks are unavailable because retained events could not be loaded."
 		data.RiskyAccess, data.UnapprovedMCP = unavailableGovernanceChecklist()
+		data.FilesError = "File evidence is unavailable because retained events could not be loaded."
 	} else {
 		data.RiskyAccess = governance.RiskyAccessFromEvents(allEvents)
 		data.UnapprovedMCP = governance.UnapprovedMCPFromEvents(allEvents, s.currentMCPAllowlist())
+		operations := []canonical.Operation{}
+		if s.operations != nil {
+			if listed, opErr := s.operations.ListOperations(r.Context(), storage.OperationFilter{SessionID: id}); opErr != nil {
+				data.FilesError = "File evidence is unavailable because retained operations could not be loaded."
+			} else {
+				operations = listed
+			}
+		}
+		if data.FilesError == "" {
+			data.FileEvidence = fileEvidenceRows(insights.SessionFilesFromEvidence(allEvents, operations))
+		}
 	}
 	s.render(w, tmplSessionDetail, layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(r), Content: data})
 }
@@ -489,6 +513,31 @@ func unavailableGovernanceChecklist() (governance.RiskyAccess, governance.Unappr
 		Findings: []governance.MCPServerFinding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable",
 	}
 	return riskyAccess, unapprovedMCP
+}
+
+func fileEvidenceRows(entries []insights.SessionFileEntry) []fileEvidenceRow {
+	rows := make([]fileEvidenceRow, 0, len(entries))
+	for _, entry := range entries {
+		row := fileEvidenceRow{
+			EventID:     entry.EventID,
+			PathState:   entry.Availability.Path,
+			ActionState: entry.Availability.Action,
+		}
+		if entry.Path != nil {
+			row.Path = *entry.Path
+		}
+		if entry.Action != nil {
+			row.Action = *entry.Action
+		}
+		if entry.DurationMs != nil {
+			row.Duration = fmt.Sprintf("%d ms", *entry.DurationMs)
+		}
+		if entry.OperationID != nil {
+			row.OperationID = *entry.OperationID
+		}
+		rows = append(rows, row)
+	}
+	return rows
 }
 
 func (s *Server) sessionTimelinePartial(w http.ResponseWriter, r *http.Request) {
