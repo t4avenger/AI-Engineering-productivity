@@ -16,8 +16,9 @@ func TestCapabilityMatrixClaimsReferenceCommittedFixtureEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read capability matrix: %v", err)
 	}
+	document := string(data)
 
-	matrix, err := capabilities.Parse(string(data))
+	matrix, err := capabilities.Parse(document)
 	if err != nil {
 		t.Fatalf("parse capability matrix: %v", err)
 	}
@@ -27,8 +28,7 @@ func TestCapabilityMatrixClaimsReferenceCommittedFixtureEvidence(t *testing.T) {
 			if state == capabilities.StateUnknown {
 				continue
 			}
-			// Notes column is only in the markdown; re-find the source line for evidence.
-			note := notesForCapability(string(data), row.Name)
+			note := capabilities.NotesForCapability(document, row.Name)
 			if !strings.Contains(note, "fixtures/") {
 				t.Fatalf("capability %q state %q must reference committed fixture evidence: %q", row.Name, state, note)
 			}
@@ -39,33 +39,6 @@ func TestCapabilityMatrixClaimsReferenceCommittedFixtureEvidence(t *testing.T) {
 			}
 		}
 	}
-}
-
-func notesForCapability(document, name string) string {
-	for _, line := range strings.Split(document, "\n") {
-		cells := markdownCells(line)
-		if len(cells) == 5 && cells[0] == name {
-			return cells[4]
-		}
-	}
-	return ""
-}
-
-func markdownCells(row string) []string {
-	row = strings.TrimSpace(row)
-	if !strings.HasPrefix(row, "|") || strings.Contains(row, "---") {
-		return nil
-	}
-	parts := strings.Split(strings.Trim(row, "|"), "|")
-	if len(parts) < 5 {
-		return nil
-	}
-	cells := make([]string, 5)
-	for i := 0; i < 4; i++ {
-		cells[i] = strings.TrimSpace(parts[i])
-	}
-	cells[4] = strings.TrimSpace(strings.Join(parts[4:], "|"))
-	return cells
 }
 
 func fixtureEvidencePaths(note string) []string {

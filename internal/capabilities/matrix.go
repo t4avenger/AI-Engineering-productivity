@@ -68,7 +68,7 @@ func Parse(document string) (Matrix, error) {
 
 	var rows []Row
 	for _, line := range strings.Split(section, "\n") {
-		cells := markdownCells(line)
+		cells := MarkdownCells(line)
 		if len(cells) != 5 || cells[0] == "Capability" {
 			continue
 		}
@@ -131,7 +131,20 @@ func ValidState(s State) bool {
 	}
 }
 
-func markdownCells(row string) []string {
+// NotesForCapability returns the Notes column for a named matrix row, or "".
+func NotesForCapability(document, name string) string {
+	for _, line := range strings.Split(document, "\n") {
+		cells := MarkdownCells(line)
+		if len(cells) == 5 && cells[0] == name {
+			return cells[4]
+		}
+	}
+	return ""
+}
+
+// MarkdownCells splits a capability-matrix markdown table row into five cells
+// (Capability, Codex, Claude Code, Cursor, Notes). Notes may contain "|".
+func MarkdownCells(row string) []string {
 	row = strings.TrimSpace(row)
 	if !strings.HasPrefix(row, "|") || strings.Contains(row, "---") {
 		return nil
