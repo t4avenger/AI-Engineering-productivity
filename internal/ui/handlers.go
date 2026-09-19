@@ -38,15 +38,35 @@ type unlockData struct {
 }
 
 type homeData struct {
-	Successful int
-	Failed     int
-	Abandoned  int
-	Other      int
-	Tools      []string
-	MCPUnused  int
-	SkillCount int
-	InsightErr string
-	Empty      bool
+	Successful       int
+	Failed           int
+	Abandoned        int
+	Other            int
+	Tools            []string
+	MCP              insights.MCPInventory
+	Skills           insights.SkillUsage
+	ModelPerformance insights.ModelPerformance
+	ContextWaste     insights.ContextWaste
+	RiskyAccess      governance.RiskyAccess
+	UnapprovedMCP    governance.UnapprovedMCP
+	Integrations     []homeIntegrationRow
+	InsightErr       string
+	IntegrationErr   string
+	Empty            bool
+}
+
+type homeIntegrationRow struct {
+	Provider      string
+	Tool          string
+	Status        string
+	LastSeen      string
+	LastSeenState string
+}
+
+type homeIntegrationActivity struct {
+	provider string
+	tool     string
+	latest   time.Time
 }
 
 type sessionsData struct {
@@ -147,8 +167,9 @@ type mcpAllowlistOption struct {
 }
 
 const (
-	htmlContentTypeHeader = "Content-Type"
-	htmlContentTypeValue  = "text/html; charset=utf-8"
+	htmlContentTypeHeader  = "Content-Type"
+	htmlContentTypeValue   = "text/html; charset=utf-8"
+	homeInsightUnavailable = "Insight and governance highlights unavailable."
 )
 
 type integrationsData struct {
@@ -214,6 +235,8 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	data := homeData{}
 	sessions, err := s.listAllSessions(r, storage.SessionScopePrimary)
 	if err != nil {
+		data.InsightErr = homeInsightUnavailable
+		data.IntegrationErr = "Integration health unavailable."
 		s.render(w, tmplHome, layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(r), Error: "Unable to load sessions.", Content: data})
 		return
 	}
@@ -239,16 +262,120 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	for tool := range tools {
 		data.Tools = append(data.Tools, tool)
 	}
-	events, err := s.insightEvents(r)
+	sort.Strings(data.Tools)
+
+	allSessions, err := s.listAllSessions(r, "")
 	if err != nil {
-		data.InsightErr = "Insight highlights unavailable."
+		data.InsightErr = homeInsightUnavailable
+		data.IntegrationErr = "Integration health unavailable."
+		s.render(w, tmplHome, layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(r), Content: data})
+		return
+	}
+	data.Integrations = homeIntegrationRows(allSessions, nil)
+	events, err := s.insightEventsForSessions(r, allSessions)
+	if err != nil {
+		data.InsightErr = homeInsightUnavailable
 	} else {
-		mcp := insights.MCPInventoryFromEvents(events)
-		skills := insights.SkillUsageFromEvents(events)
-		data.MCPUnused = mcp.Totals.UnusedServers
-		data.SkillCount = skills.Totals.ObservedSkills
+		data.MCP = insights.MCPInventoryFromEvents(events)
+		data.Skills = insights.SkillUsageFromEvents(events)
+		data.ModelPerformance = insights.ModelPerformanceFromEvents(events)
+		data.ContextWaste = insights.ContextWasteFromEvents(events, s.contextWasteThresholds)
+		data.RiskyAccess = governance.RiskyAccessFromEvents(events)
+		data.UnapprovedMCP = governance.UnapprovedMCPFromEvents(events, s.currentMCPAllowlist())
+		data.Integrations = homeIntegrationRows(allSessions, events)
 	}
 	s.render(w, tmplHome, layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(r), Content: data})
+}
+
+// homeIntegrationRows reports only identities and activity retained from the
+// provider surface. A retained session proves the integration was observed;
+// its latest event/completion/start timestamp is the last known activity. A
+// missing timestamp remains unavailable instead of being rendered as zero.
+func homeIntegrationRows(sessions []canonical.Session, events []canonical.Event) []homeIntegrationRow {
+	byKey, sessionIdentities := homeSessionIntegrationActivities(sessions)
+	for _, event := range events {
+		provider, tool := homeEventIntegrationIdentity(event, sessionIdentities)
+		recordHomeIntegrationActivity(byKey, provider, tool, event.OccurredAt)
+	}
+	return homeIntegrationRowsFromActivities(byKey)
+}
+
+func homeSessionIntegrationActivities(sessions []canonical.Session) (map[string]homeIntegrationActivity, map[string]homeIntegrationActivity) {
+	byKey := map[string]homeIntegrationActivity{}
+	bySession := make(map[string]homeIntegrationActivity, len(sessions))
+	for _, session := range sessions {
+		provider := strings.TrimSpace(session.Provider)
+		tool := strings.TrimSpace(session.Tool)
+		latest := session.StartedAt
+		if session.CompletedAt != nil && session.CompletedAt.After(latest) {
+			latest = *session.CompletedAt
+		}
+		bySession[session.SessionID] = homeIntegrationActivity{provider: provider, tool: tool}
+		recordHomeIntegrationActivity(byKey, provider, tool, latest)
+	}
+	return byKey, bySession
+}
+
+func homeEventIntegrationIdentity(event canonical.Event, bySession map[string]homeIntegrationActivity) (string, string) {
+	provider := strings.TrimSpace(event.Provider)
+	tool := strings.TrimSpace(event.Tool)
+	identity, ok := bySession[event.SessionID]
+	if !ok {
+		return provider, tool
+	}
+	if provider == "" {
+		provider = identity.provider
+	}
+	if tool == "" {
+		tool = identity.tool
+	}
+	return provider, tool
+}
+
+func recordHomeIntegrationActivity(byKey map[string]homeIntegrationActivity, provider, tool string, latest time.Time) {
+	key := provider + "\x00" + tool
+	activity := byKey[key]
+	activity.provider = provider
+	activity.tool = tool
+	if latest.After(activity.latest) {
+		activity.latest = latest
+	}
+	byKey[key] = activity
+}
+
+func homeIntegrationRowsFromActivities(byKey map[string]homeIntegrationActivity) []homeIntegrationRow {
+	rows := make([]homeIntegrationRow, 0, len(byKey))
+	for _, activity := range byKey {
+		provider := activity.provider
+		if provider == "" {
+			provider = statusLabel("unavailable")
+		}
+		tool := activity.tool
+		if tool == "" {
+			tool = statusLabel("unavailable")
+		}
+		row := homeIntegrationRow{
+			Provider:      provider,
+			Tool:          tool,
+			Status:        "observed",
+			LastSeen:      statusLabel("unavailable"),
+			LastSeenState: "unavailable",
+		}
+		if activity.provider == "" || activity.tool == "" {
+			row.Status = "partial"
+		}
+		if !activity.latest.IsZero() {
+			row.LastSeen = formatTimestamp(activity.latest)
+			row.LastSeenState = "observed"
+		}
+		rows = append(rows, row)
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		left := strings.ToLower(rows[i].Provider + "\x00" + rows[i].Tool)
+		right := strings.ToLower(rows[j].Provider + "\x00" + rows[j].Tool)
+		return left < right
+	})
+	return rows
 }
 
 func (s *Server) sessionsList(w http.ResponseWriter, r *http.Request) {
@@ -655,6 +782,13 @@ func (s *Server) insightEvents(r *http.Request) ([]canonical.Event, error) {
 	sessions, err := s.listAllSessions(r, "")
 	if err != nil {
 		return nil, err
+	}
+	return s.insightEventsForSessions(r, sessions)
+}
+
+func (s *Server) insightEventsForSessions(r *http.Request, sessions []canonical.Session) ([]canonical.Event, error) {
+	if s.events == nil {
+		return nil, errUnavailable
 	}
 	var events []canonical.Event
 	for _, session := range sessions {

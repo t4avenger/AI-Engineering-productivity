@@ -136,9 +136,12 @@ See [user-flow.md](user-flow.md) for full paths. Primary flows:
 │   · Codex · Claude Code … or “Awaiting telemetry”       │
 │                                                         │
 │ Insight highlights                                      │
-│   · MCP: N unused connected servers (link Insights)     │
-│   · Skills: N observed (link Insights)                  │
-│   · Honest note if insight data unavailable             │
+│   · MCP / skill / model / context summaries             │
+│   · Honest unknown when evidence is absent              │
+│ Governance                                              │
+│   · Risky-access + unapproved-MCP outcomes              │
+│ Integration health                                      │
+│   · Observed tool/provider + latest retained activity   │
 │                                                         │
 │ Cost is not shown here.                                 │
 └─────────────────────────────────────────────────────────┘
