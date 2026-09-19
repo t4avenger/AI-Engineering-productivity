@@ -1,234 +1,127 @@
-# UI Product Roadmap: Enterprise-shaped local dashboard
+# UI Product Roadmap: reference-aligned TelemetryIQ
 
-**Product:** TelemetryIQ (local-first edition evolving toward enterprise SaaS IA)  
-**Stack:** Go `html/template` + HTMX ([ADR 0002](../decisions/0002-go-htmx-local-dashboard.md))  
-**Status:** Planning artifact (Quick Flow)  
-**Date:** 2026-09-15  
-**Reference UX:** TraceLens-style Governance Policies + Session Trace mocks (IA and density only; branding stays TelemetryIQ)
+Accepted target: 2026-09-19. Stack: Go `html/template` + HTMX.
+Parent: [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148). Product authority: [PRODUCT_MAP](../../PRODUCT_MAP.md) §§11,17.
+Visual decision: [ADR 0003](../decisions/0003-reference-aligned-ui.md).
 
-This roadmap prepares the dashboard for an enterprise SaaS information architecture while remaining a **local Go/HTMX** app. It does **not** greenfield a React SPA or dark-theme rewrite in V1.
+Alignment evidence: [2026-09-19 audit](DESIGN_ALIGNMENT_AUDIT.md).
 
-Source of truth for product behaviour remains [PRODUCT_MAP.md](../../PRODUCT_MAP.md) (§0 reorientation, §17 dashboard IA, privacy invariants). Where this roadmap narrows nav for enterprise prep, treat it as the **UI delivery plan**; update PRODUCT_MAP §17 when V1 ships.
+## 1. Read before implementation
 
----
+1. Inspect the originals: [Governance Policies](references/governance-policies.png)
+   and [Session Trace](references/session-trace.png); [provenance/checksums](references/README.md).
+2. Read [DESIGN_IMPLEMENTATION_SPEC.md](DESIGN_IMPLEMENTATION_SPEC.md). Its
+   requirement IDs, interaction rules, interfaces and tests are normative.
+3. Read the owning GitHub issue and prerequisite fixture/contracts. Report any
+   conflict instead of silently implementing a different product direction.
+4. Reuse existing code, fixture builders and browser assertions. No invented
+   telemetry or duplicate test blocks; Sonar new-code duplication must be <=3%.
 
-## 1. Decisions locked
+The target is a close visual match, including the five destinations in the
+images. TelemetryIQ branding, evidence honesty, accessibility and staged
+enterprise behaviour are the deliberate differences. The earlier four-tab,
+light/optional-sidebar and no-conversation directions are superseded.
 
-| Decision | Choice |
-|----------|--------|
-| Planning mode | Quick Flow (durable doc + GitHub issues) |
-| Stack | Evolve Go/HTMX; match mock *structure*, not pixel SPA |
-| Primary nav | **Home · Sessions · Governance · Integrations** |
-| Folded surfaces | Insights → Home; Privacy → Integrations (or footer); Costs → session detail / secondary link |
-| Governance V1 | Findings UI **plus** MCP allowlist checkboxes + Save |
-| Governance V1 non-goals | Enforce / publish / multi-tenant policy sets / environments |
-| Privacy | No conversation/prompt replay by default; cost never on Home |
-| Branding | TelemetryIQ (TraceLens is reference only) |
+## 2. Decisions and navigation
 
-**“Allowed” semantics (V1):** checkbox membership in `governance.mcp_allowlist` drives **detect-and-report** (`unapproved-mcp`). It does **not** block agents at runtime.
+| Decision | Accepted target |
+|---|---|
+| Shell | Dark navy, persistent desktop sidebar, dense panels/tables, selected-state blue; responsive and WCAG 2.2 AA |
+| Primary nav | Overview `/` · Sessions `/sessions` · Pull Requests `/pull-requests` · Models `/models` · Governance `/governance` |
+| Utilities | Integrations, Insights, Privacy, Costs, authentication; preserve URLs. Costs omitted on Overview |
+| Conversation | Retained prompt/response previews and full local inspector content; provider omissions/redactions explicit |
+| Local governance | Detect-and-report with real local saves and previews; no blocked-action guarantee |
+| Enterprise | Full reference tracked through explicit architecture gates; no fake controls or counts |
+| Pull Requests | Retained fixture-backed URLs/session correlation first; authenticated sync later |
+| Models | Existing model-performance contracts, thresholds and availability |
+| Runtime | Same-origin Go/HTMX; no SPA, CDN, new account requirement or automatic sharing |
 
----
+## 3. Baseline versus remaining work
 
-## 2. Current baseline
+Status verified against GitHub on 2026-09-19; recheck before starting work.
 
-### 2.1 UI today
+- V1 foundations [#149](https://github.com/t4avenger/AI-Engineering-productivity/issues/149)–[#155](https://github.com/t4avenger/AI-Engineering-productivity/issues/155) are closed: four-tab navigation,
+  Overview/Home highlights, findings, MCP save, operations timeline and live tests.
+- [#158](https://github.com/t4avenger/AI-Engineering-productivity/issues/158) header metadata and [#163](https://github.com/t4avenger/AI-Engineering-productivity/issues/163) primary/observation session scopes
+  are closed. PR URL proof remains [#183](https://github.com/t4avenger/AI-Engineering-productivity/issues/183)/[#184](https://github.com/t4avenger/AI-Engineering-productivity/issues/184); never derive a link
+  from `pull_request.count`.
+- [#160](https://github.com/t4avenger/AI-Engineering-productivity/issues/160) is **closed** and its implementation
+  [PR #185](https://github.com/t4avenger/AI-Engineering-productivity/pull/185)
+  **merged on 2026-09-19 at 13:54:38 UTC**, rechecked during this audit.
+  Its shells are a completed foundation, not the full Governance reference.
+- Claude content is retained on the #94 log surface; JSONL/other prior drops
+  remain coordinated with [#173](https://github.com/t4avenger/AI-Engineering-productivity/issues/173), #104 and #105. Missing content is not a
+  product prohibition on local display.
+- Codex 0.154.0 span capture shipped in [#172](https://github.com/t4avenger/AI-Engineering-productivity/issues/172). Spans can be trace-only
+  observations, with no proven conversation join. Claude spans are available;
+  neither fact supplies the missing common projection/UI.
+- File-operation evidence/projection [#156](https://github.com/t4avenger/AI-Engineering-productivity/issues/156) and span projection
+  [#157](https://github.com/t4avenger/AI-Engineering-productivity/issues/157) remain open. The image's per-file +/- counts and task stages
+  must not be inferred from aggregate metrics.
+- No Models/PR primary pages, full trace, matching dark shell, local
+  skill/path/prompt editors or enterprise controls are declared delivered here.
 
-| Route | Status |
-|-------|--------|
-| `/` Home | Implemented — orchestration, behaviour, governance, and integration highlights (#150) |
-| `/sessions`, `/sessions/{id}` | Implemented — scoped list, operation-aware timeline, and session governance checklist (#153) |
-| `/insights` | Implemented detailed secondary route — Home carries headline content; this route preserves PRODUCT_MAP §17.3 evidence tables |
-| `/integrations` | Implemented — capability matrix headlines, last-seen tools, Cursor Enterprise status (#154) |
-| `/privacy`, `/costs` | Implemented |
-| `/governance` | Implemented — findings + Access Rules tabs (MCP editable; skills/paths/prompts unavailable shells) (#151, #152, #160) |
+## 4. Delivery order and ownership
 
-Primary nav: Home · Sessions · Governance · Integrations. Privacy and Costs are
-secondary destinations; Home omits the Costs link. See
-[internal/ui/templates/partials.html](../../internal/ui/templates/partials.html).
+Every reference region has a numbered specification requirement and owner below.
+Dependencies indicate required contracts, not permission to skip unavailable states.
 
-### 2.2 Data & APIs
+| Stage | Issue / requirement | Prerequisites and completion boundary |
+|---|---|---|
+| Evidence | [#156](https://github.com/t4avenger/AI-Engineering-productivity/issues/156) — T06 Files projection | Review #87/#109/#105 fixtures; prove each field; add read contract and live gate |
+| Evidence | [#157](https://github.com/t4avenger/AI-Engineering-productivity/issues/157) — T07 span projection | Reuse #172 and Claude fixtures; keep trace-only observations separate |
+| Evidence | [#188](https://github.com/t4avenger/AI-Engineering-productivity/issues/188) — T03 conversation projection | #94 retained bodies; coordinate #173 missing sources; do not block supported log content on all providers |
+| Destination | [#186](https://github.com/t4avenger/AI-Engineering-productivity/issues/186) — N03 Models | Existing model-performance readers; independent of shell |
+| Destination | [#187](https://github.com/t4avenger/AI-Engineering-productivity/issues/187) — N02 Pull Requests | Empty state can land now; populated-provider claims depend on #183/#184 evidence |
+| Shell | [#161](https://github.com/t4avenger/AI-Engineering-productivity/issues/161) — S01–S04, N01 | Land Models/PR routes before adding their nav links; ADR 0003 |
+| Trace part | [#189](https://github.com/t4avenger/AI-Engineering-productivity/issues/189) — T08 inspector | Existing timeline integration first; consume file/span projections as they land |
+| Trace part | [#190](https://github.com/t4avenger/AI-Engineering-productivity/issues/190) — T09 interval breakdown | #157 projection/interval evidence; full-session calculation |
+| Trace assembly | [#159](https://github.com/t4avenger/AI-Engineering-productivity/issues/159) — T01–T10 | #156, #157, #161, #188, #189, #190; all five lanes and honest partial states |
+| Local governance | [#191](https://github.com/t4avenger/AI-Engineering-productivity/issues/191) — G01–G03, G05, G08 | #161 and integration of #160/PR #185; preserve working MCP Save |
+| Local policy | [#192](https://github.com/t4avenger/AI-Engineering-productivity/issues/192) — G06 skills | #191 plus explicit skill fixtures; schema/detector/save/editor |
+| Local policy | [#193](https://github.com/t4avenger/AI-Engineering-productivity/issues/193) — G04/G06 files & paths | #191 and #156; exact/glob semantics and detect-only preview |
+| Local policy | [#194](https://github.com/t4avenger/AI-Engineering-productivity/issues/194) — G07 prompts | #191 and #188; RE2/literal rules over retained content |
+| Local phase exit | [#195](https://github.com/t4avenger/AI-Engineering-productivity/issues/195) — all local requirements | Local destinations, shell, trace and policy editors complete; checkpoint + full verification |
+| Future gate | [#196](https://github.com/t4avenger/AI-Engineering-productivity/issues/196) — E01 enforcement/approvals | Provider interception proof + deliberate product/architecture revision |
+| Future gate | [#197](https://github.com/t4avenger/AI-Engineering-productivity/issues/197) — E02 policy lifecycle | Draft/version/publish/audit/rollback/exception contracts; precedes active-version enforcement |
+| Future gate | [#198](https://github.com/t4avenger/AI-Engineering-productivity/issues/198) — E03 environment/team/share | #197 plus separate upload, identity/authorisation and privacy review |
+| Future gate | [#199](https://github.com/t4avenger/AI-Engineering-productivity/issues/199) — E04 GitHub sync | #187 local page; optional authenticated enrichment design |
 
-| Signal | SQLite / API | UI |
-|--------|--------------|-----|
-| Sessions / events | `sessions`, `events` (~7.3k / ~29k locally sampled) | Yes — #163 adds primary/observation scopes so content-derived evidence stays inspectable without dominating the default list |
-| Operations | `operations` (~1.2k) + timeline projection | Yes — observed category, qualified tool, duration, and outcome render on operation timeline entries (#153) |
-| Cost records | `cost_records` | Costs page only |
-| MCP inventory / skills / model / context / ops insights | `GET /api/v1/insights/*` | Headline summaries on Home; detailed evidence on Insights (#150) |
-| Risky access | `GET /api/v1/insights/risky-access` | Yes — `/governance` plus a session-scoped checklist over the full retained session event set (#151, #153) |
-| Unapproved MCP | `GET /api/v1/insights/unapproved-mcp` | Yes — `/governance`; Save reloads findings immediately; session detail preserves unconfigured/indeterminate policy state (#151–#153) |
-| MCP allowlist config | `governance.mcp_allowlist` YAML | Checkbox editor atomically persists and reloads local policy (#152) |
-| File operations | Capability matrix mostly `unknown` | No Files lane |
-| OTEL span trees | Claude spans in event extensions (partial) | No span UI |
-| Conversation bodies | Privacy default: prompts/responses off | Intentionally absent |
+The [#160](https://github.com/t4avenger/AI-Engineering-productivity/issues/160) issue/PR retains its original shell acceptance criteria. New work
+belongs to the follow-ups, not a retroactive expansion of that implementation.
+Historical [#71](https://github.com/t4avenger/AI-Engineering-productivity/issues/71) receives a supersession notice; closed children stay intact.
 
-Local DB path: `{UserConfigDir}/telemetryiq/telemetryiq.db`.
+## 5. Acceptance and phase gates
 
-### 2.3 Related open issues
+### Local reference-aligned phase
 
-- [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148) — **This roadmap’s epic** (`ui-enterprise`); V1 children #149–#155 closed
-- [#71](https://github.com/t4avenger/AI-Engineering-productivity/issues/71) — Dashboard UX epic (partially completed; residual scope points to #148)
-- [#79](https://github.com/t4avenger/AI-Engineering-productivity/issues/79) — Integrations capability-backed value (superseded by #154)
-- [#87](https://github.com/t4avenger/AI-Engineering-productivity/issues/87) — Claude Code full capture
-- [#109](https://github.com/t4avenger/AI-Engineering-productivity/issues/109) — Codex full capture
-- [#128](https://github.com/t4avenger/AI-Engineering-productivity/issues/128) — Cursor Enterprise OTEL
+- [ ] S01–S04: five destinations, dark shell, desktop density and responsive a11y.
+- [ ] N01–N03: existing Overview preserved; evidence-backed Models and PR pages.
+- [ ] T01–T10: five aligned trace lanes, conversation text, inspector and right rail;
+  missing evidence, timestamps, correlations and durations are explicit.
+- [ ] G01–G08: reference Governance composition with real MCP/skill/path/prompt
+  saves, findings, safe local previews and dirty-state feedback.
+- [ ] Both originals compared with deterministic implementation screenshots;
+  every deviation recorded by requirement ID.
+- [ ] No green 'clean' status without coverage, no fabricated numbers, no
+  double-counted breakdown, no claims of active runtime blocking.
+- [ ] Applicable QUALITY_GATES pass; backend coverage >=80%, duplication <=3%;
+  live daemon ingest→read→UI coverage and WCAG 2.2 AA evidence recorded.
+- [ ] #195 checkpoint and `rtk make verify-push` completed before phase closure.
 
----
+### Full future reference
 
-## 3. Mock → TelemetryIQ IA mapping
+E01–E04 remain separately gated. Each architecture issue must produce reviewed
+contracts and bounded implementation children before enabling runtime controls,
+publishing, environments, shared scope, sharing or GitHub synchronisation.
+Finishing local visual work cannot close these requirements.
 
-| TraceLens mock | TelemetryIQ V1 | Notes |
-|----------------|----------------|-------|
-| Overview | Home | Behaviour/efficiency + governance highlights; no cost |
-| Sessions / Session Trace | Sessions | Ops-aware timeline first; multi-lane in V2 |
-| Governance Policies | Governance | Findings + MCP allowlist Save; no Publish/Enforce |
-| Integrations (implied via MCP table) | Integrations | Observed tools, capability matrix, setup |
-| Pull Requests / Models nav | Deferred | Not in V1–V2 primary nav |
-| Conversation lane (prompt text) | Out of scope (default) | Privacy invariant |
-| Policy Publish / Enforced / environments | Stage 4 enterprise | Not V1 |
+## 6. Next smallest task
 
-PRODUCT_MAP §17.5 Governance (policy events, severity, status, evidence, indeterminate) is the V1 contract for the Governance page.
+Implement [#186](https://github.com/t4avenger/AI-Engineering-productivity/issues/186) using existing performance readers and tests. It
+adds a required destination without waiting on new capture. In parallel only
+when explicitly assigned, #156/#157 can establish trace evidence contracts.
 
----
-
-## 4. Phases
-
-```mermaid
-flowchart LR
-  subgraph v1 [V1 Ship]
-    IA[FourTabShell]
-    GovUI[FindingsPlusAllowlist]
-    SessOps[SessionOpsTimeline]
-    HomeFold[HomeFoldsInsights]
-  end
-  subgraph v15 [V1_5 Capture]
-    Cap[FileOpsAndSpans]
-    Meta[SessionHeaderMetadata]
-  end
-  subgraph v2 [V2 Prep]
-    Policy[SkillPathPromptShells]
-    Dens[MultiLaneTraceUX]
-  end
-  v1 --> v15 --> v2
-```
-
-### V1 — Enterprise-shaped local UI (current data)
-
-Ship the four-tab shell, fold Insights onto Home, add Governance findings + MCP allowlist Save, deepen Sessions timeline and Integrations, add Playwright coverage.
-
-### V1.5 — Capture so UI lanes can grow
-
-Close capability gaps (file ops, span projection, session header metadata) via capture/normaliser work; link existing epics rather than duplicating.
-
-### V2 — Mock density (still Go/HTMX)
-
-Multi-lane session trace; Governance tab shells for skills/paths/prompt protection with honest `unavailable`; optional density/sidebar visual pass (ADR if dark theme becomes default). Still no runtime enforce/publish.
-
----
-
-## 5. V1 MCP allowlist Save design
-
-**Goal:** Operator can tick observed MCP servers as allowed and persist that list locally.
-
-1. Governance page lists observed MCP identities (from MCP inventory insight) as checkboxes; pre-check names present in `governance.mcp_allowlist`.
-2. `POST /governance/mcp-allowlist` (session cookie / Bearer, loopback) accepts selected names.
-3. Validate with existing config rules (no blank entries).
-4. **Write** local config YAML (`governance.mcp_allowlist`) — new `config.Save` (or equivalent) path; today only `Load` exists in [internal/config/config.go](../../internal/config/config.go).
-5. Reload in-process config used by governance readers (or document one restart if reload is deferred — prefer in-process reload).
-6. Re-render findings (`unapproved-mcp`) and flash success.
-
-Empty allowlist remains **indeterminate** (existing engine behaviour). This is detect-and-report only.
-
----
-
-## 6. Data readiness matrix
-
-| Enterprise surface | Data | API | UI V1 target |
-|--------------------|------|-----|--------------|
-| Home KPIs (sessions, tools, insights) | High | Medium | Fold Insights; add gov counts |
-| Session list + ops timeline | High | High | Surface ops fields already projected |
-| Governance findings | High | High | New `/governance` page |
-| MCP allowlist edit | Medium | Missing Write | Checkbox + Save |
-| Files lane | Low | Low | V1.5 capture first |
-| Span tree | Medium (Claude) | Low | V1.5 projection + V2 UI |
-| Conversation replay | Low (privacy) | Low | Non-goal |
-| Skill/path/prompt policy CRUD | Low | Low | V2 shells only (#160); MCP allowlist remains the sole editable control |
-| Integrations management | Medium | Low | Deepen observe + setup |
-
----
-
-## 7. Acceptance criteria (epic)
-
-- [x] Primary nav is Home · Sessions · Governance · Integrations only (#149, #155).
-- [x] Insight headline content is rendered on Home; anchored `/insights` links preserve detailed evidence and backward compatibility (#150).
-- [x] Privacy and Costs remain reachable without top-nav slots (#149, #155).
-- [x] `/governance` shows risky-access and unapproved-mcp with evidence and honest indeterminate (#151, #155).
-- [x] MCP allowlist checkboxes + Save persist to local config and affect findings (#152).
-- [x] Session timeline shows operation category/tool/duration/outcome when present (never invent zeros) and session governance stays scoped and honest (#153).
-- [x] Integrations shows capability-backed status (addresses #79 intent).
-- [x] Playwright live-data e2e covers Governance visibility + allowlist save round-trip + nav IA (#155).
-- [x] Privacy invariants and “no cost on Home” preserved (#150, #155).
-
----
-
-## 8. Issue index
-
-Epic: [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148) · label `ui-enterprise`
-
-| Phase | Issue | Title |
-|-------|-------|-------|
-| Epic | [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148) | `[EPIC] UI: enterprise-shaped Go/HTMX IA (Home · Sessions · Governance · Integrations)` |
-| V1 | [#149](https://github.com/t4avenger/AI-Engineering-productivity/issues/149) | Four-tab shell + nav |
-| V1 | [#150](https://github.com/t4avenger/AI-Engineering-productivity/issues/150) | Home folds Insights + governance / integration highlights |
-| V1 | [#151](https://github.com/t4avenger/AI-Engineering-productivity/issues/151) | Governance findings page |
-| V1 | [#152](https://github.com/t4avenger/AI-Engineering-productivity/issues/152) | MCP allowlist checkboxes + Save |
-| V1 | [#153](https://github.com/t4avenger/AI-Engineering-productivity/issues/153) | Sessions timeline ops + governance checklist |
-| V1 | [#154](https://github.com/t4avenger/AI-Engineering-productivity/issues/154) | Integrations deepen (supersedes #79 intent) |
-| V1 | [#155](https://github.com/t4avenger/AI-Engineering-productivity/issues/155) | Playwright e2e for IA + Governance |
-| V1.5 | [#156](https://github.com/t4avenger/AI-Engineering-productivity/issues/156) | File-ops fixtures / matrix for Files lane |
-| V1.5 | [#157](https://github.com/t4avenger/AI-Engineering-productivity/issues/157) | Span-tree projection API for session UI |
-| V1.5 | [#158](https://github.com/t4avenger/AI-Engineering-productivity/issues/158) | Session header metadata (branch/PR/entrypoint) |
-| V2 | [#159](https://github.com/t4avenger/AI-Engineering-productivity/issues/159) | Multi-lane session trace UX |
-| V2 | [#160](https://github.com/t4avenger/AI-Engineering-productivity/issues/160) | Governance tab shells (skills / paths / prompt) |
-| V2 | [#161](https://github.com/t4avenger/AI-Engineering-productivity/issues/161) | Visual density / optional sidebar pass |
-
----
-
-## 9. Explicit non-goals (this roadmap)
-
-- Runtime policy enforcement / block at the agent
-- Multi-environment Publish workflow
-- Prompt/response conversation replay under default privacy
-- Replacing Go/HTMX with a SPA
-- Making cost a Home headline
-- TraceLens branding or Pull Requests / Models top-level nav in V1–V2
-
----
-
-## 10. Next implementation step
-
-V1 is closed (#149–#155). V1.5 UI slice **#158** (session header metadata) is
-closed. **#160** (Governance Access Rules tab shells: MCP editable; Skills /
-Files & Paths / Prompt Keywords unavailable) ships the first V2 Governance IA
-slice without Publish/Enforce.
-
-Remaining V1.5 capture work so Session Trace lanes can grow honestly:
-
-1. **#156** — File-operation fixtures + capability matrix (blocker for a Files lane).
-2. **#157** — Span-tree projection API for session UI.
-
-Remaining V2: **#159** multi-lane session trace; **#161** visual density /
-optional sidebar (ADR required if dark theme becomes default).
-
-### Access Rules schema follow-ons (shells only today)
-
-Editable policy for non-MCP tabs requires future config + detectors (not
-implemented in #160):
-
-| Tab | Suggested config key (or equivalent) | Detector dependency |
-|-----|--------------------------------------|---------------------|
-| Skills | `governance.skills_allowlist` | Explicit skill-identity telemetry |
-| Files & Paths | `governance.path_rules` | Path/command classifiers beyond risky-access findings |
-| Prompt Keywords | `governance.prompt_keywords` | Prompt-keyword detectors (privacy policy dependent) |
-
-Until those land, the UI must keep `unavailable` shells and must not invent
-allow/block counts.
+This documentation update changes no runtime APIs or schemas. Planned additive
+interfaces are specified in the implementation specification and owned by the
+issues above. No UI delivery phase is declared complete by writing this roadmap.
