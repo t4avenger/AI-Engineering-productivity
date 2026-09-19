@@ -114,7 +114,7 @@
 
     {{if eq .ActiveRulesTab "mcp"}}
     <div class="rules-panel" role="tabpanel" id="rules-panel-mcp" aria-labelledby="rules-tab-mcp">
-      {{if .Saved}}<output class="success" role="status">MCP allowlist saved. Findings now use the updated local policy.</output>{{end}}
+      {{if .Saved}}<output class="success">MCP allowlist saved. Findings now use the updated local policy.</output>{{end}}
       <form method="post" action="/governance/mcp-allowlist" class="stack allowlist-form">
         <fieldset>
           <legend>Allowed MCP servers</legend>
