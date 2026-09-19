@@ -470,6 +470,14 @@ func attachSessionEnvironment(session *canonical.Session, event canonical.Event)
 	if entrypoint := sessionString(event.Attributes["entrypoint"]); entrypoint != "" {
 		observeSessionAttribute(session, "entrypoint", entrypoint)
 	}
+	if transcript := sessionTranscriptEnvelope(event); transcript != nil {
+		if entrypoint := sessionString(transcript["entrypoint"]); entrypoint != "" {
+			observeSessionAttribute(session, "entrypoint", entrypoint)
+		}
+		if branch := sessionString(transcript["git_branch"]); branch != "" {
+			observeSessionAttribute(session, "git_branch", branch)
+		}
+	}
 	if hasCodexLogSessionID(event) {
 		observeSessionCorrelation(session, map[string]any{
 			"session_id_source":   "conversation.id",
@@ -477,6 +485,14 @@ func attachSessionEnvironment(session *canonical.Session, event canonical.Event)
 			"provider_session_id": strings.TrimPrefix(event.SessionID, codexSessionPrefix),
 		})
 	}
+}
+
+func sessionTranscriptEnvelope(event canonical.Event) map[string]any {
+	transcript, ok := event.ProviderExtensions["transcript"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	return transcript
 }
 
 func sessionResourceAttributes(event canonical.Event) map[string]any {

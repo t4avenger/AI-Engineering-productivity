@@ -24,7 +24,7 @@ const transcriptE2ESessionID = "transcript-e2e-session"
 // (message.content[], tool input.command/file_path, toolUseResult, cwd) hold
 // canaries that must never reach storage or the read API.
 const e2eTranscriptNDJSON = `{"type":"user","uuid":"e2e-user-1","sessionId":"transcript-e2e-session","timestamp":"2026-09-12T10:00:00.000Z","version":"2.1.269","message":{"role":"user","content":"tiq-canary-user-prompt"}}
-{"type":"assistant","uuid":"e2e-assistant-1","parentUuid":"e2e-user-1","sessionId":"transcript-e2e-session","timestamp":"2026-09-12T10:00:02.500Z","version":"2.1.269","cwd":"/home/tiq-canary-cwd/project","gitBranch":"main","requestId":"req_e2e_1","message":{"role":"assistant","model":"claude-opus-4-8","stop_reason":"end_turn","content":[{"type":"text","text":"tiq-canary-response"},{"type":"thinking","thinking":"tiq-canary-thinking"},{"type":"tool_use","name":"Bash","input":{"command":"tiq-canary-command"}},{"type":"tool_use","name":"Edit","input":{"file_path":"/tiq-canary-file-path"}}],"usage":{"input_tokens":4096,"output_tokens":512,"cache_read_input_tokens":8192,"cache_creation_input_tokens":128,"output_tokens_details":{"thinking_tokens":64}}},"toolUseResult":{"stdout":"tiq-canary-stdout"}}`
+{"type":"assistant","uuid":"e2e-assistant-1","parentUuid":"e2e-user-1","sessionId":"transcript-e2e-session","timestamp":"2026-09-12T10:00:02.500Z","version":"2.1.269","cwd":"/home/tiq-canary-cwd/project","gitBranch":"main","entrypoint":"cli","requestId":"req_e2e_1","message":{"role":"assistant","model":"claude-opus-4-8","stop_reason":"end_turn","content":[{"type":"text","text":"tiq-canary-response"},{"type":"thinking","thinking":"tiq-canary-thinking"},{"type":"tool_use","name":"Bash","input":{"command":"tiq-canary-command"}},{"type":"tool_use","name":"Edit","input":{"file_path":"/tiq-canary-file-path"}}],"usage":{"input_tokens":4096,"output_tokens":512,"cache_read_input_tokens":8192,"cache_creation_input_tokens":128,"output_tokens_details":{"thinking_tokens":64}}},"toolUseResult":{"stdout":"tiq-canary-stdout"}}`
 
 var transcriptContentCanaries = []string{
 	"tiq-canary-user-prompt",
@@ -54,6 +54,9 @@ func TestTranscriptImportMergesWithOTLPSession(t *testing.T) {
 
 	wantSessionID := "claude-code:" + transcriptE2ESessionID
 	sessions := requireMergedClaudeSession(t, repository, wantSessionID)
+	assertSessionHeaderMetadata(t, sessions[0], "cli", "main")
+	detail := getInsightJSON[sessionDetailResponse](t, server.URL+"/api/v1/sessions/"+wantSessionID)
+	assertSessionHeaderAvailability(t, detail.Data.Availability, "observed", "unavailable")
 	timeline := getInsightJSON[eventListResponse](t, server.URL+"/api/v1/sessions/"+wantSessionID+"/events")
 	assertTranscriptAssistantTokens(t, requireTranscriptAssistantEvent(t, timeline))
 	assertTranscriptContentAbsent(t, repository, wantSessionID, timeline, sessions, server.URL)
@@ -150,6 +153,26 @@ func requireMergedClaudeSession(t *testing.T, repository storage.Repository, wan
 		t.Fatalf("session id = %q, want %q", sessions[0].SessionID, wantSessionID)
 	}
 	return sessions
+}
+
+func assertSessionHeaderMetadata(t *testing.T, session canonical.Session, entrypoint, branch string) {
+	t.Helper()
+	if session.Attributes["entrypoint"] != entrypoint || session.Attributes["git_branch"] != branch {
+		t.Fatalf("session header metadata = %#v, want entrypoint=%q git_branch=%q", session.Attributes, entrypoint, branch)
+	}
+	if _, ok := session.Attributes["pr_link"]; ok {
+		t.Fatalf("must not invent pr_link: %#v", session.Attributes)
+	}
+}
+
+func assertSessionHeaderAvailability(t *testing.T, availability map[string]string, entrypointAndBranch, prLink string) {
+	t.Helper()
+	if availability["entrypoint"] != entrypointAndBranch || availability["git_branch"] != entrypointAndBranch {
+		t.Fatalf("header availability = %#v, want entrypoint/git_branch=%q", availability, entrypointAndBranch)
+	}
+	if availability["pr_link"] != prLink {
+		t.Fatalf("pr_link availability = %q, want %q", availability["pr_link"], prLink)
+	}
 }
 
 func assertTranscriptAssistantTokens(t *testing.T, assistant timelineEvent) {

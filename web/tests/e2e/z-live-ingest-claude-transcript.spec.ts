@@ -31,15 +31,19 @@ test('renders a Claude transcript session ingested through the live daemon', asy
     data: Array<{
       tool: string;
       session_id?: string;
-      attributes?: { model?: string };
+      attributes?: { model?: string; entrypoint?: string; git_branch?: string };
+      availability?: { entrypoint?: string; git_branch?: string; pr_link?: string };
     }>;
   };
-  expect(
-    listBody.data.some((session) => session.tool === 'claude-code'),
-  ).toBe(true);
-  expect(
-    listBody.data.some((session) => session.attributes?.model === liveModel),
-  ).toBe(true);
+  const transcriptSession = listBody.data.find(
+    (session) => session.attributes?.model === liveModel,
+  );
+  expect(transcriptSession?.tool).toBe('claude-code');
+  expect(transcriptSession?.attributes?.entrypoint).toBe('cli');
+  expect(transcriptSession?.attributes?.git_branch).toBe('main');
+  expect(transcriptSession?.availability?.entrypoint).toBe('observed');
+  expect(transcriptSession?.availability?.git_branch).toBe('observed');
+  expect(transcriptSession?.availability?.pr_link).toBe('unavailable');
 
   await unlockDashboard(page, authToken);
   await page.getByRole('link', { name: 'Sessions', exact: true }).click();
@@ -50,6 +54,9 @@ test('renders a Claude transcript session ingested through the live daemon', asy
   await expect(page.getByRole('heading', { name: /^Session / })).toBeVisible();
   await expect(page.getByText('claude-code').first()).toBeVisible();
   await expect(page.getByText(liveModel).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Environment' })).toBeVisible();
+  await expect(page.getByText('cli', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('main', { exact: true }).first()).toBeVisible();
   await expect(
     page.getByRole('heading', { name: 'Assistant message' }),
   ).toBeVisible();

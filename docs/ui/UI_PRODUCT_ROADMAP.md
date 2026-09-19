@@ -206,8 +206,12 @@ Epic: [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148
 
 ## 10. Next implementation step
 
-V1 is closed (#149–#155). Next work is **V1.5 capture** so Session Trace lanes can grow honestly:
+V1 is closed (#149–#155). **#158** (session header metadata: branch / PR /
+entrypoint with availability vocabulary) is the V1.5 UI slice on session detail.
+
+Remaining V1.5 capture work so Session Trace lanes can grow honestly:
 
 1. **#156** — File-operation fixtures + capability matrix (blocker for a Files lane).
 2. **#157** — Span-tree projection API for session UI.
-3. **#158** — Session header metadata (branch / PR / entrypoint) when providers emit it.
+
+Then V2 (#159–#161).

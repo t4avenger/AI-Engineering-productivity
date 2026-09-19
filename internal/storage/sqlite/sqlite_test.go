@@ -94,6 +94,37 @@ func assertSessionCorrelation(t *testing.T, session canonical.Session, providerS
 	}
 }
 
+func TestReconstructedClaudeTranscriptSessionPromotesHeaderMetadata(t *testing.T) {
+	repo, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = repo.Close() }()
+	e := event(t, "claude-transcript", "claude-code:session-header", "assistant_message", "2026-09-12T09:14:00.457Z")
+	e.Provider = "anthropic"
+	e.Tool = "claude-code"
+	e.SourceSchema = "session_jsonl"
+	e.ProviderExtensions = map[string]any{
+		"transcript": map[string]any{
+			"entrypoint": "cli",
+			"git_branch": "main",
+		},
+	}
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{e}); err != nil {
+		t.Fatal(err)
+	}
+	session, found, err := repo.Session(context.Background(), e.SessionID)
+	if err != nil || !found {
+		t.Fatalf("session = %v, %v", found, err)
+	}
+	if session.Attributes["entrypoint"] != "cli" || session.Attributes["git_branch"] != "main" {
+		t.Fatalf("session header metadata = %#v", session.Attributes)
+	}
+	if _, ok := session.Attributes["pr_link"]; ok {
+		t.Fatalf("must not invent pr_link: %#v", session.Attributes)
+	}
+}
+
 func TestReconstructedCodexMetricSessionDoesNotFabricateConversationCorrelation(t *testing.T) {
 	repo, err := Open(":memory:")
 	if err != nil {

@@ -468,6 +468,7 @@ export function claudeTranscriptNDJSON(model: string): string {
       version: '2.1.269',
       cwd: '/home/tiq-canary-live-cwd/project',
       gitBranch: 'main',
+      entrypoint: 'cli',
       requestId: 'req_live_e2e_1',
       message: {
         role: 'assistant',

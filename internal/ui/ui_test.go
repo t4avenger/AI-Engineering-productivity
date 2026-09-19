@@ -248,6 +248,8 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 		{"/sessions", "Model"},
 		{"/sessions/s1", "Availability"},
 		{"/sessions/s1", "Environment"},
+		{"/sessions/s1", "Branch"},
+		{"/sessions/s1", "PR"},
 		{"/sessions/s1", "codex exec"},
 		{"/sessions/s1", "0.153.4"},
 		{"/sessions/s1", "Model interaction"},
@@ -892,6 +894,32 @@ func TestSessionGovernanceReadFailureKeepsSessionMetadataVisible(t *testing.T) {
 	checklist := sessionGovernanceSection(t, body)
 	if strings.Count(checklist, "Indeterminate") != 2 || strings.Count(checklist, "Not available from this provider") != 2 {
 		t.Fatalf("failed event read must make both checks explicitly unavailable: %q", checklist)
+	}
+}
+
+func TestSessionHeaderMetadataShowsBranchAndUnavailablePR(t *testing.T) {
+	now := time.Now().UTC()
+	session := syntheticSession("header-metadata-session", now)
+	session.Attributes = map[string]any{
+		"entrypoint": "cli",
+		"git_branch": "feature/158-session-header",
+	}
+	body := renderSessionDetail(t, &fullStub{sessions: []canonical.Session{session}}, nil, "header-metadata-session")
+	assertContainsAll(t, body, []string{
+		"Environment",
+		"Branch",
+		"feature/158-session-header",
+		"PR",
+		"Entrypoint",
+		"cli",
+		"Availability",
+	})
+	env := body[strings.Index(body, "Environment"):strings.Index(body, "Availability")]
+	if !strings.Contains(env, "Not available from this provider") {
+		t.Fatalf("PR must render unavailable in Environment when no fixture proves a link: %q", env)
+	}
+	if strings.Contains(env, "pull_request") || strings.Contains(strings.ToLower(env), "github.com") {
+		t.Fatalf("must not invent a PR link: %q", env)
 	}
 }
 
