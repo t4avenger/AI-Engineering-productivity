@@ -6,25 +6,22 @@ Integrations, Insights, Models, Pull Requests, Privacy, and Costs pages over the
 same loopback origin as the JSON API and OTLP intake. It does not send analytics
 or dashboard data to third parties.
 
-Primary navigation is Home, Sessions, Governance, and Integrations. Models, Pull
-Requests, and Privacy are available from secondary navigation; Costs is also
-secondary but is omitted from Home because PRODUCT_MAP section 17.1 forbids cost
-labels and links there. The `/models` destination (#186) reuses the existing
-model-performance insight reader and sample-size ranking guard. The
-`/pull-requests` destination (#187 / N02) groups retained session `pr_link`
-HTTP(S) URLs and linked sessions; it does not call GitHub and does not invent
-PR rows from counters or branch/time. Provider URL capture proof remains #183
-and #184. The `/insights` route remains directly available during the transition
-to the Home-based insight surface in issue #150.
+Primary navigation is Overview, Sessions, Pull Requests, Models, and Governance
+in a persistent dark sidebar (#161 / ADR 0003). Integrations, Insights, Privacy,
+and Costs remain utility destinations; Costs is omitted from Overview because
+PRODUCT_MAP section 17.1 forbids cost labels and links there. The `/models`
+destination (#186) reuses the existing model-performance insight reader and
+sample-size ranking guard. The `/pull-requests` destination (#187 / N02) groups
+retained session `pr_link` HTTP(S) URLs and linked sessions; it does not call
+GitHub and does not invent PR rows from counters or branch/time. Provider URL
+capture proof remains #183 and #184. The `/insights` route remains directly
+available as a utility during the Home-based insight surface from issue #150.
 
-This paragraph describes the V1 baseline. The accepted successor is Overview,
-Sessions, Pull Requests, Models and Governance in a dark sidebar, with utility
-access to Integrations/Insights/Privacy/Costs (Costs omitted on Overview).
+Historical V1 used a four-tab light shell (Home · Sessions · Governance ·
+Integrations) with Models/PRs secondary; that IA is superseded by ADR 0003.
 See [ADR 0003](../decisions/0003-reference-aligned-ui.md), the
 [roadmap](../ui/UI_PRODUCT_ROADMAP.md) and
-[implementation specification](../ui/DESIGN_IMPLEMENTATION_SPEC.md) for planned
-routes, additive projections and reference acceptance. These targets have not
-been implemented by the documentation update.
+[implementation specification](../ui/DESIGN_IMPLEMENTATION_SPEC.md).
 
 Browser authentication uses `POST /unlock` with the token from `make auth-token`.
 A successful unlock sets an httpOnly **Secure** session cookie. Use the
@@ -62,7 +59,7 @@ from observed local sessions: with none observed it says `Awaiting telemetry`,
 rather than claiming that a provider has been detected.
 
 Home emphasises orchestration usage (sessions today, tools observed, insight
-highlights) and does not surface cost labels or links. Costs remains a secondary
+highlights) and does not surface cost labels or links. Costs remains a utility
 page available at `/costs` from other authenticated pages, outside the primary
 navigation.
 

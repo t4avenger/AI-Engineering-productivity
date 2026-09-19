@@ -1,28 +1,34 @@
 /*
- * TelemetryIQ dashboard visual system (issue #76).
- * Design tokens mirror docs/bmad/ux-design.md; status badges mirror the
- * enum labels in docs/ui/field-glossary.md. No CDN, no framework — the daemon
- * serves this file statically.
+ * TelemetryIQ dashboard visual system (#161 / ADR 0003).
+ * Dark sidebar shell tokens follow docs/ui/DESIGN_IMPLEMENTATION_SPEC.md S02.
+ * Status badges mirror docs/ui/field-glossary.md. No CDN, no framework —
+ * the daemon serves this file statically.
  */
 :root {
-  /* Colour tokens — keep in sync with docs/bmad/ux-design.md "Design Tokens". */
-  --color-text: #172026;
-  --color-muted: #53616b;
-  --color-bg: #f6f8fa;
-  --color-border: #d8dee4;
-  --color-accent: #0969da;
-  --color-ok: #087443;
-  --color-danger: #cf222e;
+  /* Colour tokens — S02 reference-aligned dark shell. */
+  --color-text: #eef4ff;
+  --color-muted: #adc5df;
+  --color-bg: #0b1722;
+  --color-panel: #101f2d;
+  --color-selected: #153450;
+  --color-border: #294356;
+  --color-accent: #38bdf8;
+  --color-ok: #4ade80;
+  --color-danger: #f87171;
+
+  --sidebar-width: 200px;
+  --rail-width: 300px;
+  --compact-nav-width: 64px;
 
   /* Type: system sans for chrome, monospace for IDs and raw data. */
   --font-sans: system-ui, ui-sans-serif, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-sm: 0.85rem;
-  --font-base: 1rem;
-  --font-lg: 1.25rem;
-  --font-xl: clamp(1.8rem, 4vw, 2.6rem);
+  --font-sm: 0.75rem;   /* 12px metadata floor (S04) */
+  --font-base: 0.875rem; /* 14px body floor (S04) */
+  --font-lg: 1.125rem;
+  --font-xl: clamp(1.5rem, 3vw, 2rem);
 
-  /* Spacing scale (4px base). */
+  /* Spacing scale (4px base); 16px panel gaps on desktop (S03). */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -32,6 +38,7 @@
 
   --radius: 6px;
   --focus-ring: 3px;
+  --target-min: 24px;
 
   color: var(--color-text);
   background: var(--color-bg);
@@ -39,20 +46,22 @@
   font-size: var(--font-base);
 }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; }
+body { margin: 0; min-width: 320px; overflow-x: hidden; }
 a { color: var(--color-accent); }
 button, .button {
   font: inherit;
   background: var(--color-accent);
   border: 0;
   border-radius: var(--radius);
-  color: #fff;
+  color: #0b1722;
   cursor: pointer;
   display: inline-block;
+  min-height: var(--target-min);
+  min-width: var(--target-min);
   padding: 0.55rem 0.9rem;
   text-decoration: none;
 }
-button.danger, .button.danger, a.danger { background: var(--color-danger); color: #fff; }
+button.danger, .button.danger, a.danger { background: var(--color-danger); color: #0b1722; }
 
 /* Single visible focus treatment for every interactive element. */
 button:focus-visible, a:focus-visible, input:focus-visible {
@@ -66,23 +75,43 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .skip-link:focus {
   left: var(--space-4);
   top: var(--space-4);
-  background: #fff;
+  background: var(--color-panel);
+  color: var(--color-text);
   padding: var(--space-2) var(--space-3);
-  z-index: 10;
+  z-index: 20;
 }
 
-.app-shell { margin: 0 auto; max-width: 1120px; padding: var(--space-5); }
-.app-header {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-4);
+/* --- Shell layout (S01 / S03) --- */
+.app-shell {
+  min-height: 100vh;
 }
-.header-meta {
-  align-items: center;
+body.unlock-shell .app-shell {
+  margin: 0 auto;
+  max-width: 40rem;
+  padding: var(--space-5);
+}
+body.has-sidebar .app-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--rail-width);
+  min-height: 100vh;
+}
+
+.app-sidebar {
+  background: var(--color-panel);
+  border-right: 1px solid var(--color-border);
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: var(--space-4);
+  padding: var(--space-4);
+  position: sticky;
+  top: 0;
+  align-self: start;
+  min-height: 100vh;
+}
+.sidebar-brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 .brand { font-size: var(--font-lg); font-weight: 800; margin: 0; }
 .brand a { color: inherit; text-decoration: none; }
@@ -97,45 +126,167 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   margin-top: 2px;
   text-transform: uppercase;
 }
+
+.nav-toggle {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-accent);
+  display: none;
+  justify-content: center;
+  padding: 0.4rem 0.75rem;
+}
+.sidebar-nav {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+.navigation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.primary-navigation { margin: 0; }
+.utility-navigation {
+  border-top: 1px solid var(--color-border);
+  margin-top: auto;
+  padding-top: var(--space-3);
+}
+
+.nav-link, .utility-link {
+  align-items: center;
+  border-radius: var(--radius);
+  color: var(--color-muted);
+  display: flex;
+  gap: var(--space-2);
+  min-height: var(--target-min);
+  padding: var(--space-2) var(--space-3);
+  text-decoration: none;
+}
+.nav-link:hover, .utility-link:hover {
+  background: var(--color-selected);
+  color: var(--color-text);
+}
+.nav-link.active, .utility-link.active {
+  background: var(--color-selected);
+  color: var(--color-accent);
+  font-weight: 700;
+}
+.nav-icon {
+  flex-shrink: 0;
+}
+.nav-label { min-width: 0; }
+
 .logout-form { margin: 0; }
 .logout-form button {
   background: transparent;
   border: 1px solid var(--color-border);
   color: var(--color-accent);
   padding: 0.4rem 0.75rem;
+  width: 100%;
 }
 
-.navigation {
-  border-bottom: 1px solid var(--color-border);
+.app-content {
+  background: var(--color-bg);
+  min-width: 0;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+.app-topbar {
+  align-items: center;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-4);
+}
+.header-meta {
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  margin: var(--space-6) 0;
+  gap: var(--space-4);
 }
-.nav-link {
-  border-bottom: 3px solid transparent;
-  color: inherit;
-  padding: var(--space-3) var(--space-4);
-  text-decoration: none;
+
+/* Reserved right-rail slot for Session Trace (#159); empty until that issue. */
+.right-rail {
+  background: var(--color-bg);
+  border-left: 1px solid var(--color-border);
+  min-width: 0;
 }
-.nav-link.active {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-  font-weight: 700;
+
+/* Compact labelled-on-focus navigation at tablet widths (S03). */
+@media (max-width: 1024px) {
+  body.has-sidebar .app-shell {
+    grid-template-columns: var(--compact-nav-width) minmax(0, 1fr);
+  }
+  .right-rail {
+    display: none;
+  }
+  .app-sidebar {
+    padding: var(--space-3) var(--space-2);
+  }
+  /* Labels stay in the accessibility tree; visually compact until focus/hover. */
+  .nav-link .nav-label,
+  .utility-link,
+  .logout-form button,
+  .brand span {
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+  .nav-link:focus-visible .nav-label,
+  .nav-link:hover .nav-label,
+  .utility-link:focus-visible,
+  .utility-link:hover,
+  .logout-form button:focus-visible,
+  .app-sidebar:focus-within .brand span {
+    clip: auto;
+    clip-path: none;
+    height: auto;
+    overflow: visible;
+    position: static;
+    white-space: normal;
+    width: auto;
+  }
+  .nav-link {
+    justify-content: center;
+  }
+  .app-sidebar:focus-within {
+    width: max(var(--sidebar-width), 100%);
+    z-index: 5;
+  }
 }
-.secondary-navigation {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin: var(--space-4) 0;
-}
-.app-footer {
-  border-top: 1px solid var(--color-border);
-  margin-top: var(--space-6);
-}
-.secondary-link.active {
-  color: var(--color-accent);
-  font-weight: 700;
+
+/* Below 768px: disclosure + single column (S03). */
+@media (max-width: 767px) {
+  body.has-sidebar .app-shell {
+    grid-template-columns: 1fr;
+  }
+  .app-sidebar {
+    min-height: 0;
+    position: static;
+  }
+  .nav-toggle { display: inline-flex; }
+  .sidebar-nav { display: none; }
+  .sidebar-nav.is-open { display: flex; }
+  .nav-link .nav-label,
+  .utility-link,
+  .logout-form button,
+  .brand span {
+    clip: auto;
+    clip-path: none;
+    height: auto;
+    overflow: visible;
+    position: static;
+    white-space: normal;
+    width: auto;
+  }
+  .nav-link { justify-content: flex-start; }
+  .right-rail { display: none; }
 }
 
 /* Daemon health — honest state, colour is never the sole cue (the word is). */
@@ -144,18 +295,26 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .health.unknown { color: var(--color-muted); }
 .health.degraded { color: var(--color-danger); }
 
-.page { max-width: 920px; }
+.page { max-width: 100%; }
 h1 { font-size: var(--font-xl); margin-bottom: 0.4rem; }
 .stack { display: grid; gap: var(--space-3); max-width: 28rem; }
 input[type="password"], input[type="text"] {
+  background: var(--color-panel);
   border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
   font: inherit;
   padding: 0.55rem 0.7rem;
   width: 100%;
 }
 .error { color: var(--color-danger); font-weight: 600; }
 .success { color: var(--color-ok); font-weight: 600; }
-.allowlist-form fieldset { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-4); }
+.allowlist-form fieldset {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+}
 .allowlist-form legend { font-weight: 700; padding: 0 var(--space-1); }
 .allowlist-options { display: grid; gap: var(--space-3); }
 .allowlist-option { align-items: baseline; display: grid; gap: var(--space-2); grid-template-columns: auto minmax(8rem, auto) 1fr; }
@@ -170,11 +329,13 @@ input[type="password"], input[type="text"] {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   color: var(--color-text);
+  min-height: var(--target-min);
   padding: 0.4rem 0.75rem;
   text-decoration: none;
 }
 .rules-tab:hover { border-color: var(--color-accent); }
 .rules-tab.active {
+  background: var(--color-selected);
   border-color: var(--color-accent);
   color: var(--color-accent);
   font-weight: 700;
@@ -182,7 +343,11 @@ input[type="password"], input[type="text"] {
 .rules-panel { margin-top: var(--space-3); }
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; }
-th, td { border-bottom: 1px solid var(--color-border); padding: 0.65rem 0.5rem; text-align: left; }
+th, td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.65rem 0.5rem; /* ~44px row target with content (S03) */
+  text-align: left;
+}
 .timeline-item {
   border-bottom: 1px solid var(--color-border);
   margin-bottom: 0.75rem;
@@ -238,3 +403,12 @@ section { margin: 1.5rem 0; }
 .status-unknown::before { content: "?"; } /* not proven yet */
 .status-version-dependent { border-color: var(--color-accent); color: var(--color-accent); }
 .status-version-dependent::before { content: "\2699"; } /* ⚙ version-dependent */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

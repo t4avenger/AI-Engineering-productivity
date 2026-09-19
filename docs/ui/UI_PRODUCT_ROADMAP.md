@@ -59,13 +59,18 @@ Status verified against GitHub on 2026-09-19; recheck before starting work.
   [#157](https://github.com/t4avenger/AI-Engineering-productivity/issues/157) remain open. The image's per-file +/- counts and task stages
   must not be inferred from aggregate metrics.
 - [#186](https://github.com/t4avenger/AI-Engineering-productivity/issues/186) Models
-  destination is delivered as secondary navigation over the existing
-  model-performance reader; five-destination primary shell remains [#161](https://github.com/t4avenger/AI-Engineering-productivity/issues/161).
+  destination is delivered over the existing model-performance reader and is a
+  primary destination in the #161 shell.
 - [#187](https://github.com/t4avenger/AI-Engineering-productivity/issues/187) Pull
-  Requests destination is delivered as secondary navigation over retained
-  `pr_link` HTTP(S) evidence (empty/unavailable until #183/#184 prove provider URLs).
-- No five-destination dark primary shell, full Session Trace, matching local
-  skill/path/prompt editors or enterprise controls are declared delivered here.
+  Requests destination is delivered over retained `pr_link` HTTP(S) evidence
+  (empty/unavailable until #183/#184 prove provider URLs) and is a primary
+  destination in the #161 shell.
+- [#161](https://github.com/t4avenger/AI-Engineering-productivity/issues/161)
+  required dark sidebar and five-destination primary navigation (S01–S04, N01)
+  is delivered; screenshot baselines live under
+  [docs/ui/evidence/161](evidence/161/README.md).
+- No full Session Trace, matching local skill/path/prompt editors or enterprise
+  controls are declared delivered here.
 
 ## 4. Delivery order and ownership
 
@@ -101,8 +106,8 @@ Historical [#71](https://github.com/t4avenger/AI-Engineering-productivity/issues
 
 ### Local reference-aligned phase
 
-- [ ] S01–S04: five destinations, dark shell, desktop density and responsive a11y.
-- [ ] N01–N03: existing Overview preserved; evidence-backed Models and PR pages.
+- [x] S01–S04: five destinations, dark shell, desktop density and responsive a11y (#161).
+- [x] N01–N03: existing Overview preserved; evidence-backed Models and PR pages (#161/#186/#187).
 - [ ] T01–T10: five aligned trace lanes, conversation text, inspector and right rail;
   missing evidence, timestamps, correlations and durations are explicit.
 - [ ] G01–G08: reference Governance composition with real MCP/skill/path/prompt
@@ -124,10 +129,16 @@ Finishing local visual work cannot close these requirements.
 
 ## 6. Next smallest task
 
-Implement [#161](https://github.com/t4avenger/AI-Engineering-productivity/issues/161)
-(required dark sidebar shell and five-destination primary navigation) now that
-`/models` and `/pull-requests` routes exist. In parallel only when explicitly
-assigned, #156/#157 can establish trace evidence contracts.
+With [#161](https://github.com/t4avenger/AI-Engineering-productivity/issues/161)
+delivered, prefer evidence projections
+[#156](https://github.com/t4avenger/AI-Engineering-productivity/issues/156) /
+[#157](https://github.com/t4avenger/AI-Engineering-productivity/issues/157) /
+[#188](https://github.com/t4avenger/AI-Engineering-productivity/issues/188), or
+trace parts [#189](https://github.com/t4avenger/AI-Engineering-productivity/issues/189) /
+[#190](https://github.com/t4avenger/AI-Engineering-productivity/issues/190),
+toward Session Trace assembly [#159](https://github.com/t4avenger/AI-Engineering-productivity/issues/159).
+Governance composition [#191](https://github.com/t4avenger/AI-Engineering-productivity/issues/191)
+can proceed in parallel now that the shell exists.
 
 This documentation update changes no runtime APIs or schemas. Planned additive
 interfaces are specified in the implementation specification and owned by the

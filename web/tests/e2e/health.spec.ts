@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
+import path from 'node:path';
 
 import {
   authToken,
-  expectFourTabPrimaryNav,
-  expectSecondaryDestinations,
+  expectFiveDestinationPrimaryNav,
+  expectUtilityDestinations,
   unlockDashboard,
 } from './live-ingest-helpers';
 
@@ -18,8 +19,10 @@ test('unlocks and walks the local dashboard journey', async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByText('Daemon: Healthy')).toBeVisible();
 
-  await expectFourTabPrimaryNav(page);
+  await expectFiveDestinationPrimaryNav(page);
+  await expectUtilityDestinations(page, { costs: false });
   const primaryNavigation = page.getByLabel('Primary navigation');
+  const utilityNavigation = page.getByLabel('Utility navigation');
 
   await primaryNavigation
     .getByRole('link', { name: 'Governance', exact: true })
@@ -37,7 +40,7 @@ test('unlocks and walks the local dashboard journey', async ({ page }) => {
     page.getByText('does not enforce or publish', { exact: false }),
   ).toBeVisible();
 
-  await primaryNavigation
+  await utilityNavigation
     .getByRole('link', { name: 'Integrations', exact: true })
     .click();
   await expect(
@@ -67,9 +70,8 @@ test('unlocks and walks the local dashboard journey', async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByText('No retained sessions yet.')).toBeVisible();
 
-  await expectSecondaryDestinations(page);
-  const secondaryNavigation = page.getByLabel('Secondary navigation');
-  await secondaryNavigation
+  await expectUtilityDestinations(page);
+  await primaryNavigation
     .getByRole('link', { name: 'Pull Requests', exact: true })
     .click();
   await expect(
@@ -80,8 +82,7 @@ test('unlocks and walks the local dashboard journey', async ({ page }) => {
       exact: false,
     }),
   ).toBeVisible();
-  await page
-    .getByLabel('Secondary navigation')
+  await primaryNavigation
     .getByRole('link', { name: 'Models', exact: true })
     .click();
   await expect(page.getByRole('heading', { name: 'Models' })).toBeVisible();
@@ -89,7 +90,7 @@ test('unlocks and walks the local dashboard journey', async ({ page }) => {
     page.getByText('No outcome-contract rows yet', { exact: false }),
   ).toBeVisible();
   await page
-    .getByLabel('Secondary navigation')
+    .getByLabel('Utility navigation')
     .getByRole('link', { name: 'Privacy', exact: true })
     .click();
   await expect(page.getByRole('heading', { name: 'Privacy' })).toBeVisible();
@@ -97,8 +98,46 @@ test('unlocks and walks the local dashboard journey', async ({ page }) => {
     page.getByText('Prompts, responses, and source code are not retained'),
   ).toBeVisible();
   await page
-    .getByLabel('Secondary navigation')
+    .getByLabel('Utility navigation')
     .getByRole('link', { name: 'Costs', exact: true })
     .click();
   await expect(page.getByRole('heading', { name: 'Costs' })).toBeVisible();
+});
+
+test('dark shell renders at reference viewports without body overflow (#161)', async ({
+  page,
+}) => {
+  await unlockDashboard(page, authToken);
+  const evidenceDir = path.resolve(process.cwd(), '../docs/ui/evidence/161');
+  const viewports = [
+    { name: '1440x900', width: 1440, height: 900 },
+    { name: '1024x768', width: 1024, height: 768 },
+    { name: '390x844', width: 390, height: 844 },
+  ] as const;
+
+  for (const vp of viewports) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    if (vp.width < 768) {
+      const menu = page.getByRole('button', { name: 'Menu' });
+      await expect(menu).toBeVisible();
+      if ((await menu.getAttribute('aria-expanded')) !== 'true') {
+        await menu.click();
+      }
+      await expect(menu).toHaveAttribute('aria-expanded', 'true');
+    }
+    await expectFiveDestinationPrimaryNav(page);
+    await expectUtilityDestinations(page, { costs: false });
+    const overflowX = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
+    );
+    expect(overflowX, `${vp.name} must not body-scroll horizontally`).toBe(
+      false,
+    );
+    await page.screenshot({
+      path: path.join(evidenceDir, `overview-${vp.name}.png`),
+      fullPage: true,
+    });
+  }
 });
