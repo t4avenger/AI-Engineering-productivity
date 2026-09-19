@@ -293,6 +293,8 @@ func sessionAvailability(session canonical.Session) map[string]string {
 		"completed_at":    observedIf(session.CompletedAt != nil),
 		"model":           modelAvailability(session),
 		"entrypoint":      observedIf(sessionStringAttribute(session, "entrypoint") != ""),
+		"git_branch":      observedIf(sessionStringAttribute(session, "git_branch") != ""),
+		"pr_link":         observedIf(sessionStringAttribute(session, "pr_link") != ""),
 		"tool_version":    observedIf(sessionStringAttribute(session, "service_version") != ""),
 		"observed_events": observedIf(numericAttribute(session.Attributes, "event_count")),
 		"token_usage":     tokenUsageAvailability(session),

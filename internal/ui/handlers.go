@@ -113,8 +113,10 @@ type availabilityRow struct {
 }
 
 type metadataRow struct {
-	Label string
-	Value string
+	Label    string
+	Value    string
+	Observed bool
+	Machine  string
 }
 
 type timelineRow struct {
@@ -1213,24 +1215,36 @@ func sessionAvailability(session canonical.Session) []availabilityRow {
 		{Label: "Started", State: observedIf(!session.StartedAt.IsZero())},
 		{Label: "Completed", State: observedIf(session.CompletedAt != nil)},
 		{Label: "Model", State: modelAvailability(session)},
+		{Label: "Branch", State: observedIf(sessionAttribute(session, "git_branch") != "")},
+		{Label: "PR", State: observedIf(sessionAttribute(session, "pr_link") != "")},
 		{Label: "Entrypoint", State: observedIf(sessionAttribute(session, "entrypoint") != "")},
 		{Label: "Tool version", State: observedIf(sessionAttribute(session, "service_version") != "")},
 	}
 }
 
 func sessionMetadata(session canonical.Session) []metadataRow {
-	rows := make([]metadataRow, 0, 3)
+	rows := make([]metadataRow, 0, 5)
 	for _, field := range []struct {
-		label string
-		key   string
+		label    string
+		key      string
+		required bool
 	}{
-		{label: "Entrypoint", key: "entrypoint"},
+		{label: "Branch", key: "git_branch", required: true},
+		{label: "PR", key: "pr_link", required: true},
+		{label: "Entrypoint", key: "entrypoint", required: true},
 		{label: "Service", key: "service_name"},
 		{label: "Version", key: "service_version"},
 	} {
-		if value := sessionAttribute(session, field.key); value != "" {
-			rows = append(rows, metadataRow{Label: field.label, Value: value})
+		value := sessionAttribute(session, field.key)
+		if value == "" && !field.required {
+			continue
 		}
+		rows = append(rows, metadataRow{
+			Label:    field.label,
+			Value:    value,
+			Observed: value != "",
+			Machine:  observedIf(value != ""),
+		})
 	}
 	return rows
 }

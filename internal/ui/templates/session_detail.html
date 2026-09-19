@@ -13,7 +13,7 @@
     <h2>Environment</h2>
     <dl class="metadata-list">
       {{range .SessionMetadata}}
-      <div><dt>{{.Label}}</dt><dd>{{.Value}}</dd></div>
+      <div><dt>{{.Label}}</dt><dd>{{if .Observed}}{{.Value}}{{else}}{{template "status-badge" .Machine}}{{end}}</dd></div>
       {{end}}
     </dl>
   </section>

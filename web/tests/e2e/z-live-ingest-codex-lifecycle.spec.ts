@@ -40,6 +40,8 @@ test('renders Codex lifecycle signals ingested through the live daemon', async (
   expect(session?.attributes.service_version).toBe('0.153.4');
   expect(session?.availability.entrypoint).toBe('observed');
   expect(session?.availability.tool_version).toBe('observed');
+  expect(session?.availability.git_branch).toBe('unavailable');
+  expect(session?.availability.pr_link).toBe('unavailable');
   expect(session?.provider_extensions.resource_attributes?.['service.name']).toBe(
     'codex_exec',
   );
@@ -80,10 +82,12 @@ test('renders Codex lifecycle signals ingested through the live daemon', async (
   await expect(page.getByRole('heading', { name: 'Environment' })).toBeVisible();
   await expect(page.getByText('codex_exec')).toBeVisible();
   await expect(page.getByText('0.153.4')).toBeVisible();
+  await expect(page.getByText('codex exec').first()).toBeVisible();
+  await expect(page.getByText('Branch').first()).toBeVisible();
+  await expect(page.getByText('PR').first()).toBeVisible();
   await expect(page.getByText('Session active')).toBeVisible();
   await expect(page.getByText('Lifecycle').first()).toBeVisible();
   await expect(page.getByText('session_start')).toBeVisible();
-  await expect(page.getByText('codex exec').first()).toBeVisible();
   await expect(page.getByText('tiq-canary-live-lifecycle')).toHaveCount(0);
   await expect(page.getByText('lifecycle-live@example.test')).toHaveCount(0);
 });

@@ -99,6 +99,19 @@ func TestSessionAPIReportsUnknownOutcomeAsUnknownAvailability(t *testing.T) {
 	}
 }
 
+func TestSessionAPIReportsHeaderMetadataAvailability(t *testing.T) {
+	observed := sessionAvailability(canonical.Session{
+		Attributes: map[string]any{"entrypoint": "cli", "git_branch": "main"},
+	})
+	if observed["entrypoint"] != "observed" || observed["git_branch"] != "observed" || observed["pr_link"] != "unavailable" {
+		t.Fatalf("observed header availability = %#v", observed)
+	}
+	missing := sessionAvailability(canonical.Session{})
+	if missing["entrypoint"] != "unavailable" || missing["git_branch"] != "unavailable" || missing["pr_link"] != "unavailable" {
+		t.Fatalf("missing header availability = %#v", missing)
+	}
+}
+
 func TestSessionAPIReportsMixedProviderAvailability(t *testing.T) {
 	repo := sessionTestRepository(t)
 	claude := sessionTestEvent(t, "event-claude-unavailable", "session-claude-unavailable", "claude-code", "completed", "2026-01-02T12:00:00Z", "")
