@@ -358,6 +358,97 @@ export function claudeToolResultOTLPLogs(): string {
   });
 }
 
+// Claude enhanced-telemetry tool span with a retained file_path (#156 / T06).
+// Session id is live-e2e-specific so file evidence assertions stay isolated.
+export function claudeToolSpanFilePathOTLPTraces(): string {
+  return JSON.stringify({
+    resourceSpans: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'claude-code' } },
+            { key: 'service.version', value: { stringValue: '2.1.268' } },
+            { key: 'host.arch', value: { stringValue: 'amd64' } },
+            { key: 'os.type', value: { stringValue: 'linux' } },
+          ],
+        },
+        scopeSpans: [
+          {
+            scope: {
+              name: 'com.anthropic.claude_code.tracing',
+              version: '1.0.0',
+            },
+            spans: [
+              {
+                traceId: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+                spanId: 'aaaaaaaaaaaaaaaa',
+                name: 'claude_code.tool',
+                kind: 1,
+                startTimeUnixNano: '1789117600500000000',
+                endTimeUnixNano: '1789117600700000000',
+                attributes: [
+                  {
+                    key: 'session.id',
+                    value: {
+                      stringValue: 'tiq-live-e2e-session-files',
+                    },
+                  },
+                  { key: 'span.type', value: { stringValue: 'tool' } },
+                  { key: 'tool_name', value: { stringValue: 'Read' } },
+                  { key: 'tool_name_safe', value: { stringValue: 'Read' } },
+                  {
+                    key: 'tool_use_id',
+                    value: { stringValue: 'toolu_live_session_files_read' },
+                  },
+                  {
+                    key: 'gen_ai.tool.call.id',
+                    value: { stringValue: 'toolu_live_session_files_read' },
+                  },
+                  {
+                    key: 'file_path',
+                    value: {
+                      stringValue: '/workspace/tiq-live-e2e-session-files.go',
+                    },
+                  },
+                  { key: 'duration_ms', value: { intValue: '200' } },
+                  { key: 'result_tokens', value: { intValue: '64' } },
+                ],
+                status: { code: 0 },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
+
+// Codex apply_patch tool_result proves filesystem write category without a path.
+export function codexFilesystemWriteOTLPLogs(): string {
+  return codexExecOTLPLog(
+    [
+      { key: 'event.name', value: { stringValue: 'codex.tool_result' } },
+      {
+        key: 'conversation.id',
+        value: { stringValue: 'tiq-live-e2e-session-files-codex' },
+      },
+      { key: 'tool_name', value: { stringValue: 'apply_patch' } },
+      { key: 'tool_namespace', value: { stringValue: 'functions' } },
+      {
+        key: 'call_id',
+        value: { stringValue: 'tiq-live-e2e-session-files-write' },
+      },
+      { key: 'duration_ms', value: { stringValue: '40' } },
+      { key: 'success', value: { stringValue: 'true' } },
+      {
+        key: 'arguments',
+        value: { stringValue: '--token=tiq-canary-live-session-files' },
+      },
+    ],
+    'tiq-canary-live-session-files-body',
+  );
+}
+
 
 export function codexLifecycleOTLPLogs(): string {
   return codexExecOTLPLogs([

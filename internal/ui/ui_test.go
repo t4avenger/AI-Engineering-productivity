@@ -753,6 +753,29 @@ func TestTimelineRendersObservedOperationDetails(t *testing.T) {
 	})
 }
 
+func TestSessionDetailRendersFileEvidence(t *testing.T) {
+	now := time.Now().UTC()
+	event := canonical.Event{
+		EventID: "file-span", EventType: "claude_code.tool", SessionID: "file-session",
+		OccurredAt: now, ReceivedAt: now, Provider: "anthropic", Tool: "claude-code",
+		Attributes: map[string]any{
+			"tool": map[string]any{
+				"file_path": "/workspace/proven-file.go", "tool_name": "Read", "duration_ms": int64(200),
+			},
+		},
+	}
+	body := renderSessionDetail(t, &fullStub{
+		sessions: []canonical.Session{syntheticSession("file-session", now)},
+		events:   map[string][]canonical.Event{"file-session": {event}},
+	}, nil, "file-session")
+	assertContainsAll(t, body, []string{
+		"File evidence", "/workspace/proven-file.go", "read", "200 ms", "file-span",
+	})
+	if strings.Contains(body, "lines_added") || strings.Contains(body, "lines_removed") {
+		t.Fatalf("aggregate LOC must not appear as file evidence: %s", body)
+	}
+}
+
 func TestTimelineRendersOperationToolFromRetainedProviderEvidence(t *testing.T) {
 	now := time.Now().UTC()
 	event := canonical.Event{

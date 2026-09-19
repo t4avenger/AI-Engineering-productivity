@@ -4,6 +4,8 @@ The Phase 2 local management API provides authenticated session endpoints:
 
 - `GET /api/v1/sessions`
 - `GET /api/v1/sessions/{id}`
+- `GET /api/v1/sessions/{id}/events`
+- `GET /api/v1/sessions/{id}/files`
 - `DELETE /api/v1/sessions/{id}`
 - `GET /api/v1/costs/summary`, `GET /api/v1/sessions/{id}/costs`, `GET /api/v1/insights/mcp-inventory`, `GET /api/v1/insights/skill-usage`, `GET /api/v1/insights/model-performance`, `GET /api/v1/insights/context-waste`, `DELETE /api/v1/sessions`
 
@@ -70,6 +72,18 @@ cross-session call-ID reuse from collapsing evidence. These fields are populated
 only when the provider event proves an executed tool call, such as Codex
 `codex.tool_result`; ordinary model/lifecycle events leave them absent/null and
 keep `tool_calls` in `unavailable_fields` where appropriate.
+
+`GET /api/v1/sessions/{id}/files` is the additive Files-lane projection (#156 /
+T06). It returns cursor-paged `data` rows with `event_id`, nullable
+`operation_id` / `path` / `action` / `occurred_at` / `duration_ms`, always-null
+`additions`/`deletions` until a per-file fixture exists, plus `availability` and
+`source` provenance. Paths come only from retained tool-block `file_path`
+evidence (Claude tool spans). Filesystem `action` values (`read`/`write`/
+`delete`/`unknown`) come from proven filesystem operation categories or are
+inferred from tool names when a path is present; tool names never invent a path.
+Aggregate `lines_of_code` counters never fill per-file diffs. Codex currently
+proves write category without path; filesystem delete remains unavailable.
+Session detail HTML shares the same `insights.SessionFilesFromEvidence` reader.
 
 Timeline entries can also include optional approval fields for reviewed
 authorization decisions: `approval_id`, `approval_decision`,
