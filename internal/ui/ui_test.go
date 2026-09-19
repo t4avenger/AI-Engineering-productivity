@@ -574,44 +574,49 @@ func navigationSection(t *testing.T, body, label string) string {
 func assertPrimaryNavigation(t *testing.T, body string) {
 	t.Helper()
 	primary := navigationSection(t, body, "Primary navigation")
-	if got := strings.Count(primary, `class="nav-link`); got != 4 {
-		t.Fatalf("primary navigation link count = %d, want 4: %q", got, primary)
+	if got := strings.Count(primary, `class="nav-link`); got != 5 {
+		t.Fatalf("primary navigation link count = %d, want 5: %q", got, primary)
+	}
+	if !strings.Contains(primary, ">Overview</span>") {
+		t.Fatalf("primary navigation must label Overview: %q", primary)
 	}
 	previous := -1
-	for _, href := range []string{`href="/"`, `href="/sessions"`, `href="/governance"`, `href="/integrations"`} {
+	for _, href := range []string{`href="/"`, `href="/sessions"`, `href="/pull-requests"`, `href="/models"`, `href="/governance"`} {
 		index := strings.Index(primary, href)
 		if index <= previous {
-			t.Fatalf("primary navigation must contain four ordered destinations; %s index=%d previous=%d: %q", href, index, previous, primary)
+			t.Fatalf("primary navigation must contain five ordered destinations; %s index=%d previous=%d: %q", href, index, previous, primary)
 		}
 		previous = index
 	}
-	for _, legacy := range []string{`href="/insights"`, `href="/privacy"`, `href="/costs"`, `href="/models"`, `href="/pull-requests"`} {
+	for _, legacy := range []string{`href="/insights"`, `href="/privacy"`, `href="/costs"`, `href="/integrations"`} {
 		if strings.Contains(primary, legacy) {
 			t.Fatalf("primary navigation must not contain %s: %q", legacy, primary)
 		}
 	}
 }
 
-func assertSecondaryNavigation(t *testing.T, body string, wantCosts bool) {
+func assertUtilityNavigation(t *testing.T, body string, wantCosts bool) {
 	t.Helper()
-	secondary := navigationSection(t, body, "Secondary navigation")
-	if !strings.Contains(secondary, `href="/pull-requests"`) {
-		t.Fatalf("secondary navigation must keep Pull Requests reachable: %q", secondary)
+	utility := navigationSection(t, body, "Utility navigation")
+	previous := -1
+	for _, href := range []string{`href="/integrations"`, `href="/insights"`, `href="/privacy"`} {
+		index := strings.Index(utility, href)
+		if index <= previous {
+			t.Fatalf("utility navigation must keep ordered destinations; %s index=%d previous=%d: %q", href, index, previous, utility)
+		}
+		previous = index
 	}
-	if !strings.Contains(secondary, `href="/models"`) {
-		t.Fatalf("secondary navigation must keep Models reachable: %q", secondary)
-	}
-	if !strings.Contains(secondary, `href="/privacy"`) {
-		t.Fatalf("secondary navigation must keep Privacy reachable: %q", secondary)
-	}
-	hasCosts := strings.Contains(secondary, `href="/costs"`)
+	hasCosts := strings.Contains(utility, `href="/costs"`)
 	if hasCosts != wantCosts {
-		t.Fatalf("secondary navigation Costs presence = %t, want %t: %q", hasCosts, wantCosts, secondary)
+		t.Fatalf("utility navigation Costs presence = %t, want %t: %q", hasCosts, wantCosts, utility)
+	}
+	if strings.Contains(utility, `href="/pull-requests"`) || strings.Contains(utility, `href="/models"`) {
+		t.Fatalf("utility navigation must not duplicate Models/Pull Requests: %q", utility)
 	}
 }
 
-// TestHomeShellControls covers the enterprise-shaped issue #149 shell while
-// preserving the existing logout and honest daemon health affordances.
+// TestHomeShellControls covers the #161 dark sidebar shell while preserving
+// logout and honest daemon health affordances.
 func TestHomeShellControls(t *testing.T) {
 	repo := &fullStub{sessions: []canonical.Session{{
 		SessionID: "s1", Provider: "openai", Tool: "codex",
@@ -626,12 +631,12 @@ func TestHomeShellControls(t *testing.T) {
 	body := getAuthed(t, handler, cookie, "/").Body.String()
 
 	assertPrimaryNavigation(t, body)
-	assertSecondaryNavigation(t, body, false)
+	assertUtilityNavigation(t, body, false)
 	if strings.Contains(body, `href="/costs"`) {
 		t.Fatalf("Home must not surface a Costs link: %q", body)
 	}
 	sessionsBody := getAuthed(t, handler, cookie, "/sessions").Body.String()
-	assertSecondaryNavigation(t, sessionsBody, true)
+	assertUtilityNavigation(t, sessionsBody, true)
 	if !strings.Contains(body, `action="/logout"`) {
 		t.Fatalf("authenticated home must show a logout control: %q", body)
 	}
@@ -1316,7 +1321,7 @@ func TestModelsPageRendersScorecardAndUnlockGate(t *testing.T) {
 	body := getAuthed(t, handler, cookie, "/models").Body.String()
 	assertContainsAll(t, body, []string{
 		"<h1>Models</h1>",
-		`class="secondary-link active" href="/models" aria-current="page"`,
+		`class="nav-link active" href="/models" aria-current="page"`,
 		"Ranking available: no, sample size below the ranking guard",
 		"claude-test",
 		"anthropic",
@@ -1326,7 +1331,7 @@ func TestModelsPageRendersScorecardAndUnlockGate(t *testing.T) {
 		"Evidence notes",
 	})
 	assertPrimaryNavigation(t, body)
-	assertSecondaryNavigation(t, body, true)
+	assertUtilityNavigation(t, body, true)
 
 	emptyBody := authedPageBody(t, &fullStub{}, "/models")
 	if !strings.Contains(emptyBody, "No outcome-contract rows yet") {
@@ -1355,7 +1360,7 @@ func TestPullRequestsPageRendersGroupsAndUnlockGate(t *testing.T) {
 	body := getAuthed(t, handler, cookie, "/pull-requests").Body.String()
 	assertContainsAll(t, body, []string{
 		"<h1>Pull Requests</h1>",
-		`class="secondary-link active" href="/pull-requests" aria-current="page"`,
+		`class="nav-link active" href="/pull-requests" aria-current="page"`,
 		`href="https://github.com/org/repo/pull/12"`,
 		"2 linked sessions",
 		`href="/sessions/pr-session-a"`,
@@ -1373,7 +1378,7 @@ func TestPullRequestsPageRendersGroupsAndUnlockGate(t *testing.T) {
 		t.Fatalf("branch-only session must not invent a PR group: %q", body)
 	}
 	assertPrimaryNavigation(t, body)
-	assertSecondaryNavigation(t, body, true)
+	assertUtilityNavigation(t, body, true)
 
 	filtered := getAuthed(t, handler, cookie, "/pull-requests?q=pr-session-missing").Body.String()
 	if !strings.Contains(filtered, "No retained HTTP(S) pull-request URLs yet") {

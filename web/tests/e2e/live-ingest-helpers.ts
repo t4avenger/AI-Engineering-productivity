@@ -21,39 +21,34 @@ export async function unlockDashboard(
   ).toBeVisible();
 }
 
-/** Four-tab enterprise IA primary nav (#149 / #155); shared to avoid Sonar CPD. */
-export async function expectFourTabPrimaryNav(page: Page): Promise<void> {
+/** Five-destination primary nav (#161 / S01); shared to avoid Sonar CPD. */
+export async function expectFiveDestinationPrimaryNav(page: Page): Promise<void> {
   const primaryNavigation = page.getByLabel('Primary navigation');
   await expect(primaryNavigation.getByRole('link')).toHaveText([
-    'Home',
+    'Overview',
     'Sessions',
-    'Governance',
-    'Integrations',
-  ]);
-  for (const name of [
-    'Insights',
-    'Privacy',
-    'Costs',
-    'Models',
     'Pull Requests',
-  ]) {
+    'Models',
+    'Governance',
+  ]);
+  for (const name of ['Insights', 'Privacy', 'Costs', 'Integrations']) {
     await expect(
       primaryNavigation.getByRole('link', { name, exact: true }),
     ).toHaveCount(0);
   }
 }
 
-/** Secondary destinations before #161 primary shell (#186 Models, #187 PRs). */
-export async function expectSecondaryDestinations(
+/** Utility destinations after #161 primary shell. */
+export async function expectUtilityDestinations(
   page: Page,
   opts: { costs?: boolean } = {},
 ): Promise<void> {
   const wantCosts = opts.costs !== false;
-  const secondaryNavigation = page.getByLabel('Secondary navigation');
+  const utilityNavigation = page.getByLabel('Utility navigation');
   const labels = wantCosts
-    ? ['Pull Requests', 'Models', 'Privacy', 'Costs']
-    : ['Pull Requests', 'Models', 'Privacy'];
-  await expect(secondaryNavigation.getByRole('link')).toHaveText(labels);
+    ? ['Integrations', 'Insights', 'Privacy', 'Costs']
+    : ['Integrations', 'Insights', 'Privacy'];
+  await expect(utilityNavigation.getByRole('link')).toHaveText(labels);
 }
 
 /** Access Rules tab shells (#160): MCP editable; others honest unavailable. */

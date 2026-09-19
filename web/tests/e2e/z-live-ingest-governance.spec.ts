@@ -4,7 +4,7 @@ import {
   authToken,
   claudeMCPConnectionOTLPLogs,
   claudeRiskyAccessOTLPLogs,
-  expectFourTabPrimaryNav,
+  expectFiveDestinationPrimaryNav,
   expectGovernanceAccessRulesShells,
   ingestOTLPLogs,
   resetDaemonBetweenTests,
@@ -13,11 +13,12 @@ import {
 
 /**
  * Live end-to-end gate for Governance findings (#151) and the V1 enterprise IA
- * Playwright DoD (#155): ingest a real Claude OTLP payload with credential-file
- * evidence through the daemon started by playwright.config.ts, then assert
- * /governance renders the finding and the four-tab primary nav. Also covers the
- * MCP allowlist Save round-trip and Access Rules tab shells (#160). No
- * page.route().fulfill() mocking (QUALITY_GATES live-data DoD).
+ * Playwright DoD (#155), updated for the #161 five-destination shell: ingest a
+ * real Claude OTLP payload with credential-file evidence through the daemon
+ * started by playwright.config.ts, then assert /governance renders the finding
+ * and primary nav. Also covers the MCP allowlist Save round-trip and Access
+ * Rules tab shells (#160). No page.route().fulfill() mocking
+ * (QUALITY_GATES live-data DoD).
  */
 resetDaemonBetweenTests();
 
@@ -46,7 +47,7 @@ test('renders risky-access findings after live OTLP ingest', async ({
 
   await unlockDashboard(page, authToken);
   await page.goto('/governance');
-  await expectFourTabPrimaryNav(page);
+  await expectFiveDestinationPrimaryNav(page);
   await expect(page.getByRole('heading', { name: 'Governance' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Risky access' })).toBeVisible();
   await expect(page.getByText('Violation').first()).toBeVisible();

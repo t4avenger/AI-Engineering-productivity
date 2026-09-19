@@ -66,22 +66,32 @@ Replace the React/Mantine SPA with a server-rendered local dashboard that helps 
 
 ## Information Architecture
 
-> **Enterprise-shaped IA:** primary nav is **Home · Sessions · Governance · Integrations**. Insights remains directly reachable during its move to Home; Privacy and Costs are secondary destinations, with no cost link on Home. See [docs/ui/UI_PRODUCT_ROADMAP.md](../ui/UI_PRODUCT_ROADMAP.md) and epic [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148).
+> **Historical (V1 / #149):** primary nav was **Home · Sessions · Governance ·
+> Integrations** with Models/Pull Requests as secondary destinations.
+>
+> **Accepted target (ADR 0003 / #161):** dark sidebar primary destinations are
+> **Overview · Sessions · Pull Requests · Models · Governance**. Integrations,
+> Insights, Privacy and Costs remain utilities; Costs is omitted on Overview.
+> See [ADR 0003](../decisions/0003-reference-aligned-ui.md),
+> [docs/ui/UI_PRODUCT_ROADMAP.md](../ui/UI_PRODUCT_ROADMAP.md) and epic
+> [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148).
 
 | Route | Screen | One job |
 |-------|--------|---------|
 | `GET /unlock` | Unlock | Paste `make auth-token` once |
-| `GET /` | Home | Orchestration snapshot |
+| `GET /` | Overview (Home) | Orchestration snapshot |
 | `GET /sessions` | Sessions | Find and open readable session evidence |
 | `GET /sessions/{id}` | Session detail | Timeline evidence + provenance + delete |
-| `GET /governance` | Governance | Honest transition shell pending findings UI in #151 |
-| `GET /insights` | Insights | Educate on MCP + skills |
-| `GET /integrations` | Integrations | Capability matrix + observed tools (last-seen) + Cursor Enterprise OTEL setup/status + Privacy link |
-| `GET /privacy` | Privacy | Defaults + DELETE ALL |
-| `GET /costs` | Costs | Secondary estimates only |
+| `GET /pull-requests` | Pull Requests | Retained `pr_link` HTTP(S) evidence groups |
+| `GET /models` | Models | Model-performance contracts |
+| `GET /governance` | Governance | Detect-and-report findings + Access Rules |
+| `GET /insights` | Insights | Educate on MCP + skills (utility) |
+| `GET /integrations` | Integrations | Capability matrix + observed tools (utility) |
+| `GET /privacy` | Privacy | Defaults + DELETE ALL (utility) |
+| `GET /costs` | Costs | Secondary estimates only (utility; not on Overview) |
 
-Primary nav order: Home · Sessions · Governance · Integrations.  
-Secondary destinations: Privacy; Costs outside Home.
+Primary nav order: Overview · Sessions · Pull Requests · Models · Governance.  
+Utility destinations: Integrations, Insights, Privacy; Costs outside Overview.
 
 ---
 
@@ -240,15 +250,21 @@ MVP filters: document date/tool/provider as later if API query params are not ye
 
 ## Responsive Behavior
 
-- **≥1024px:** max-width content ~1120px, horizontal nav
-- **768–1023px:** same stack, tighter padding
-- **&lt;768px:** nav wraps; tables scroll horizontally in a region with accessible name
+- **≥1025px:** 200px dark sidebar, content column, 300px right-rail layout slot
+- **768–1024px:** 64px compact labelled-on-focus navigation; right rail below content
+- **&lt;768px:** keyboard-operable Menu disclosure; single-column panels; tables scroll horizontally in a named region
 
 ---
 
 ## Design Tokens
 
-| Token | Value |
+> **Superseded for the live shell:** ADR 0003 / DESIGN_IMPLEMENTATION_SPEC S02
+> require the dark navy default (`--color-bg` `#0b1722`, panel `#101f2d`,
+> selected `#153450`, border `#294356`, text `#eef4ff`, muted `#adc5df`,
+> accent `#38bdf8`). The light tokens below remain historical evidence of the
+> #76 visual system and must not be treated as the product default.
+
+| Token | Historical (#76) value |
 |-------|-------|
 | `--color-text` | `#172026` |
 | `--color-muted` | `#53616b` |
