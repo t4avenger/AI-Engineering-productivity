@@ -169,15 +169,34 @@ type insightsData struct {
 	Error            string
 }
 
-// governanceData is the server-rendered Governance findings view (#151).
+// governanceData is the server-rendered Governance findings view (#151)
+// plus Access Rules tab shells (#160).
 type governanceData struct {
-	RiskyAccess   governance.RiskyAccess
-	UnapprovedMCP governance.UnapprovedMCP
-	MCPServers    []mcpAllowlistOption
-	SaveAvailable bool
-	Saved         bool
-	Error         string
+	RiskyAccess    governance.RiskyAccess
+	UnapprovedMCP  governance.UnapprovedMCP
+	MCPServers     []mcpAllowlistOption
+	SaveAvailable  bool
+	Saved          bool
+	Error          string
+	ActiveRulesTab string
+	RulesShell     *accessRulesShell // set for unavailable Access Rules tabs
 }
+
+// accessRulesShell is honest unavailable copy for Skills / Paths / Prompt tabs (#160).
+type accessRulesShell struct {
+	PanelID   string
+	TabID     string
+	Subject   string
+	SchemaKey string
+}
+
+// Access Rules tab ids for ?rules= (issue #160). MCP is the only editable tab.
+const (
+	rulesTabMCP     = "mcp"
+	rulesTabSkills  = "skills"
+	rulesTabPaths   = "paths"
+	rulesTabPrompts = "prompts"
+)
 
 type mcpAllowlistOption struct {
 	Name     string
@@ -525,33 +544,70 @@ func (s *Server) insightsPage(w http.ResponseWriter, r *http.Request) {
 func (s *Server) governancePage(w http.ResponseWriter, r *http.Request) {
 	data := s.governancePageData(r, nil)
 	data.Saved = r.URL.Query().Get("saved") == "1"
+	data.ActiveRulesTab = governanceRulesTab(r.URL.Query().Get("rules"))
+	data.RulesShell = accessRulesShellFor(data.ActiveRulesTab)
 	s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
+}
+
+// governanceRulesTab clamps ?rules= to a known Access Rules tab; default mcp.
+func governanceRulesTab(raw string) string {
+	switch tab := strings.ToLower(strings.TrimSpace(raw)); tab {
+	case rulesTabSkills, rulesTabPaths, rulesTabPrompts:
+		return tab
+	default:
+		return rulesTabMCP
+	}
+}
+
+// governanceRulesPath builds /governance?rules=… for Access Rules tab links.
+func governanceRulesPath(tab string) string {
+	tab = governanceRulesTab(tab)
+	if tab == rulesTabMCP {
+		return pathGovernance
+	}
+	return pathGovernance + "?rules=" + tab
+}
+
+func accessRulesShellFor(tab string) *accessRulesShell {
+	switch tab {
+	case rulesTabSkills:
+		return &accessRulesShell{
+			PanelID: "rules-panel-skills", TabID: "rules-tab-skills",
+			Subject: "Skills allow/deny policy", SchemaKey: "governance.skills_allowlist",
+		}
+	case rulesTabPaths:
+		return &accessRulesShell{
+			PanelID: "rules-panel-paths", TabID: "rules-tab-paths",
+			Subject: "Files & Paths allow/deny policy", SchemaKey: "governance.path_rules",
+		}
+	case rulesTabPrompts:
+		return &accessRulesShell{
+			PanelID: "rules-panel-prompts", TabID: "rules-tab-prompts",
+			Subject: "Prompt Keywords protection policy", SchemaKey: "governance.prompt_keywords",
+		}
+	default:
+		return nil
+	}
 }
 
 func (s *Server) governanceMCPAllowlistSave(w http.ResponseWriter, r *http.Request) {
 	if s.mcpAllowlistController == nil {
 		data := s.governancePageData(r, nil)
 		data.Error = "MCP allowlist saving is unavailable."
-		w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
-		w.WriteHeader(http.StatusServiceUnavailable)
-		s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
+		s.renderGovernanceError(w, r, http.StatusServiceUnavailable, data)
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 	if err := r.ParseForm(); err != nil {
 		data := s.governancePageData(r, nil)
 		data.Error = "Unable to read the MCP allowlist selection."
-		w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
+		s.renderGovernanceError(w, r, http.StatusUnprocessableEntity, data)
 		return
 	}
 	selected := append([]string{}, r.Form["mcp_server"]...)
 	data := s.governancePageData(r, selected)
 	if data.Error != "" {
-		w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
-		w.WriteHeader(http.StatusServiceUnavailable)
-		s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
+		s.renderGovernanceError(w, r, http.StatusServiceUnavailable, data)
 		return
 	}
 	known := make(map[string]struct{}, len(data.MCPServers))
@@ -573,20 +629,23 @@ func (s *Server) governanceMCPAllowlistSave(w http.ResponseWriter, r *http.Reque
 			data.Error = "The MCP allowlist contained an unknown server. Refresh and try again."
 		}
 		if data.Error != "" {
-			w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
-			w.WriteHeader(http.StatusUnprocessableEntity)
-			s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
+			s.renderGovernanceError(w, r, http.StatusUnprocessableEntity, data)
 			return
 		}
 	}
 	if err := s.mcpAllowlistController.SaveMCPAllowlist(selected); err != nil {
 		data.Error = "Unable to save the MCP allowlist. The active policy was not changed."
-		w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
-		w.WriteHeader(http.StatusInternalServerError)
-		s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
+		s.renderGovernanceError(w, r, http.StatusInternalServerError, data)
 		return
 	}
 	http.Redirect(w, r, pathGovernance+"?saved=1", http.StatusSeeOther)
+}
+
+func (s *Server) renderGovernanceError(w http.ResponseWriter, r *http.Request, status int, data governanceData) {
+	data.ActiveRulesTab = rulesTabMCP
+	w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
+	w.WriteHeader(status)
+	s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
 }
 
 func (s *Server) governancePageData(r *http.Request, selected []string) governanceData {
@@ -594,7 +653,10 @@ func (s *Server) governancePageData(r *http.Request, selected []string) governan
 	if selected != nil {
 		allowlist = selected
 	}
-	data := governanceData{SaveAvailable: s.mcpAllowlistController != nil}
+	data := governanceData{
+		SaveAvailable:  s.mcpAllowlistController != nil,
+		ActiveRulesTab: rulesTabMCP,
+	}
 	events, err := s.insightEvents(r)
 	if err != nil {
 		data.Error = "Unable to load governance findings."

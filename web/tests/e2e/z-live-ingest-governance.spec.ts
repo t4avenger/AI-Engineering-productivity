@@ -5,6 +5,7 @@ import {
   claudeMCPConnectionOTLPLogs,
   claudeRiskyAccessOTLPLogs,
   expectFourTabPrimaryNav,
+  expectGovernanceAccessRulesShells,
   ingestOTLPLogs,
   resetDaemonBetweenTests,
   unlockDashboard,
@@ -15,8 +16,8 @@ import {
  * Playwright DoD (#155): ingest a real Claude OTLP payload with credential-file
  * evidence through the daemon started by playwright.config.ts, then assert
  * /governance renders the finding and the four-tab primary nav. Also covers the
- * MCP allowlist Save round-trip below. No page.route().fulfill() mocking
- * (QUALITY_GATES live-data DoD).
+ * MCP allowlist Save round-trip and Access Rules tab shells (#160). No
+ * page.route().fulfill() mocking (QUALITY_GATES live-data DoD).
  */
 resetDaemonBetweenTests();
 
@@ -56,6 +57,7 @@ test('renders risky-access findings after live OTLP ingest', async ({
   await expect(
     page.getByText('does not enforce or publish', { exact: false }),
   ).toBeVisible();
+  await expectGovernanceAccessRulesShells(page);
 
   await page.goto('/sessions/claude-code:tiq-live-e2e-governance-session');
   await expect(
