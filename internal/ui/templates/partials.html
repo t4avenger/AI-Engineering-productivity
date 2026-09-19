@@ -45,6 +45,7 @@
     {{if .Nav}}
     <footer class="app-footer">
       <nav aria-label="Secondary navigation" class="secondary-navigation">
+        <a class="secondary-link{{if eq .Nav "models"}} active{{end}}" href="/models" {{if eq .Nav "models"}}aria-current="page"{{end}}>Models</a>
         <a class="secondary-link{{if eq .Nav "privacy"}} active{{end}}" href="/privacy" {{if eq .Nav "privacy"}}aria-current="page"{{end}}>Privacy</a>
         {{if ne .Nav "home"}}
         <a class="secondary-link{{if eq .Nav "costs"}} active{{end}}" href="/costs" {{if eq .Nav "costs"}}aria-current="page"{{end}}>Costs</a>
@@ -65,3 +66,60 @@
   Dot context is the enum string, e.g. {{template "status-badge" $state}}.
 */}}
 {{define "status-badge"}}<span class="status {{statusClass .}}" title="{{.}}">{{statusLabel .}}</span>{{end}}
+
+{{/*
+  model-performance-scorecard renders the shared N03 scorecard body. Dot
+  context is insights.ModelPerformance (RankingAvailable, Notes, Models,
+  RankedModels). Used by Insights and the Models destination (#186).
+*/}}
+{{define "model-performance-scorecard"}}
+    <p>Ranking available: {{if .RankingAvailable}}yes{{else}}no, sample size below the ranking guard{{end}}.</p>
+    {{if .Notes}}
+    <h3>Evidence notes</h3>
+    <ul>{{range .Notes}}<li>{{.}}</li>{{end}}</ul>
+    {{end}}
+    {{if .Models}}
+    <section class="table-wrap" aria-label="Model performance">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Model</th>
+            <th scope="col">Provider</th>
+            <th scope="col">Tool</th>
+            <th scope="col">Sample size</th>
+            <th scope="col">Succeeded</th>
+            <th scope="col">Failed</th>
+            <th scope="col">Abandoned</th>
+            <th scope="col">Retry rate</th>
+            <th scope="col">Tokens per completed task</th>
+            <th scope="col">Latency p50</th>
+            <th scope="col">Latency p95</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Models}}
+          <tr>
+            <td>{{.Model}}</td>
+            <td>{{if .Provider}}{{.Provider}}{{else}}{{template "status-badge" "unavailable"}}{{end}}</td>
+            <td>{{.Tool}}</td>
+            <td>{{.SampleSize}} contracts</td>
+            <td>{{.Success}} contracts</td>
+            <td>{{.Failed}} contracts</td>
+            <td>{{.Abandoned}} contracts</td>
+            <td>{{if eq .RetryRateState "observed"}}{{with .RetryRate}}{{formatPercent (deref .) "retried"}}{{end}}{{else}}{{template "status-badge" .RetryRateState}}{{end}}</td>
+            <td>{{with .TokensPerCompletedTask}}{{printf "%.0f tokens/task" (deref .)}}{{else}}{{template "status-badge" "unavailable"}}{{end}}</td>
+            <td>{{formatMillis .LatencyP50Ms}}</td>
+            <td>{{formatMillis .LatencyP95Ms}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </section>
+    {{else}}
+    <p>No outcome-contract rows yet. Model performance remains unavailable until retained events include explicit outcome evidence.</p>
+    {{end}}
+    {{if .RankedModels}}
+    <h3>Ranked models</h3>
+    <ol>{{range .RankedModels}}<li>{{.}}</li>{{end}}</ol>
+    {{end}}
+{{end}}

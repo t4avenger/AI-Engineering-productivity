@@ -1,0 +1,15 @@
+{{define "models.html"}}
+{{template "shell-start" .}}
+{{template "nav" .}}
+<main id="main-content" class="page">
+  <h1>Models</h1>
+  <p>Outcome-contract scorecards use provider-reported completion evidence, retry linkage, token totals, and latency where retained. Session lifecycle state is not used as a model outcome. Ranking reuses the Insights sample-size guard; no session-status-derived task success.</p>
+  {{with .Content}}
+  {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{else}}
+  {{template "model-performance-scorecard" .ModelPerformance}}
+  {{end}}
+  {{end}}
+  <p><a href="/insights#model-performance">View detailed Insights evidence</a></p>
+</main>
+{{template "shell-end" .}}
+{{end}}

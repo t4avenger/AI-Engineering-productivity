@@ -262,7 +262,12 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 		{"/insights", "92 ms"},
 		{"/insights", "Model performance"},
 		{"/insights", "1234 ms"},
+		{"/insights", "Open Models destination"},
 		{"/insights", "Context pressure"},
+		{"/models", "Models"},
+		{"/models", "1234 ms"},
+		{"/models", "Ranking available: no"},
+		{"/models", "View detailed Insights evidence"},
 		{"/governance", "Risky access"},
 		{"/governance", "Unapproved MCP"},
 		{"/governance", "does not enforce or publish"},
@@ -436,6 +441,7 @@ func TestHomeRendersBehaviourGovernanceAndIntegrationHighlights(t *testing.T) {
 		"claude-code",
 		now.Format(time.RFC3339),
 		`href="/insights#mcp-inventory"`,
+		`href="/models"`,
 		`href="/governance"`,
 		`href="/integrations"`,
 	})
@@ -553,7 +559,7 @@ func assertPrimaryNavigation(t *testing.T, body string) {
 		}
 		previous = index
 	}
-	for _, legacy := range []string{`href="/insights"`, `href="/privacy"`, `href="/costs"`} {
+	for _, legacy := range []string{`href="/insights"`, `href="/privacy"`, `href="/costs"`, `href="/models"`, `href="/pull-requests"`} {
 		if strings.Contains(primary, legacy) {
 			t.Fatalf("primary navigation must not contain %s: %q", legacy, primary)
 		}
@@ -563,6 +569,9 @@ func assertPrimaryNavigation(t *testing.T, body string) {
 func assertSecondaryNavigation(t *testing.T, body string, wantCosts bool) {
 	t.Helper()
 	secondary := navigationSection(t, body, "Secondary navigation")
+	if !strings.Contains(secondary, `href="/models"`) {
+		t.Fatalf("secondary navigation must keep Models reachable: %q", secondary)
+	}
 	if !strings.Contains(secondary, `href="/privacy"`) {
 		t.Fatalf("secondary navigation must keep Privacy reachable: %q", secondary)
 	}
@@ -1227,7 +1236,9 @@ func TestInsightsRenderGlossaryLabelsUnitsNotesAndLinks(t *testing.T) {
 		"75% cached",
 		"2.0×",
 		`href="/sessions/insight-session"`,
+		`href="/models"`,
 		"Evidence notes",
+		"Tokens per completed task",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("insights page missing %q in body: %q", want, body)
@@ -1235,6 +1246,79 @@ func TestInsightsRenderGlossaryLabelsUnitsNotesAndLinks(t *testing.T) {
 	}
 	if strings.Contains(body, "%!f(*float64") {
 		t.Fatalf("insights page should not expose pointer formatter output: %q", body)
+	}
+}
+
+func TestModelsPageRendersScorecardAndUnlockGate(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fullStub{
+		sessions: []canonical.Session{{
+			SessionID: "model-session",
+			Provider:  "anthropic",
+			Tool:      "claude-code",
+			State:     "completed",
+			StartedAt: now,
+		}},
+		events: map[string][]canonical.Event{
+			"model-session": {{
+				EventID:    "outcome-1",
+				EventType:  "model_interaction",
+				SessionID:  "model-session",
+				OccurredAt: now,
+				ReceivedAt: now,
+				Provider:   "anthropic",
+				Tool:       "claude-code",
+				ProviderExtensions: map[string]any{
+					"outcome_contract": map[string]any{
+						"model":         "claude-test",
+						"status":        "success",
+						"retry_attempt": int64(1),
+						"duration_ms":   1234.0,
+						"input_tokens":  int64(10),
+						"output_tokens": int64(5),
+						"source":        "test",
+					},
+				},
+			}},
+		},
+	}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+
+	unauth := httptest.NewRequest(http.MethodGet, "/models", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, unauth)
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/unlock" {
+		t.Fatalf("unauthenticated /models = %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+
+	cookie := unlock(t, handler)
+	body := getAuthed(t, handler, cookie, "/models").Body.String()
+	assertContainsAll(t, body, []string{
+		"<h1>Models</h1>",
+		`class="secondary-link active" href="/models" aria-current="page"`,
+		"Ranking available: no, sample size below the ranking guard",
+		"claude-test",
+		"anthropic",
+		"1234 ms",
+		"tokens/task",
+		`href="/insights#model-performance"`,
+		"Evidence notes",
+	})
+	assertPrimaryNavigation(t, body)
+	assertSecondaryNavigation(t, body, true)
+
+	emptyServer, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emptyHandler := emptyServer.Wrap(http.NotFoundHandler())
+	emptyBody := getAuthed(t, emptyHandler, unlock(t, emptyHandler), "/models").Body.String()
+	if !strings.Contains(emptyBody, "No outcome-contract rows yet") {
+		t.Fatalf("empty models page missing unavailable copy: %q", emptyBody)
 	}
 }
 

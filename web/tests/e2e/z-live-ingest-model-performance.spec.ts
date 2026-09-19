@@ -48,4 +48,13 @@ test('renders model-performance scorecard for live outcome contracts', async ({
   await expect(page.getByText('gpt-6-astra').first()).toBeVisible();
   await expect(page.getByText('claude-haiku-4-5-20251001').first()).toBeVisible();
   await expect(page.getByText('Ranking available: no')).toBeVisible();
+
+  await page.goto('/models');
+  await expect(page.getByRole('heading', { name: 'Models' })).toBeVisible();
+  await expect(page.getByText('gpt-6-astra').first()).toBeVisible();
+  await expect(page.getByText('claude-haiku-4-5-20251001').first()).toBeVisible();
+  await expect(page.getByText('Ranking available: no')).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'View detailed Insights evidence' }),
+  ).toBeVisible();
 });
