@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import {
   authToken,
@@ -10,12 +10,33 @@ import {
 } from './live-ingest-helpers';
 
 /**
- * Live end-to-end gate for Governance findings (#151): ingest a real Claude
- * OTLP payload with credential-file evidence through the daemon started by
- * playwright.config.ts, then assert /governance renders the finding. No
- * page.route().fulfill() mocking (QUALITY_GATES live-data DoD).
+ * Live end-to-end gate for Governance findings (#151) and the V1 enterprise IA
+ * Playwright DoD (#155): ingest a real Claude OTLP payload with credential-file
+ * evidence through the daemon started by playwright.config.ts, then assert
+ * /governance renders the finding and the four-tab primary nav. Also covers the
+ * MCP allowlist Save round-trip below. No page.route().fulfill() mocking
+ * (QUALITY_GATES live-data DoD).
  */
 resetDaemonBetweenTests();
+
+async function expectFourTabPrimaryNav(page: Page) {
+  const primaryNavigation = page.getByLabel('Primary navigation');
+  await expect(primaryNavigation.getByRole('link')).toHaveText([
+    'Home',
+    'Sessions',
+    'Governance',
+    'Integrations',
+  ]);
+  await expect(
+    primaryNavigation.getByRole('link', { name: 'Insights', exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    primaryNavigation.getByRole('link', { name: 'Privacy', exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    primaryNavigation.getByRole('link', { name: 'Costs', exact: true }),
+  ).toHaveCount(0);
+}
 
 test('renders risky-access findings after live OTLP ingest', async ({
   page,
@@ -42,6 +63,7 @@ test('renders risky-access findings after live OTLP ingest', async ({
 
   await unlockDashboard(page, authToken);
   await page.goto('/governance');
+  await expectFourTabPrimaryNav(page);
   await expect(page.getByRole('heading', { name: 'Governance' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Risky access' })).toBeVisible();
   await expect(page.getByText('Violation').first()).toBeVisible();
