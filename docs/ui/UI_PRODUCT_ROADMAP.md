@@ -35,9 +35,9 @@ Source of truth for product behaviour remains [PRODUCT_MAP.md](../../PRODUCT_MAP
 
 | Route | Status |
 |-------|--------|
-| `/` Home | Implemented — orchestration overview |
+| `/` Home | Implemented — orchestration, behaviour, governance, and integration highlights (#150) |
 | `/sessions`, `/sessions/{id}` | Implemented — list + flat timeline |
-| `/insights` | Implemented transition route — retained until #150 folds content into Home |
+| `/insights` | Implemented detailed secondary route — Home carries headline content; this route preserves PRODUCT_MAP §17.3 evidence tables |
 | `/integrations` | Light — observed tools + Cursor Enterprise status |
 | `/privacy`, `/costs` | Implemented |
 | `/governance` | Implemented — risky-access + unapproved-MCP findings (#151) |
@@ -53,7 +53,7 @@ secondary destinations; Home omits the Costs link. See
 | Sessions / events | `sessions`, `events` (~7.3k / ~29k locally sampled) | Yes — #163 adds primary/observation scopes so content-derived evidence stays inspectable without dominating the default list |
 | Operations | `operations` (~1.2k) + timeline projection | Partial (API richer than UI) |
 | Cost records | `cost_records` | Costs page only |
-| MCP inventory / skills / model / context / ops insights | `GET /api/v1/insights/*` | Insights page |
+| MCP inventory / skills / model / context / ops insights | `GET /api/v1/insights/*` | Headline summaries on Home; detailed evidence on Insights (#150) |
 | Risky access | `GET /api/v1/insights/risky-access` | Yes — `/governance` (#151) |
 | Unapproved MCP | `GET /api/v1/insights/unapproved-mcp` | Yes — `/governance`; Save reloads findings immediately (#151, #152) |
 | MCP allowlist config | `governance.mcp_allowlist` YAML | Checkbox editor atomically persists and reloads local policy (#152) |
@@ -160,7 +160,7 @@ Empty allowlist remains **indeterminate** (existing engine behaviour). This is d
 ## 7. Acceptance criteria (epic)
 
 - [ ] Primary nav is Home · Sessions · Governance · Integrations only.
-- [ ] Insights content reachable from Home; `/insights` redirects or canonicalises to Home sections.
+- [x] Insight headline content is rendered on Home; anchored `/insights` links preserve detailed evidence and backward compatibility (#150).
 - [ ] Privacy and Costs remain reachable without top-nav slots.
 - [ ] `/governance` shows risky-access and unapproved-mcp with evidence and honest indeterminate.
 - [x] MCP allowlist checkboxes + Save persist to local config and affect findings (#152).
@@ -207,6 +207,6 @@ Epic: [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148
 
 ## 10. Next implementation step
 
-1. Continue V1 UI order: **#150** / **#153** / **#154** → **#155** (e2e).
+1. Continue V1 UI order: **#153** / **#154** → **#155** (consolidated e2e).
 
-With allowlist Save delivered, the remaining V1 work can deepen Home, Sessions, and Integrations before the consolidated e2e issue.
+With allowlist Save and Home highlights delivered, the remaining V1 work can deepen Sessions and Integrations before the consolidated e2e issue.

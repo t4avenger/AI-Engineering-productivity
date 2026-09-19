@@ -83,11 +83,13 @@
 [Render Home]
   • Sessions today outcome counts
   • Tools observed (or Awaiting telemetry)
-  • Insight highlights with links
+  • MCP, skill, model-performance, and context-pressure highlights
+  • Governance outcomes with links to evidence
+  • Observed integrations with latest retained activity
   • No cost headline
 ```
 
-**Empty state:** No sessions → short guidance to send OTLP to the daemon; tools/insights say awaiting/unavailable honestly.
+**Empty state:** No primary sessions → short guidance to send OTLP to the daemon; observation-only insight evidence remains visible, while missing tools/insights say awaiting/unknown honestly.
 
 **Error state:** Partial failure → alert for failed section; other sections still render when possible.
 

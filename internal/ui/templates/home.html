@@ -6,33 +6,106 @@
   <p class="eyebrow">Privacy mode: local-only · Retention: 30 days</p>
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
   {{with .Content}}
+  <section aria-labelledby="sessions-today-heading">
+    <h2 id="sessions-today-heading">Sessions today</h2>
   {{if .Empty}}
   <p>No retained sessions yet. Point a supported tool’s OTLP exporter at this daemon to begin auditing usage.</p>
   {{else}}
-  <section>
-    <h2>Sessions today</h2>
     <p>Successful {{.Successful}} · Failed {{.Failed}} · Abandoned {{.Abandoned}} · Other {{.Other}}</p>
+  {{end}}
   </section>
-  <section>
-    <h2>Tools observed</h2>
+  <section aria-labelledby="tools-observed-heading">
+    <h2 id="tools-observed-heading">Tools observed</h2>
     {{if .Tools}}
     <ul>{{range .Tools}}<li>{{.}}</li>{{end}}</ul>
     {{else}}
     <p>Awaiting telemetry</p>
     {{end}}
   </section>
-  <section>
-    <h2>Insight highlights</h2>
+  <section id="insight-highlights" aria-labelledby="insight-highlights-heading">
+    <h2 id="insight-highlights-heading">Behaviour and efficiency</h2>
     {{if .InsightErr}}
-    <p>{{.InsightErr}}</p>
+    <p class="error" role="alert">{{.InsightErr}}</p>
     {{else}}
-    <ul>
-      <li>MCP: {{.MCPUnused}} unused connected servers — <a href="/insights">Insights</a></li>
-      <li>Skills: {{.SkillCount}} observed — <a href="/insights">Insights</a></li>
-    </ul>
+    <section aria-labelledby="mcp-highlight-heading">
+      <h3 id="mcp-highlight-heading">MCP usage</h3>
+      {{if .MCP.Servers}}
+      <p>Connected {{.MCP.Totals.ConnectedServers}} · Invoked {{.MCP.Totals.UsedServers}} · Unused {{.MCP.Totals.UnusedServers}} · Usage unavailable {{.MCP.Totals.UsageUnavailableServers}}</p>
+      {{else}}
+      <p>{{template "status-badge" "unknown"}} No retained MCP connection or invocation evidence.</p>
+      {{end}}
+      <p><a href="/insights#mcp-inventory">View MCP evidence</a></p>
+    </section>
+    <section aria-labelledby="skill-highlight-heading">
+      <h3 id="skill-highlight-heading">Skill usage</h3>
+      {{if .Skills.Coverage}}
+      <p>Observed skills {{.Skills.Totals.ObservedSkills}} · Invocations {{.Skills.Totals.Invocations}} · Explicit surfaces {{.Skills.Totals.ExplicitDetection}} · Inferred surfaces {{.Skills.Totals.InferredDetection}} · Unavailable surfaces {{.Skills.Totals.UnavailableDetection}} · Unknown surfaces {{.Skills.Totals.UnknownDetection}}</p>
+      {{else}}
+      <p>{{template "status-badge" "unknown"}} No retained skill-detection evidence.</p>
+      {{end}}
+      <p><a href="/insights#skill-usage">View skill evidence</a></p>
+    </section>
+    <section aria-labelledby="model-highlight-heading">
+      <h3 id="model-highlight-heading">Model performance</h3>
+      {{if .ModelPerformance.Models}}
+      <ul>
+        {{range .ModelPerformance.Models}}
+        <li><span class="mono">{{.Model}}</span> ({{.Tool}}): {{.SampleSize}} contracts · {{.Success}} succeeded · {{.Failed}} failed · {{.Abandoned}} abandoned</li>
+        {{end}}
+      </ul>
+      {{else}}
+      <p>{{template "status-badge" "unknown"}} No provider-reported outcome contracts.</p>
+      {{end}}
+      <p><a href="/insights#model-performance">View model evidence</a></p>
+    </section>
+    <section aria-labelledby="context-highlight-heading">
+      <h3 id="context-highlight-heading">Context pressure</h3>
+      {{if .ContextWaste.Sessions}}
+      <p>Triggered sessions {{.ContextWaste.Totals.TriggeredSessions}} / {{.ContextWaste.Totals.Sessions}} · Cached context observed {{.ContextWaste.Totals.CachedRatioObserved}} · Input growth observed {{.ContextWaste.Totals.InputTokenGrowthObserved}} · Both metrics unavailable {{.ContextWaste.Totals.BothMetricsUnavailable}}</p>
+      {{else}}
+      <p>{{template "status-badge" "unknown"}} No retained token samples support this insight.</p>
+      {{end}}
+      <p><a href="/insights#context-pressure">View context evidence</a></p>
+    </section>
     {{end}}
   </section>
-  {{end}}
+  <section id="governance-highlights" aria-labelledby="governance-highlights-heading">
+    <h2 id="governance-highlights-heading">Governance</h2>
+    {{if .InsightErr}}
+    <p>Governance outcomes are unavailable because retained events could not be read.</p>
+    {{else}}
+    <ul>
+      <li>Risky access: {{template "status-badge" (printf "%s" .RiskyAccess.Outcome)}} · {{len .RiskyAccess.Findings}} findings</li>
+      <li>Unapproved MCP: {{template "status-badge" (printf "%s" .UnapprovedMCP.Outcome)}} · {{len .UnapprovedMCP.Findings}} findings{{if eq .UnapprovedMCP.Visibility "policy_unconfigured"}} · {{template "status-badge" "policy_unconfigured"}}{{end}}</li>
+    </ul>
+    {{end}}
+    <p><a href="/governance">Review governance evidence</a></p>
+  </section>
+  <section id="integration-health" aria-labelledby="integration-health-heading">
+    <h2 id="integration-health-heading">Integration health</h2>
+    {{if .IntegrationErr}}
+    <p class="error" role="alert">{{.IntegrationErr}}</p>
+    {{else if .Integrations}}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Provider</th><th scope="col">Tool</th><th scope="col">Status</th><th scope="col">Last activity</th></tr></thead>
+        <tbody>
+          {{range .Integrations}}
+          <tr>
+            <td>{{.Provider}}</td>
+            <td>{{.Tool}}</td>
+            <td>{{template "status-badge" .Status}}</td>
+            <td>{{if eq .LastSeenState "observed"}}<time datetime="{{.LastSeen}}">{{.LastSeen}}</time>{{else}}{{template "status-badge" .LastSeenState}}{{end}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}
+    <p>{{template "status-badge" "unknown"}} No retained integration activity.</p>
+    {{end}}
+    <p><a href="/integrations">Review integration details</a></p>
+  </section>
   {{end}}
 </main>
 {{template "shell-end" .}}

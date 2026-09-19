@@ -48,6 +48,7 @@ func (c *testAllowlistController) SaveMCPAllowlist(names []string) error {
 type fullStub struct {
 	sessions   []canonical.Session
 	events     map[string][]canonical.Event
+	eventErr   error
 	operations []canonical.Operation
 	costs      []cost.Record
 	deleted    []string
@@ -97,6 +98,9 @@ func (s *fullStub) DeleteAllSessions(context.Context) error {
 }
 
 func (s *fullStub) ListEvents(_ context.Context, filter storage.EventFilter) ([]canonical.Event, error) {
+	if s.eventErr != nil {
+		return nil, s.eventErr
+	}
 	return append([]canonical.Event(nil), s.events[filter.SessionID]...), nil
 }
 
@@ -328,6 +332,20 @@ func TestSessionViewsKeepObservationsInspectableWithoutCountingThemAsPrimary(t *
 			SessionID: "codex:token:observation", Provider: "openai", Tool: "codex", State: "failed", StartedAt: now,
 			Attributes: map[string]any{"identity_scope": "observation", "identity_source": "content-derived"},
 		},
+	}, events: map[string][]canonical.Event{
+		"codex:token:observation": {{
+			EventID:    "observation-skill",
+			EventType:  "skill_invocation",
+			SessionID:  "codex:token:observation",
+			OccurredAt: now,
+			ReceivedAt: now,
+			Provider:   "openai",
+			Tool:       "codex",
+			ProviderExtensions: map[string]any{
+				"skill_detection": "explicit",
+				"skill":           map[string]any{"name": "observation-skill", "outcome": "success"},
+			},
+		}},
 	}}
 	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
 	if err != nil {
@@ -347,6 +365,106 @@ func TestSessionViewsKeepObservationsInspectableWithoutCountingThemAsPrimary(t *
 	home := getAuthed(t, handler, cookie, "/").Body.String()
 	if !strings.Contains(home, "Successful 1 · Failed 0") {
 		t.Fatalf("home counts included observation-only row: %q", home)
+	}
+	if !strings.Contains(home, "Observed skills 1") {
+		t.Fatalf("home hid insight evidence retained in an observation-only row: %q", home)
+	}
+}
+
+func TestHomeRendersBehaviourGovernanceAndIntegrationHighlights(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	completed := now.Add(-time.Hour)
+	repo := &fullStub{
+		sessions: []canonical.Session{
+			{SessionID: "claude-home", Provider: "anthropic", Tool: "claude-code", State: "completed", StartedAt: now.Add(-2 * time.Hour), CompletedAt: &completed},
+			{SessionID: "codex-home", Provider: "openai", Tool: "codex", State: "completed", StartedAt: now.Add(-3 * time.Hour)},
+		},
+		events: map[string][]canonical.Event{
+			"claude-home": {
+				{
+					EventID: "home-mcp", EventType: "mcp_server_connection", SessionID: "claude-home",
+					OccurredAt: now.Add(-30 * time.Minute), ReceivedAt: now.Add(-30 * time.Minute), Provider: "anthropic", Tool: "claude-code",
+					ProviderExtensions: map[string]any{"event": map[string]any{"server_name": "rogue-home", "status": "connected"}},
+				},
+				{
+					EventID: "home-skill", EventType: "skill_invocation", SessionID: "claude-home",
+					OccurredAt: now.Add(-20 * time.Minute), ReceivedAt: now.Add(-20 * time.Minute), Provider: "anthropic", Tool: "claude-code",
+					ProviderExtensions: map[string]any{"skill_detection": "explicit", "skill": map[string]any{"name": "home-probe", "outcome": "success"}},
+				},
+				{
+					EventID: "home-model", EventType: "operation", SessionID: "claude-home",
+					OccurredAt: now.Add(-10 * time.Minute), ReceivedAt: now.Add(-10 * time.Minute), Provider: "anthropic", Tool: "claude-code",
+					ProviderExtensions: map[string]any{"outcome_contract": map[string]any{"model": "claude-home-model", "status": "success", "source": "test"}},
+				},
+				{
+					EventID: "home-context-1", EventType: "model_interaction", SessionID: "claude-home",
+					OccurredAt: now.Add(-5 * time.Minute), ReceivedAt: now.Add(-5 * time.Minute), Provider: "anthropic", Tool: "claude-code",
+					Attributes: map[string]any{"input_token_count": int64(100), "cached_input_tokens": int64(75)},
+				},
+				{
+					EventID: "home-risk", EventType: "api_request", SessionID: "claude-home",
+					OccurredAt: now, ReceivedAt: now, Provider: "anthropic", Tool: "claude-code",
+					Attributes: map[string]any{"file_path": "/synthetic/project/.env"},
+				},
+			},
+		},
+	}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, []string{"approved-home"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	body := getAuthed(t, handler, unlock(t, handler), "/").Body.String()
+
+	assertContainsAll(t, body, []string{
+		"Behaviour and efficiency",
+		"Connected 1 · Invoked 0 · Unused 1 · Usage unavailable 0",
+		"Observed skills 1 · Invocations 1",
+		"claude-home-model",
+		"1 contracts · 1 succeeded · 0 failed · 0 abandoned",
+		"Triggered sessions 1 / 1",
+		"Risky access:",
+		"Unapproved MCP:",
+		"Violation",
+		"1 findings",
+		"Integration health",
+		"anthropic",
+		"claude-code",
+		now.Format(time.RFC3339),
+		`href="/insights#mcp-inventory"`,
+		`href="/governance"`,
+		`href="/integrations"`,
+	})
+	if strings.Contains(body, "Cost") || strings.Contains(body, "$0") {
+		t.Fatalf("Home must not surface cost content: %q", body)
+	}
+	if anthropic, openai := strings.Index(body, "anthropic"), strings.Index(body, "openai"); anthropic < 0 || openai < 0 || anthropic >= openai {
+		t.Fatalf("integration rows are not sorted by provider/tool: %q", body)
+	}
+}
+
+func TestHomeKeepsIntegrationEvidenceWhenInsightEventsFail(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	repo := &fullStub{
+		sessions: []canonical.Session{{SessionID: "home-partial", Provider: "openai", Tool: "codex", State: "completed", StartedAt: now}},
+		eventErr: errors.New("event store unavailable"),
+	}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	body := getAuthed(t, handler, unlock(t, handler), "/").Body.String()
+	assertContainsAll(t, body, []string{
+		"Insight and governance highlights unavailable.",
+		"Governance outcomes are unavailable",
+		"Integration health",
+		"openai",
+		"codex",
+		now.Format(time.RFC3339),
+	})
+	if strings.Contains(body, "Integration health unavailable.") {
+		t.Fatalf("session-backed integration evidence should survive an event-reader failure: %q", body)
 	}
 }
 
@@ -389,6 +507,12 @@ func TestUnlockAndHome(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(body, "Orchestration overview") || !strings.Contains(body, "codex") {
 		t.Fatalf("home = %d %q", rec.Code, body)
 	}
+	assertContainsAll(t, body, []string{
+		"No retained MCP connection or invocation evidence.",
+		"No provider-reported outcome contracts.",
+		"Indeterminate",
+		"Allowlist not configured",
+	})
 	// Home must not surface any calculated or estimated cost content. Issue #149
 	// also removes the former global Costs link from this page.
 	for _, forbidden := range []string{"Calculated amount", "Cost estimates", "Secondary estimates"} {
@@ -801,6 +925,10 @@ func TestInsightsRenderGlossaryLabelsUnitsNotesAndLinks(t *testing.T) {
 	body := renderInsights(t, repo)
 
 	for _, want := range []string{
+		`id="mcp-inventory"`,
+		`id="skill-usage"`,
+		`id="model-performance"`,
+		`id="context-pressure"`,
 		"Provider reported",
 		"Connected, never invoked",
 		"1500 tokens",

@@ -6,7 +6,7 @@
   <p>Learn from retained telemetry. Missing signals are labelled explicitly.</p>
   {{with .Content}}
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
-  <section>
+  <section id="mcp-inventory">
     <h2>MCP inventory</h2>
     <p>MCP rows show connected servers, whether explicit invocation telemetry was seen, and the request-level token context available around those events.</p>
     <p>Connected servers {{.MCP.Totals.ConnectedServers}} · Invoked servers {{.MCP.Totals.UsedServers}} · Unused connections {{.MCP.Totals.UnusedServers}} · Usage unavailable {{.MCP.Totals.UsageUnavailableServers}}</p>
@@ -47,7 +47,7 @@
     <p>No retained MCP connection or invocation rows yet. Point supported OTLP ingest at the daemon, then refresh this page.</p>
     {{end}}
   </section>
-  <section>
+  <section id="skill-usage">
     <h2>Skill usage</h2>
     <p>Skills are listed only when a provider explicitly reports a skill identity. Coverage rows explain surfaces where skill identity is inferred, unavailable, or still not proven.</p>
     <p>Observed skills {{.Skills.Totals.ObservedSkills}} · Skill invocations {{.Skills.Totals.Invocations}} · Explicit surfaces {{.Skills.Totals.ExplicitDetection}} · Inferred surfaces {{.Skills.Totals.InferredDetection}} · Unavailable surfaces {{.Skills.Totals.UnavailableDetection}} · Unknown surfaces {{.Skills.Totals.UnknownDetection}}</p>
@@ -109,7 +109,7 @@
     <p>No retained events with skill-detection metadata yet.</p>
     {{end}}
   </section>
-  <section>
+  <section id="operations">
     <h2>Operations</h2>
     <p>Executed tool-call records are counted only when retained canonical operation evidence exists.</p>
     {{if .OperationErr}}
@@ -166,7 +166,7 @@
     {{end}}
     {{end}}
   </section>
-  <section>
+  <section id="model-performance">
     <h2>Model performance</h2>
     <p>Outcome-contract scorecards use provider-reported completion evidence, retry linkage, token totals, and latency where retained. Session lifecycle state is not used as a model outcome.</p>
     <p>Ranking available: {{if .ModelPerformance.RankingAvailable}}yes{{else}}no, sample size below the ranking guard{{end}}.</p>
@@ -215,7 +215,7 @@
     <ol>{{range .ModelPerformance.RankedModels}}<li>{{.}}</li>{{end}}</ol>
     {{end}}
   </section>
-  <section>
+  <section id="context-pressure">
     <h2>Context pressure</h2>
     <p>Context pressure flags sessions where retained token samples show high cached-context ratio or input-token growth. It is separate from the MCP unused-connection signal above.</p>
     <p>Triggered sessions {{.ContextWaste.Totals.TriggeredSessions}} / {{.ContextWaste.Totals.Sessions}} · Cached context observed {{.ContextWaste.Totals.CachedRatioObserved}} · Input growth observed {{.ContextWaste.Totals.InputTokenGrowthObserved}} · Both metrics unavailable {{.ContextWaste.Totals.BothMetricsUnavailable}}</p>
