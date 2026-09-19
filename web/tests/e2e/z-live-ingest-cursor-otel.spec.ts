@@ -59,9 +59,13 @@ test('renders a Cursor Enterprise OTEL session ingested through the live daemon'
     page.getByRole('heading', { name: 'No retained sessions yet.' }),
   ).toHaveCount(0);
 
-  // Integrations (#132): Enterprise setup + honest observed status from retained
-  // tool=cursor sessions (never a fabricated "connected" state).
+  // Integrations (#132 / #154): Enterprise setup + honest observed status from
+  // retained tool=cursor sessions (never a fabricated "connected" state), plus
+  // capability-backed matrix and last-seen tools table.
   await page.getByRole('link', { name: 'Integrations', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Capability matrix' }),
+  ).toBeVisible();
   await expect(
     page.getByRole('heading', {
       name: 'Cursor Enterprise OpenTelemetry Export',
@@ -69,6 +73,7 @@ test('renders a Cursor Enterprise OTEL session ingested through the live daemon'
   ).toBeVisible();
   await expect(page.getByText('Team Settings').first()).toBeVisible();
   await expect(page.getByText('Seen in telemetry').first()).toBeVisible();
-  await expect(page.getByText('cursor (cursor)').first()).toBeVisible();
+  const toolsObserved = page.locator('#tools-observed');
+  await expect(toolsObserved.getByRole('cell', { name: 'cursor' }).first()).toBeVisible();
   await expect(page.getByText('Not seen in telemetry')).toHaveCount(0);
 });

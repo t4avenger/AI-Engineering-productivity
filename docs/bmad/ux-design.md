@@ -76,7 +76,7 @@ Replace the React/Mantine SPA with a server-rendered local dashboard that helps 
 | `GET /sessions/{id}` | Session detail | Timeline evidence + provenance + delete |
 | `GET /governance` | Governance | Honest transition shell pending findings UI in #151 |
 | `GET /insights` | Insights | Educate on MCP + skills |
-| `GET /integrations` | Integrations | Observed tools + Cursor Enterprise OTEL setup/status |
+| `GET /integrations` | Integrations | Capability matrix + observed tools (last-seen) + Cursor Enterprise OTEL setup/status + Privacy link |
 | `GET /privacy` | Privacy | Defaults + DELETE ALL |
 | `GET /costs` | Costs | Secondary estimates only |
 
@@ -193,11 +193,13 @@ MVP filters: document date/tool/provider as later if API query params are not ye
 
 ### Integrations / Privacy / Costs
 
-- **Integrations:** Cursor Enterprise OpenTelemetry Export setup + honest
-  observed/`unavailable` ingest status from retained `tool=cursor` sessions
-  (`unknown` when storage cannot be read); tools list derived only from
-  retained sessions; else “Awaiting telemetry” with a gateway-aware next-step.
-  Never fabricate “connected”; wrapper/`cursor-agent` is local-dev footnote only.
+- **Integrations:** Headline capability matrix (Codex / Claude Code / Cursor) with
+  honest matrix states; observed tools with last-seen from retained sessions;
+  Cursor Enterprise OpenTelemetry Export setup + honest observed/`unavailable`
+  ingest status from retained `tool=cursor` sessions (`unknown` when storage
+  cannot be read); Privacy link in-page. Empty tools state explains gateway-
+  aware next steps. Never fabricate “connected”; wrapper/`cursor-agent` is
+  local-dev footnote only.
 - **Privacy:** static enforced defaults + typed `DELETE ALL` confirm (must type phrase).
 - **Costs:** aggregate summary and statuses; unknown never shown as `$0`.
 

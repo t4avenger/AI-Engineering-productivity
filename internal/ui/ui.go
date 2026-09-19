@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wayne/telemetryiq/internal/capabilities"
 	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
@@ -201,7 +202,8 @@ func clearAuthCookie(w http.ResponseWriter) {
 
 func availabilityLabel(value string) string {
 	switch value {
-	case "observed", "partial", "unavailable", "unsupported", "unknown":
+	case "observed", "partial", "unavailable", "unsupported", "unknown",
+		string(capabilities.StateSupported), string(capabilities.StateVersionDependent):
 		return value
 	case "":
 		return "unavailable"
@@ -221,6 +223,9 @@ var statusLabels = map[string]string{
 	"unavailable": "Not available from this provider",
 	"unsupported": "Not supported",
 	"unknown":     "Not proven yet",
+	// Capability-matrix states (docs/integrations/capability-matrix.md).
+	string(capabilities.StateSupported):        "Supported",
+	string(capabilities.StateVersionDependent): "Version dependent",
 	// MCP inventory states.
 	"not_observed":         "Not seen in telemetry",
 	"connected_but_unused": "Connected, never invoked",
@@ -261,6 +266,7 @@ var statusLabels = map[string]string{
 var availabilityBadgeClasses = map[string]bool{
 	"observed": true, "partial": true, "unavailable": true,
 	"unsupported": true, "unknown": true,
+	string(capabilities.StateSupported): true, string(capabilities.StateVersionDependent): true,
 	"violation": true, "not_violation": true, "indeterminate": true,
 	"policy_unconfigured": true,
 }

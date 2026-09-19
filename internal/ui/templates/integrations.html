@@ -3,9 +3,58 @@
 {{template "nav" .}}
 <main id="main-content" class="page">
   <h1>Integrations</h1>
-  <p>Tools appear only after local session data has been observed.</p>
+  <p>Observed tools appear after local session data is retained. Capability cells come from the committed multi-provider matrix — never invented parity.</p>
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
   {{with .Content}}
+  <section id="capability-matrix" aria-labelledby="capability-matrix-heading">
+    <h2 id="capability-matrix-heading">Capability matrix</h2>
+    <p class="muted">Headline signals from <code>docs/integrations/capability-matrix.md</code>. States stay honest: supported, partial, unsupported, unknown, or version-dependent.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Capability</th>
+            {{range .Providers}}<th scope="col">{{.}}</th>{{end}}
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Capabilities}}
+          <tr>
+            <th scope="row">{{.Name}}</th>
+            {{range .States}}<td>{{template "status-badge" .}}</td>{{end}}
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section id="tools-observed" aria-labelledby="tools-observed-heading">
+    <h2 id="tools-observed-heading">Tools observed</h2>
+    {{if .Empty}}
+    <p>Awaiting telemetry. Configure Cursor Enterprise export through a protected HTTPS gateway (see <code>docs/integrations/cursor-enterprise-otel.md</code>), or ingest from another supported local tool, then refresh.</p>
+    {{else}}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Tool</th>
+            <th scope="col">Provider</th>
+            <th scope="col">Last seen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Tools}}
+          <tr>
+            <td>{{.Tool}}</td>
+            <td>{{.Provider}}</td>
+            <td>{{if eq .LastSeenState "observed"}}<time datetime="{{.LastSeen}}">{{.LastSeen}}</time>{{else}}{{template "status-badge" .LastSeenState}}{{end}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{end}}
+  </section>
   <section>
     <h2>Cursor Enterprise OpenTelemetry Export</h2>
     <p>Ingest status {{template "status-badge" .CursorEnterprise.Status}}</p>
@@ -16,17 +65,9 @@
     <p>See <code>docs/integrations/cursor-enterprise-otel.md</code> for protected-gateway auth, egress IPs, and honest non-goals. Do not expose the unauthenticated loopback daemon as a public Enterprise destination.</p>
     <p class="muted">Local-dev only: <code>POST /v1/cursor-agent</code> and the stream-json wrapper are not the org/SaaS path. See <code>docs/integrations/cursor-agent-auto-reporting.md</code>.</p>
   </section>
-  <section>
-    <h2>Tools observed</h2>
-    {{if .Empty}}
-    <p>Awaiting telemetry. Configure Cursor Enterprise export through a protected HTTPS gateway (see <code>docs/integrations/cursor-enterprise-otel.md</code>), or ingest from another supported local tool, then refresh.</p>
-    {{else}}
-    <ul>
-      {{range .Tools}}
-      <li>{{.Tool}} ({{.Provider}})</li>
-      {{end}}
-    </ul>
-    {{end}}
+  <section id="integrations-privacy" aria-labelledby="integrations-privacy-heading">
+    <h2 id="integrations-privacy-heading">Privacy</h2>
+    <p>Retention defaults and delete-all live on the <a href="/privacy">Privacy</a> page. Integrations does not upload telemetry.</p>
   </section>
   {{end}}
 </main>

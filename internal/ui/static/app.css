@@ -206,6 +206,8 @@ section { margin: 1.5rem 0; }
 .status::before { font-weight: 700; }
 .status-observed { border-color: var(--color-ok); color: var(--color-ok); }
 .status-observed::before { content: "\25CF"; } /* ● seen */
+.status-supported { border-color: var(--color-ok); color: var(--color-ok); }
+.status-supported::before { content: "\2713"; } /* ✓ supported */
 .status-partial { border-color: var(--color-accent); color: var(--color-accent); }
 .status-partial::before { content: "\25D0"; } /* ◐ partial */
 .status-unavailable { color: var(--color-muted); }
@@ -214,3 +216,5 @@ section { margin: 1.5rem 0; }
 .status-unsupported::before { content: "\2715"; } /* ✕ unsupported */
 .status-unknown { color: var(--color-muted); }
 .status-unknown::before { content: "?"; } /* not proven yet */
+.status-version-dependent { border-color: var(--color-accent); color: var(--color-accent); }
+.status-version-dependent::before { content: "\2699"; } /* ⚙ version-dependent */
