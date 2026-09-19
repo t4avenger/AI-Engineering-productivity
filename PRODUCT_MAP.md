@@ -87,7 +87,11 @@ The initial product must be useful to one developer running locally. The same ar
 The first usable release must run entirely on a developer's machine. Cloud connectivity must not be required.
 
 ### 2.2 Privacy by design
-Prompt text, response text, source code, filenames, and command arguments must not be collected by default.
+In the local-only edition, retain raw provider content at ingest, including prompt
+text, response text, source code, file paths and command arguments (epic #87).
+Visibility policy is downstream of retention. Account identifiers and email
+remain excluded at the wire boundary; diagnostics must be sanitised and sharing
+requires a separate trust-boundary review. Section 11.3 governs older defaults.
 
 ### 2.3 Progressive telemetry
 Users and administrators must be able to select increasing levels of telemetry detail.
@@ -177,7 +181,7 @@ An organisation that needs central deployment, policy enforcement, audit evidenc
 - Multi-tenant SaaS
 - Employee rankings
 - Universal productivity score
-- Prompt or source-code storage by default
+- Cloud or team sharing of raw prompt/source content without a separate trust-boundary review
 - Billing system
 - Mobile application
 - Devin integration (audit-log only; deferred)
@@ -507,6 +511,13 @@ values, including the `unknown` fallback) and carries a `provenance` marker.
 ---
 
 ## 11. Privacy model
+
+**Local-only precedence (epic #87; UI alignment 2026-09-19):** raw capture and
+local visibility in §11.3 supersede the historical opt-in levels/default snippet
+in §§11.1–11.2 wherever they imply ingest-time content dropping. Those sections
+describe the earlier configuration model, not permission to remove observed
+provider fields. This documentation revision does not change a runtime config
+schema. Remaining adapter gaps are tracked in #173 and the capture epics.
 
 ### 11.1 Telemetry levels
 
@@ -922,6 +933,18 @@ claim and its enforcement cannot drift apart silently.
 
 ## 17. Dashboard information architecture
 
+**Accepted UI target (2026-09-19):** primary navigation is **Overview · Sessions ·
+Pull Requests · Models · Governance**, with the dark sidebar and detailed layouts
+in [the source designs](docs/ui/references/README.md). Overview uses the existing
+`/` route (the Home name below remains a historical synonym). Integrations,
+Insights, Privacy and Costs stay reachable through utility navigation; Costs is
+omitted on Overview. Existing URLs remain compatible. Delivery status and issue
+dependencies are in [the UI roadmap](docs/ui/UI_PRODUCT_ROADMAP.md); precise
+interactions, planned interfaces and acceptance tests are in
+[the implementation specification](docs/ui/DESIGN_IMPLEMENTATION_SPEC.md).
+ADR 0003 fixes the visual direction; ADR 0002 still fixes the Go/HTMX stack.
+These are delivery requirements, not claims that the UI has already shipped.
+
 ### 17.1 Home
 - sessions today
 - active integration status
@@ -954,6 +977,14 @@ Session detail:
 - policy decisions
 - data-retention view
 - delete action
+
+The target Session Trace uses a shared time axis for Conversation, Agent,
+Tools & MCP, Files and Spans lanes; a selectable bottom inspector; and a right
+rail for evidence-backed duration breakdown, governance and event legend.
+Retained prompt/response text is shown in local previews and full inspectors.
+Provider omissions/redactions and missing file/span relationships remain explicit;
+planning stages, reasoning, per-file changes and user-wait intervals must not be
+invented. Share is deferred to the separate cloud/team trust-boundary gate.
 
 Cross-tool session rows and detail fields must use the same shared availability
 semantics for Codex and Claude Code: `observed`, `partial`, `unavailable`,
@@ -997,6 +1028,15 @@ MCP servers, skills, or other operations without observed provider evidence.
 - remediation
 - indeterminate checks
 
+Match the reference's header, tabs, summary cards, rule table, expanded path
+editor and preview rail in staged delivery. Local MCP, skill, path and prompt
+rules have validated saves, previews and evidence-backed findings. Local prompt
+matching happens after capture and does not remove raw data or prevent sending.
+Use explicit detect-and-report wording, never an unsupported Enforced/Blocked
+claim. Runtime enforcement/approvals, versioned publishing/audit/rollback/
+exceptions, environments and shared user/repository scope require the roadmap's
+E01–E03 architecture gates and deliberate product revisions before implementation.
+
 ### 17.6 Privacy
 - current telemetry level
 - retained field categories
@@ -1021,6 +1061,21 @@ MCP servers, skills, or other operations without observed provider evidence.
 - storage status
 - parser warnings
 - export sanitised bundle
+
+### 17.8 Pull Requests
+
+`/pull-requests` groups retained fixture-backed PR URLs and linked sessions.
+Show only observed repository/branch/provider facts and explicit unavailable
+states. Do not infer PR links from counters, branch names or timestamps.
+#183/#184 own provider URL evidence. Authenticated GitHub synchronisation is
+optional later work behind E04; no account is required for the local page.
+
+### 17.9 Models
+
+`/models` exposes the existing model-performance insight contract, sample size,
+outcome coverage, retries/errors, token efficiency and latency with evidence
+links. Preserve existing sample thresholds and availability semantics; no new
+ranking formula or lifecycle-derived task-success claim.
 
 ---
 

@@ -12,6 +12,15 @@ from Home because PRODUCT_MAP section 17.1 forbids cost labels and links there.
 The `/insights` route remains directly available during the transition to the
 Home-based insight surface in issue #150.
 
+This paragraph describes the V1 baseline. The accepted successor is Overview,
+Sessions, Pull Requests, Models and Governance in a dark sidebar, with utility
+access to Integrations/Insights/Privacy/Costs (Costs omitted on Overview).
+See [ADR 0003](../decisions/0003-reference-aligned-ui.md), the
+[roadmap](../ui/UI_PRODUCT_ROADMAP.md) and
+[implementation specification](../ui/DESIGN_IMPLEMENTATION_SPEC.md) for planned
+routes, additive projections and reference acceptance. These targets have not
+been implemented by the documentation update.
+
 Browser authentication uses `POST /unlock` with the token from `make auth-token`.
 A successful unlock sets an httpOnly **Secure** session cookie. Use the
 `localhost` hostname (the daemon default) so browsers accept that cookie over
@@ -70,6 +79,12 @@ Prompt Keywords are honest unavailable shells until config schema keys
 allow/block counts and no Publish/Enforce controls. The page makes no
 enforcement claim; the local edition remains detect-and-report only.
 
+The preceding Access Rules shell description reflects #160, whose PR #185
+merged on 2026-09-19 at 13:54:38 UTC (rechecked during this audit).
+The full design remains follow-up work. Follow-up #191 composes the
+reference layout; #192–#194 own real skill/path/prompt schemas and editors.
+Runtime interception, publishing and sharing remain separately gated.
+
 The Insights page reads MCP inventory, skill usage, model-performance, and
 context-pressure summaries from retained canonical events. It renders the raw
 provider-reported MCP server names (the correlation identity — epic #87 removed
@@ -81,11 +96,13 @@ so the retained evidence can be inspected.
 The Costs page reads local calculation summaries, shows calculated estimates
 and cost statuses, and never represents an unknown price as zero.
 
-The Privacy page documents the enforced local-only defaults: no prompt,
-response, or source-code retention by default (configurable capture tracked in
-#94); raw provider-native IDs, file paths, and command lines retained and shown
-(epic #87 — no ingest-time hiding); no sharing; and a default 30-day retention
-period. These values are
-not editable in the dashboard except for the MCP allowlist, which remains
-file-backed and validated by the daemon. Bulk deletion requires typing
-`DELETE ALL`.
+The local-only product contract retains raw observed prompts, responses, source
+content, provider-native IDs, paths and commands (epic #87; #94 content logs).
+Account identifiers/email remain excluded at the wire boundary, diagnostics are
+sanitised, and cloud/team sharing requires a separate field review. Historical
+Privacy-page/default copy claiming all content is disabled must be corrected
+under #188; it is not a reason to hide already retained evidence. JSONL/prior
+adapter gaps remain #173, #104 and #105, not a claim of universal capture.
+The default retention period is 30 days. Bulk deletion requires typing
+`DELETE ALL`. The current MCP allowlist is file-backed and validated by the
+daemon; the new local editors are planned interfaces, not implemented here.
