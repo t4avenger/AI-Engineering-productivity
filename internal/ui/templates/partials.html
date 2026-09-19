@@ -45,6 +45,7 @@
     {{if .Nav}}
     <footer class="app-footer">
       <nav aria-label="Secondary navigation" class="secondary-navigation">
+        <a class="secondary-link{{if eq .Nav "pull-requests"}} active{{end}}" href="/pull-requests" {{if eq .Nav "pull-requests"}}aria-current="page"{{end}}>Pull Requests</a>
         <a class="secondary-link{{if eq .Nav "models"}} active{{end}}" href="/models" {{if eq .Nav "models"}}aria-current="page"{{end}}>Models</a>
         <a class="secondary-link{{if eq .Nav "privacy"}} active{{end}}" href="/privacy" {{if eq .Nav "privacy"}}aria-current="page"{{end}}>Privacy</a>
         {{if ne .Nav "home"}}

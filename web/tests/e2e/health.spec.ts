@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import {
   authToken,
   expectFourTabPrimaryNav,
+  expectSecondaryDestinations,
   unlockDashboard,
 } from './live-ingest-helpers';
 
@@ -66,13 +67,21 @@ test('unlocks and walks the local dashboard journey', async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByText('No retained sessions yet.')).toBeVisible();
 
+  await expectSecondaryDestinations(page);
   const secondaryNavigation = page.getByLabel('Secondary navigation');
-  await expect(secondaryNavigation.getByRole('link')).toHaveText([
-    'Models',
-    'Privacy',
-    'Costs',
-  ]);
   await secondaryNavigation
+    .getByRole('link', { name: 'Pull Requests', exact: true })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Pull Requests' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('No retained HTTP(S) pull-request URLs yet', {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await page
+    .getByLabel('Secondary navigation')
     .getByRole('link', { name: 'Models', exact: true })
     .click();
   await expect(page.getByRole('heading', { name: 'Models' })).toBeVisible();

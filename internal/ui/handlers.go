@@ -176,6 +176,13 @@ type modelsData struct {
 	Error            string
 }
 
+// pullRequestsData is the Pull Requests destination (#187 / N02) over retained
+// session pr_link values — no GitHub API calls.
+type pullRequestsData struct {
+	PullRequests insights.PullRequests
+	Error        string
+}
+
 // governanceData is the server-rendered Governance findings view (#151)
 // plus Access Rules tab shells (#160).
 type governanceData struct {
@@ -557,6 +564,17 @@ func (s *Server) modelsPage(w http.ResponseWriter, r *http.Request) {
 		data.ModelPerformance = insights.ModelPerformanceFromEvents(events)
 	}
 	s.render(w, tmplModels, layoutData{Title: "Models", Nav: "models", Health: s.healthLabel(r), Content: data})
+}
+
+func (s *Server) pullRequestsPage(w http.ResponseWriter, r *http.Request) {
+	data := pullRequestsData{}
+	sessions, err := s.listAllSessions(r, "")
+	if err != nil {
+		data.Error = "Unable to load pull-request evidence."
+	} else {
+		data.PullRequests = insights.PullRequestsFromSessions(sessions, r.URL.Query().Get("q"))
+	}
+	s.render(w, tmplPullRequests, layoutData{Title: "Pull Requests", Nav: "pull-requests", Health: s.healthLabel(r), Content: data})
 }
 
 func (s *Server) governancePage(w http.ResponseWriter, r *http.Request) {

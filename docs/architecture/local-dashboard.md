@@ -2,16 +2,20 @@
 
 The local dashboard is served by the TelemetryIQ daemon using Go `html/template`
 and HTMX (ADR 0002). It provides Home, Sessions, Session Detail, Governance,
-Integrations, Insights, Models, Privacy, and Costs pages over the same loopback origin
-as the JSON API and OTLP intake. It does not send analytics or dashboard data
-to third parties.
+Integrations, Insights, Models, Pull Requests, Privacy, and Costs pages over the
+same loopback origin as the JSON API and OTLP intake. It does not send analytics
+or dashboard data to third parties.
 
-Primary navigation is Home, Sessions, Governance, and Integrations. Models and
-Privacy are available from secondary navigation; Costs is also secondary but is omitted
-from Home because PRODUCT_MAP section 17.1 forbids cost labels and links there.
-The `/models` destination (#186) reuses the existing model-performance insight
-reader and sample-size ranking guard. The `/insights` route remains directly
-available during the transition to the Home-based insight surface in issue #150.
+Primary navigation is Home, Sessions, Governance, and Integrations. Models, Pull
+Requests, and Privacy are available from secondary navigation; Costs is also
+secondary but is omitted from Home because PRODUCT_MAP section 17.1 forbids cost
+labels and links there. The `/models` destination (#186) reuses the existing
+model-performance insight reader and sample-size ranking guard. The
+`/pull-requests` destination (#187 / N02) groups retained session `pr_link`
+HTTP(S) URLs and linked sessions; it does not call GitHub and does not invent
+PR rows from counters or branch/time. Provider URL capture proof remains #183
+and #184. The `/insights` route remains directly available during the transition
+to the Home-based insight surface in issue #150.
 
 This paragraph describes the V1 baseline. The accepted successor is Overview,
 Sessions, Pull Requests, Models and Governance in a dark sidebar, with utility

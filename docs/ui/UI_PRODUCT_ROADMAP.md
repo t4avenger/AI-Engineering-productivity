@@ -61,7 +61,10 @@ Status verified against GitHub on 2026-09-19; recheck before starting work.
 - [#186](https://github.com/t4avenger/AI-Engineering-productivity/issues/186) Models
   destination is delivered as secondary navigation over the existing
   model-performance reader; five-destination primary shell remains [#161](https://github.com/t4avenger/AI-Engineering-productivity/issues/161).
-- No Pull Requests primary page, full trace, matching dark shell, local
+- [#187](https://github.com/t4avenger/AI-Engineering-productivity/issues/187) Pull
+  Requests destination is delivered as secondary navigation over retained
+  `pr_link` HTTP(S) evidence (empty/unavailable until #183/#184 prove provider URLs).
+- No five-destination dark primary shell, full Session Trace, matching local
   skill/path/prompt editors or enterprise controls are declared delivered here.
 
 ## 4. Delivery order and ownership
@@ -121,10 +124,10 @@ Finishing local visual work cannot close these requirements.
 
 ## 6. Next smallest task
 
-Implement [#187](https://github.com/t4avenger/AI-Engineering-productivity/issues/187)
-(Pull Requests destination) with an honest empty/unavailable state now; populated
-provider claims wait on #183/#184. In parallel only when explicitly assigned,
-#156/#157 can establish trace evidence contracts.
+Implement [#161](https://github.com/t4avenger/AI-Engineering-productivity/issues/161)
+(required dark sidebar shell and five-destination primary navigation) now that
+`/models` and `/pull-requests` routes exist. In parallel only when explicitly
+assigned, #156/#157 can establish trace evidence contracts.
 
 This documentation update changes no runtime APIs or schemas. Planned additive
 interfaces are specified in the implementation specification and owned by the

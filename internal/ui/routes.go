@@ -73,6 +73,7 @@ var protectedRoutes = []route{
 	{match: prefix(http.MethodGet, pathSessionsPrefix), handle: (*Server).sessionDetail},
 	{match: exact(http.MethodGet, pathInsights), handle: (*Server).insightsPage},
 	{match: exact(http.MethodGet, pathModels), handle: (*Server).modelsPage},
+	{match: exact(http.MethodGet, pathPullRequests), handle: (*Server).pullRequestsPage},
 	{match: exact(http.MethodGet, pathGovernance), handle: (*Server).governancePage},
 	{match: exact(http.MethodPost, pathMCPAllowlist), handle: (*Server).governanceMCPAllowlistSave},
 	{match: exact(http.MethodGet, pathIntegrations), handle: (*Server).integrationsPage},
@@ -99,7 +100,7 @@ func prefixSuffix(method, prefixPath, suffix string) func(string, string) bool {
 
 func (s *Server) isDashboardPath(path string) bool {
 	switch path {
-	case pathHome, pathSessions, pathInsights, pathModels, pathGovernance, pathMCPAllowlist, pathIntegrations, pathPrivacy, pathPrivacyDelete, pathCosts:
+	case pathHome, pathSessions, pathInsights, pathModels, pathPullRequests, pathGovernance, pathMCPAllowlist, pathIntegrations, pathPrivacy, pathPrivacyDelete, pathCosts:
 		return true
 	}
 	return strings.HasPrefix(path, pathSessionsPrefix) || strings.HasPrefix(path, pathEventsPrefix)
