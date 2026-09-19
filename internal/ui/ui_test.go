@@ -128,6 +128,32 @@ func unlock(t *testing.T, handler http.Handler) *http.Cookie {
 	return cookies[0]
 }
 
+func wrapUI(t *testing.T, repo storage.SessionReader) http.Handler {
+	t.Helper()
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return server.Wrap(http.NotFoundHandler())
+}
+
+func assertUnlockGate(t *testing.T, handler http.Handler, path string) *http.Cookie {
+	t.Helper()
+	unauth := httptest.NewRequest(http.MethodGet, path, nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, unauth)
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/unlock" {
+		t.Fatalf("unauthenticated %s = %d %s", path, rec.Code, rec.Header().Get("Location"))
+	}
+	return unlock(t, handler)
+}
+
+func authedPageBody(t *testing.T, repo storage.SessionReader, path string) string {
+	t.Helper()
+	handler := wrapUI(t, repo)
+	return getAuthed(t, handler, unlock(t, handler), path).Body.String()
+}
+
 func getAuthed(t *testing.T, handler http.Handler, cookie *http.Cookie, path string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -1285,20 +1311,8 @@ func TestModelsPageRendersScorecardAndUnlockGate(t *testing.T) {
 			}},
 		},
 	}
-	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	handler := server.Wrap(http.NotFoundHandler())
-
-	unauth := httptest.NewRequest(http.MethodGet, "/models", nil)
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, unauth)
-	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/unlock" {
-		t.Fatalf("unauthenticated /models = %d %s", rec.Code, rec.Header().Get("Location"))
-	}
-
-	cookie := unlock(t, handler)
+	handler := wrapUI(t, repo)
+	cookie := assertUnlockGate(t, handler, "/models")
 	body := getAuthed(t, handler, cookie, "/models").Body.String()
 	assertContainsAll(t, body, []string{
 		"<h1>Models</h1>",
@@ -1314,12 +1328,7 @@ func TestModelsPageRendersScorecardAndUnlockGate(t *testing.T) {
 	assertPrimaryNavigation(t, body)
 	assertSecondaryNavigation(t, body, true)
 
-	emptyServer, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	emptyHandler := emptyServer.Wrap(http.NotFoundHandler())
-	emptyBody := getAuthed(t, emptyHandler, unlock(t, emptyHandler), "/models").Body.String()
+	emptyBody := authedPageBody(t, &fullStub{}, "/models")
 	if !strings.Contains(emptyBody, "No outcome-contract rows yet") {
 		t.Fatalf("empty models page missing unavailable copy: %q", emptyBody)
 	}
@@ -1327,66 +1336,22 @@ func TestModelsPageRendersScorecardAndUnlockGate(t *testing.T) {
 
 func TestPullRequestsPageRendersGroupsAndUnlockGate(t *testing.T) {
 	now := time.Now().UTC()
-	repo := &fullStub{
-		sessions: []canonical.Session{
-			{
-				SessionID: "pr-session-a",
-				Provider:  "anthropic",
-				Tool:      "claude-code",
-				State:     "completed",
-				StartedAt: now,
-				Attributes: map[string]any{
-					"pr_link":    "https://github.com/org/repo/pull/12",
-					"git_branch": "feature/pr-12",
-					"repository": "org/repo",
-				},
-			},
-			{
-				SessionID: "pr-session-b",
-				Provider:  "openai",
-				Tool:      "codex",
-				State:     "completed",
-				StartedAt: now,
-				Attributes: map[string]any{
-					"pr_link": "https://github.com/org/repo/pull/12",
-				},
-			},
-			{
-				SessionID: "unsafe-session",
-				Provider:  "openai",
-				Tool:      "codex",
-				State:     "completed",
-				StartedAt: now,
-				Attributes: map[string]any{
-					"pr_link": "javascript:alert(1)",
-				},
-			},
-			{
-				SessionID: "branch-only",
-				Provider:  "openai",
-				Tool:      "codex",
-				State:     "completed",
-				StartedAt: now,
-				Attributes: map[string]any{
-					"git_branch": "feature/no-url",
-				},
-			},
-		},
-	}
-	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	handler := server.Wrap(http.NotFoundHandler())
-
-	unauth := httptest.NewRequest(http.MethodGet, "/pull-requests", nil)
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, unauth)
-	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/unlock" {
-		t.Fatalf("unauthenticated /pull-requests = %d %s", rec.Code, rec.Header().Get("Location"))
-	}
-
-	cookie := unlock(t, handler)
+	repo := &fullStub{sessions: []canonical.Session{
+		completedSession("pr-session-a", "anthropic", "claude-code", now, map[string]any{
+			"pr_link": "https://github.com/org/repo/pull/12", "git_branch": "feature/pr-12", "repository": "org/repo",
+		}),
+		completedSession("pr-session-b", "openai", "codex", now, map[string]any{
+			"pr_link": "https://github.com/org/repo/pull/12",
+		}),
+		completedSession("unsafe-session", "openai", "codex", now, map[string]any{
+			"pr_link": "javascript:alert(1)",
+		}),
+		completedSession("branch-only", "openai", "codex", now, map[string]any{
+			"git_branch": "feature/no-url",
+		}),
+	}}
+	handler := wrapUI(t, repo)
+	cookie := assertUnlockGate(t, handler, "/pull-requests")
 	body := getAuthed(t, handler, cookie, "/pull-requests").Body.String()
 	assertContainsAll(t, body, []string{
 		"<h1>Pull Requests</h1>",
@@ -1414,25 +1379,24 @@ func TestPullRequestsPageRendersGroupsAndUnlockGate(t *testing.T) {
 	if !strings.Contains(filtered, "No retained HTTP(S) pull-request URLs yet") {
 		t.Fatalf("filtered empty state missing copy: %q", filtered)
 	}
-
-	emptyServer, err := ui.New("test-token", &fullStub{}, defaultContextWasteThresholds, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	emptyHandler := emptyServer.Wrap(http.NotFoundHandler())
-	emptyBody := getAuthed(t, emptyHandler, unlock(t, emptyHandler), "/pull-requests").Body.String()
+	emptyBody := authedPageBody(t, &fullStub{}, "/pull-requests")
 	if !strings.Contains(emptyBody, "No retained HTTP(S) pull-request URLs yet") {
 		t.Fatalf("empty pull-requests page missing unavailable copy: %q", emptyBody)
 	}
-
-	errServer, err := ui.New("test-token", errStub{}, defaultContextWasteThresholds, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	errHandler := errServer.Wrap(http.NotFoundHandler())
-	errBody := getAuthed(t, errHandler, unlock(t, errHandler), "/pull-requests").Body.String()
+	errBody := authedPageBody(t, errStub{}, "/pull-requests")
 	if !strings.Contains(errBody, "Unable to load pull-request evidence.") {
 		t.Fatalf("reader error missing alert: %q", errBody)
+	}
+}
+
+func completedSession(id, provider, tool string, started time.Time, attrs map[string]any) canonical.Session {
+	return canonical.Session{
+		SessionID:  id,
+		Provider:   provider,
+		Tool:       tool,
+		State:      "completed",
+		StartedAt:  started,
+		Attributes: attrs,
 	}
 }
 

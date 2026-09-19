@@ -30,21 +30,17 @@ export async function expectFourTabPrimaryNav(page: Page): Promise<void> {
     'Governance',
     'Integrations',
   ]);
-  await expect(
-    primaryNavigation.getByRole('link', { name: 'Insights', exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    primaryNavigation.getByRole('link', { name: 'Privacy', exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    primaryNavigation.getByRole('link', { name: 'Costs', exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    primaryNavigation.getByRole('link', { name: 'Models', exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    primaryNavigation.getByRole('link', { name: 'Pull Requests', exact: true }),
-  ).toHaveCount(0);
+  for (const name of [
+    'Insights',
+    'Privacy',
+    'Costs',
+    'Models',
+    'Pull Requests',
+  ]) {
+    await expect(
+      primaryNavigation.getByRole('link', { name, exact: true }),
+    ).toHaveCount(0);
+  }
 }
 
 /** Secondary destinations before #161 primary shell (#186 Models, #187 PRs). */

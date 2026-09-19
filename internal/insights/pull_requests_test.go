@@ -10,83 +10,32 @@ import (
 
 func TestPullRequestsFromSessionsGroupsSafeURLsOnly(t *testing.T) {
 	now := time.Now().UTC()
-	sessions := []canonical.Session{
-		{
-			SessionID: "s-https",
-			Provider:  "anthropic",
-			Tool:      "claude-code",
-			StartedAt: now,
-			Attributes: map[string]any{
-				"pr_link":            "https://github.com/org/repo/pull/12",
-				"git_branch":         "feature/pr-12",
-				"repository":         "org/repo",
-				"pull_request.count": 3, // must never invent a URL
-			},
-		},
-		{
-			SessionID: "s-dup",
-			Provider:  "anthropic",
-			Tool:      "claude-code",
-			StartedAt: now,
-			Attributes: map[string]any{
-				"pr_link":    "https://github.com/org/repo/pull/12",
-				"git_branch": "feature/pr-12",
-			},
-		},
-		{
-			SessionID: "s-dup", // same session id must not double-count
-			Provider:  "anthropic",
-			Tool:      "claude-code",
-			StartedAt: now,
-			Attributes: map[string]any{
-				"pr_link": "https://github.com/org/repo/pull/12",
-			},
-		},
-		{
-			SessionID: "s-http",
-			Provider:  "openai",
-			Tool:      "codex",
-			StartedAt: now,
-			Attributes: map[string]any{
-				"pr_link": "http://example.test/pulls/1",
-			},
-		},
-		{
-			SessionID: "s-branch-only",
-			Provider:  "openai",
-			Tool:      "codex",
-			StartedAt: now,
-			Attributes: map[string]any{
-				"git_branch": "same-time-branch",
-			},
-		},
-		{
-			SessionID: "s-js",
-			Provider:  "openai",
-			Tool:      "codex",
-			StartedAt: now,
-			Attributes: map[string]any{
-				"pr_link": "javascript:alert(1)",
-			},
-		},
-		{
-			SessionID: "s-data",
-			Provider:  "openai",
-			Tool:      "codex",
-			StartedAt: now,
-			Attributes: map[string]any{
-				"pr_link": "data:text/html,hi",
-			},
-		},
-		{
-			SessionID: "s-long",
-			Provider:  "openai",
-			Tool:      "codex",
-			StartedAt: now,
-			Attributes: map[string]any{
-				"pr_link": "https://github.com/org/repo/pull/99?utm=" + strings.Repeat("a", 200),
-			},
-		},
+	sessions := make([]canonical.Session, 0, 8)
+	for _, tc := range []struct {
+		id, provider, tool string
+		attrs              map[string]any
+	}{
+		{"s-https", "anthropic", "claude-code", map[string]any{
+			"pr_link": "https://github.com/org/repo/pull/12", "git_branch": "feature/pr-12",
+			"repository": "org/repo", "pull_request.count": 3,
+		}},
+		{"s-dup", "anthropic", "claude-code", map[string]any{
+			"pr_link": "https://github.com/org/repo/pull/12", "git_branch": "feature/pr-12",
+		}},
+		{"s-dup", "anthropic", "claude-code", map[string]any{
+			"pr_link": "https://github.com/org/repo/pull/12",
+		}},
+		{"s-http", "openai", "codex", map[string]any{"pr_link": "http://example.test/pulls/1"}},
+		{"s-branch-only", "openai", "codex", map[string]any{"git_branch": "same-time-branch"}},
+		{"s-js", "openai", "codex", map[string]any{"pr_link": "javascript:alert(1)"}},
+		{"s-data", "openai", "codex", map[string]any{"pr_link": "data:text/html,hi"}},
+		{"s-long", "openai", "codex", map[string]any{
+			"pr_link": "https://github.com/org/repo/pull/99?utm=" + strings.Repeat("a", 200),
+		}},
+	} {
+		sessions = append(sessions, canonical.Session{
+			SessionID: tc.id, Provider: tc.provider, Tool: tc.tool, StartedAt: now, Attributes: tc.attrs,
+		})
 	}
 
 	got := PullRequestsFromSessions(sessions, "")
@@ -106,11 +55,10 @@ func TestPullRequestsFromSessionsGroupsSafeURLsOnly(t *testing.T) {
 	if httpsGroup.Sessions[0].Repository != "org/repo" || httpsGroup.Sessions[0].Branch != "feature/pr-12" {
 		t.Fatalf("https first session metadata = %#v", httpsGroup.Sessions[0])
 	}
-	if _, ok := byURL["javascript:alert(1)"]; ok {
-		t.Fatal("javascript URL must not become a group")
-	}
-	if _, ok := byURL["data:text/html,hi"]; ok {
-		t.Fatal("data URL must not become a group")
+	for _, bad := range []string{"javascript:alert(1)", "data:text/html,hi"} {
+		if _, ok := byURL[bad]; ok {
+			t.Fatalf("%q must not become a group", bad)
+		}
 	}
 	for _, group := range got.Groups {
 		if strings.Contains(group.URL, "pull_request") {
@@ -121,25 +69,12 @@ func TestPullRequestsFromSessionsGroupsSafeURLsOnly(t *testing.T) {
 
 func TestPullRequestsFromSessionsSearchAndEmpty(t *testing.T) {
 	sessions := []canonical.Session{
-		{
-			SessionID: "a",
-			Provider:  "anthropic",
-			Tool:      "claude-code",
-			Attributes: map[string]any{
-				"pr_link":    "https://github.com/acme/one/pull/1",
-				"git_branch": "feat/one",
-				"repository": "acme/one",
-			},
-		},
-		{
-			SessionID: "b",
-			Provider:  "openai",
-			Tool:      "codex",
-			Attributes: map[string]any{
-				"pr_link":    "https://github.com/acme/two/pull/2",
-				"git_branch": "feat/two",
-			},
-		},
+		{SessionID: "a", Provider: "anthropic", Tool: "claude-code", Attributes: map[string]any{
+			"pr_link": "https://github.com/acme/one/pull/1", "git_branch": "feat/one", "repository": "acme/one",
+		}},
+		{SessionID: "b", Provider: "openai", Tool: "codex", Attributes: map[string]any{
+			"pr_link": "https://github.com/acme/two/pull/2", "git_branch": "feat/two",
+		}},
 	}
 
 	cases := []struct {
