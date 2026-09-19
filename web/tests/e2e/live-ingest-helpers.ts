@@ -287,28 +287,13 @@ export function codexCachedReasoningOTLPLogs(): string {
 }
 
 export function codexToolResultOTLPLogs(): string {
-  return codexExecOTLPLog(
-    [
-      { key: 'event.name', value: { stringValue: 'codex.tool_result' } },
-      {
-        key: 'conversation.id',
-        value: { stringValue: 'tiq-live-e2e-operation-codex' },
-      },
-      { key: 'tool_name', value: { stringValue: 'exec_command' } },
-      { key: 'tool_namespace', value: { stringValue: 'functions' } },
-      {
-        key: 'call_id',
-        value: { stringValue: 'tiq-live-e2e-operation-call' },
-      },
-      { key: 'duration_ms', value: { stringValue: '92' } },
-      { key: 'success', value: { stringValue: 'true' } },
-      {
-        key: 'arguments',
-        value: { stringValue: '--token=tiq-canary-live-operation' },
-      },
-    ],
-    'tiq-canary-live-operation-body',
-  );
+  return codexToolResultOTLPLog({
+    conversationId: 'tiq-live-e2e-operation-codex',
+    toolName: 'exec_command',
+    callId: 'tiq-live-e2e-operation-call',
+    durationMs: '92',
+    canary: 'tiq-canary-live-operation',
+  });
 }
 
 export function claudeToolResultOTLPLogs(): string {
@@ -425,27 +410,40 @@ export function claudeToolSpanFilePathOTLPTraces(): string {
 
 // Codex apply_patch tool_result proves filesystem write category without a path.
 export function codexFilesystemWriteOTLPLogs(): string {
+  return codexToolResultOTLPLog({
+    conversationId: 'tiq-live-e2e-session-files-codex',
+    toolName: 'apply_patch',
+    callId: 'tiq-live-e2e-session-files-write',
+    durationMs: '40',
+    canary: 'tiq-canary-live-session-files',
+  });
+}
+
+function codexToolResultOTLPLog(opts: {
+  conversationId: string;
+  toolName: string;
+  callId: string;
+  durationMs: string;
+  canary: string;
+}): string {
   return codexExecOTLPLog(
     [
       { key: 'event.name', value: { stringValue: 'codex.tool_result' } },
       {
         key: 'conversation.id',
-        value: { stringValue: 'tiq-live-e2e-session-files-codex' },
+        value: { stringValue: opts.conversationId },
       },
-      { key: 'tool_name', value: { stringValue: 'apply_patch' } },
+      { key: 'tool_name', value: { stringValue: opts.toolName } },
       { key: 'tool_namespace', value: { stringValue: 'functions' } },
-      {
-        key: 'call_id',
-        value: { stringValue: 'tiq-live-e2e-session-files-write' },
-      },
-      { key: 'duration_ms', value: { stringValue: '40' } },
+      { key: 'call_id', value: { stringValue: opts.callId } },
+      { key: 'duration_ms', value: { stringValue: opts.durationMs } },
       { key: 'success', value: { stringValue: 'true' } },
       {
         key: 'arguments',
-        value: { stringValue: '--token=tiq-canary-live-session-files' },
+        value: { stringValue: `--token=${opts.canary}` },
       },
     ],
-    'tiq-canary-live-session-files-body',
+    `${opts.canary}-body`,
   );
 }
 

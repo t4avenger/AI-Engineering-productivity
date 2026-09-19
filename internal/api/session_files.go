@@ -1,8 +1,6 @@
 package api
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"net/http"
 
 	"github.com/wayne/telemetryiq/internal/insights"
@@ -15,27 +13,9 @@ type fileListResponse struct {
 	Pagination eventPagination             `json:"pagination"`
 }
 
-type fileCursor struct {
-	OccurredAt string `json:"occurred_at"`
-	EventID    string `json:"event_id"`
-}
-
 func (a sessionAPI) files(w http.ResponseWriter, r *http.Request) {
-	if a.sessions == nil || a.eventReader == nil {
-		writeSessionError(w, http.StatusServiceUnavailable, "sessions_unavailable", sessionUnavailable)
-		return
-	}
-	id := r.PathValue("id")
-	if _, found, err := a.sessions.Session(r.Context(), id); err != nil {
-		writeSessionError(w, http.StatusInternalServerError, "session_query_failed", "unable to query session")
-		return
-	} else if !found {
-		writeSessionError(w, http.StatusNotFound, "session_not_found", sessionNotFound)
-		return
-	}
-	limit, cursor, err := parseEventListQuery(r)
-	if err != nil {
-		writeSessionError(w, http.StatusBadRequest, "invalid_query", err.Error())
+	id, limit, cursor, ok := a.requireSessionSubresource(w, r)
+	if !ok {
 		return
 	}
 	events, err := a.insightSessionEvents(r, id)
@@ -59,9 +39,7 @@ func (a sessionAPI) files(w http.ResponseWriter, r *http.Request) {
 	page, last := insights.PageSessionFiles(entries, limit, cursorOccurredAt, cursorEventID)
 	var next *string
 	if last != nil {
-		payload, _ := json.Marshal(fileCursor{OccurredAt: last.OccurredAt, EventID: last.EventID})
-		encoded := base64.RawURLEncoding.EncodeToString(payload)
-		next = &encoded
+		next = encodeEventCursor(last.OccurredAt, last.EventID)
 	}
 	writeSessionJSON(w, http.StatusOK, fileListResponse{
 		Data:       page,

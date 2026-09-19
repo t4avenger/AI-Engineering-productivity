@@ -58,21 +58,8 @@ type eventCursor struct {
 }
 
 func (a sessionAPI) events(w http.ResponseWriter, r *http.Request) {
-	if a.sessions == nil || a.eventReader == nil {
-		writeSessionError(w, http.StatusServiceUnavailable, "sessions_unavailable", sessionUnavailable)
-		return
-	}
-	id := r.PathValue("id")
-	if _, found, err := a.sessions.Session(r.Context(), id); err != nil {
-		writeSessionError(w, http.StatusInternalServerError, "session_query_failed", "unable to query session")
-		return
-	} else if !found {
-		writeSessionError(w, http.StatusNotFound, "session_not_found", sessionNotFound)
-		return
-	}
-	limit, cursor, err := parseEventListQuery(r)
-	if err != nil {
-		writeSessionError(w, http.StatusBadRequest, "invalid_query", err.Error())
+	id, limit, cursor, ok := a.requireSessionSubresource(w, r)
+	if !ok {
 		return
 	}
 	events, err := a.eventReader.ListEvents(r.Context(), storage.EventFilter{SessionID: id, Cursor: storageEventCursor(cursor), Limit: limit})
@@ -86,6 +73,29 @@ func (a sessionAPI) events(w http.ResponseWriter, r *http.Request) {
 		response.Data[index] = publicTimelineEvent(event)
 	}
 	writeSessionJSON(w, http.StatusOK, response)
+}
+
+// requireSessionSubresource authenticates session existence and list query params
+// for cursor-paged session sub-resources (/events, /files).
+func (a sessionAPI) requireSessionSubresource(w http.ResponseWriter, r *http.Request) (string, int, *eventCursor, bool) {
+	if a.sessions == nil || a.eventReader == nil {
+		writeSessionError(w, http.StatusServiceUnavailable, "sessions_unavailable", sessionUnavailable)
+		return "", 0, nil, false
+	}
+	id := r.PathValue("id")
+	if _, found, err := a.sessions.Session(r.Context(), id); err != nil {
+		writeSessionError(w, http.StatusInternalServerError, "session_query_failed", "unable to query session")
+		return "", 0, nil, false
+	} else if !found {
+		writeSessionError(w, http.StatusNotFound, "session_not_found", sessionNotFound)
+		return "", 0, nil, false
+	}
+	limit, cursor, err := parseEventListQuery(r)
+	if err != nil {
+		writeSessionError(w, http.StatusBadRequest, "invalid_query", err.Error())
+		return "", 0, nil, false
+	}
+	return id, limit, cursor, true
 }
 
 func parseEventListQuery(r *http.Request) (int, *eventCursor, error) {
@@ -125,9 +135,13 @@ func eventPage(events []canonical.Event, limit int) ([]canonical.Event, *string)
 	}
 	page := events[:limit]
 	last := page[len(page)-1]
-	data, _ := json.Marshal(eventCursor{OccurredAt: last.OccurredAt.UTC().Format(time.RFC3339Nano), EventID: last.EventID})
+	return page, encodeEventCursor(last.OccurredAt.UTC().Format(time.RFC3339Nano), last.EventID)
+}
+
+func encodeEventCursor(occurredAt, eventID string) *string {
+	data, _ := json.Marshal(eventCursor{OccurredAt: occurredAt, EventID: eventID})
 	cursor := base64.RawURLEncoding.EncodeToString(data)
-	return page, &cursor
+	return &cursor
 }
 
 func publicTimelineEvent(event canonical.Event) timelineEvent {
