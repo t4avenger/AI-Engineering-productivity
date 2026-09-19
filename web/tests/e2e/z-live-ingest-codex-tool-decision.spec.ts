@@ -39,7 +39,7 @@ test('renders a Codex tool decision ingested through the live daemon', async ({
   await unlockDashboard(page, authToken);
   await page.goto('/sessions/codex:tiq-live-e2e-decision-session');
   await expect(page.getByText('Approval')).toBeVisible();
-  await expect(page.getByText('approved')).toBeVisible();
+  await expect(page.getByText('approved', { exact: true })).toBeVisible();
   await expect(page.getByText('policy')).toBeVisible();
   await expect(page.getByText('functions/exec_command')).toBeVisible();
   await expect(page.getByText('tiq-canary-live-decision')).toHaveCount(0);

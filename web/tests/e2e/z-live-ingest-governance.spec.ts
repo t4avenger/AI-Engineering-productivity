@@ -52,6 +52,22 @@ test('renders risky-access findings after live OTLP ingest', async ({
   await expect(
     page.getByText('does not enforce or publish', { exact: false }),
   ).toBeVisible();
+
+  await page.goto('/sessions/claude-code:tiq-live-e2e-governance-session');
+  await expect(
+    page.getByRole('heading', { name: 'Governance checklist' }),
+  ).toBeVisible();
+  const riskyAccess = page
+    .getByRole('listitem')
+    .filter({ hasText: 'Risky access' });
+  await expect(riskyAccess.getByText('Violation')).toBeVisible();
+  await expect(riskyAccess.getByText('Seen in telemetry')).toBeVisible();
+  await expect(riskyAccess.getByText('2 findings')).toBeVisible();
+  const unapprovedMCP = page
+    .getByRole('listitem')
+    .filter({ hasText: 'Unapproved MCP' });
+  await expect(unapprovedMCP.getByText('Indeterminate')).toBeVisible();
+  await expect(unapprovedMCP.getByText('Allowlist not configured')).toBeVisible();
 });
 
 test('saves an observed MCP server and reloads findings without mocks', async ({

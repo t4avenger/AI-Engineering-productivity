@@ -30,6 +30,26 @@
     <p>No availability map on this session.</p>
     {{end}}
   </section>
+  <section aria-labelledby="session-governance-heading">
+    <h2 id="session-governance-heading">Governance checklist</h2>
+    <p class="muted">Session-scoped detect-and-report checks over all retained events. Missing evidence remains indeterminate.</p>
+    {{if .GovernanceError}}<p class="error" role="alert">{{.GovernanceError}}</p>{{end}}
+    <ul class="availability-list">
+      <li>
+        <strong>Risky access</strong>
+        Status {{template "status-badge" (printf "%s" .RiskyAccess.Outcome)}}
+        Visibility {{template "status-badge" .RiskyAccess.Visibility}}
+        <span>{{len .RiskyAccess.Findings}} {{if eq (len .RiskyAccess.Findings) 1}}finding{{else}}findings{{end}}</span>
+      </li>
+      <li>
+        <strong>Unapproved MCP</strong>
+        Status {{template "status-badge" (printf "%s" .UnapprovedMCP.Outcome)}}
+        Visibility {{template "status-badge" .UnapprovedMCP.Visibility}}
+        <span>{{len .UnapprovedMCP.Findings}} {{if eq (len .UnapprovedMCP.Findings) 1}}finding{{else}}findings{{end}}</span>
+      </li>
+    </ul>
+    <p><a href="/governance">View governance evidence and MCP allowlist</a></p>
+  </section>
   <section>
     <h2>Timeline</h2>
     {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}

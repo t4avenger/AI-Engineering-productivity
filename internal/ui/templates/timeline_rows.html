@@ -21,6 +21,18 @@
     {{if .Entrypoint}}<div><dt>Entrypoint</dt><dd>{{.Entrypoint}}</dd></div>{{end}}
     {{end}}
   </dl>
+  {{if .HasOperation}}
+  <section class="timeline-operation" aria-label="Operation details">
+    <h4>Operation details</h4>
+    <dl class="timeline-facts">
+      <div><dt>Operation ID</dt><dd><code>{{.OperationID}}</code></dd></div>
+      <div><dt>Category</dt><dd>{{if .OperationCategory.Observed}}{{.OperationCategory.Text}}{{else}}{{template "status-badge" .OperationCategory.Machine}}{{end}}</dd></div>
+      <div><dt>Tool</dt><dd>{{if .OperationTool.Observed}}{{.OperationTool.Text}}{{else}}{{template "status-badge" .OperationTool.Machine}}{{end}}</dd></div>
+      <div><dt>Duration</dt><dd>{{if .OperationDuration.Observed}}{{.OperationDuration.Text}}{{else}}{{template "status-badge" .OperationDuration.Machine}}{{end}}</dd></div>
+      <div><dt>Outcome</dt><dd>{{if .OperationOutcome.Observed}}{{template "status-badge" .OperationOutcome.Text}}{{else}}{{template "status-badge" .OperationOutcome.Machine}}{{end}}</dd></div>
+    </dl>
+  </section>
+  {{end}}
   {{if .UnavailableFields}}
   <p class="muted">Unavailable: {{range $i, $f := .UnavailableFields}}{{if $i}}, {{end}}{{$f}}{{end}}</p>
   {{end}}
