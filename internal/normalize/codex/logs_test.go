@@ -186,6 +186,32 @@ func TestNormalizeLogsMapsCodexToolResultSignal(t *testing.T) {
 	}
 }
 
+func TestNormalizeLogsRetainsToolEvidenceAndFindsProviderNeutralPRLinks(t *testing.T) {
+	data := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.tool_result"}},{"key":"conversation.id","value":{"stringValue":"pr-link-session"}},{"key":"arguments","value":{"stringValue":"gh pr view https://github.com/example/repository/pull/184"}},{"key":"output","value":{"stringValue":"https://gitlab.example.test/group/project/-/merge_requests/12"}}]}]}]}]}`)
+	events, err := NormalizeLogs(data, time.Date(2026, 9, 19, 20, 0, 0, 0, time.UTC))
+	if err != nil || len(events) != 1 {
+		t.Fatalf("events = %#v, %v", events, err)
+	}
+	event := events[0]
+	if got := event.ProviderExtensions["log_attributes"].(map[string]any)["arguments"]; got != "gh pr view https://github.com/example/repository/pull/184" {
+		t.Fatalf("arguments = %#v", got)
+	}
+	if got := event.ProviderExtensions["log_attributes"].(map[string]any)["output"]; got != "https://gitlab.example.test/group/project/-/merge_requests/12" {
+		t.Fatalf("output = %#v", got)
+	}
+	if got := event.Attributes["pr_link_candidates"]; !slices.Equal(got.([]string), []string{"https://github.com/example/repository/pull/184", "https://gitlab.example.test/group/project/-/merge_requests/12"}) {
+		t.Fatalf("pr candidates = %#v", got)
+	}
+}
+
+func TestPRLinkURLsAcceptsSupportedHostsAndRejectsNonPRURLs(t *testing.T) {
+	got := prLinkURLs("https://bitbucket.org/workspace/repo/pull-requests/5 https://dev.azure.com/org/project/_git/repo/pullrequest/9 https://example.test/docs/pull/10 https://example.test/issues/10")
+	want := []string{"https://bitbucket.org/workspace/repo/pull-requests/5", "https://dev.azure.com/org/project/_git/repo/pullrequest/9", "https://example.test/docs/pull/10"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("urls = %#v, want %#v", got, want)
+	}
+}
+
 func TestNormalizeLogsMapsCodexToolDecisionSignal(t *testing.T) {
 	data := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.version","value":{"stringValue":"0.153.4"}},{"key":"host.name","value":{"stringValue":"decision-host.example.test"}},{"key":"user.account_id","value":{"stringValue":"decision-account-123"}},{"key":"authorization","value":{"stringValue":"Bearer tiq-canary-decision-resource-token"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.tool_decision"}},{"key":"conversation.id","value":{"stringValue":"decision-session"}},{"key":"call_id","value":{"stringValue":"decision-call-approved"}},{"key":"decision","value":{"stringValue":"allow"}},{"key":"source","value":{"stringValue":"policy"}},{"key":"tool_name","value":{"stringValue":"exec_command"}},{"key":"tool_namespace","value":{"stringValue":"functions"}},{"key":"model","value":{"stringValue":"gpt-6-astra"}},{"key":"slug","value":{"stringValue":"tiq-canary-decision-slug"}},{"key":"authorization","value":{"stringValue":"Bearer tiq-canary-decision-token"}},{"key":"command","value":{"stringValue":"tiq-canary-decision-command"}},{"key":"command_args","value":{"stringValue":"tiq-canary-decision-command-args"}},{"key":"command_line","value":{"stringValue":"tiq-canary-decision-command-line"}},{"key":"cwd","value":{"stringValue":"/tmp/tiq-canary-decision-cwd"}},{"key":"path","value":{"stringValue":"/tmp/tiq-canary-decision-path"}},{"key":"file_path","value":{"stringValue":"/tmp/tiq-canary-decision-file-path"}},{"key":"arguments","value":{"stringValue":"--token=tiq-canary-decision-argument"}},{"key":"output","value":{"stringValue":"tiq-canary-decision-output"}},{"key":"api_key","value":{"stringValue":"tiq-canary-decision-api-key"}},{"key":"user.email","value":{"stringValue":"decision-user@example.test"}}],"body":{"stringValue":"tiq-canary-decision-body"},"severityText":"INFO"},{"attributes":[{"key":"event.name","value":{"stringValue":"codex.tool_decision"}},{"key":"conversation.id","value":{"stringValue":"decision-session"}},{"key":"call_id","value":{"stringValue":"decision-call-denied"}},{"key":"decision","value":{"stringValue":"deny"}},{"key":"source","value":{"stringValue":"sandbox"}},{"key":"tool_name","value":{"stringValue":"apply_patch"}},{"key":"tool_namespace","value":{"stringValue":"functions"}}],"severityText":"INFO"}]}]}]}`)
 	events, err := NormalizeLogs(data, time.Date(2026, 9, 10, 20, 9, 20, 0, time.UTC))

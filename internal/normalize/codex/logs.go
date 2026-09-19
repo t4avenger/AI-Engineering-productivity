@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
+	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -127,6 +130,7 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 	extensions := map[string]any{"resource_attributes": codexLogResourceAttributes(eventName, resource), "log_attributes": codexLogAttributes(fields), "severity": record.SeverityText}
 	attachCodexLifecycleSignal(attributes, extensions, resource, fields, eventName)
 	attachCodexLogSignals(attributes, extensions, fields, id, sessionID)
+	attachCodexPRLinkEvidence(attributes, extensions, fields)
 	if mcpCall, ok := codexMCPCall(fields); ok {
 		attributes["category"] = string(canonical.OperationCategoryMCPCall)
 		extensions["mcp_call"] = mcpCall
@@ -631,11 +635,76 @@ func safeCodexLogAttributes(fields map[string]any) map[string]any {
 
 func sensitiveCodexLogAttribute(key string) bool {
 	switch strings.ToLower(strings.TrimSpace(key)) {
-	case "api_key", "arguments", "authorization", "cmd", "command", "command_args", "command_line", "commandarguments", "custom_metadata", "cwd", "file", "file_path", "filename", "files", "host.name", "hostname", "input", "output", "path", "prompt", "response", "slug", "source_code", "user.account_id", "user.email":
+	case "api_key", "authorization", "custom_metadata", "cwd", "file", "file_path", "filename", "files", "host.name", "hostname", "input", "path", "prompt", "response", "slug", "source_code", "user.account_id", "user.email":
 		return true
 	default:
 		return false
 	}
+}
+
+var (
+	prLinkURLPattern  = regexp.MustCompile(`https?://[^\s"'<>\\\]\[(){}]+`)
+	prLinkPathPattern = regexp.MustCompile(`(?i)/(?:pull|pulls|pull-requests|pullrequest)/[1-9][0-9]*$|/-/merge_requests/[1-9][0-9]*$`)
+)
+
+// attachCodexPRLinkEvidence records only URLs present verbatim in reviewed
+// provider fields. It recognises common pull/merge-request paths across
+// GitHub, GitLab, Bitbucket, Azure DevOps, and compatible self-hosted hosts;
+// it neither calls the host nor derives a URL from repository metadata.
+func attachCodexPRLinkEvidence(attributes, extensions, fields map[string]any) {
+	seen := map[string]struct{}{}
+	evidence := make([]map[string]string, 0)
+	for _, field := range []string{"pr_link", "pr_url", "pull_request_url", "arguments", "cmd", "command", "command_args", "command_line", "commandarguments", "output"} {
+		text, ok := normalize.ObservedString(fields[field])
+		if !ok {
+			continue
+		}
+		for _, candidate := range prLinkURLs(text) {
+			key := field + "\x00" + candidate
+			if _, found := seen[key]; found {
+				continue
+			}
+			seen[key] = struct{}{}
+			evidence = append(evidence, map[string]string{"field": field, "url": candidate})
+		}
+	}
+	if len(evidence) == 0 {
+		return
+	}
+	sort.Slice(evidence, func(i, j int) bool {
+		if evidence[i]["url"] == evidence[j]["url"] {
+			return evidence[i]["field"] < evidence[j]["field"]
+		}
+		return evidence[i]["url"] < evidence[j]["url"]
+	})
+	candidates := make([]string, 0, len(evidence))
+	unique := map[string]struct{}{}
+	for _, item := range evidence {
+		if _, found := unique[item["url"]]; found {
+			continue
+		}
+		unique[item["url"]] = struct{}{}
+		candidates = append(candidates, item["url"])
+	}
+	attributes["pr_link_candidates"] = candidates
+	extensions["pr_link_evidence"] = evidence
+}
+
+func prLinkURLs(text string) []string {
+	seen := map[string]struct{}{}
+	var candidates []string
+	for _, raw := range prLinkURLPattern.FindAllString(text, -1) {
+		parsed, err := url.Parse(raw)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || !prLinkPathPattern.MatchString(strings.TrimSuffix(parsed.Path, "/")) {
+			continue
+		}
+		if _, found := seen[raw]; found {
+			continue
+		}
+		seen[raw] = struct{}{}
+		candidates = append(candidates, raw)
+	}
+	return candidates
 }
 
 func codexMCPCall(fields map[string]any) (map[string]any, bool) {

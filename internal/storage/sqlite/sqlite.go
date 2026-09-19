@@ -387,10 +387,44 @@ func reconstructSession(id string, events []canonical.Event) canonical.Session {
 			}
 		}
 	}
+	attachSessionPRLink(&session, events)
 	scope, source := sessionIdentity(events)
 	session.Attributes[identityScopeKey] = scope
 	session.Attributes[identitySourceKey] = source
 	return session
+}
+
+func attachSessionPRLink(session *canonical.Session, events []canonical.Event) {
+	links := map[string]struct{}{}
+	for _, event := range events {
+		for _, link := range stringSliceAttribute(event.Attributes["pr_link_candidates"]) {
+			links[link] = struct{}{}
+		}
+	}
+	if len(links) == 1 {
+		for link := range links {
+			session.Attributes["pr_link"] = link
+		}
+	} else if len(links) > 1 {
+		session.Attributes["pr_link_candidate_count"] = len(links)
+	}
+}
+
+func stringSliceAttribute(value any) []string {
+	switch typed := value.(type) {
+	case []string:
+		return typed
+	case []any:
+		values := make([]string, 0, len(typed))
+		for _, item := range typed {
+			if text, ok := item.(string); ok && text != "" {
+				values = append(values, text)
+			}
+		}
+		return values
+	default:
+		return nil
+	}
 }
 
 func sessionIdentity(events []canonical.Event) (string, string) {

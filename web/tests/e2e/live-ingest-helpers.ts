@@ -119,6 +119,43 @@ export function codexOTLPLogs(model: string): string {
   });
 }
 
+// codexPRLinkOTLPLogs is the reviewed 0.155.1 tool-result shape where Codex
+// retains a provider-emitted pull-request URL inside the tool arguments.
+export function codexPRLinkOTLPLogs(): string {
+  return JSON.stringify({
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'codex_exec' } },
+            { key: 'service.version', value: { stringValue: '0.155.1' } },
+          ],
+        },
+        scopeLogs: [
+          {
+            logRecords: [
+              {
+                attributes: [
+                  { key: 'event.name', value: { stringValue: 'codex.tool_result' } },
+                  { key: 'conversation.id', value: { stringValue: 'tiq-live-e2e-pr-link' } },
+                  { key: 'tool_name', value: { stringValue: 'exec_command' } },
+                  {
+                    key: 'arguments',
+                    value: {
+                      stringValue:
+                        'gh pr view https://gitlab.example.test/group/project/-/merge_requests/184',
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
+
 // Codex token metrics do not carry a conversation identifier in the observed
 // 0.153.4 surface. They must remain inspectable observations without inflating
 // the primary session list.

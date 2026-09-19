@@ -1,0 +1,39 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "openai",
+  "tool": "codex",
+  "tool_version": "0.155.1",
+  "captured_at": "2026-09-19T20:26:08Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "resourceLogs": [
+      {
+        "resource": {
+          "attributes": [
+            { "key": "service.name", "value": { "stringValue": "codex_exec" } },
+            { "key": "service.version", "value": { "stringValue": "0.155.1" } },
+            { "key": "env", "value": { "stringValue": "telemetryiq-synthetic" } }
+          ]
+        },
+        "scopeLogs": [
+          {
+            "logRecords": [
+              {
+                "attributes": [
+                  { "key": "event.name", "value": { "stringValue": "codex.tool_result" } },
+                  { "key": "conversation.id", "value": { "stringValue": "tiq-codex-pr-link-session" } },
+                  { "key": "tool_name", "value": { "stringValue": "exec_command" } },
+                  { "key": "tool_namespace", "value": { "stringValue": "functions" } },
+                  { "key": "arguments", "value": { "stringValue": "{\"cmd\":\"printf \\\"https://github.com/telemetryiq-synthetic/fixture-repository/pull/184\\\\n\\\"\"}" } },
+                  { "key": "output", "value": { "stringValue": "synthetic command output omitted from this fixture" } }
+                ],
+                "severityText": "INFO"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

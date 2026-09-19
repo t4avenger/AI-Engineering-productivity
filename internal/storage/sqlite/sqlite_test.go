@@ -53,6 +53,32 @@ func TestReconstructedCodexSessionCarriesEnvironmentMetadata(t *testing.T) {
 	}
 }
 
+func TestReconstructedSessionPromotesOnlyUnambiguousPRLink(t *testing.T) {
+	tests := []struct {
+		name       string
+		candidates []string
+		wantLink   string
+		wantCount  int
+	}{
+		{name: "one provider URL", candidates: []string{"https://gitlab.example.test/group/project/-/merge_requests/12"}, wantLink: "https://gitlab.example.test/group/project/-/merge_requests/12"},
+		{name: "duplicate provider URL", candidates: []string{"https://bitbucket.org/workspace/repository/pull-requests/4", "https://bitbucket.org/workspace/repository/pull-requests/4"}, wantLink: "https://bitbucket.org/workspace/repository/pull-requests/4"},
+		{name: "conflicting provider URLs", candidates: []string{"https://github.com/example/repository/pull/184", "https://dev.azure.com/org/project/_git/repository/pullrequest/9"}, wantCount: 2},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e := event(t, "pr-link-"+tc.name, "codex:pr-link-"+tc.name, "codex.tool_result", "2026-09-19T20:00:00Z")
+			e.Attributes["pr_link_candidates"] = tc.candidates
+			session := reconstructSession(e.SessionID, []canonical.Event{e})
+			if got, _ := session.Attributes["pr_link"].(string); got != tc.wantLink {
+				t.Fatalf("pr_link = %q, want %q", got, tc.wantLink)
+			}
+			if got, _ := session.Attributes["pr_link_candidate_count"].(int); got != tc.wantCount {
+				t.Fatalf("candidate count = %d, want %d", got, tc.wantCount)
+			}
+		})
+	}
+}
+
 func codexSessionWithEnvironment(t *testing.T, name, service, version string) canonical.Session {
 	t.Helper()
 	repo, err := Open(":memory:")

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -140,8 +141,6 @@ func TestCodexLogsIngestEndToEnd(t *testing.T) {
 	assertCodexTokenObservations(t, server)
 
 	canaries := []string{
-		"tiq-canary-argument-token",
-		"tiq-canary-output",
 		"tiq-canary-provider-extension",
 		"tiq-canary-api-key",
 		"synthetic@example.test",
@@ -154,6 +153,26 @@ func TestCodexLogsIngestEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertNoRawIdentifiers(t, canaries, marshalJSON(t, stored))
+	assertRawToolEvidence(t, marshalJSON(t, stored), "tiq-canary-argument-token", "tiq-canary-output")
+}
+
+func TestCodexToolEvidenceIngestPromotesObservedPRLink(t *testing.T) {
+	server, repository := newPersistentTestServer(t)
+	body := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.version","value":{"stringValue":"0.155.1"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.tool_result"}},{"key":"conversation.id","value":{"stringValue":"pr-link-live-session"}},{"key":"arguments","value":{"stringValue":"gh pr view https://gitlab.example.test/group/project/-/merge_requests/184"}}]}]}]}]}`)
+	response := postOTLPToPath(t, server.URL, "/v1/logs", body, "application/json")
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("ingest status = %d", response.StatusCode)
+	}
+	closeBody(t, response)
+	sessions := fetchSessionList(t, server.URL+"/api/v1/sessions?limit=10")
+	if len(sessions.Data) != 1 || sessions.Data[0].Attributes["pr_link"] != "https://gitlab.example.test/group/project/-/merge_requests/184" || sessions.Data[0].Availability["pr_link"] != "observed" {
+		t.Fatalf("PR-link session = %#v", sessions.Data)
+	}
+	stored, err := repository.ListEvents(t.Context(), storage.EventFilter{SessionID: "codex:pr-link-live-session", Limit: 10})
+	if err != nil || len(stored) != 1 {
+		t.Fatalf("stored events = %#v, %v", stored, err)
+	}
+	assertRawToolEvidence(t, marshalJSON(t, stored), "https://gitlab.example.test/group/project/-/merge_requests/184")
 }
 
 func postCodexSessionAndMetrics(t *testing.T, server *httptest.Server) {
@@ -427,8 +446,6 @@ func TestCodexToolResultIngestExposesToolCallSignal(t *testing.T) {
 	}
 
 	canaries := []string{
-		"tiq-canary-tool-argument",
-		"tiq-canary-tool-output",
 		"tiq-canary-tool-api-key",
 		"tiq-canary-tool-resource-token",
 		"tool-host.example.test",
@@ -443,6 +460,16 @@ func TestCodexToolResultIngestExposesToolCallSignal(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertNoRawIdentifiers(t, canaries, marshalJSON(t, stored))
+	assertRawToolEvidence(t, marshalJSON(t, stored), "tiq-canary-tool-argument", "tiq-canary-tool-output")
+}
+
+func assertRawToolEvidence(t *testing.T, document []byte, values ...string) {
+	t.Helper()
+	for _, value := range values {
+		if !bytes.Contains(document, []byte(value)) {
+			t.Fatalf("raw tool evidence %q missing", value)
+		}
+	}
 }
 
 const rawCodexToolDecisionOTLPLogs = `{"resourceLogs":[{"resource":{"attributes":[
