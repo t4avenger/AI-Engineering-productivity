@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-import { authToken, unlockDashboard } from './live-ingest-helpers';
+import {
+  authToken,
+  expectFourTabPrimaryNav,
+  unlockDashboard,
+} from './live-ingest-helpers';
 
 test('unlocks and walks the local dashboard journey', async ({ page }) => {
   await page.goto('/');
@@ -13,22 +17,8 @@ test('unlocks and walks the local dashboard journey', async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByText('Daemon: Healthy')).toBeVisible();
 
+  await expectFourTabPrimaryNav(page);
   const primaryNavigation = page.getByLabel('Primary navigation');
-  await expect(primaryNavigation.getByRole('link')).toHaveText([
-    'Home',
-    'Sessions',
-    'Governance',
-    'Integrations',
-  ]);
-  await expect(
-    primaryNavigation.getByRole('link', { name: 'Insights', exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    primaryNavigation.getByRole('link', { name: 'Privacy', exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    primaryNavigation.getByRole('link', { name: 'Costs', exact: true }),
-  ).toHaveCount(0);
 
   await primaryNavigation
     .getByRole('link', { name: 'Governance', exact: true })

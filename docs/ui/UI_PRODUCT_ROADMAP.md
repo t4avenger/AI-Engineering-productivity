@@ -65,8 +65,7 @@ Local DB path: `{UserConfigDir}/telemetryiq/telemetryiq.db`.
 
 ### 2.3 Related open issues
 
-- [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148) — **This roadmap’s epic** (`ui-enterprise`)
-- [#163](https://github.com/t4avenger/AI-Engineering-productivity/issues/163) — **Bug:** Sessions list fragmented by content-derived / `codex-log:` IDs (blocks usable #153 / #159)
+- [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148) — **This roadmap’s epic** (`ui-enterprise`); V1 children #149–#155 closed
 - [#71](https://github.com/t4avenger/AI-Engineering-productivity/issues/71) — Dashboard UX epic (partially completed; residual scope points to #148)
 - [#79](https://github.com/t4avenger/AI-Engineering-productivity/issues/79) — Integrations capability-backed value (superseded by #154)
 - [#87](https://github.com/t4avenger/AI-Engineering-productivity/issues/87) — Claude Code full capture
@@ -159,15 +158,15 @@ Empty allowlist remains **indeterminate** (existing engine behaviour). This is d
 
 ## 7. Acceptance criteria (epic)
 
-- [ ] Primary nav is Home · Sessions · Governance · Integrations only.
+- [x] Primary nav is Home · Sessions · Governance · Integrations only (#149, #155).
 - [x] Insight headline content is rendered on Home; anchored `/insights` links preserve detailed evidence and backward compatibility (#150).
-- [ ] Privacy and Costs remain reachable without top-nav slots.
-- [ ] `/governance` shows risky-access and unapproved-mcp with evidence and honest indeterminate.
+- [x] Privacy and Costs remain reachable without top-nav slots (#149, #155).
+- [x] `/governance` shows risky-access and unapproved-mcp with evidence and honest indeterminate (#151, #155).
 - [x] MCP allowlist checkboxes + Save persist to local config and affect findings (#152).
 - [x] Session timeline shows operation category/tool/duration/outcome when present (never invent zeros) and session governance stays scoped and honest (#153).
 - [x] Integrations shows capability-backed status (addresses #79 intent).
-- [ ] Playwright live-data e2e covers Governance visibility + allowlist save round-trip + nav IA.
-- [ ] Privacy invariants and “no cost on Home” preserved.
+- [x] Playwright live-data e2e covers Governance visibility + allowlist save round-trip + nav IA (#155).
+- [x] Privacy invariants and “no cost on Home” preserved (#150, #155).
 
 ---
 
@@ -207,6 +206,8 @@ Epic: [#148](https://github.com/t4avenger/AI-Engineering-productivity/issues/148
 
 ## 10. Next implementation step
 
-1. Close V1 with **#155** (consolidated Playwright e2e for IA + Governance + allowlist save).
+V1 is closed (#149–#155). Next work is **V1.5 capture** so Session Trace lanes can grow honestly:
 
-Integrations is capability-backed (#154). Remaining V1 gate is live-data e2e coverage on the four-tab shell and Governance Save path.
+1. **#156** — File-operation fixtures + capability matrix (blocker for a Files lane).
+2. **#157** — Span-tree projection API for session UI.
+3. **#158** — Session header metadata (branch / PR / entrypoint) when providers emit it.

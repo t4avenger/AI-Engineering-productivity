@@ -13,9 +13,10 @@ import {
 } from './live-ingest-helpers';
 
 /**
- * Live gate for #150: send wire-shaped OTLP through the daemon and prove Home
- * composes retained behaviour, governance, and integration evidence. This test
- * intentionally uses no page.route().fulfill() API mocking.
+ * Live gate for #150 (and #155 no-cost-on-Home DoD): send wire-shaped OTLP
+ * through the daemon and prove Home composes retained behaviour, governance,
+ * and integration evidence without a Costs CTA. This test intentionally uses
+ * no page.route().fulfill() API mocking.
  */
 resetDaemonBetweenTests();
 
