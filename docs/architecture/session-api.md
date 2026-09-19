@@ -53,8 +53,12 @@ evidence when providers emit it:
   `provider_extensions.transcript.git_branch` promote into
   `attributes.entrypoint` and `attributes.git_branch` (#158). OTLP
   `app.entrypoint` and richer environment identity remain owned by #107.
-- `pr_link` stays `unavailable` until a reviewed fixture proves a PR URL; do not
-  invent a link from metrics such as `pull_request.count`.
+- `pr_link` is promoted only from one distinct provider-emitted HTTP(S)
+  pull/merge-request URL. GitHub, GitLab, Bitbucket, Azure DevOps, and compatible
+  self-hosted URL paths are accepted verbatim from reviewed tool evidence; multiple
+  distinct candidates produce `partial`, never an arbitrary selected link. Do not
+  invent a link from metrics such as `pull_request.count`, branch names, or
+  repository metadata, and never fetch or enrich the URL.
 
 Session event timeline entries include optional token fields for retained model
 signals: `input_token_count`, `output_token_count`, `cached_input_token_count`,

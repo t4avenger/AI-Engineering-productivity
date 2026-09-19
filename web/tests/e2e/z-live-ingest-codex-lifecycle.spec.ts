@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import {
   authToken,
   codexLifecycleOTLPLogs,
+  codexPRLinkOTLPLogs,
   ingestOTLPLogs,
   resetDaemonBetweenTests,
   unlockDashboard,
@@ -98,4 +99,12 @@ test('renders Codex lifecycle signals ingested through the live daemon', async (
     page.getByText('No retained HTTP(S) pull-request URLs yet', { exact: false }),
   ).toBeVisible();
   await expect(page.getByRole('link', { name: /github\.com/ })).toHaveCount(0);
+
+  await ingestOTLPLogs(codexPRLinkOTLPLogs());
+  await page.goto('/pull-requests');
+  await expect(
+    page.getByRole('link', {
+      name: 'https://gitlab.example.test/group/project/-/merge_requests/184',
+    }),
+  ).toBeVisible();
 });

@@ -1363,7 +1363,7 @@ func sessionAvailability(session canonical.Session) []availabilityRow {
 		{Label: "Completed", State: observedIf(session.CompletedAt != nil)},
 		{Label: "Model", State: modelAvailability(session)},
 		{Label: "Branch", State: observedIf(sessionAttribute(session, "git_branch") != "")},
-		{Label: "PR", State: observedIf(sessionAttribute(session, "pr_link") != "")},
+		{Label: "PR", State: canonical.PRLinkAvailability(session.Attributes)},
 		{Label: "Entrypoint", State: observedIf(sessionAttribute(session, "entrypoint") != "")},
 		{Label: "Tool version", State: observedIf(sessionAttribute(session, "service_version") != "")},
 	}
