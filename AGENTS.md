@@ -27,6 +27,43 @@ When implementation and documentation conflict, stop and report the conflict. Do
 - Update documentation with code.
 - Do not add speculative abstractions for future enterprise features.
 
+## Duplication and SonarCloud (hard rule)
+
+SonarCloud fails the PR quality gate when **Duplication on New Code > 3%**.
+This repo has repeatedly burned CI on copy-pasted helpers, OTLP payload
+builders, assertion blocks, and near-identical test cases. Treat duplication
+as a merge blocker equal to a failing unit test.
+
+**Before writing new code or tests:**
+
+1. Search for an existing helper, fixture builder, assertion, or table-driven
+   case that already expresses the same behaviour (`rg`, sibling `*_test.go`,
+   `web/tests/e2e/live-ingest-helpers.ts`, nearby packages).
+2. Prefer extending a shared helper over pasting a second copy “just for this
+   issue.” Cross-file copy of ≥ ~10 consecutive similar lines is almost always
+   wrong.
+3. When two specs need the same UI assertion (nav, unlock, empty states), put
+   it in one exported helper and call it from both — do not re-inline the
+   block in the second file to “consolidate coverage.”
+4. Table-driven / parameterized tests beat N near-duplicate `t.Run` bodies or
+   Playwright `test(...)` blocks that differ only by literals.
+5. After editing, re-read the diff specifically for CPD risk: if Sonar would
+   see the same token sequence in another file (especially another new or
+   recently touched file), extract before pushing.
+
+**Do not:**
+
+- Duplicate a block from `health.spec.ts` (or any sibling) into a `z-live-*`
+  spec to satisfy an issue DoD — share a helper instead.
+- “Fix” Sonar by renaming locals, reordering lines, or adding noise comments.
+  That is suppression theatre; extract or parameterize.
+- Copy OTLP JSON / protobuf shapes between adapters or e2e helpers when a
+  builder already exists.
+
+**When Sonar reports duplication on a PR you authored:** stop feature work,
+deduplicate first, and only then continue. Cite the shared helper in the PR
+body if the change was primarily a CPD fix.
+
 ## Privacy invariants
 
 - Raw capture is the default (epic #87, PRODUCT_MAP §11.3). Prompts, responses,

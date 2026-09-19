@@ -58,7 +58,7 @@ claims to surface retained telemetry:
 
 A change may merge only when:
 
-- required CI jobs pass
+- required CI jobs pass (including SonarCloud; **Duplication on New Code ≤ 3%**)
 - branch is up to date under the repository merge policy
 - acceptance criteria are mapped in the PR description
 - tests accompany behavioural changes
@@ -68,6 +68,9 @@ A change may merge only when:
 - generated schemas and documentation are current
 - suppressions have owner, reason, and expiry
 - checkpoint evidence is updated when the change completes a phase
+- new code does not reintroduce copy-pasted helpers/assertions (see
+  `AGENTS.md` “Duplication and SonarCloud”) — extract shared helpers instead of
+  renaming or reordering lines to dodge CPD
 
 ## Release gate
 

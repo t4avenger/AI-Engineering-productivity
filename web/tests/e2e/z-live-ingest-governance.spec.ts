@@ -1,9 +1,10 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import {
   authToken,
   claudeMCPConnectionOTLPLogs,
   claudeRiskyAccessOTLPLogs,
+  expectFourTabPrimaryNav,
   ingestOTLPLogs,
   resetDaemonBetweenTests,
   unlockDashboard,
@@ -18,25 +19,6 @@ import {
  * (QUALITY_GATES live-data DoD).
  */
 resetDaemonBetweenTests();
-
-async function expectFourTabPrimaryNav(page: Page) {
-  const primaryNavigation = page.getByLabel('Primary navigation');
-  await expect(primaryNavigation.getByRole('link')).toHaveText([
-    'Home',
-    'Sessions',
-    'Governance',
-    'Integrations',
-  ]);
-  await expect(
-    primaryNavigation.getByRole('link', { name: 'Insights', exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    primaryNavigation.getByRole('link', { name: 'Privacy', exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    primaryNavigation.getByRole('link', { name: 'Costs', exact: true }),
-  ).toHaveCount(0);
-}
 
 test('renders risky-access findings after live OTLP ingest', async ({
   page,

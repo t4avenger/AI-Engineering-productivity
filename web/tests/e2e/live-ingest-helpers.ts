@@ -21,6 +21,26 @@ export async function unlockDashboard(
   ).toBeVisible();
 }
 
+/** Four-tab enterprise IA primary nav (#149 / #155); shared to avoid Sonar CPD. */
+export async function expectFourTabPrimaryNav(page: Page): Promise<void> {
+  const primaryNavigation = page.getByLabel('Primary navigation');
+  await expect(primaryNavigation.getByRole('link')).toHaveText([
+    'Home',
+    'Sessions',
+    'Governance',
+    'Integrations',
+  ]);
+  await expect(
+    primaryNavigation.getByRole('link', { name: 'Insights', exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    primaryNavigation.getByRole('link', { name: 'Privacy', exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    primaryNavigation.getByRole('link', { name: 'Costs', exact: true }),
+  ).toHaveCount(0);
+}
+
 // codexOTLPLogs builds a raw codex_cli_rs OTLP/HTTP log payload carrying a
 // single sse_event that reports the given model, in the observed wire shape.
 export function codexOTLPLogs(model: string): string {
