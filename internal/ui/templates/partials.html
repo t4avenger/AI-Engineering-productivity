@@ -32,7 +32,7 @@
 {{end}}
 
 {{define "nav"}}
-    <aside class="app-sidebar">
+    <aside class="app-sidebar" aria-label="Application">
       <div class="sidebar-brand">
         <p class="brand"><a href="/">TelemetryIQ</a> <span>Local developer edition</span></p>
         <button type="button" class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="app-sidebar-nav">
@@ -78,7 +78,7 @@
 {{define "shell-end"}}
     {{if .Nav}}
     </div>
-    <aside class="right-rail" aria-hidden="true"></aside>
+    <div class="right-rail" aria-hidden="true"></div>
     {{end}}
   </div>
   {{if .Nav}}
