@@ -39,6 +39,9 @@ export async function expectFourTabPrimaryNav(page: Page): Promise<void> {
   await expect(
     primaryNavigation.getByRole('link', { name: 'Costs', exact: true }),
   ).toHaveCount(0);
+  await expect(
+    primaryNavigation.getByRole('link', { name: 'Models', exact: true }),
+  ).toHaveCount(0);
 }
 
 /** Access Rules tab shells (#160): MCP editable; others honest unavailable. */

@@ -169,6 +169,13 @@ type insightsData struct {
 	Error            string
 }
 
+// modelsData is the Models destination (#186 / N03) backed by the same
+// model-performance reader as Insights — no separate ranking formula.
+type modelsData struct {
+	ModelPerformance insights.ModelPerformance
+	Error            string
+}
+
 // governanceData is the server-rendered Governance findings view (#151)
 // plus Access Rules tab shells (#160).
 type governanceData struct {
@@ -539,6 +546,17 @@ func (s *Server) insightsPage(w http.ResponseWriter, r *http.Request) {
 		data.Operations = insights.OperationStatsFromOperations(operations)
 	}
 	s.render(w, tmplInsights, layoutData{Title: "Insights", Nav: "insights", Health: s.healthLabel(r), Content: data})
+}
+
+func (s *Server) modelsPage(w http.ResponseWriter, r *http.Request) {
+	data := modelsData{}
+	events, err := s.insightEvents(r)
+	if err != nil {
+		data.Error = "Unable to load model performance."
+	} else {
+		data.ModelPerformance = insights.ModelPerformanceFromEvents(events)
+	}
+	s.render(w, tmplModels, layoutData{Title: "Models", Nav: "models", Health: s.healthLabel(r), Content: data})
 }
 
 func (s *Server) governancePage(w http.ResponseWriter, r *http.Request) {

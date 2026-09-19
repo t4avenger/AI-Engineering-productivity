@@ -2,15 +2,16 @@
 
 The local dashboard is served by the TelemetryIQ daemon using Go `html/template`
 and HTMX (ADR 0002). It provides Home, Sessions, Session Detail, Governance,
-Integrations, Insights, Privacy, and Costs pages over the same loopback origin
+Integrations, Insights, Models, Privacy, and Costs pages over the same loopback origin
 as the JSON API and OTLP intake. It does not send analytics or dashboard data
 to third parties.
 
-Primary navigation is Home, Sessions, Governance, and Integrations. Privacy is
-available from secondary navigation; Costs is also secondary but is omitted
+Primary navigation is Home, Sessions, Governance, and Integrations. Models and
+Privacy are available from secondary navigation; Costs is also secondary but is omitted
 from Home because PRODUCT_MAP section 17.1 forbids cost labels and links there.
-The `/insights` route remains directly available during the transition to the
-Home-based insight surface in issue #150.
+The `/models` destination (#186) reuses the existing model-performance insight
+reader and sample-size ranking guard. The `/insights` route remains directly
+available during the transition to the Home-based insight surface in issue #150.
 
 This paragraph describes the V1 baseline. The accepted successor is Overview,
 Sessions, Pull Requests, Models and Governance in a dark sidebar, with utility

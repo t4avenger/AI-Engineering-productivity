@@ -58,7 +58,10 @@ Status verified against GitHub on 2026-09-19; recheck before starting work.
 - File-operation evidence/projection [#156](https://github.com/t4avenger/AI-Engineering-productivity/issues/156) and span projection
   [#157](https://github.com/t4avenger/AI-Engineering-productivity/issues/157) remain open. The image's per-file +/- counts and task stages
   must not be inferred from aggregate metrics.
-- No Models/PR primary pages, full trace, matching dark shell, local
+- [#186](https://github.com/t4avenger/AI-Engineering-productivity/issues/186) Models
+  destination is delivered as secondary navigation over the existing
+  model-performance reader; five-destination primary shell remains [#161](https://github.com/t4avenger/AI-Engineering-productivity/issues/161).
+- No Pull Requests primary page, full trace, matching dark shell, local
   skill/path/prompt editors or enterprise controls are declared delivered here.
 
 ## 4. Delivery order and ownership
@@ -118,9 +121,10 @@ Finishing local visual work cannot close these requirements.
 
 ## 6. Next smallest task
 
-Implement [#186](https://github.com/t4avenger/AI-Engineering-productivity/issues/186) using existing performance readers and tests. It
-adds a required destination without waiting on new capture. In parallel only
-when explicitly assigned, #156/#157 can establish trace evidence contracts.
+Implement [#187](https://github.com/t4avenger/AI-Engineering-productivity/issues/187)
+(Pull Requests destination) with an honest empty/unavailable state now; populated
+provider claims wait on #183/#184. In parallel only when explicitly assigned,
+#156/#157 can establish trace evidence contracts.
 
 This documentation update changes no runtime APIs or schemas. Planned additive
 interfaces are specified in the implementation specification and owned by the

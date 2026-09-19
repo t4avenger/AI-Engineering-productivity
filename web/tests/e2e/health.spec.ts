@@ -68,10 +68,19 @@ test('unlocks and walks the local dashboard journey', async ({ page }) => {
 
   const secondaryNavigation = page.getByLabel('Secondary navigation');
   await expect(secondaryNavigation.getByRole('link')).toHaveText([
+    'Models',
     'Privacy',
     'Costs',
   ]);
   await secondaryNavigation
+    .getByRole('link', { name: 'Models', exact: true })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Models' })).toBeVisible();
+  await expect(
+    page.getByText('No outcome-contract rows yet', { exact: false }),
+  ).toBeVisible();
+  await page
+    .getByLabel('Secondary navigation')
     .getByRole('link', { name: 'Privacy', exact: true })
     .click();
   await expect(page.getByRole('heading', { name: 'Privacy' })).toBeVisible();
