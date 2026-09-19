@@ -5,6 +5,7 @@ import {
   authToken,
   expectFiveDestinationPrimaryNav,
   expectUtilityDestinations,
+  followShellNavigation,
   unlockDashboard,
 } from './live-ingest-helpers';
 
@@ -82,26 +83,15 @@ test('unlocks and walks the local dashboard journey', async ({ page }) => {
       exact: false,
     }),
   ).toBeVisible();
-  await primaryNavigation
-    .getByRole('link', { name: 'Models', exact: true })
-    .click();
-  await expect(page.getByRole('heading', { name: 'Models' })).toBeVisible();
+  await followShellNavigation(page, 'Primary navigation', 'Models');
   await expect(
     page.getByText('No outcome-contract rows yet', { exact: false }),
   ).toBeVisible();
-  await page
-    .getByLabel('Utility navigation')
-    .getByRole('link', { name: 'Privacy', exact: true })
-    .click();
-  await expect(page.getByRole('heading', { name: 'Privacy' })).toBeVisible();
+  await followShellNavigation(page, 'Utility navigation', 'Privacy');
   await expect(
     page.getByText('raw prompts, responses, source content, paths, and commands are retained locally', { exact: false }),
   ).toBeVisible();
-  await page
-    .getByLabel('Utility navigation')
-    .getByRole('link', { name: 'Costs', exact: true })
-    .click();
-  await expect(page.getByRole('heading', { name: 'Costs' })).toBeVisible();
+  await followShellNavigation(page, 'Utility navigation', 'Costs');
 });
 
 test('dark shell renders at reference viewports without body overflow (#161)', async ({
