@@ -125,6 +125,9 @@ CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, session_json B
 	if err := r.ensureListAndCostColumns(ctx); err != nil {
 		return err
 	}
+	if err := r.ensureInsightSignals(ctx); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -437,7 +440,7 @@ func (r *Repository) saveEventTx(ctx context.Context, tx *sql.Tx, event canonica
 	if err != nil {
 		return fmt.Errorf("marshal event: %w", err)
 	}
-	result, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO events(event_id,session_id,occurred_at,event_json) VALUES(?,?,?,?)", event.EventID, event.SessionID, event.OccurredAt.UTC().Format(timeFormat), payload)
+	result, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO events(event_id,session_id,occurred_at,event_type,event_json) VALUES(?,?,?,?,?)", event.EventID, event.SessionID, event.OccurredAt.UTC().Format(timeFormat), event.EventType, payload)
 	if err != nil {
 		return err
 	}
@@ -507,7 +510,14 @@ func (r *Repository) rebuildSession(ctx context.Context, tx *sql.Tx, id string) 
 	if len(events) == 0 {
 		return nil
 	}
-	if err := upsertSession(ctx, tx, reconstructSession(id, events)); err != nil {
+	session := reconstructSession(id, events)
+	if last := lastEventAt(events); !last.IsZero() {
+		session.Attributes["last_event_at"] = last.UTC().Format(time.RFC3339Nano)
+	}
+	if err := upsertSession(ctx, tx, session, lastEventAt(events)); err != nil {
+		return err
+	}
+	if err := rebuildInsightSignals(ctx, tx, id, events); err != nil {
 		return err
 	}
 	return rebuildAgentRelations(ctx, tx, id, events)
@@ -805,24 +815,29 @@ func sessionString(value any) string {
 	return strings.TrimSpace(text)
 }
 
-func upsertSession(ctx context.Context, tx *sql.Tx, session canonical.Session) error {
+func upsertSession(ctx context.Context, tx *sql.Tx, session canonical.Session, lastEvent time.Time) error {
 	data, err := json.Marshal(session)
 	if err != nil {
 		return fmt.Errorf("marshal reconstructed session: %w", err)
 	}
 	model, _ := session.Attributes["model"].(string)
 	scope, _ := session.Attributes[identityScopeKey].(string)
+	var lastEventValue any
+	if !lastEvent.IsZero() {
+		lastEventValue = lastEvent.UTC().Format(time.RFC3339Nano)
+	}
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO sessions(session_id,session_json,started_at,tool,state,identity_scope,model)
-VALUES(?,?,?,?,?,?,?)
+		`INSERT INTO sessions(session_id,session_json,started_at,tool,state,identity_scope,model,last_event_at)
+VALUES(?,?,?,?,?,?,?,?)
 ON CONFLICT(session_id) DO UPDATE SET
 session_json=excluded.session_json,
 started_at=excluded.started_at,
 tool=excluded.tool,
 state=excluded.state,
 identity_scope=excluded.identity_scope,
-model=excluded.model`,
-		session.SessionID, data, session.StartedAt.UTC().Format(time.RFC3339Nano), session.Tool, session.State, scope, model)
+model=excluded.model,
+last_event_at=excluded.last_event_at`,
+		session.SessionID, data, session.StartedAt.UTC().Format(time.RFC3339Nano), session.Tool, session.State, scope, model, lastEventValue)
 	return err
 }
 func lifecycle(t string) string {

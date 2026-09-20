@@ -244,3 +244,43 @@ func BenchmarkListSessions(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkListInsightSourceEvents(b *testing.B) {
+	repo, err := Open(filepath.Join(b.TempDir(), "signals-bench.db"))
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() { _ = repo.Close() }()
+	var events []canonical.Event
+	for i := 0; i < 200; i++ {
+		sessionID := fmt.Sprintf("session-%d", i)
+		for j := 0; j < 20; j++ {
+			occurred := time.Unix(1_700_000_000+int64(i*20+j), 0).UTC()
+			events = append(events, canonical.Event{
+				SchemaVersion: canonical.RecordSchemaVersion,
+				EventID:       fmt.Sprintf("%s-e%d", sessionID, j),
+				EventType:     "model_interaction",
+				OccurredAt:    occurred,
+				ReceivedAt:    occurred,
+				Provider:      "anthropic",
+				Tool:          "claude-code",
+				SessionID:     sessionID,
+				PrivacyLevel:  "operational",
+				Attributes: map[string]any{
+					"input_token_count":   int64(100 + j),
+					"cached_input_tokens": int64(50 + j),
+				},
+				ProviderExtensions: map[string]any{},
+			})
+		}
+	}
+	if err := repo.SaveEvents(context.Background(), events); err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := repo.ListInsightSourceEvents(context.Background()); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

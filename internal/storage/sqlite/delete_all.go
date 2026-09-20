@@ -10,6 +10,9 @@ func (r *Repository) DeleteAllSessions(ctx context.Context) error {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if _, err = tx.ExecContext(ctx, "DELETE FROM insight_signals"); err != nil {
+		return err
+	}
 	if _, err = tx.ExecContext(ctx, "DELETE FROM cost_records"); err != nil {
 		return err
 	}

@@ -1,41 +1,22 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
-// insightEvents loads every retained canonical event across all sessions so an
-// insight can be derived over the full corpus. It is shared by insights that
-// need session-wide event data (MCP inventory, skill usage).
+var errInsightSourceUnavailable = errors.New("insight source storage is unavailable")
+
+// insightEvents loads thin insight-source events persisted at write time so
+// dashboard insight endpoints do not scan the full event_json corpus.
 func (a sessionAPI) insightEvents(r *http.Request) ([]canonical.Event, error) {
-	events := []canonical.Event{}
-	var sessionCursor *storage.SessionCursor
-	for {
-		sessions, err := a.sessions.ListSessions(r.Context(), storage.SessionFilter{Limit: maximumSessionLimit, Cursor: sessionCursor})
-		if err != nil {
-			return nil, err
-		}
-		page := sessions
-		sessionCursor = nil
-		if len(sessions) > maximumSessionLimit {
-			page = sessions[:maximumSessionLimit]
-			last := page[len(page)-1]
-			sessionCursor = &storage.SessionCursor{StartedAt: last.StartedAt, SessionID: last.SessionID}
-		}
-		for _, session := range page {
-			sessionEvents, err := a.insightSessionEvents(r, session.SessionID)
-			if err != nil {
-				return nil, err
-			}
-			events = append(events, sessionEvents...)
-		}
-		if sessionCursor == nil {
-			return events, nil
-		}
+	if a.insightSources == nil {
+		return nil, errInsightSourceUnavailable
 	}
+	return a.insightSources.ListInsightSourceEvents(r.Context())
 }
 
 func (a sessionAPI) insightSessionEvents(r *http.Request, sessionID string) ([]canonical.Event, error) {

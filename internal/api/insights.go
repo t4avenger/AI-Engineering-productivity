@@ -109,7 +109,7 @@ func (a sessionAPI) unapprovedMCP(w http.ResponseWriter, r *http.Request) {
 // loadInsightEvents returns retained events for an insight handler, or writes
 // the shared unavailable/query-failed response and returns ok=false.
 func (a sessionAPI) loadInsightEvents(w http.ResponseWriter, r *http.Request) ([]canonical.Event, bool) {
-	if a.sessions == nil || a.eventReader == nil {
+	if a.insightSources == nil {
 		writeSessionError(w, http.StatusServiceUnavailable, insightUnavailableCode, insightUnavailableMsg)
 		return nil, false
 	}

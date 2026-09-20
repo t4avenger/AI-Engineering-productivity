@@ -5,6 +5,7 @@
 package governance
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
@@ -189,6 +190,63 @@ func (r RiskyAccess) Decision() PolicyDecision {
 		Outcome:       r.Outcome,
 		Evidence:      evidence,
 	}
+}
+
+// AccessObservation is one raw filesystem path or shell command observed on an
+// event, used to rebuild thin insight-source events without retaining full
+// provider payloads.
+type AccessObservation struct {
+	Method AccessMethod
+	Value  string
+}
+
+// AccessObservations walks attributes and provider extensions recursively and
+// returns every raw path or command under a known field key.
+func AccessObservations(event canonical.Event) []AccessObservation {
+	raw := collectAccesses(event)
+	out := make([]AccessObservation, 0, len(raw))
+	for _, item := range raw {
+		out = append(out, AccessObservation{Method: item.method, Value: item.value})
+	}
+	return out
+}
+
+// ThinAccessEvent builds a minimal event that RiskyAccessFromEvents can classify
+// without the original nested provider payload.
+func ThinAccessEvent(event canonical.Event, observation AccessObservation, index int) canonical.Event {
+	attrs := map[string]any{}
+	switch observation.Method {
+	case AccessFilesystemRead:
+		attrs["file_path"] = observation.Value
+	case AccessShellCommand:
+		attrs["command"] = observation.Value
+	}
+	return canonical.Event{
+		SchemaVersion:      event.SchemaVersion,
+		EventID:            fmt.Sprintf("%s:access:%d", event.EventID, index),
+		EventType:          event.EventType,
+		OccurredAt:         event.OccurredAt,
+		ReceivedAt:         event.ReceivedAt,
+		Provider:           event.Provider,
+		Tool:               event.Tool,
+		SessionID:          event.SessionID,
+		PrivacyLevel:       event.PrivacyLevel,
+		Attributes:         attrs,
+		ProviderExtensions: map[string]any{},
+	}
+}
+
+// ThinAccessEvents returns thin events for every access observation in order.
+func ThinAccessEvents(events []canonical.Event) []canonical.Event {
+	out := []canonical.Event{}
+	index := 0
+	for _, event := range events {
+		for _, observation := range AccessObservations(event) {
+			out = append(out, ThinAccessEvent(event, observation, index))
+			index++
+		}
+	}
+	return out
 }
 
 // access is one raw file path or command line observed on an event, tagged with

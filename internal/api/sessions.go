@@ -26,6 +26,7 @@ type sessionAPI struct {
 	eventReader     storage.EventReader
 	operationReader storage.OperationReader
 	costReader      storage.CostReader
+	insightSources  storage.InsightSourceReader
 	thresholds      InsightThresholds
 }
 
@@ -77,7 +78,8 @@ func newSessionAPI(sessions storage.SessionReader, thresholds InsightThresholds)
 	eventReader, _ := sessions.(storage.EventReader)
 	operationReader, _ := sessions.(storage.OperationReader)
 	costReader, _ := sessions.(storage.CostReader)
-	return sessionAPI{sessions: sessions, deleter: deleter, eventReader: eventReader, operationReader: operationReader, costReader: costReader, thresholds: thresholds}
+	insightSources, _ := sessions.(storage.InsightSourceReader)
+	return sessionAPI{sessions: sessions, deleter: deleter, eventReader: eventReader, operationReader: operationReader, costReader: costReader, insightSources: insightSources, thresholds: thresholds}
 }
 
 func (a sessionAPI) list(w http.ResponseWriter, r *http.Request) {
