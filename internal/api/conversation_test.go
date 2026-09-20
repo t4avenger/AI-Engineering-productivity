@@ -179,6 +179,10 @@ func (s conversationEventReaderStub) ListEvents(context.Context, storage.EventFi
 	return nil, s.err
 }
 
+func (s conversationEventReaderStub) GetEvent(context.Context, string, string) (canonical.Event, bool, error) {
+	return canonical.Event{}, false, s.err
+}
+
 func conversationEvent(id, eventType, sessionID string, at time.Time, echo map[string]any) canonical.Event {
 	return canonical.Event{
 		SchemaVersion: "0.1.0", EventID: id, EventType: eventType, OccurredAt: at, ReceivedAt: at,

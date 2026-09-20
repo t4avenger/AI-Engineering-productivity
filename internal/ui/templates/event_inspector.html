@@ -1,0 +1,96 @@
+{{define "event_inspector.html"}}
+{{if .Open}}
+<dialog id="event-inspector" class="event-inspector" open aria-modal="false" aria-labelledby="event-inspector-title" data-focus-return="{{.FocusTargetID}}">
+  <div class="event-inspector-header">
+    <div>
+      <h2 id="event-inspector-title">{{if .Missing}}Event unavailable{{else if .Error}}Event inspector{{else}}{{.Title}}{{end}}</h2>
+      {{if and (not .Missing) (not .Error)}}
+      <p class="muted"><code>{{.SelectedEventID}}</code> · {{.OccurredAt}} · {{.Provider}} / {{.Tool}}</p>
+      {{end}}
+    </div>
+    <a class="event-inspector-close" href="{{.CloseURL}}" id="event-inspector-close">Close</a>
+  </div>
+  {{if .Error}}
+  <p class="error" role="alert">{{.Error}}</p>
+  {{else if .Missing}}
+  <p class="error" role="alert">No retained event with this ID exists in the current session. The selection was kept so you can retry or choose another event.</p>
+  {{else}}
+  <div class="rules-tabs" role="tablist" aria-label="Event inspector sections">
+    <a class="rules-tab{{if eq .ActiveTab "details"}} active{{end}}" role="tab" id="inspector-tab-details" href="{{.DetailsTabURL}}" aria-controls="inspector-panel-details" aria-selected="{{if eq .ActiveTab "details"}}true{{else}}false{{end}}">Details</a>
+    <a class="rules-tab{{if eq .ActiveTab "attributes"}} active{{end}}" role="tab" id="inspector-tab-attributes" href="{{.AttributesTabURL}}" aria-controls="inspector-panel-attributes" aria-selected="{{if eq .ActiveTab "attributes"}}true{{else}}false{{end}}">Attributes</a>
+    <a class="rules-tab{{if eq .ActiveTab "events"}} active{{end}}" role="tab" id="inspector-tab-events" href="{{.EventsTabURL}}" aria-controls="inspector-panel-events" aria-selected="{{if eq .ActiveTab "events"}}true{{else}}false{{end}}">Events</a>
+  </div>
+  {{if eq .ActiveTab "details"}}
+  <div class="rules-panel" role="tabpanel" id="inspector-panel-details" aria-labelledby="inspector-tab-details">
+    <dl class="timeline-facts">
+      <div><dt>Event type</dt><dd>{{.EventType}}</dd></div>
+      <div><dt>Occurred at</dt><dd>{{.OccurredAt}}</dd></div>
+      <div><dt>Outcome</dt><dd>{{if .Outcome}}{{.Outcome}}{{else}}{{template "status-badge" "unavailable"}}{{end}}</dd></div>
+      <div><dt>Duration</dt><dd>{{if .Duration}}{{.Duration}}{{else}}{{template "status-badge" "unavailable"}}{{end}}</dd></div>
+      <div><dt>Source version</dt><dd>{{if .SourceVersion}}{{.SourceVersion}}{{else}}{{template "status-badge" "unavailable"}}{{end}}</dd></div>
+      <div><dt>Operation ID</dt><dd>{{if .OperationID}}<code>{{.OperationID}}</code>{{else}}{{template "status-badge" "unavailable"}}{{end}}</dd></div>
+    </dl>
+  </div>
+  {{else if eq .ActiveTab "attributes"}}
+  <div class="rules-panel" role="tabpanel" id="inspector-panel-attributes" aria-labelledby="inspector-tab-attributes">
+    <h3>Attributes</h3>
+    <pre class="inspector-json">{{.AttributesJSON}}</pre>
+    <h3>Provider extensions</h3>
+    <pre class="inspector-json">{{.ExtensionsJSON}}</pre>
+    {{if .Truncated}}
+    <p class="muted">Long retained values are truncated in this view. <a href="{{.ExpandURL}}">Show full retained values</a></p>
+    {{end}}
+  </div>
+  {{else}}
+  <div class="rules-panel" role="tabpanel" id="inspector-panel-events" aria-labelledby="inspector-tab-events">
+    <h3>Related files</h3>
+    {{if eq .FilesAvailability "none"}}
+    <p class="muted">No proven file relationships for this event.</p>
+    {{else}}
+    <ul class="file-evidence-list">{{range .Files}}
+      <li>{{if .Href}}<a href="{{.Href}}">{{.Label}}</a>{{else}}{{.Label}}{{end}} <span class="muted">{{.Meta}}</span></li>
+    {{end}}</ul>
+    {{end}}
+    <h3>Related spans</h3>
+    {{if eq .SpansAvailability "none"}}
+    <p class="muted">No proven span relationships for this event.</p>
+    {{else}}
+    <ul class="file-evidence-list">{{range .Spans}}
+      <li><code>{{.Label}}</code> <span class="muted">{{.Meta}}</span></li>
+    {{end}}</ul>
+    {{end}}
+    <h3>Related events</h3>
+    {{if eq .RelatedAvailability "none"}}
+    <p class="muted">No proven related events. Temporal neighbours are not linked.</p>
+    {{else}}
+    <ul class="file-evidence-list">{{range .RelatedEvents}}
+      <li>{{if .Href}}<a href="{{.Href}}">{{.Label}}</a>{{else}}{{.Label}}{{end}} <span class="muted">{{.Meta}}</span></li>
+    {{end}}</ul>
+    {{end}}
+  </div>
+  {{end}}
+  {{end}}
+</dialog>
+<script>
+(function () {
+  var panel = document.getElementById('event-inspector');
+  if (!panel) return;
+  var returnId = panel.dataset.focusReturn;
+  var close = document.getElementById('event-inspector-close');
+  if (close) close.focus();
+  function restoreFocus() {
+    if (!returnId) return;
+    var target = document.getElementById(returnId);
+    if (target) target.focus();
+  }
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      restoreFocus();
+      if (close) window.location.href = close.href;
+    }
+  });
+})();
+</script>
+{{end}}
+{{end}}

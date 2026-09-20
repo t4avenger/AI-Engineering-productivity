@@ -149,6 +149,18 @@ func (s *fullStub) ListEvents(_ context.Context, filter storage.EventFilter) ([]
 	return filtered, nil
 }
 
+func (s *fullStub) GetEvent(_ context.Context, sessionID, eventID string) (canonical.Event, bool, error) {
+	if s.eventErr != nil {
+		return canonical.Event{}, false, s.eventErr
+	}
+	for _, event := range s.events[sessionID] {
+		if event.EventID == eventID {
+			return event, true, nil
+		}
+	}
+	return canonical.Event{}, false, nil
+}
+
 func (s *fullStub) ListInsightSourceEvents(context.Context) ([]canonical.Event, error) {
 	s.insightCalls++
 	if s.eventErr != nil {

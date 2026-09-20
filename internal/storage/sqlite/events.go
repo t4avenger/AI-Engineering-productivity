@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,34 @@ import (
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
+
+// GetEvent returns one retained event scoped to sessionID. A row that exists
+// under a different session is reported as not found so callers cannot leak
+// cross-session content (#189).
+func (r *Repository) GetEvent(ctx context.Context, sessionID, eventID string) (canonical.Event, bool, error) {
+	if sessionID == "" {
+		return canonical.Event{}, false, errors.New("event session ID is required")
+	}
+	if eventID == "" {
+		return canonical.Event{}, false, errors.New("event ID is required")
+	}
+	var data []byte
+	err := r.db.QueryRowContext(ctx,
+		"SELECT event_json FROM events WHERE session_id=? AND event_id=?",
+		sessionID, eventID,
+	).Scan(&data)
+	if errors.Is(err, sql.ErrNoRows) {
+		return canonical.Event{}, false, nil
+	}
+	if err != nil {
+		return canonical.Event{}, false, err
+	}
+	var event canonical.Event
+	if err := json.Unmarshal(data, &event); err != nil {
+		return canonical.Event{}, false, fmt.Errorf("decode stored event: %w", err)
+	}
+	return event, true, nil
+}
 
 // ListEvents returns one session timeline in deterministic chronological order.
 func (r *Repository) ListEvents(ctx context.Context, filter storage.EventFilter) ([]canonical.Event, error) {
