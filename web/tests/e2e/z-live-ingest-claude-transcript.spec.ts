@@ -1,9 +1,12 @@
 import { expect, test } from '@playwright/test';
 
 import {
-  authToken,
+  claudeLivePRLinkURL,
+  claudePRLinkOTLPTraces,
   claudeTranscriptNDJSON,
+  fetchLiveSessions,
   ingestClaudeTranscript,
+  ingestOTLPTraces,
   resetDaemonBetweenTests,
   unlockDashboard,
 } from './live-ingest-helpers';
@@ -13,6 +16,8 @@ import {
  * Drives the real daemon from playwright.config.ts — no page.route().fulfill()
  * mocking. POSTs NDJSON to /v1/claude/transcript, then asserts the UI renders
  * the session + assistant_message model/token counts without content canaries.
+ * A second gate (#183) proves a tool-span full_command PR URL promotes to an
+ * observed pr_link and renders on /pull-requests.
  */
 const liveModel = 'tiq-live-e2e-transcript-model';
 
@@ -23,19 +28,8 @@ test('renders a Claude transcript session ingested through the live daemon', asy
 }) => {
   await ingestClaudeTranscript(claudeTranscriptNDJSON(liveModel));
 
-  const list = await fetch('http://localhost:18080/api/v1/sessions?limit=100', {
-    headers: { Authorization: `Bearer ${authToken}` },
-  });
-  expect(list.status).toBe(200);
-  const listBody = (await list.json()) as {
-    data: Array<{
-      tool: string;
-      session_id?: string;
-      attributes?: { model?: string; entrypoint?: string; git_branch?: string };
-      availability?: { entrypoint?: string; git_branch?: string; pr_link?: string };
-    }>;
-  };
-  const transcriptSession = listBody.data.find(
+  const sessions = await fetchLiveSessions();
+  const transcriptSession = sessions.find(
     (session) => session.attributes?.model === liveModel,
   );
   expect(transcriptSession?.tool).toBe('claude-code');
@@ -45,7 +39,7 @@ test('renders a Claude transcript session ingested through the live daemon', asy
   expect(transcriptSession?.availability?.git_branch).toBe('observed');
   expect(transcriptSession?.availability?.pr_link).toBe('unavailable');
 
-  await unlockDashboard(page, authToken);
+  await unlockDashboard(page);
   await page.getByRole('link', { name: 'Sessions', exact: true }).click();
   await expect(
     page.getByRole('cell', { name: 'claude-code' }).first(),
@@ -74,4 +68,32 @@ test('renders a Claude transcript session ingested through the live daemon', asy
   ]) {
     expect(pageText).not.toContain(canary);
   }
+});
+
+// #183: a Claude tool span whose raw full_command carries a verbatim
+// pull-request URL must promote pr_link to observed through the same
+// provider-agnostic aggregation the Codex path uses, and render the URL on
+// /pull-requests — closing the always-unavailable Claude cell #158 shipped.
+test('promotes a Claude tool-span PR URL to an observed pr_link on the live daemon', async ({
+  page,
+}) => {
+  await unlockDashboard(page);
+  await page.goto('/pull-requests');
+  await expect(page.getByRole('link', { name: /github\.com/ })).toHaveCount(0);
+
+  await ingestOTLPTraces(claudePRLinkOTLPTraces());
+
+  const sessions = await fetchLiveSessions();
+  const prSession = sessions.find(
+    (session) =>
+      session.session_id === 'claude-code:tiq-live-e2e-session-pr-link',
+  );
+  expect(prSession?.tool).toBe('claude-code');
+  expect(prSession?.attributes?.pr_link).toBe(claudeLivePRLinkURL);
+  expect(prSession?.availability?.pr_link).toBe('observed');
+
+  await page.goto('/pull-requests');
+  await expect(
+    page.getByRole('link', { name: claudeLivePRLinkURL }),
+  ).toBeVisible();
 });

@@ -60,7 +60,14 @@ evidence when providers emit it:
   self-hosted URL paths are accepted verbatim from reviewed tool evidence; multiple
   distinct candidates produce `partial`, never an arbitrary selected link. Do not
   invent a link from metrics such as `pull_request.count`, branch names, or
-  repository metadata, and never fetch or enrich the URL.
+  repository metadata, and never fetch or enrich the URL. The URL grammar and
+  extraction are shared across providers in `normalize.AttachPRLinkEvidence`.
+  Codex sources it from `codex.tool_result` `arguments`/`output`; Claude sources it
+  from a tool span's raw `full_command` (e.g. `gh pr view <url>`), so
+  `claude_code.pull_request.count` (a metric counter, #98) never stands in for a
+  URL (#183). The Claude `tool_decision` `tool_parameters` and session-JSONL tool
+  output surfaces can also carry a URL but are currently dropped at ingest; they
+  stay `unavailable` for `pr_link` until retained raw by #173 / #105.
 
 Session event timeline entries include optional token fields for retained model
 signals: `input_token_count`, `output_token_count`, `cached_input_token_count`,

@@ -102,6 +102,16 @@ var safeSpanAttributeKeys = map[string]struct{}{
 	"user_prompt_length":      {},
 }
 
+// claudePRLinkScanFields are the reviewed Claude span fields that can carry a
+// pull/merge-request URL verbatim. full_command is the OTEL_LOG_TOOL_DETAILS-gated
+// raw command line on tool spans (#101), so a `gh pr create` / `gh pr view <url>`
+// invocation surfaces a PR URL here. The URL grammar and extraction live in
+// normalize.AttachPRLinkEvidence, shared with Codex (no CPD-duplicated block).
+// tool_decision tool_parameters (dropped, pending #173) and JSONL tool output
+// (allow-listed out, pending #105) are the other candidate surfaces, documented
+// as unavailable until those issues retain them raw.
+var claudePRLinkScanFields = []string{"full_command"}
+
 type tracesPayload struct {
 	ResourceSpans []resourceSpan `json:"resourceSpans"`
 }
@@ -294,6 +304,13 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 		"resource":        ctx.safeResource,
 		"span_attributes": safeSpanAttributes(fields),
 	}
+	// A tool span's raw full_command carries the exact command line (#101), so a
+	// `gh pr create` / `gh pr view <url>` invocation surfaces a pull-request URL
+	// verbatim here. The shared extractor promotes only URLs present in the wire
+	// value; it never derives one from repo metadata (honesty invariant). Claude
+	// events carrying pr_link_candidates flow through the provider-agnostic
+	// session aggregation (attachSessionPRLink) into session.Attributes["pr_link"].
+	normalize.AttachPRLinkEvidence(attributes, extensions, fields, claudePRLinkScanFields)
 	return canonical.Event{
 		SchemaVersion:      canonicalSchemaVersion,
 		EventID:            eventID,

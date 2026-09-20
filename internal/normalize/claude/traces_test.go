@@ -372,6 +372,58 @@ func TestNormalizeTracesToolSpansGolden(t *testing.T) {
 	assertMatchesGolden(t, "claude-code-2.1.268-tool-spans.events.json", first)
 }
 
+// TestNormalizeTracesToolSpanPromotesPRLink proves the #183 contract: a verbatim
+// pull-request URL in a tool span's raw full_command is extracted into
+// pr_link_candidates (attributes) + pr_link_evidence (extensions) by the shared
+// normalize.AttachPRLinkEvidence, while a span with no such URL (the interaction
+// parent) stays silent — no fabricated or empty candidate. The session-level
+// promotion to session.Attributes["pr_link"] is exercised by the storage
+// aggregation (attachSessionPRLink) and the live ingest→read gate, not here.
+func TestNormalizeTracesToolSpanPromotesPRLink(t *testing.T) {
+	payload := tracesFixturePayload(t, "claude-code-2.1.273-tool-pr-link-otlp.json")
+	receivedAt := time.Date(2026, 9, 20, 11, 20, 1, 0, time.UTC)
+
+	first, err := NormalizeTraces(payload, receivedAt)
+	if err != nil {
+		t.Fatalf("first: %v", err)
+	}
+	second, err := NormalizeTraces(payload, receivedAt)
+	if err != nil {
+		t.Fatalf("second: %v", err)
+	}
+	if !reflect.DeepEqual(first, second) {
+		t.Fatal("normalisation must be deterministic")
+	}
+
+	bySpanID := make(map[string]canonical.Event, len(first))
+	for _, event := range first {
+		bySpanID[spanField(t, event, "span_id")] = event
+	}
+
+	const wantURL = "https://github.com/acme-synthetic/telemetryiq/pull/183"
+	bash := bySpanID["0000000000000b02"]
+	candidates, ok := bash.Attributes["pr_link_candidates"].([]string)
+	if !ok || len(candidates) != 1 || candidates[0] != wantURL {
+		t.Fatalf("bash pr_link_candidates = %#v, want [%q]", bash.Attributes["pr_link_candidates"], wantURL)
+	}
+	evidence, ok := bash.ProviderExtensions["pr_link_evidence"].([]map[string]string)
+	if !ok || len(evidence) != 1 || evidence[0]["field"] != "full_command" || evidence[0]["url"] != wantURL {
+		t.Fatalf("bash pr_link_evidence = %#v", bash.ProviderExtensions["pr_link_evidence"])
+	}
+
+	// The interaction parent has no command surface, so it must not carry a
+	// candidate key at all (genuine absence, never an empty slice).
+	interaction := bySpanID["0000000000000b01"]
+	if _, present := interaction.Attributes["pr_link_candidates"]; present {
+		t.Fatalf("interaction span must not carry pr_link_candidates, got %#v", interaction.Attributes["pr_link_candidates"])
+	}
+	if _, present := interaction.ProviderExtensions["pr_link_evidence"]; present {
+		t.Fatalf("interaction span must not carry pr_link_evidence, got %#v", interaction.ProviderExtensions["pr_link_evidence"])
+	}
+
+	assertMatchesGolden(t, "claude-code-2.1.273-tool-pr-link.events.json", first)
+}
+
 // assertClaudeToolSpanTree proves the raw-capture contract for #101: each tool
 // span type carries its typed block with every documented field (paths, commands,
 // and free-text errors present verbatim), those raw values live only in the typed
