@@ -234,6 +234,50 @@ func segmentMs(segment *SegmentDuration) int64 {
 	return segment.DurationMs
 }
 
+func TestCalculateKeepsFirstCategoryForDuplicateIdentity(t *testing.T) {
+	base := time.Date(2026, 9, 20, 10, 0, 0, 0, time.UTC)
+	first := typedSpan("earlier-event", "trace", "same", "", "llm_request", base, base.Add(5*time.Second))
+	later := typedSpan("later-event", "trace", "same", "", "tool", base.Add(time.Second), base.Add(6*time.Second))
+	later.OccurredAt = base.Add(time.Minute)
+	later.ReceivedAt = later.OccurredAt
+	result := Calculate([]canonical.Event{later, first}, nil)
+	if result.Availability != AvailabilityAvailable {
+		t.Fatalf("availability = %#v", result)
+	}
+	got := map[string]int64{}
+	for _, category := range result.Categories {
+		got[category.ID] = category.DurationMs
+	}
+	if got[CategoryModelGeneration] != 5_000 || got[CategoryToolCalls] != 0 {
+		t.Fatalf("categories = %#v, want first-wins model_generation only", got)
+	}
+}
+
+func TestCalculateSubMillisecondFragmentsStillPartition(t *testing.T) {
+	base := time.Date(2026, 9, 20, 10, 0, 0, 0, time.UTC)
+	// 1500µs tool span inside a 2ms window leaves sub-ms unclassified residue that
+	// must still partition exactly after nanosecond accumulation.
+	events := []canonical.Event{
+		typedSpan("tool", "trace", "tool", "", "tool", base, base.Add(1500*time.Microsecond)),
+	}
+	session := &canonical.Session{StartedAt: base, CompletedAt: ptrTime(base.Add(2 * time.Millisecond))}
+	result := Calculate(events, session)
+	if result.Availability != AvailabilityAvailable {
+		t.Fatalf("availability = %#v", result)
+	}
+	if result.Window == nil || result.Window.DurationMs != 2 {
+		t.Fatalf("window = %#v, want 2ms", result.Window)
+	}
+	sum := int64(0)
+	for _, category := range result.Categories {
+		sum += category.DurationMs
+	}
+	sum += segmentMs(result.Overlap) + segmentMs(result.Unclassified)
+	if sum != result.Window.DurationMs {
+		t.Fatalf("partition sum %d != window %d (%#v)", sum, result.Window.DurationMs, result)
+	}
+}
+
 func typedSpan(eventID, traceID, spanID, parentID, spanType string, start, end time.Time) canonical.Event {
 	envelope := map[string]any{
 		"trace_id":        traceID,

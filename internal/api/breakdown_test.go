@@ -18,9 +18,18 @@ func TestSessionBreakdownAPIContract(t *testing.T) {
 	repo := sessionTestRepository(t)
 	base := time.Date(2026, 9, 20, 12, 0, 0, 0, time.UTC)
 	events := []canonical.Event{
-		apiTypedSpanEvent("evt-llm", "session-newest", "trace", "llm", "", "llm_request", base, base.Add(4*time.Second)),
-		apiTypedSpanEvent("evt-tool", "session-newest", "trace", "tool", "", "tool", base.Add(2*time.Second), base.Add(6*time.Second)),
-		apiTypedSpanEvent("evt-other", "session-middle", "other", "llm", "", "llm_request", base, base.Add(time.Second)),
+		apiTypedSpanEvent(apiTypedSpan{
+			EventID: "evt-llm", SessionID: "session-newest", TraceID: "trace", SpanID: "llm",
+			SpanType: "llm_request", Start: base, End: base.Add(4 * time.Second),
+		}),
+		apiTypedSpanEvent(apiTypedSpan{
+			EventID: "evt-tool", SessionID: "session-newest", TraceID: "trace", SpanID: "tool",
+			SpanType: "tool", Start: base.Add(2 * time.Second), End: base.Add(6 * time.Second),
+		}),
+		apiTypedSpanEvent(apiTypedSpan{
+			EventID: "evt-other", SessionID: "session-middle", TraceID: "other", SpanID: "llm",
+			SpanType: "llm_request", Start: base, End: base.Add(time.Second),
+		}),
 	}
 	if err := repo.SaveEvents(context.Background(), events); err != nil {
 		t.Fatal(err)
@@ -49,7 +58,6 @@ func TestSessionBreakdownAPIContract(t *testing.T) {
 		t.Fatalf("expected overlap, got %#v", result.Overlap)
 	}
 
-	// Page-size independence: the endpoint is non-paged and must ignore limit.
 	again := getBreakdown(t, server.URL+"/api/v1/sessions/session-newest/breakdown?limit=1")
 	if again.Window == nil || result.Window == nil || again.Window.DurationMs != result.Window.DurationMs {
 		t.Fatalf("limit changed breakdown window: %#v vs %#v", again.Window, result.Window)
@@ -58,11 +66,9 @@ func TestSessionBreakdownAPIContract(t *testing.T) {
 
 func TestSessionBreakdownAPIUnavailableWithoutClassifiedIntervals(t *testing.T) {
 	repo := sessionTestRepository(t)
-	base := time.Unix(1, 0).UTC()
 	events := []canonical.Event{
 		apiSpanEvent("span-root", "session-newest", "trace", "root", "", "1000000000", "2000000000"),
 	}
-	_ = base
 	if err := repo.SaveEvents(context.Background(), events); err != nil {
 		t.Fatal(err)
 	}
@@ -108,24 +114,18 @@ func getBreakdown(t *testing.T, address string) breakdown.Result {
 	return payload.Data
 }
 
-func apiTypedSpanEvent(eventID, sessionID, traceID, spanID, parentID, spanType string, start, end time.Time) canonical.Event {
-	envelope := map[string]any{
-		"trace_id": traceID, "span_id": spanID, "name": "claude_code." + spanType,
-		"start_unix_nano": formatNano(start), "end_unix_nano": formatNano(end), "status_code": int64(0),
-	}
-	if parentID != "" {
-		envelope["parent_span_id"] = parentID
-	}
-	return canonical.Event{
-		SchemaVersion: "0.1.0", EventID: eventID, EventType: "claude_code." + spanType,
-		OccurredAt: start, ReceivedAt: start, Provider: "anthropic", Tool: "claude-code",
-		SourceSchema: "otel", SourceVersion: "2.1.268", ActorID: "unavailable", DeviceID: "unavailable",
-		SessionID: sessionID, PrivacyLevel: "operational",
-		Attributes:         map[string]any{"span_type": spanType},
-		ProviderExtensions: map[string]any{"span": envelope},
-	}
+type apiTypedSpan struct {
+	EventID, SessionID, TraceID, SpanID, ParentID, SpanType string
+	Start, End                                              time.Time
 }
 
-func formatNano(value time.Time) string {
-	return strconv.FormatInt(value.UnixNano(), 10)
+func apiTypedSpanEvent(span apiTypedSpan) canonical.Event {
+	return apiSpanEventOpts(apiSpanOpts{
+		EventID: span.EventID, SessionID: span.SessionID, TraceID: span.TraceID, SpanID: span.SpanID,
+		ParentID: span.ParentID, StartUnixNano: strconv.FormatInt(span.Start.UnixNano(), 10),
+		EndUnixNano: strconv.FormatInt(span.End.UnixNano(), 10),
+		Name:        "claude_code." + span.SpanType, EventType: "claude_code." + span.SpanType,
+		Provider: "anthropic", Tool: "claude-code", SourceVersion: "2.1.268",
+		OccurredAt: span.Start, Attributes: map[string]any{"span_type": span.SpanType},
+	})
 }

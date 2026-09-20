@@ -94,8 +94,18 @@ func Calculate(events []canonical.Event, session *canonical.Session) Result {
 		return unavailable(reason)
 	}
 
-	windowMs := windowEnd.Sub(windowStart).Milliseconds()
-	totals, evidence := segment(windowStart, windowEnd, intervals)
+	windowNs := windowEnd.Sub(windowStart).Nanoseconds()
+	if windowNs <= 0 {
+		reason := "observed session window has no positive duration"
+		return unavailable(reason)
+	}
+	totalsNs, evidence := segment(windowStart, windowEnd, intervals)
+	windowMs := windowNs / int64(time.Millisecond)
+	if windowMs <= 0 {
+		reason := "observed session window has no positive duration"
+		return unavailable(reason)
+	}
+	totalsMs := durationsToMilliseconds(windowNs, totalsNs)
 	coverageState := CoverageComplete
 	if sawInvalid {
 		coverageState = CoveragePartial
@@ -104,7 +114,7 @@ func Calculate(events []canonical.Event, session *canonical.Session) Result {
 	categories := make([]CategoryDuration, 0, 4)
 	classifiedMs := int64(0)
 	for _, id := range []string{CategoryPlanning, CategoryToolCalls, CategoryModelGeneration, CategoryUserWait} {
-		ms := totals[id]
+		ms := totalsMs[id]
 		if ms <= 0 {
 			continue
 		}
@@ -114,8 +124,8 @@ func Calculate(events []canonical.Event, session *canonical.Session) Result {
 			SourceEventIDs: evidence[id],
 		})
 	}
-	overlapMs := totals["overlap"]
-	unclassifiedMs := totals["unclassified"]
+	overlapMs := totalsMs["overlap"]
+	unclassifiedMs := totalsMs["unclassified"]
 	if overlapMs > 0 {
 		classifiedMs += overlapMs
 	}
@@ -152,10 +162,22 @@ func unavailable(reason string) Result {
 }
 
 func categoryIndex(events []canonical.Event) map[string]string {
-	index := make(map[string]string, len(events))
-	for _, event := range events {
+	// Match spans.Project: sort by occurred_at then event_id, keep the first
+	// classified category for each (trace_id, span_id) identity.
+	ordered := append([]canonical.Event(nil), events...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		if !ordered[i].OccurredAt.Equal(ordered[j].OccurredAt) {
+			return ordered[i].OccurredAt.Before(ordered[j].OccurredAt)
+		}
+		return ordered[i].EventID < ordered[j].EventID
+	})
+	index := make(map[string]string, len(ordered))
+	for _, event := range ordered {
 		identity := spanIdentity(event)
 		if identity == "" {
+			continue
+		}
+		if _, found := index[identity]; found {
 			continue
 		}
 		if category, ok := classify(event); ok {
@@ -250,12 +272,7 @@ func collectIntervals(records []spans.Record, categoryByIdentity map[string]stri
 	intervals := make([]classifiedInterval, 0, len(records))
 	sawInvalid := false
 	for _, record := range records {
-		switch record.IntervalAvailability {
-		case spans.IntervalInvalid, spans.IntervalMissing:
-			sawInvalid = true
-			continue
-		case spans.IntervalAvailable:
-		default:
+		if record.IntervalAvailability != spans.IntervalAvailable {
 			sawInvalid = true
 			continue
 		}
@@ -324,13 +341,41 @@ func segment(windowStart, windowEnd time.Time, intervals []classifiedInterval) (
 		if !segEnd.After(segStart) || segStart.Before(windowStart) || !segStart.Before(windowEnd) {
 			continue
 		}
-		applySegment(totals, evidence, segEnd.Sub(segStart).Milliseconds(), coveringCategories(segStart, segEnd, intervals))
+		applySegment(totals, evidence, segEnd.Sub(segStart).Nanoseconds(), coveringCategories(segStart, segEnd, intervals))
 	}
 	for category, ids := range evidence {
 		sort.Strings(ids)
 		evidence[category] = ids
 	}
 	return totals, evidence
+}
+
+// durationsToMilliseconds converts nanosecond bucket totals to milliseconds once
+// at the result boundary and assigns any truncation residual to unclassified so
+// category + overlap + unclassified always equals the observed window.
+func durationsToMilliseconds(windowNs int64, totalsNs map[string]int64) map[string]int64 {
+	windowMs := windowNs / int64(time.Millisecond)
+	keys := []string{
+		CategoryPlanning, CategoryToolCalls, CategoryModelGeneration, CategoryUserWait,
+		"overlap", "unclassified",
+	}
+	result := make(map[string]int64, len(keys))
+	assigned := int64(0)
+	for _, key := range keys {
+		if key == "unclassified" {
+			continue
+		}
+		ms := totalsNs[key] / int64(time.Millisecond)
+		if ms > 0 {
+			result[key] = ms
+			assigned += ms
+		}
+	}
+	remainder := windowMs - assigned
+	if remainder > 0 {
+		result["unclassified"] = remainder
+	}
+	return result
 }
 
 func boundaryPoints(windowStart, windowEnd time.Time, intervals []classifiedInterval) []int64 {

@@ -8,7 +8,9 @@
   {{else}}
   <p class="breakdown-total"><span class="breakdown-total-value">{{.Breakdown.TotalLabel}}</span> <span class="muted">observed window</span></p>
   {{if .Breakdown.ShowDonut}}
-  <div class="breakdown-donut" style="--breakdown-conic: {{.Breakdown.ConicGradient}};" role="img" aria-label="{{.Breakdown.DonutLabel}}"></div>
+  <svg class="breakdown-donut" style="--breakdown-conic: {{.Breakdown.ConicGradient}};" role="img" aria-label="{{.Breakdown.DonutLabel}}" focusable="false">
+    <title>{{.Breakdown.DonutLabel}}</title>
+  </svg>
   {{end}}
   <ul class="breakdown-list" aria-label="Duration categories">
     {{range .Breakdown.Categories}}

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -81,7 +82,7 @@ func appendCategoryViews(view *breakdownView, categories []breakdown.CategoryDur
 		cursor += percent
 		evidencePath := ""
 		if len(category.SourceEventIDs) > 0 {
-			evidencePath = sessionPath(sessionID) + "?event=" + category.SourceEventIDs[0] + "&inspector=details#event-inspector"
+			evidencePath = sessionPath(sessionID) + "?event=" + url.QueryEscape(category.SourceEventIDs[0]) + "&inspector=details#event-inspector"
 		}
 		view.Categories = append(view.Categories, breakdownCategoryView{
 			ID: category.ID, Label: category.Label,
