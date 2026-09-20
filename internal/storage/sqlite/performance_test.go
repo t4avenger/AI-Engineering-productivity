@@ -142,6 +142,40 @@ func TestSummarizeCostsAggregatesWithoutFullScanSemantics(t *testing.T) {
 	}
 }
 
+func TestSessionHydratesLastEventAtFromColumn(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hydrate.db")
+	repo, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = repo.Close() }()
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{
+		event(t, "early", "hydrate-session", "session.created", "2026-01-02T10:00:00Z"),
+		event(t, "late", "hydrate-session", "session.completed", "2026-01-02T12:45:00Z"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.db.Exec(`UPDATE sessions SET session_json = json_remove(session_json, '$.attributes.last_event_at') WHERE session_id='hydrate-session'`); err != nil {
+		t.Fatal(err)
+	}
+	session, found, err := repo.Session(context.Background(), "hydrate-session")
+	if err != nil || !found {
+		t.Fatalf("Session() = found=%v err=%v", found, err)
+	}
+	raw, _ := session.Attributes["last_event_at"].(string)
+	if !strings.HasPrefix(raw, "2026-01-02T12:45:00") {
+		t.Fatalf("Session last_event_at = %q, want column hydration", raw)
+	}
+	listed, err := repo.ListSessions(context.Background(), storage.SessionFilter{Limit: 10})
+	if err != nil || len(listed) != 1 {
+		t.Fatalf("ListSessions() = %#v, %v", listed, err)
+	}
+	listedRaw, _ := listed[0].Attributes["last_event_at"].(string)
+	if !strings.HasPrefix(listedRaw, "2026-01-02T12:45:00") {
+		t.Fatalf("ListSessions last_event_at = %q, want column hydration", listedRaw)
+	}
+}
+
 func TestOpenDoesNotRebuildAllSessions(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "norebuild.db")
 	repo, err := Open(path)

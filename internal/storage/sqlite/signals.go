@@ -63,7 +63,7 @@ CREATE INDEX IF NOT EXISTS insight_signals_session_kind ON insight_signals(sessi
 CREATE INDEX IF NOT EXISTS events_session_type_occurred ON events(session_id, event_type, occurred_at, event_id)`); err != nil {
 		return fmt.Errorf("create insight signal indexes: %w", err)
 	}
-	if err := backfillInsightSignals(ctx, tx); err != nil {
+	if err := r.backfillInsightSignals(ctx, tx); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO schema_migrations(version) VALUES (7)"); err != nil {
@@ -75,7 +75,7 @@ CREATE INDEX IF NOT EXISTS events_session_type_occurred ON events(session_id, ev
 	return nil
 }
 
-func backfillInsightSignals(ctx context.Context, tx *sql.Tx) error {
+func (r *Repository) backfillInsightSignals(ctx context.Context, tx *sql.Tx) error {
 	rows, err := tx.QueryContext(ctx, "SELECT DISTINCT session_id FROM events ORDER BY session_id")
 	if err != nil {
 		return fmt.Errorf("list sessions for signal backfill: %w", err)
@@ -96,11 +96,9 @@ func backfillInsightSignals(ctx context.Context, tx *sql.Tx) error {
 		return err
 	}
 	for _, id := range ids {
-		events, err := loadSessionEvents(ctx, tx, id)
-		if err != nil {
-			return err
-		}
-		if err := rebuildInsightSignals(ctx, tx, id, events); err != nil {
+		// Full rebuild writes last_event_at into session_json as well as the
+		// denormalized column and insight_signals — ListSessions only returns JSON.
+		if err := r.rebuildSession(ctx, tx, id); err != nil {
 			return err
 		}
 	}

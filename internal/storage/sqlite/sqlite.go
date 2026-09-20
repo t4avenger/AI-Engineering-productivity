@@ -862,7 +862,8 @@ func terminal(s string) bool {
 }
 func (r *Repository) Session(ctx context.Context, id string) (canonical.Session, bool, error) {
 	var data []byte
-	err := r.db.QueryRowContext(ctx, "SELECT session_json FROM sessions WHERE session_id=?", id).Scan(&data)
+	var lastEventAt sql.NullString
+	err := r.db.QueryRowContext(ctx, "SELECT session_json, last_event_at FROM sessions WHERE session_id=?", id).Scan(&data, &lastEventAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return canonical.Session{}, false, nil
 	}
@@ -873,6 +874,7 @@ func (r *Repository) Session(ctx context.Context, id string) (canonical.Session,
 	err = json.Unmarshal(data, &s)
 	if err == nil {
 		ensureSessionIdentity(&s)
+		hydrateLastEventAt(&s, lastEventAt)
 	}
 	return s, true, err
 }
@@ -933,7 +935,7 @@ func sessionListQuery(filter storage.SessionFilter) (string, []any, error) {
 		cursorTime := filter.Cursor.StartedAt.UTC().Format(time.RFC3339Nano)
 		args = append(args, cursorTime, cursorTime, filter.Cursor.SessionID)
 	}
-	query := "SELECT session_json FROM sessions"
+	query := "SELECT session_json, last_event_at FROM sessions"
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
@@ -945,7 +947,8 @@ func decodeSessions(rows *sql.Rows, limit int) ([]canonical.Session, error) {
 	sessions := make([]canonical.Session, 0, limit+1)
 	for rows.Next() {
 		var data []byte
-		if err := rows.Scan(&data); err != nil {
+		var lastEventAt sql.NullString
+		if err := rows.Scan(&data, &lastEventAt); err != nil {
 			return nil, err
 		}
 		var session canonical.Session
@@ -953,12 +956,23 @@ func decodeSessions(rows *sql.Rows, limit int) ([]canonical.Session, error) {
 			return nil, err
 		}
 		ensureSessionIdentity(&session)
+		hydrateLastEventAt(&session, lastEventAt)
 		sessions = append(sessions, session)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return sessions, nil
+}
+
+func hydrateLastEventAt(session *canonical.Session, lastEventAt sql.NullString) {
+	if !lastEventAt.Valid || strings.TrimSpace(lastEventAt.String) == "" {
+		return
+	}
+	if session.Attributes == nil {
+		session.Attributes = map[string]any{}
+	}
+	session.Attributes["last_event_at"] = lastEventAt.String
 }
 
 // ListOperations returns retained stable-primitive operation records.
