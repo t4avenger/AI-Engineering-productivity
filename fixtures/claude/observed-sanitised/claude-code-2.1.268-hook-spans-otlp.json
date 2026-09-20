@@ -1,0 +1,270 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "synthetic",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.268",
+  "captured_at": "2026-09-20T09:14:22Z",
+  "sanitisation_reviewed": true,
+  "capture_note": "Hook spans (claude_code.hook) could not be captured live in this environment: they appear only when detailed beta tracing is active (ENABLE_BETA_TRACING_DETAILED=1 + BETA_TRACING_ENDPOINT), which in interactive CLI sessions also requires org allowlisting, and OTEL_LOG_TOOL_DETAILS to emit hook_definitions. Reproduced from the documented schema at https://code.claude.com/docs/en/monitoring-usage (attributes verified 2026-09-20). The docs state span.type 'matches its name', but the live interaction/tool captures (#100/#101) proved span.type is the short form (name minus the claude_code. prefix), so 'hook' is used here to match that observed convention and the existing dispatch; revisit if a live capture ever shows the literal 'claude_code.hook' value. The gated hook_definitions is included raw, modelled as it would appear with OTEL_LOG_TOOL_DETAILS=1. No live run occurred; all values are synthetic (#103 T16, epic #87).",
+  "payload": {
+    "resourceSpans": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "host.arch",
+              "value": {
+                "stringValue": "amd64"
+              }
+            },
+            {
+              "key": "os.type",
+              "value": {
+                "stringValue": "linux"
+              }
+            },
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "claude-code"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "2.1.268"
+              }
+            }
+          ],
+          "droppedAttributesCount": 0
+        },
+        "scopeSpans": [
+          {
+            "scope": {
+              "name": "com.anthropic.claude_code.tracing",
+              "version": "1.0.0"
+            },
+            "spans": [
+              {
+                "traceId": "00000000000000000000000000000103",
+                "spanId": "0000000000000c01",
+                "name": "claude_code.interaction",
+                "kind": 1,
+                "startTimeUnixNano": "1789203600000000000",
+                "endTimeUnixNano": "1789203605000000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000103"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "interaction"
+                    }
+                  },
+                  {
+                    "key": "interaction.sequence",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "interaction.duration_ms",
+                    "value": {
+                      "intValue": 5000
+                    }
+                  },
+                  {
+                    "key": "user_prompt_length",
+                    "value": {
+                      "intValue": 58
+                    }
+                  },
+                  {
+                    "key": "queued_sends",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "parent.source",
+                    "value": {
+                      "stringValue": "none"
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 0
+                }
+              },
+              {
+                "traceId": "00000000000000000000000000000103",
+                "spanId": "0000000000000c02",
+                "parentSpanId": "0000000000000c01",
+                "name": "claude_code.hook",
+                "kind": 1,
+                "startTimeUnixNano": "1789203600400000000",
+                "endTimeUnixNano": "1789203600445000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000103"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "hook"
+                    }
+                  },
+                  {
+                    "key": "hook_event",
+                    "value": {
+                      "stringValue": "PreToolUse"
+                    }
+                  },
+                  {
+                    "key": "hook_name",
+                    "value": {
+                      "stringValue": "PreToolUse:Write"
+                    }
+                  },
+                  {
+                    "key": "num_hooks",
+                    "value": {
+                      "intValue": 2
+                    }
+                  },
+                  {
+                    "key": "hook_definitions",
+                    "value": {
+                      "stringValue": "[{\"type\":\"command\",\"command\":\"./scripts/format-guard.sh\"},{\"type\":\"command\",\"command\":\"./scripts/audit-log.sh\"}]"
+                    }
+                  },
+                  {
+                    "key": "num_success",
+                    "value": {
+                      "intValue": 2
+                    }
+                  },
+                  {
+                    "key": "num_blocking",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "num_non_blocking_error",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "num_cancelled",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 45
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 0
+                }
+              },
+              {
+                "traceId": "00000000000000000000000000000103",
+                "spanId": "0000000000000c03",
+                "parentSpanId": "0000000000000c01",
+                "name": "claude_code.hook",
+                "kind": 1,
+                "startTimeUnixNano": "1789203602000000000",
+                "endTimeUnixNano": "1789203602012000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000103"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "hook"
+                    }
+                  },
+                  {
+                    "key": "hook_event",
+                    "value": {
+                      "stringValue": "PreToolUse"
+                    }
+                  },
+                  {
+                    "key": "hook_name",
+                    "value": {
+                      "stringValue": "PreToolUse:Bash"
+                    }
+                  },
+                  {
+                    "key": "num_hooks",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "hook_definitions",
+                    "value": {
+                      "stringValue": "[{\"type\":\"command\",\"command\":\"./scripts/deny-network.sh\"}]"
+                    }
+                  },
+                  {
+                    "key": "num_success",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "num_blocking",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "num_non_blocking_error",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "num_cancelled",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 12
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 2
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

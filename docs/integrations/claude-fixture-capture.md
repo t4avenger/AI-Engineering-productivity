@@ -154,6 +154,38 @@ Committed evidence:
 - `fixtures/claude/expected/claude-code-2.1.268-tool-spans.events.json`
   (golden canonical tool-span events)
 
+### Hook-span capture (`claude_code.hook`, T16/#103)
+
+The `claude_code.hook` span reports how user-configured hooks intervened in an
+agent turn (`hook_event`, `hook_name`, `num_hooks`, `num_success`,
+`num_blocking`, `num_non_blocking_error`, `num_cancelled`, `duration_ms`, plus
+the gated `hook_definitions`). Like the tool spans it requires the enhanced
+detailed beta tracing exporter (`ENABLE_BETA_TRACING_DETAILED=1` +
+`BETA_TRACING_ENDPOINT`), which in an interactive CLI session also requires org
+allowlisting, plus **at least one configured hook** for a hook span to be
+emitted, and `OTEL_LOG_TOOL_DETAILS=1` to retain the gated `hook_definitions`.
+That combination could not be reproduced under the capture harness, so the hook
+fixture is `fixture_origin: "synthetic"`, reproduced from the documented schema
+at `https://code.claude.com/docs/en/monitoring-usage` (attributes verified
+2026-09-20) with synthetic values and the gated `hook_definitions` present raw.
+
+The docs table says a span's `span.type` "matches its name", but the live
+interaction/tool captures proved `span.type` carries the short form (the name
+minus the `claude_code.` prefix), so the fixture uses `span.type=hook` to match
+that observed convention and the existing dispatch; its `capture_note` records
+this reasoning. If a real hook-span trace is ever captured (an interactive
+session with a configured hook against a loopback sink), re-label it
+`observed-sanitised`, confirm the literal `span.type` value, and record the tool
+version actually used.
+
+Committed evidence:
+
+- `fixtures/claude/observed-sanitised/claude-code-2.1.268-hook-spans-otlp.json`
+  (docs-shaped synthetic hook spans under an interaction root: a `PreToolUse:Write`
+  that succeeds and a `PreToolUse:Bash` that blocks)
+- `fixtures/claude/expected/claude-code-2.1.268-hook-spans.events.json`
+  (golden canonical hook-span events)
+
 ## Outcome-contract capture
 
 To raise Task outcome above `unknown`, capture provider-completion signals without

@@ -633,3 +633,151 @@ func TestNormalizeTracesSubAgentWorkflowPresentOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestNormalizeTracesHookSpansGolden(t *testing.T) {
+	payload := tracesFixturePayload(t, "claude-code-2.1.268-hook-spans-otlp.json")
+	receivedAt := time.Date(2026, 9, 20, 9, 14, 23, 0, time.UTC)
+
+	first, err := NormalizeTraces(payload, receivedAt)
+	if err != nil {
+		t.Fatalf("first: %v", err)
+	}
+	second, err := NormalizeTraces(payload, receivedAt)
+	if err != nil {
+		t.Fatalf("second: %v", err)
+	}
+	if !reflect.DeepEqual(first, second) {
+		t.Fatal("normalisation must be deterministic")
+	}
+	assertClaudeHookSpanTree(t, first)
+	assertMatchesGolden(t, "claude-code-2.1.268-hook-spans.events.json", first)
+}
+
+// assertClaudeHookSpanTree proves the #103 contract: each hook span carries its
+// typed block with every documented count/duration, the gated hook_definitions
+// is present verbatim but lives only in the typed block (never duplicated into
+// span_attributes), and a hook span is observed to not be a task boundary.
+func assertClaudeHookSpanTree(t *testing.T, events []canonical.Event) {
+	t.Helper()
+	if len(events) != 3 {
+		t.Fatalf("event count = %d, want 3 (interaction + 2 hook)", len(events))
+	}
+	bySpanID := make(map[string]canonical.Event, len(events))
+	for _, event := range events {
+		bySpanID[spanField(t, event, "span_id")] = event
+	}
+
+	// The successful PreToolUse:Write hook: every count present, gated
+	// hook_definitions captured raw.
+	writeHook := bySpanID["0000000000000c02"]
+	assertBlockFields(t, "hook", toolBlock(t, writeHook, "hook"), map[string]any{
+		"hook_event":             "PreToolUse",
+		"hook_name":              "PreToolUse:Write",
+		"hook_definitions":       "[{\"type\":\"command\",\"command\":\"./scripts/format-guard.sh\"},{\"type\":\"command\",\"command\":\"./scripts/audit-log.sh\"}]",
+		"num_hooks":              int64(2),
+		"num_success":            int64(2),
+		"num_blocking":           int64(0),
+		"num_non_blocking_error": int64(0),
+		"num_cancelled":          int64(0),
+		"duration_ms":            int64(45),
+	})
+	if got := boundaryConfidence(t, writeHook); got != "observed" {
+		t.Fatalf("hook span task_boundary confidence = %q, want observed", got)
+	}
+	// The gated hook_definitions is content: its only home is the typed block.
+	assertAbsentFromSpanAttributes(t, writeHook, "hook_definitions")
+
+	// The blocking PreToolUse:Bash hook records the denial via num_blocking.
+	bashHook := bySpanID["0000000000000c03"]
+	assertBlockFields(t, "hook", toolBlock(t, bashHook, "hook"), map[string]any{
+		"hook_event":   "PreToolUse",
+		"hook_name":    "PreToolUse:Bash",
+		"num_success":  int64(0),
+		"num_blocking": int64(1),
+		"duration_ms":  int64(12),
+	})
+	assertAbsentFromSpanAttributes(t, bashHook, "hook_definitions")
+}
+
+// TestNormalizeTracesHookSpanPresentOnly proves a hook span maps its present
+// counts and omits (never fabricates as zero) the fields a minimal, gate-off
+// hook span does not carry.
+func TestNormalizeTracesHookSpanPresentOnly(t *testing.T) {
+	event := singleSpanEvent(t, toolSpanPayload("hook", `,{"key":"hook_event","value":{"stringValue":"PreToolUse"}},{"key":"num_blocking","value":{"intValue":1}}`))
+	block := toolBlock(t, event, "hook")
+	if block["hook_event"] != "PreToolUse" || block["num_blocking"] != int64(1) {
+		t.Fatalf("hook block = %#v", block)
+	}
+	for _, key := range []string{"hook_name", "hook_definitions", "num_hooks", "num_success", "num_non_blocking_error", "num_cancelled", "duration_ms"} {
+		if _, present := block[key]; present {
+			t.Fatalf("absent %s must be omitted, not fabricated: %#v", key, block)
+		}
+	}
+}
+
+// TestNormalizeTracesHookSpanUnavailableFields proves a hook span keeps declaring
+// the tool/file/command surfaces unavailable — a hook span genuinely carries none
+// of them, so (unlike a tool span) it must not drop them from unavailable_fields.
+func TestNormalizeTracesHookSpanUnavailableFields(t *testing.T) {
+	event := singleSpanEvent(t, toolSpanPayload("hook", `,{"key":"hook_event","value":{"stringValue":"PreToolUse"}}`))
+	fields, _ := event.Attributes["unavailable_fields"].([]string)
+	for _, want := range []string{"tool_io", "file_operations", "command_execution"} {
+		found := false
+		for _, field := range fields {
+			if field == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("hook span must declare %q unavailable: %#v", want, fields)
+		}
+	}
+}
+
+// TestNormalizeTracesHookSpanFiltersSensitiveAttributes proves the allow-list
+// still drops an unforeseen identity/secret attribute on a hook span, while the
+// gated hook_definitions is captured raw in the typed block (its canonical home)
+// and never leaks into span_attributes.
+func TestNormalizeTracesHookSpanFiltersSensitiveAttributes(t *testing.T) {
+	event := singleSpanEvent(t, toolSpanPayload("hook", `,{"key":"hook_event","value":{"stringValue":"PreToolUse"}},{"key":"hook_definitions","value":{"stringValue":"[{\"type\":\"command\",\"command\":\"./scripts/guard.sh\"}]"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"api_key","value":{"stringValue":"tiq-canary-hook-key"}}`))
+	encoded, err := json.Marshal(event)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	for _, leaked := range []string{"synthetic@example.test", "tiq-canary-hook-key"} {
+		if strings.Contains(string(encoded), leaked) {
+			t.Fatalf("sensitive value %q leaked: %s", leaked, encoded)
+		}
+	}
+	if block := toolBlock(t, event, "hook"); block["hook_definitions"] != "[{\"type\":\"command\",\"command\":\"./scripts/guard.sh\"}]" {
+		t.Fatalf("raw hook_definitions must be captured in the typed block: %#v", block)
+	}
+	assertAbsentFromSpanAttributes(t, event, "hook_definitions")
+}
+
+// TestNormalizeTracesHookSpanPreservesRawDefinitions proves the gated
+// hook_definitions is retained byte-for-byte (epic #87 raw capture): surrounding
+// whitespace observed on the wire survives, unlike the trimmed form the shared
+// putSpanString helper would store.
+func TestNormalizeTracesHookSpanPreservesRawDefinitions(t *testing.T) {
+	const padded = "  [{\"type\":\"command\",\"command\":\"./scripts/guard.sh\"}]  \n"
+	event := singleSpanEvent(t, toolSpanPayload("hook", `,{"key":"hook_event","value":{"stringValue":"PreToolUse"}},{"key":"hook_definitions","value":{"stringValue":"  [{\"type\":\"command\",\"command\":\"./scripts/guard.sh\"}]  \n"}}`))
+	if block := toolBlock(t, event, "hook"); block["hook_definitions"] != padded {
+		t.Fatalf("hook_definitions must be retained verbatim (untrimmed): %q", block["hook_definitions"])
+	}
+}
+
+// FuzzNormalizeTraces keeps the OTLP trace/span normaliser boundary from
+// panicking on arbitrary input (QUALITY_GATES: fuzz smoke when a normalisation
+// boundary changes). Seeds cover a well-formed hook span, the interaction root,
+// and malformed envelopes so the span dispatch and typed mappers are exercised.
+func FuzzNormalizeTraces(f *testing.F) {
+	f.Add([]byte(toolSpanPayload("hook", `,{"key":"hook_event","value":{"stringValue":"PreToolUse"}},{"key":"hook_definitions","value":{"stringValue":"[]"}},{"key":"num_blocking","value":{"intValue":1}}`)))
+	f.Add([]byte(toolSpanPayload("tool", `,{"key":"tool_name","value":{"stringValue":"Bash"}},{"key":"full_command","value":{"stringValue":"echo hi"}}`)))
+	f.Add([]byte(`{"resourceSpans":[{"scopeSpans":[{"spans":[{}]}]}]}`))
+	f.Add([]byte("not json"))
+	f.Add([]byte(""))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		_, _ = NormalizeTraces(data, time.Unix(0, 0).UTC())
+	})
+}
