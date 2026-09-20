@@ -69,7 +69,22 @@
     <p>No retained file-operation evidence for this session.</p>
     {{end}}
   </section>
-  <section aria-labelledby="session-conversation-heading">
+  <section aria-labelledby="session-spans-heading">
+  <h2 id="session-spans-heading">Span evidence</h2>
+  <p class="muted">Flat, retained trace evidence. Parent nesting is not inferred; the first 50 spans are shown.</p>
+  {{if .SpansError}}<p class="error" role="alert">{{.SpansError}}</p>{{else if .SpanEvidence}}
+  <ul class="file-evidence-list" aria-label="Span evidence">{{range .SpanEvidence}}
+    <li><div><span class="muted">Trace / span</span> <code>{{.TraceID}} / {{.SpanID}}</code></div>
+    {{if .Name}}<div><span class="muted">Name</span> {{.Name}}</div>{{end}}
+    <div><span class="muted">Parent</span> {{if .ParentID}}<code>{{.ParentID}}</code> · {{end}}{{template "status-badge" .ParentAvailability}}</div>
+    <div><span class="muted">Interval</span> {{if .Duration}}{{.Duration}} · {{end}}{{template "status-badge" .IntervalState}}</div>
+    {{if .Status}}<div><span class="muted">Status</span> {{.Status}}</div>{{end}}
+    <div><span class="muted">Source events</span> <code>{{.SourceEvents}}</code></div>
+    </li>{{end}}</ul>
+  {{if .SpansPartial}}<p class="muted">Additional retained span evidence is available through the API cursor.</p>{{end}}
+  {{else}}<p>No retained trace span evidence for this session.</p>{{end}}
+</section>
+<section aria-labelledby="session-conversation-heading">
     <h2 id="session-conversation-heading">Retained conversation evidence</h2>
     <p class="muted">Fixture-backed Claude Code log content only. API request and response bodies are shown as evidence, not inferred messages; JSONL and tool-body coverage remains unavailable.</p>
     {{if .ConversationError}}<p class="error" role="alert">{{.ConversationError}}</p>{{end}}

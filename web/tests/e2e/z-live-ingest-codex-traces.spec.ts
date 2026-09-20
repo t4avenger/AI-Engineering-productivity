@@ -52,5 +52,8 @@ test('renders Codex trace evidence ingested through the live daemon', async ({
     page.getByRole('heading', { name: 'session task turn', exact: true }),
   ).toBeVisible();
   await expect(page.getByText(/session_task\.turn ·/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Span evidence", exact: true })).toBeVisible();
+  await expect(page.getByText("Trace / span").first()).toBeVisible();
+  await expect(page.getByText("loaded").first()).toBeVisible();
   await expect(page.getByText('TRACE_CAPTURE_COMPLETE')).toHaveCount(0);
 });

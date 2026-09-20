@@ -106,6 +106,9 @@ type sessionDetailData struct {
 	ConversationError string
 	FileEvidence      []fileEvidenceRow
 	FilesError        string
+	SpanEvidence      []spanEvidenceRow
+	SpansPartial      bool
+	SpansError        string
 	RiskyAccess       governance.RiskyAccess
 	UnapprovedMCP     governance.UnapprovedMCP
 	GovernanceError   string
@@ -500,34 +503,7 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		data.Error = "Unable to load timeline."
 	}
-	allEvents, governanceErr := s.listSessionEvents(r, id)
-	if governanceErr != nil {
-		data.GovernanceError = "Session governance checks are unavailable because retained events could not be loaded."
-		data.RiskyAccess, data.UnapprovedMCP = unavailableGovernanceChecklist()
-		data.FilesError = "File evidence is unavailable because retained events could not be loaded."
-		data.ConversationError = "Retained conversation evidence is unavailable because session events could not be loaded."
-	} else {
-		conversationPage, conversationNext, conversationErr := conversationRows(allEvents, r.URL.Query().Get("conversation_cursor"))
-		if conversationErr != nil {
-			data.ConversationError = "Retained conversation evidence could not be loaded because its cursor is invalid."
-		} else {
-			data.Conversation = conversationPage
-			data.ConversationNext = conversationNext
-		}
-		data.RiskyAccess = governance.RiskyAccessFromEvents(allEvents)
-		data.UnapprovedMCP = governance.UnapprovedMCPFromEvents(allEvents, s.currentMCPAllowlist())
-		operations := []canonical.Operation{}
-		if s.operations != nil {
-			if listed, opErr := s.operations.ListOperations(r.Context(), storage.OperationFilter{SessionID: id}); opErr != nil {
-				data.FilesError = "File evidence is unavailable because retained operations could not be loaded."
-			} else {
-				operations = listed
-			}
-		}
-		if data.FilesError == "" {
-			data.FileEvidence = fileEvidenceRows(insights.SessionFilesFromEvidence(allEvents, operations))
-		}
-	}
+	s.populateSessionDetailEvidence(r, id, &data)
 	s.render(w, tmplSessionDetail, layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(r), Content: data})
 }
 
