@@ -106,6 +106,9 @@ type sessionDetailData struct {
 	ConversationError string
 	FileEvidence      []fileEvidenceRow
 	FilesError        string
+	SpanEvidence      []spanEvidenceRow
+	SpansPartial      bool
+	SpansError        string
 	RiskyAccess       governance.RiskyAccess
 	UnapprovedMCP     governance.UnapprovedMCP
 	GovernanceError   string
@@ -506,6 +509,7 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 		data.RiskyAccess, data.UnapprovedMCP = unavailableGovernanceChecklist()
 		data.FilesError = "File evidence is unavailable because retained events could not be loaded."
 		data.ConversationError = "Retained conversation evidence is unavailable because session events could not be loaded."
+		data.SpansError = "Span evidence is unavailable because retained events could not be loaded."
 	} else {
 		conversationPage, conversationNext, conversationErr := conversationRows(allEvents, r.URL.Query().Get("conversation_cursor"))
 		if conversationErr != nil {
@@ -514,6 +518,7 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 			data.Conversation = conversationPage
 			data.ConversationNext = conversationNext
 		}
+		data.SpanEvidence, data.SpansPartial = spanEvidenceRows(allEvents)
 		data.RiskyAccess = governance.RiskyAccessFromEvents(allEvents)
 		data.UnapprovedMCP = governance.UnapprovedMCPFromEvents(allEvents, s.currentMCPAllowlist())
 		operations := []canonical.Operation{}
