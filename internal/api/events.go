@@ -251,28 +251,16 @@ func (a sessionAPI) costSummary(w http.ResponseWriter, r *http.Request) {
 		writeSessionError(w, http.StatusServiceUnavailable, "costs_unavailable", "cost storage is unavailable")
 		return
 	}
-	records, err := a.costReader.ListCostRecords(r.Context(), "")
+	summary, err := a.costReader.SummarizeCosts(r.Context())
 	if err != nil {
 		writeSessionError(w, http.StatusInternalServerError, "cost_query_failed", "unable to query costs")
 		return
 	}
-	summary := costSummary{Statuses: map[string]int{}}
-	var amount int64
-	hasAmount := false
-	for _, record := range records {
-		if summary.Currency == "" {
-			summary.Currency = record.Currency
-		}
-		summary.Statuses[record.Status]++
-		if record.AmountMicrousd != nil {
-			hasAmount = true
-			amount += *record.AmountMicrousd
-		}
-	}
-	if hasAmount {
-		summary.CalculatedAmountMicrousd = &amount
-	}
-	writeSessionJSON(w, http.StatusOK, costSummaryResponse{Data: summary})
+	writeSessionJSON(w, http.StatusOK, costSummaryResponse{Data: costSummary{
+		Currency:                 summary.Currency,
+		CalculatedAmountMicrousd: summary.CalculatedAmountMicrousd,
+		Statuses:                 summary.Statuses,
+	}})
 }
 
 func optionalString(value any) *string {

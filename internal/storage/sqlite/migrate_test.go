@@ -36,8 +36,8 @@ func TestMigrationDropsProvenanceFromV2Database(t *testing.T) {
 	if err := repo.db.QueryRowContext(ctx, "SELECT MAX(version) FROM schema_migrations").Scan(&version); err != nil {
 		t.Fatalf("read migration version: %v", err)
 	}
-	if version != 5 {
-		t.Fatalf("schema version = %d, want 5", version)
+	if version != 6 {
+		t.Fatalf("schema version = %d, want 6", version)
 	}
 	if _, err := repo.ListOperations(ctx, storage.OperationFilter{}); err != nil {
 		t.Fatalf("operations table after migration: %v", err)

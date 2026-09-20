@@ -53,6 +53,17 @@ func main() {
 	}
 	defer func() { _ = repository.Close() }()
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if deleted, err := repository.ApplyRetention(ctx, cfg.Storage.RetentionDays, time.Now()); err != nil {
+		logger.Error("apply storage retention", "error", err)
+		os.Exit(1)
+	} else if deleted > 0 {
+		logger.Info("applied storage retention", "deleted_sessions", deleted, "retention_days", cfg.Storage.RetentionDays)
+	}
+	go runRetentionLoop(ctx, logger, repository, cfg.Storage.RetentionDays)
+
 	thresholds := api.InsightThresholds{
 		ContextWaste: insights.ContextWasteThresholds{
 			CachedContextRatioThreshold: cfg.Insights.ContextWaste.CachedContextRatioThreshold,
@@ -71,9 +82,6 @@ func main() {
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -94,6 +102,26 @@ func main() {
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("telemetryiq daemon failed", "error", err)
 			os.Exit(1)
+		}
+	}
+}
+
+func runRetentionLoop(ctx context.Context, logger *slog.Logger, repository *sqlite.Repository, retentionDays int) {
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			deleted, err := repository.ApplyRetention(ctx, retentionDays, time.Now())
+			if err != nil {
+				logger.Error("apply storage retention", "error", err)
+				continue
+			}
+			if deleted > 0 {
+				logger.Info("applied storage retention", "deleted_sessions", deleted, "retention_days", retentionDays)
+			}
 		}
 	}
 }

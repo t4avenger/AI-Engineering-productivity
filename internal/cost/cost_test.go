@@ -10,6 +10,21 @@ import (
 	"time"
 )
 
+func TestSummarizeRecords(t *testing.T) {
+	amount := int64(42)
+	summary := SummarizeRecords([]Record{
+		{Currency: "USD", Status: "calculated", AmountMicrousd: &amount},
+		{Currency: "USD", Status: "unknown_price"},
+		{Currency: "USD", Status: "calculated", AmountMicrousd: &amount},
+	})
+	if summary.Currency != "USD" || summary.Statuses["calculated"] != 2 || summary.Statuses["unknown_price"] != 1 {
+		t.Fatalf("summary=%#v", summary)
+	}
+	if summary.CalculatedAmountMicrousd == nil || *summary.CalculatedAmountMicrousd != 84 {
+		t.Fatalf("amount=%#v", summary.CalculatedAmountMicrousd)
+	}
+}
+
 func TestCalculateStatusesAndRates(t *testing.T) {
 	calculator := &Calculator{catalog: Catalog{SchemaVersion: schemaVersion, CatalogVersion: "test", Currency: "USD", Records: []PriceRecord{{ID: "one", Provider: "openai", ModelMatcher: "model-*", EffectiveAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Source: "test", RatesMicrousdPM: map[string]int64{"input": 1000000, "output": 2000000}}}}}
 	event := canonical.Event{EventID: "e", SessionID: "s", Provider: "openai", OccurredAt: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC), ReceivedAt: time.Now(), Attributes: map[string]any{"model": "model-a", "input_token_count": "100", "output_token_count": "10"}}

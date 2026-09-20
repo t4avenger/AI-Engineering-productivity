@@ -952,27 +952,18 @@ func (s *Server) costsPage(w http.ResponseWriter, r *http.Request) {
 		s.render(w, tmplCosts, layoutData{Title: "Costs", Nav: "costs", Health: s.healthLabel(r), Content: data})
 		return
 	}
-	records, err := s.costs.ListCostRecords(r.Context(), "")
+	summary, err := s.costs.SummarizeCosts(r.Context())
 	if err != nil {
 		data.Error = "Unable to load costs."
 		s.render(w, tmplCosts, layoutData{Title: "Costs", Nav: "costs", Health: s.healthLabel(r), Content: data})
 		return
 	}
-	var amount int64
-	var hasKnownAmount bool
-	for _, record := range records {
-		if data.Currency == "" {
-			data.Currency = record.Currency
-		}
-		data.Statuses[record.Status]++
-		if record.AmountMicrousd != nil {
-			hasKnownAmount = true
-			amount += *record.AmountMicrousd
-		}
+	data.Currency = summary.Currency
+	data.Statuses = summary.Statuses
+	if data.Statuses == nil {
+		data.Statuses = map[string]int{}
 	}
-	if hasKnownAmount {
-		data.Amount = &amount
-	}
+	data.Amount = summary.CalculatedAmountMicrousd
 	s.render(w, tmplCosts, layoutData{Title: "Costs", Nav: "costs", Health: s.healthLabel(r), Content: data})
 }
 

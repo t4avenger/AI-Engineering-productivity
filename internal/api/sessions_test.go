@@ -24,6 +24,10 @@ func (s costReaderStub) ListCostRecords(context.Context, string) ([]cost.Record,
 	return s.records, nil
 }
 
+func (s costReaderStub) SummarizeCosts(context.Context) (cost.Summary, error) {
+	return cost.SummarizeRecords(s.records), nil
+}
+
 func TestSessionAPIContract(t *testing.T) {
 	repo := sessionTestRepository(t)
 	server := httptest.NewServer(NewHandler(slog.Default(), repo))

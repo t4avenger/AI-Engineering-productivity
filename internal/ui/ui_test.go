@@ -114,6 +114,10 @@ func (s *fullStub) ListCostRecords(context.Context, string) ([]cost.Record, erro
 	return s.costs, nil
 }
 
+func (s *fullStub) SummarizeCosts(context.Context) (cost.Summary, error) {
+	return cost.SummarizeRecords(s.costs), nil
+}
+
 func unlock(t *testing.T, handler http.Handler) *http.Cookie {
 	t.Helper()
 	form := strings.NewReader("token=test-token")

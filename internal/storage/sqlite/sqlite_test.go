@@ -431,6 +431,71 @@ func TestListSessionsFiltersAndOrdersDeterministically(t *testing.T) {
 	}
 }
 
+func TestListSessionsModelFilterMatchesLaterEventModel(t *testing.T) {
+	repo, err := Open(memoryDBPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = repo.Close() }()
+	first := event(t, "first-model", "multi-model", "session.active", "2026-01-02T09:00:00Z")
+	first.Attributes["model"] = "model-a"
+	second := event(t, "second-model", "multi-model", "session.completed", "2026-01-02T10:00:00Z")
+	second.Attributes["model"] = "model-b"
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{first, second}); err != nil {
+		t.Fatal(err)
+	}
+	sessions, err := repo.ListSessions(context.Background(), storage.SessionFilter{Model: "model-b", Limit: 10})
+	if err != nil || len(sessions) != 1 || sessions[0].SessionID != "multi-model" {
+		t.Fatalf("later-model filter = %#v, %v", sessions, err)
+	}
+	session, found, err := repo.Session(context.Background(), "multi-model")
+	if err != nil || !found || session.Attributes["model"] != "model-a" {
+		t.Fatalf("display model should remain first observed, got %#v found=%v err=%v", session.Attributes, found, err)
+	}
+}
+
+func TestMigrationSixRunsOnce(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "once.db")
+	repo, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{event(t, "e1", "s1", "session.completed", "2026-01-02T10:00:00Z")}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = reopened.Close() }()
+	applied, err := reopened.migrationApplied(context.Background(), 6)
+	if err != nil || !applied {
+		t.Fatalf("migration 6 applied=%v err=%v", applied, err)
+	}
+	// Corrupt a denormalized column; a no-op re-open must not rewrite it via backfill.
+	if _, err := reopened.db.Exec(`UPDATE sessions SET model='tampered' WHERE session_id='s1'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := reopened.Close(); err != nil {
+		t.Fatal(err)
+	}
+	again, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = again.Close() }()
+	var model string
+	if err := again.db.QueryRow(`SELECT model FROM sessions WHERE session_id='s1'`).Scan(&model); err != nil {
+		t.Fatal(err)
+	}
+	if model != "tampered" {
+		t.Fatalf("model = %q, want tampered (migration 6 must not re-backfill)", model)
+	}
+}
+
 func assertMode(t *testing.T, path string, want os.FileMode) {
 	t.Helper()
 	info, err := os.Stat(path)
@@ -442,7 +507,7 @@ func assertMode(t *testing.T, path string, want os.FileMode) {
 	}
 }
 
-func event(t *testing.T, id, sessionID, kind, at string) canonical.Event {
+func event(t testing.TB, id, sessionID, kind, at string) canonical.Event {
 	t.Helper()
 	occurred, err := time.Parse(time.RFC3339, at)
 	if err != nil {
