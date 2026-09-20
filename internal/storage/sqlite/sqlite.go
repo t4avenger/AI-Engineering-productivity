@@ -392,7 +392,10 @@ func rebuildAgentRelations(ctx context.Context, tx *sql.Tx, id string, events []
 		if err != nil {
 			return fmt.Errorf("marshal agent relation: %w", err)
 		}
-		if _, err := tx.ExecContext(ctx, "INSERT INTO agent_relations(session_id,trace_id,agent_id,relation_json) VALUES(?,?,?,?)", relation.SessionID, relation.TraceID, relation.AgentID, payload); err != nil {
+		// Key the row on the authoritative id being rebuilt (the same value the
+		// DELETE above cleared), not relation.SessionID, so a malformed relation
+		// can never insert rows for a different session than the one in flight.
+		if _, err := tx.ExecContext(ctx, "INSERT INTO agent_relations(session_id,trace_id,agent_id,relation_json) VALUES(?,?,?,?)", id, relation.TraceID, relation.AgentID, payload); err != nil {
 			return fmt.Errorf("insert agent relation: %w", err)
 		}
 	}

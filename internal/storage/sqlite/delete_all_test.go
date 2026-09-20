@@ -27,6 +27,13 @@ func TestDeleteAllSessionsRemovesRetainedTelemetry(t *testing.T) {
 	if err := repo.SaveEvents(ctx, normalizeTwoSpanAgent(t)); err != nil {
 		t.Fatalf("SaveEvents(sub-agent spans) error = %v", err)
 	}
+	// Precondition: the sub-agent spans must have produced relations, otherwise the
+	// post-delete assertion below would pass even if rebuildSession stopped writing
+	// them (0 before, 0 after) — a silent regression.
+	var relationsBefore int
+	if err := repo.db.QueryRow("SELECT COUNT(*) FROM agent_relations").Scan(&relationsBefore); err != nil || relationsBefore == 0 {
+		t.Fatalf("agent relations before delete = %d, %v, want at least one", relationsBefore, err)
+	}
 	if err := repo.DeleteAllSessions(ctx); err != nil {
 		t.Fatalf("DeleteAllSessions() error = %v", err)
 	}
