@@ -1,0 +1,35 @@
+{{define "conversation_rows.html"}}
+{{range .Conversation}}
+<article class="conversation-item" data-event-id="{{.EventID}}">
+  <h3>{{.Title}}</h3>
+  <p class="muted">{{.OccurredAt}} · {{.Source}} · <code>{{.EventID}}</code></p>
+  <p>Content {{template "status-badge" .Availability}}</p>
+  {{if .HasText}}
+    {{if .Truncated}}
+    <pre class="conversation-preview">{{.Preview}}</pre>
+    <details>
+      <summary>Show full retained text</summary>
+      <pre class="conversation-text">{{.Text}}</pre>
+    </details>
+    {{else}}
+    <pre class="conversation-text">{{.Text}}</pre>
+    {{end}}
+  {{else}}
+  <p class="muted">No inline text was retained for this source event.</p>
+  {{end}}
+</article>
+{{else}}
+{{if not .ConversationNext}}<p>No retained conversation evidence is available from the reviewed provider surfaces for this session.</p>{{end}}
+{{end}}
+{{if .ConversationNext}}
+<p id="conversation-more">
+  <a
+    href="/sessions/{{.SessionID}}?conversation_cursor={{.ConversationNext}}"
+    hx-get="/sessions/{{.SessionID}}/conversation?cursor={{.ConversationNext}}"
+    hx-target="#conversation"
+    hx-swap="beforeend"
+    hx-on::after-swap="this.closest('#conversation-more').remove()"
+  >Load more retained conversation evidence</a>
+</p>
+{{end}}
+{{end}}

@@ -21,6 +21,19 @@ export async function unlockDashboard(
   ).toBeVisible();
 }
 
+/** Follow a shell navigation link and verify the destination heading. */
+export async function followShellNavigation(
+  page: Page,
+  navigationLabel: 'Primary navigation' | 'Utility navigation',
+  destination: string,
+): Promise<void> {
+  await page
+    .getByLabel(navigationLabel)
+    .getByRole('link', { name: destination, exact: true })
+    .click();
+  await expect(page.getByRole('heading', { name: destination })).toBeVisible();
+}
+
 /** Five-destination primary nav (#161 / S01); shared to avoid Sonar CPD. */
 export async function expectFiveDestinationPrimaryNav(page: Page): Promise<void> {
   const primaryNavigation = page.getByLabel('Primary navigation');
@@ -676,6 +689,42 @@ function claudeOTLPLogs(logRecords: Array<{ attributes: OTLPAttribute[] }>): str
       },
     ],
   });
+}
+
+// claudeContentOTLPLogs uses the reviewed content-bearing Claude log shape.
+// Its values are synthetic and intentionally asserted as retained local content
+// by the #188 daemon-to-UI gate.
+export function claudeContentOTLPLogs(): string {
+  const sessionId = 'tiq-live-e2e-conversation-content';
+  const contentEvents = [
+    ['user_prompt', '2026-09-19T12:00:00Z', '1', 'prompt', 'tiq-live-e2e retained user\nsecond line'],
+    ['assistant_response', '2026-09-19T12:00:01Z', '2', 'response', '<REDACTED>'],
+    ['api_response_body', '2026-09-19T12:00:02Z', '3', 'body', 'tiq-live-e2e raw API evidence'],
+  ];
+  return claudeOTLPLogs(
+    contentEvents.map(([eventName, timestamp, sequence, contentKey, content]) =>
+      claudeContentEvent(eventName, timestamp, sequence, sessionId, contentKey, content),
+    ),
+  );
+}
+
+function claudeContentEvent(
+  eventName: string,
+  timestamp: string,
+  sequence: string,
+  sessionId: string,
+  contentKey: string,
+  content: string,
+): { attributes: OTLPAttribute[] } {
+  return {
+    attributes: [
+      { key: 'event.name', value: { stringValue: eventName } },
+      { key: 'event.timestamp', value: { stringValue: timestamp } },
+      { key: 'event.sequence', value: { intValue: sequence } },
+      { key: 'session.id', value: { stringValue: sessionId } },
+      { key: contentKey, value: { stringValue: content } },
+    ],
+  };
 }
 
 type ClaudeApiRequestOptions = {

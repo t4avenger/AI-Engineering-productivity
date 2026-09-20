@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/capabilities"
+	"github.com/wayne/telemetryiq/internal/conversation"
 	"github.com/wayne/telemetryiq/internal/governance"
 	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
@@ -93,20 +94,37 @@ type sessionRow struct {
 }
 
 type sessionDetailData struct {
-	Session         canonical.Session
-	SessionID       string
-	SessionPath     string
-	Availability    []availabilityRow
-	SessionMetadata []metadataRow
-	Events          []timelineRow
-	NextCursor      string
-	FileEvidence    []fileEvidenceRow
-	FilesError      string
-	RiskyAccess     governance.RiskyAccess
-	UnapprovedMCP   governance.UnapprovedMCP
-	GovernanceError string
-	Error           string
-	Confirm         bool
+	Session           canonical.Session
+	SessionID         string
+	SessionPath       string
+	Availability      []availabilityRow
+	SessionMetadata   []metadataRow
+	Events            []timelineRow
+	NextCursor        string
+	Conversation      []conversationRow
+	ConversationNext  string
+	ConversationError string
+	FileEvidence      []fileEvidenceRow
+	FilesError        string
+	RiskyAccess       governance.RiskyAccess
+	UnapprovedMCP     governance.UnapprovedMCP
+	GovernanceError   string
+	Error             string
+	Confirm           bool
+}
+
+type conversationRow struct {
+	EventID      string
+	EventType    string
+	OccurredAt   string
+	Role         string
+	Title        string
+	Text         string
+	Preview      string
+	HasText      bool
+	Truncated    bool
+	Availability string
+	Source       string
 }
 
 type fileEvidenceRow struct {
@@ -487,7 +505,15 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 		data.GovernanceError = "Session governance checks are unavailable because retained events could not be loaded."
 		data.RiskyAccess, data.UnapprovedMCP = unavailableGovernanceChecklist()
 		data.FilesError = "File evidence is unavailable because retained events could not be loaded."
+		data.ConversationError = "Retained conversation evidence is unavailable because session events could not be loaded."
 	} else {
+		conversationPage, conversationNext, conversationErr := conversationRows(allEvents, r.URL.Query().Get("conversation_cursor"))
+		if conversationErr != nil {
+			data.ConversationError = "Retained conversation evidence could not be loaded because its cursor is invalid."
+		} else {
+			data.Conversation = conversationPage
+			data.ConversationNext = conversationNext
+		}
 		data.RiskyAccess = governance.RiskyAccessFromEvents(allEvents)
 		data.UnapprovedMCP = governance.UnapprovedMCPFromEvents(allEvents, s.currentMCPAllowlist())
 		operations := []canonical.Operation{}
@@ -558,6 +584,38 @@ func (s *Server) sessionTimelinePartial(w http.ResponseWriter, r *http.Request) 
 		Events     []timelineRow
 		NextCursor string
 	}{SessionID: id, Events: rows, NextCursor: next})
+}
+
+func (s *Server) sessionConversationPartial(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, pathSessionsPrefix)
+	id, ok := safePathID(strings.TrimSuffix(path, "/conversation"))
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	if _, found, err := s.sessions.Session(r.Context(), id); err != nil {
+		http.Error(w, "unable to load session", http.StatusInternalServerError)
+		return
+	} else if !found {
+		http.NotFound(w, r)
+		return
+	}
+	events, err := s.listSessionEvents(r, id)
+	if err != nil {
+		http.Error(w, "unable to load retained conversation evidence", http.StatusInternalServerError)
+		return
+	}
+	rows, next, err := conversationRows(events, r.URL.Query().Get("cursor"))
+	if err != nil {
+		http.Error(w, "conversation cursor is invalid", http.StatusBadRequest)
+		return
+	}
+	w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
+	_ = s.templates.ExecuteTemplate(w, tmplConversationRows, struct {
+		SessionID        string
+		Conversation     []conversationRow
+		ConversationNext string
+	}{SessionID: id, Conversation: rows, ConversationNext: next})
 }
 
 func (s *Server) sessionDelete(w http.ResponseWriter, r *http.Request) {
@@ -1120,6 +1178,86 @@ func (s *Server) loadTimeline(r *http.Request, sessionID, cursorRaw string) ([]t
 		}
 	}
 	return rows, next, nil
+}
+
+func conversationRows(events []canonical.Event, cursorRaw string) ([]conversationRow, string, error) {
+	cursorOccurredAt, cursorEventID, err := decodeConversationCursor(cursorRaw)
+	if err != nil {
+		return nil, "", err
+	}
+	page, last := conversation.Page(conversation.Project(events), 50, cursorOccurredAt, cursorEventID)
+	rows := make([]conversationRow, len(page))
+	for index, record := range page {
+		rows[index] = newConversationRow(record)
+	}
+	if last == nil {
+		return rows, "", nil
+	}
+	return rows, encodeConversationCursor(last.OccurredAt, last.EventID), nil
+}
+
+func decodeConversationCursor(raw string) (string, string, error) {
+	if raw == "" {
+		return "", "", nil
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(raw)
+	if err != nil {
+		return "", "", err
+	}
+	var cursor struct {
+		OccurredAt string `json:"occurred_at"`
+		EventID    string `json:"event_id"`
+	}
+	if err := json.Unmarshal(decoded, &cursor); err != nil || cursor.EventID == "" {
+		return "", "", errors.New("invalid conversation cursor")
+	}
+	if _, err := time.Parse(time.RFC3339Nano, cursor.OccurredAt); err != nil {
+		return "", "", err
+	}
+	return cursor.OccurredAt, cursor.EventID, nil
+}
+
+func encodeConversationCursor(occurredAt time.Time, eventID string) string {
+	encoded, _ := json.Marshal(struct {
+		OccurredAt string `json:"occurred_at"`
+		EventID    string `json:"event_id"`
+	}{OccurredAt: occurredAt.UTC().Format(time.RFC3339Nano), EventID: eventID})
+	return base64.RawURLEncoding.EncodeToString(encoded)
+}
+
+func newConversationRow(record conversation.Record) conversationRow {
+	row := conversationRow{
+		EventID: record.EventID, EventType: record.EventType, OccurredAt: record.OccurredAt.UTC().Format(time.RFC3339Nano),
+		Role: record.Role, Title: conversationTitle(record.Role), Availability: record.ContentAvailability,
+		Source: record.Tool + " / " + record.EventType + " / " + record.SourceVersion,
+	}
+	if record.Text == nil {
+		return row
+	}
+	row.HasText = true
+	row.Text = *record.Text
+	row.Preview, row.Truncated = conversationPreview(row.Text)
+	return row
+}
+
+func conversationTitle(role string) string {
+	switch role {
+	case conversation.RoleUser:
+		return "User message"
+	case conversation.RoleAssistant:
+		return "Assistant response"
+	default:
+		return "API content evidence"
+	}
+}
+
+func conversationPreview(text string) (string, bool) {
+	const maximumRunes = 240
+	runes := []rune(text)
+	if len(runes) <= maximumRunes {
+		return text, false
+	}
+	return string(runes[:maximumRunes]) + "…", true
 }
 
 func sessionRows(sessions []canonical.Session) []sessionRow {

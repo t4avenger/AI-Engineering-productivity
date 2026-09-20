@@ -356,6 +356,48 @@ func TestDashboardPagesAndMutations(t *testing.T) {
 	}
 }
 
+func TestSessionDetailRendersRetainedConversationEvidence(t *testing.T) {
+	now := time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC)
+	session := syntheticSession("content-session", now)
+	repo := &fullStub{
+		sessions: []canonical.Session{session},
+		events: map[string][]canonical.Event{"content-session": {
+			{
+				EventID: "user-content", EventType: "user_prompt", OccurredAt: now, ReceivedAt: now,
+				Provider: "anthropic", Tool: "claude-code", SourceVersion: "2.1.270",
+				ProviderExtensions: map[string]any{"event": map[string]any{"prompt": "first line\n<script>alert('xss')</script>"}},
+			},
+			{
+				EventID: "redacted-content", EventType: "assistant_response", OccurredAt: now.Add(time.Second), ReceivedAt: now,
+				Provider: "anthropic", Tool: "claude-code", SourceVersion: "2.1.270",
+				ProviderExtensions: map[string]any{"event": map[string]any{"response": "<REDACTED>"}},
+			},
+			{
+				EventID: "body-reference", EventType: "api_request_body", OccurredAt: now.Add(2 * time.Second), ReceivedAt: now,
+				Provider: "anthropic", Tool: "claude-code", SourceVersion: "2.1.270",
+				ProviderExtensions: map[string]any{"event": map[string]any{"body_ref": "local/request.json"}},
+			},
+			{
+				EventID: "long-content", EventType: "assistant_response", OccurredAt: now.Add(3 * time.Second), ReceivedAt: now,
+				Provider: "anthropic", Tool: "claude-code", SourceVersion: "2.1.270",
+				ProviderExtensions: map[string]any{"event": map[string]any{"response": strings.Repeat("retained ", 40)}},
+			},
+		},
+		},
+	}
+	body := renderSessionDetail(t, repo, nil, session.SessionID)
+	assertContainsAll(t, body, []string{
+		"Retained conversation evidence", "User message", "Assistant response", "API content evidence",
+		"provider_redacted", "body_reference", "first line", "Show full retained text", "&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;",
+	})
+	assertOmitsAll(t, body, []string{"<script>alert('xss')</script>", "other session"})
+
+	partial := getAuthed(t, wrapUI(t, repo), unlock(t, wrapUI(t, repo)), "/sessions/missing/conversation")
+	if partial.Code != http.StatusNotFound {
+		t.Fatalf("deleted conversation partial status = %d", partial.Code)
+	}
+}
+
 func TestSessionViewsKeepObservationsInspectableWithoutCountingThemAsPrimary(t *testing.T) {
 	now := time.Now().UTC()
 	repo := &fullStub{sessions: []canonical.Session{

@@ -162,6 +162,15 @@ func TestClaudeUserPromptContentPersistsRawEndToEnd(t *testing.T) {
 			t.Fatalf("prompt_content must be available on user_prompt: %v", timeline.Data[0].UnavailableFields)
 		}
 	}
+	conversation := getInsightJSON[conversationResponse](t, server.URL+"/api/v1/sessions/"+url.PathEscape("claude-code:tiq-content-session")+"/conversation")
+	assertRetainedConversationProjection(t, conversation)
+}
+
+func assertRetainedConversationProjection(t *testing.T, conversation conversationResponse) {
+	t.Helper()
+	if len(conversation.Data) != 1 || conversation.Data[0].Role != "user" || conversation.Data[0].Text == nil || *conversation.Data[0].Text != "synthetic probe prompt for E7 content capture" || conversation.Data[0].ContentAvailability != "available" {
+		t.Fatalf("retained conversation projection = %#v", conversation)
+	}
 }
 
 func newPersistentTestServer(t *testing.T) (*httptest.Server, storage.Repository) {

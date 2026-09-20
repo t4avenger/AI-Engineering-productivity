@@ -35,8 +35,12 @@ sessions as an evidence browser: the primary row label combines tool and
 relative start time, while the provider-prefixed native session ID remains
 visible as secondary detail. A session detail is loaded only after navigation to
 `/sessions/{id}`. The detail view renders glossary-backed availability badges,
-friendly timeline event titles, and token values with units, all backed by the
-event store. Deletion requires an in-app confirmation before
+friendly timeline event titles, token values with units, and cursor-paged
+retained conversation evidence backed by the event store. The reviewed Claude
+Code log surface keeps user/assistant roles; raw API bodies remain unknown-role
+evidence rather than inferred duplicate messages. Provider-redacted,
+length-only, body-reference, and unavailable content states remain distinct;
+JSONL and tool-body gaps remain unavailable. Deletion requires an in-app confirmation before
 `POST /sessions/{id}/delete`; the repository removes the session and all retained
 events transactionally.
 
