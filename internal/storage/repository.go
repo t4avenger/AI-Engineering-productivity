@@ -88,6 +88,20 @@ type OperationReader interface {
 	ListOperations(context.Context, OperationFilter) ([]canonical.Operation, error)
 }
 
+// AgentRelationFilter constrains sub-agent relation queries. Empty SessionID
+// returns every retained relation; callers that need a session-scoped view of
+// the reconstructed sub-agent tree pass SessionID.
+type AgentRelationFilter struct {
+	SessionID string
+}
+
+// AgentRelationReader exposes the reconstructed sub-agent tree (#102): the
+// parent→child agent relations and per-agent token/duration rollups derived from
+// a session's enhanced-telemetry span set.
+type AgentRelationReader interface {
+	ListAgentRelations(context.Context, AgentRelationFilter) ([]canonical.AgentRelation, error)
+}
+
 // OperationWriter persists stable-primitive operation records.
 type OperationWriter interface {
 	SaveOperations(context.Context, []canonical.Operation) error
@@ -111,6 +125,7 @@ type Repository interface {
 	SessionDeleter
 	EventReader
 	OperationReader
+	AgentRelationReader
 	CostReader
 	Close() error
 }

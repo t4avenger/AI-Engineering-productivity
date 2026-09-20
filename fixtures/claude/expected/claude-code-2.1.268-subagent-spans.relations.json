@@ -1,0 +1,64 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "relation_id": "00000000000000000000000000000201:agent_a",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000201",
+    "trace_id": "00000000000000000000000000000201",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "agent_id": "agent_a",
+    "parent_agent_id": null,
+    "parent_kind": "main_session",
+    "subagent_type": "code-reviewer",
+    "workflow_run_id": "wf_synthetic0001",
+    "workflow_name": "custom",
+    "span_count": 3,
+    "llm_request_count": 1,
+    "tool_count": 2,
+    "input_tokens": 100,
+    "output_tokens": 200,
+    "cache_read_tokens": 10,
+    "cache_creation_tokens": 20,
+    "llm_duration_ms_total": 1500,
+    "tool_duration_ms_total": 2300,
+    "wall_clock_ms": 4000,
+    "provenance": "observed",
+    "provider_extensions": {
+      "span_ids": [
+        "0000000000000a03",
+        "0000000000000a04",
+        "0000000000000a05"
+      ]
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "relation_id": "00000000000000000000000000000201:agent_b",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000201",
+    "trace_id": "00000000000000000000000000000201",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "agent_id": "agent_b",
+    "parent_agent_id": "agent_a",
+    "parent_kind": "sub_agent",
+    "subagent_type": null,
+    "workflow_run_id": "wf_synthetic0001",
+    "workflow_name": "custom",
+    "span_count": 1,
+    "llm_request_count": 1,
+    "tool_count": 0,
+    "input_tokens": 50,
+    "output_tokens": 80,
+    "cache_read_tokens": null,
+    "cache_creation_tokens": null,
+    "llm_duration_ms_total": 800,
+    "tool_duration_ms_total": null,
+    "wall_clock_ms": 800,
+    "provenance": "observed",
+    "provider_extensions": {
+      "span_ids": [
+        "0000000000000a06"
+      ]
+    }
+  }
+]
