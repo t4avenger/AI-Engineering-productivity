@@ -28,6 +28,8 @@ func TestManagementAuthProtectsLocalData(t *testing.T) {
 		{name: "conversation valid token", path: "/api/v1/sessions/a/conversation", token: "test-token", status: http.StatusNoContent},
 		{name: "spans missing token", path: "/api/v1/sessions/a/spans", status: http.StatusUnauthorized},
 		{name: "spans valid token", path: "/api/v1/sessions/a/spans", token: "test-token", status: http.StatusNoContent},
+		{name: "breakdown missing token", path: "/api/v1/sessions/a/breakdown", status: http.StatusUnauthorized},
+		{name: "breakdown valid token", path: "/api/v1/sessions/a/breakdown", token: "test-token", status: http.StatusNoContent},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			method := http.MethodGet

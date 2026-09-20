@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import {
   authToken,
   codexOTLPLogs,
+  expectSessionDetailHeading,
   ingestOTLPLogs,
   resetDaemonBetweenTests,
   unlockDashboard,
@@ -21,7 +22,7 @@ test('renders availability labels on a live session detail', async ({
   await unlockDashboard(page, authToken);
   await page.getByRole('link', { name: 'Sessions', exact: true }).click();
   await page.locator('table tbody a').first().click();
-  await expect(page.getByRole('heading', { name: /^Session / })).toBeVisible();
+  await expectSessionDetailHeading(page);
   // Availability states render as plain-label status badges (issue #76),
   // matching the field glossary rather than raw machine enums.
   await expect(page.getByText('Model').first()).toBeVisible();

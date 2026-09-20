@@ -85,7 +85,7 @@ Dependencies indicate required contracts, not permission to skip unavailable sta
 | Destination | [#187](https://github.com/t4avenger/AI-Engineering-productivity/issues/187) — N02 Pull Requests | Empty state can land now; populated-provider claims depend on #183/#184 evidence |
 | Shell | [#161](https://github.com/t4avenger/AI-Engineering-productivity/issues/161) — S01–S04, N01 | Land Models/PR routes before adding their nav links; ADR 0003 |
 | Trace part | [#189](https://github.com/t4avenger/AI-Engineering-productivity/issues/189) — T08 inspector | Existing timeline integration first; consume file/span projections as they land |
-| Trace part | [#190](https://github.com/t4avenger/AI-Engineering-productivity/issues/190) — T09 interval breakdown | #157 projection/interval evidence; full-session calculation |
+| Trace part | [#190](https://github.com/t4avenger/AI-Engineering-productivity/issues/190) — T09 interval breakdown | Delivered: full-session `/breakdown` + right-rail Session Breakdown / Governance / Event Legend |
 | Trace assembly | [#159](https://github.com/t4avenger/AI-Engineering-productivity/issues/159) — T01–T10 | #156, #157, #161, #188, #189, #190; all five lanes and honest partial states |
 | Local governance | [#191](https://github.com/t4avenger/AI-Engineering-productivity/issues/191) — G01–G03, G05, G08 | #161 and integration of #160/PR #185; preserve working MCP Save |
 | Local policy | [#192](https://github.com/t4avenger/AI-Engineering-productivity/issues/192) — G06 skills | #191 plus explicit skill fixtures; schema/detector/save/editor |
@@ -128,15 +128,12 @@ Finishing local visual work cannot close these requirements.
 
 ## 6. Next smallest task
 
-With [#156](https://github.com/t4avenger/AI-Engineering-productivity/issues/156)
-delivered, prefer remaining evidence projections
-[#157](https://github.com/t4avenger/AI-Engineering-productivity/issues/157) /
-[#188](https://github.com/t4avenger/AI-Engineering-productivity/issues/188), or
-trace parts [#189](https://github.com/t4avenger/AI-Engineering-productivity/issues/189) /
-[#190](https://github.com/t4avenger/AI-Engineering-productivity/issues/190),
-toward Session Trace assembly [#159](https://github.com/t4avenger/AI-Engineering-productivity/issues/159).
-Governance composition [#191](https://github.com/t4avenger/AI-Engineering-productivity/issues/191)
-can proceed in parallel now that the shell exists.
+With [#190](https://github.com/t4avenger/AI-Engineering-productivity/issues/190)
+delivered, prefer Session Trace assembly
+[#159](https://github.com/t4avenger/AI-Engineering-productivity/issues/159),
+or governance composition
+[#191](https://github.com/t4avenger/AI-Engineering-productivity/issues/191)
+in parallel. Remaining local policy editors are #192–#194 after #191.
 
 This documentation update changes no runtime APIs or schemas. Planned additive
 interfaces are specified in the implementation specification and owned by the

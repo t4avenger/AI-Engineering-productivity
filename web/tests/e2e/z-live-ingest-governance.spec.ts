@@ -61,16 +61,15 @@ test('renders risky-access findings after live OTLP ingest', async ({
   await expectGovernanceAccessRulesShells(page);
 
   await page.goto('/sessions/claude-code:tiq-live-e2e-governance-session');
-  await expect(
-    page.getByRole('heading', { name: 'Governance checklist' }),
-  ).toBeVisible();
-  const riskyAccess = page
+  const rail = page.getByLabel('Session summary');
+  await expect(rail.getByRole('heading', { name: 'Governance' })).toBeVisible();
+  const riskyAccess = rail
     .getByRole('listitem')
     .filter({ hasText: 'Risky access' });
   await expect(riskyAccess.getByText('Violation')).toBeVisible();
   await expect(riskyAccess.getByText('Seen in telemetry')).toBeVisible();
   await expect(riskyAccess.getByText('2 findings')).toBeVisible();
-  const unapprovedMCP = page
+  const unapprovedMCP = rail
     .getByRole('listitem')
     .filter({ hasText: 'Unapproved MCP' });
   await expect(unapprovedMCP.getByText('Indeterminate')).toBeVisible();

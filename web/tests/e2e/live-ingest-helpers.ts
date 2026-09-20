@@ -21,6 +21,13 @@ export async function unlockDashboard(
   ).toBeVisible();
 }
 
+/** Session detail h1; level-scoped so "Session Breakdown" rail does not match. */
+export async function expectSessionDetailHeading(page: Page): Promise<void> {
+  await expect(
+    page.getByRole('heading', { level: 1, name: /^Session / }),
+  ).toBeVisible();
+}
+
 /** Follow a shell navigation link and verify the destination heading. */
 export async function followShellNavigation(
   page: Page,
@@ -653,6 +660,54 @@ export async function fetchLiveSessions(limit = 100): Promise<LiveSessionRow[]> 
   expect(response.status).toBe(200);
   const body = (await response.json()) as { data: LiveSessionRow[] };
   return body.data;
+}
+
+/** Full-session duration breakdown (#190 / T09); never page-scoped. */
+export type LiveBreakdown = {
+  availability: string;
+  calculation_version: string;
+  window: { duration_ms: number } | null;
+  categories: Array<{
+    id: string;
+    label: string;
+    duration_ms: number;
+    source_event_ids: string[];
+  }>;
+  overlap: { duration_ms: number } | null;
+  unclassified: { duration_ms: number } | null;
+  unavailable_reason: string | null;
+};
+
+export async function fetchSessionBreakdown(
+  sessionId: string,
+): Promise<LiveBreakdown> {
+  const response = await fetch(
+    `${daemonBase}/api/v1/sessions/${encodeURIComponent(sessionId)}/breakdown`,
+    { headers: { Authorization: `Bearer ${authToken}` } },
+  );
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as { data: LiveBreakdown };
+  return body.data;
+}
+
+/** Right-rail T09 assertions shared by live breakdown coverage. */
+export async function expectSessionBreakdownRail(
+  page: Page,
+  opts: { available: boolean; categoryLabels?: string[] },
+): Promise<void> {
+  const rail = page.getByLabel('Session summary');
+  await expect(rail.getByRole('heading', { name: 'Session Breakdown' })).toBeVisible();
+  await expect(rail.getByRole('heading', { name: 'Governance' })).toBeVisible();
+  await expect(rail.getByRole('heading', { name: 'Event Legend' })).toBeVisible();
+  if (opts.available) {
+    for (const label of opts.categoryLabels ?? []) {
+      await expect(rail.getByText(label, { exact: true })).toBeVisible();
+    }
+    await expect(rail.getByRole('link', { name: 'Evidence' }).first()).toBeVisible();
+  } else {
+    await expect(rail.getByText(/Duration breakdown unavailable/)).toBeVisible();
+    await expect(rail.locator('.breakdown-donut')).toHaveCount(0);
+  }
 }
 
 // ingestOTLPLogs POSTs a raw OTLP log payload to the live /v1/logs receiver and
