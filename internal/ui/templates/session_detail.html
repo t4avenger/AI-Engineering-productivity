@@ -76,8 +76,8 @@
   <ul class="file-evidence-list" aria-label="Span evidence">{{range .SpanEvidence}}
     <li><div><span class="muted">Trace / span</span> <code>{{.TraceID}} / {{.SpanID}}</code></div>
     {{if .Name}}<div><span class="muted">Name</span> {{.Name}}</div>{{end}}
-    <div><span class="muted">Parent</span> {{if .ParentID}}<code>{{.ParentID}}</code> · {{end}}<span class="status-badge {{statusClass .ParentAvailability}}">{{.ParentAvailability}}</span></div>
-    <div><span class="muted">Interval</span> {{if .Duration}}{{.Duration}} · {{end}}<span class="status-badge {{statusClass .IntervalState}}">{{.IntervalState}}</span></div>
+    <div><span class="muted">Parent</span> {{if .ParentID}}<code>{{.ParentID}}</code> · {{end}}{{template "status-badge" .ParentAvailability}}</div>
+    <div><span class="muted">Interval</span> {{if .Duration}}{{.Duration}} · {{end}}{{template "status-badge" .IntervalState}}</div>
     {{if .Status}}<div><span class="muted">Status</span> {{.Status}}</div>{{end}}
     <div><span class="muted">Source events</span> <code>{{.SourceEvents}}</code></div>
     </li>{{end}}</ul>

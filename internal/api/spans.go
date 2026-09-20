@@ -24,12 +24,13 @@ func (a sessionAPI) spans(w http.ResponseWriter, r *http.Request) {
 		writeSessionError(w, http.StatusInternalServerError, "span_query_failed", "unable to query session spans")
 		return
 	}
+	records := spans.Project(events)
 	traceID, spanID := spanCursor(cursor)
-	if cursor != nil && (traceID == "" || spanID == "") {
+	if cursor != nil && (traceID == "" || spanID == "" || !spans.Contains(records, traceID, spanID)) {
 		writeSessionError(w, http.StatusBadRequest, "invalid_query", "cursor is not a span cursor")
 		return
 	}
-	page, last := spans.Page(spans.Project(events), limit, traceID, spanID)
+	page, last := spans.Page(records, limit, traceID, spanID)
 	var next *string
 	if last != nil {
 		next = encodeEventCursor("1970-01-01T00:00:00Z", last.TraceID+"\x00"+last.SpanID)

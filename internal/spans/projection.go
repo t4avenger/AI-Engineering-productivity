@@ -98,7 +98,8 @@ func Page(records []Record, limit int, cursorTraceID, cursorSpanID string) ([]Re
 	} else {
 		end = len(records)
 	}
-	page := append([]Record(nil), records[start:end]...)
+	page := make([]Record, end-start)
+	copy(page, records[start:end])
 	setParentAvailability(page, records)
 	return page, last
 }
