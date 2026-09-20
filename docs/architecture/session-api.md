@@ -98,7 +98,7 @@ Aggregate `lines_of_code` counters never fill per-file diffs. Codex currently
 proves write category without path; filesystem delete remains unavailable.
 Session detail HTML shares the same `insights.SessionFilesFromEvidence` reader.
 
-`GET /api/v1/sessions/{id}/spans` is the additive flat retained-span projection (#157). It returns opaque-cursor-paged trace/span nodes with raw provider identities, nullable parent, original interval/status evidence, provenance, and source-event links. Parent availability distinguishes roots, loaded parents, parents outside the page, and absent retained parents; cycles remain flat. Codex trace-only observations are never joined to conversation sessions. See `docs/architecture/session-spans.md` for the complete record contract.
+`GET /api/v1/sessions/{id}/spans` is the additive flat retained-span projection (#157). It returns opaque-cursor-paged trace/span nodes with raw provider identities, nullable parent, original interval/status evidence, provenance, and source-event links. Parent availability distinguishes roots, loaded parents, parents outside the page, and absent retained parents; cycles remain flat. Codex trace-only observations are never joined; Codex traces with the observed resource-level `conversation.id` are projected through that exact provider conversation session. See `docs/architecture/session-spans.md` for the complete record contract.
 
 `GET /api/v1/sessions/{id}/conversation` is the additive retained-conversation
 projection (#188 / T03). It cursor-pages chronological `data` records keyed by

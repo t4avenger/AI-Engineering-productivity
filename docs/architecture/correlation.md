@@ -16,7 +16,7 @@ trace batches, so live ingest persists recognized `codex_exec` and
 
 The same value is used as the canonical `event_id` and is copied to `provider_extensions.correlation.dedup_key` so downstream storage, diagnostics, and tests can explain why a duplicate collapsed. Replaying a fixture twice must not create a second observation. If two source spans present the same trace/span identity, the normaliser sorts first and keeps one deterministic canonical event for that key.
 
-Codex OTLP log records observed in 0.145.0 can carry `conversation.id`. Log-derived events and `canonical.ModelInteraction` records use the raw `codex:<conversation.id>` as the session ID. Records without a conversation ID fall back to a non-keyed content ID (epic #87 removed ingest-time hiding — no HMAC fingerprint). Their deduplication key remains the `request_id`, which is copied to `provider_extensions.correlation.dedup_key`.
+Codex OTLP log records observed in 0.145.0 can carry `conversation.id`. CLI 0.155.1 traces can carry the same provider-emitted value as a resource attribute; only that exact field maps their spans to `codex:<conversation.id>`. Log-derived events and `canonical.ModelInteraction` records use the same raw session ID. Records without a conversation ID fall back to a non-keyed content ID (epic #87 removed ingest-time hiding — no HMAC fingerprint). Their deduplication key remains the `request_id`, which is copied to `provider_extensions.correlation.dedup_key`.
 
 ## Session identity scope
 

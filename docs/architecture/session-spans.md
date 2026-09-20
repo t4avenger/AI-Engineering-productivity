@@ -21,10 +21,7 @@ retained events for the same tuple collapse to one node with sorted source event
 IDs. Nodes from different traces never collide, and cycles remain flat rather
 than triggering recursive server work.
 
-The projection reads only existing Claude Code and Codex trace envelopes. Codex
-trace-only observations retain their `codex:trace:<trace-id>` session identity;
-the endpoint never joins them to conversation sessions by timestamp, model, or
-other proximity. Missing provider fields remain null or explicitly unavailable.
+The projection reads only existing Claude Code and Codex trace envelopes. Codex traces with an observed resource-level `conversation.id` use the matching provider conversation session. Trace-only observations retain their `codex:trace:<trace-id>` session identity; the endpoint never joins them by timestamp, model, or other proximity. Missing provider fields remain null or explicitly unavailable.
 
 
 ## Response contract
@@ -60,8 +57,4 @@ IDs return `404 session_not_found`; unavailable session/event storage returns
 
 The reviewed Claude Code surface is OTLP enhanced-telemetry 2.1.268 traces;
 Claude uses provider `session.id` when observed and otherwise keeps a
-trace-scoped session. The reviewed Codex surface is CLI 0.154.0 traces. It has
-no observed conversation join key, so `codex:trace:<trace-id>` remains a
-trace-only observation. Other versions and unobserved fields are `unknown`, not
-unsupported; consumers must display null/availability states rather than infer
-missing values.
+trace-scoped session. The reviewed Codex trace surfaces are CLI 0.154.0, which remains trace-only, and CLI 0.155.1, whose resource-level `conversation.id` exactly matched same-run logs in the committed fixture. Other versions and traces without that key remain `codex:trace:<trace-id>` observations; consumers must display unavailable rather than infer a join.

@@ -752,8 +752,11 @@ func hasCodexLogSessionID(event canonical.Event) bool {
 	if event.Tool != "codex" || !strings.HasPrefix(event.SessionID, codexSessionPrefix) {
 		return false
 	}
-	_, ok := event.ProviderExtensions["log_attributes"].(map[string]any)
-	return ok
+	if _, ok := event.ProviderExtensions["log_attributes"].(map[string]any); ok {
+		return true
+	}
+	correlation, ok := event.ProviderExtensions["correlation"].(map[string]any)
+	return ok && correlation["session_id_source"] == "conversation.id"
 }
 
 func observeSessionAttribute(session *canonical.Session, key, value string) {

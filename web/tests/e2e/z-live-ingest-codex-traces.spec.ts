@@ -2,7 +2,10 @@ import { expect, test } from '@playwright/test';
 
 import {
   authToken,
+  codexOTLPLogs,
   codexOTLPTraces,
+  fetchLiveSessions,
+  ingestOTLPLogs,
   ingestOTLPTraces,
   resetDaemonBetweenTests,
   unlockDashboard,
@@ -56,4 +59,30 @@ test('renders Codex trace evidence ingested through the live daemon', async ({
   await expect(page.getByText("Trace / span").first()).toBeVisible();
   await expect(page.getByText("loaded").first()).toBeVisible();
   await expect(page.getByText('TRACE_CAPTURE_COMPLETE')).toHaveCount(0);
+});
+
+
+test("renders Codex trace evidence joined to its provider conversation", async ({
+  page,
+}) => {
+  await ingestOTLPLogs(codexOTLPLogs("tiq-live-e2e-codex-model"));
+  await ingestOTLPTraces(codexOTLPTraces("tiq-live-e2e-codex-session"));
+
+  await expect
+    .poll(async () => fetchLiveSessions())
+    .toContainEqual(
+      expect.objectContaining({
+        session_id: "codex:tiq-live-e2e-codex-session",
+        identity_scope: "provider",
+        identity_source: "conversation.id",
+      }),
+    );
+
+  await unlockDashboard(page, authToken);
+  await page.getByRole("link", { name: "Sessions", exact: true }).click();
+  await expect(page.getByText("conversation.id")).toBeVisible();
+  await page.getByRole("link", { name: /codex · started/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "Span evidence", exact: true }),
+  ).toBeVisible();
 });

@@ -224,7 +224,7 @@ export function codexTurnTokenOTLPMetrics(): string {
 // Codex CLI 0.154.0 was observed exporting this resource/scope/span shape via
 // the separate otel.trace_exporter. The prompt used during capture is absent
 // because log_user_prompt=false.
-export function codexOTLPTraces(): string {
+export function codexOTLPTraces(conversationID?: string): string {
   return JSON.stringify({
     resourceSpans: [
       {
@@ -236,6 +236,14 @@ export function codexOTLPTraces(): string {
               key: 'env',
               value: { stringValue: 'telemetryiq-synthetic' },
             },
+            ...(conversationID
+              ? [
+                  {
+                    key: 'conversation.id',
+                    value: { stringValue: conversationID },
+                  },
+                ]
+              : []),
           ],
         },
         scopeSpans: [
