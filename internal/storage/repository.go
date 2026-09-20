@@ -115,6 +115,12 @@ type EventOperationWriter interface {
 // CostReader returns calculation provenance without exposing raw intake data.
 type CostReader interface {
 	ListCostRecords(context.Context, string) ([]cost.Record, error)
+	SummarizeCosts(context.Context) (cost.Summary, error)
+}
+
+// RetentionApplier deletes raw telemetry older than the configured retention window.
+type RetentionApplier interface {
+	ApplyRetention(ctx context.Context, retentionDays int, now time.Time) (deletedSessions int, err error)
 }
 
 type Repository interface {

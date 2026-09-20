@@ -24,6 +24,26 @@ func (s costReaderStub) ListCostRecords(context.Context, string) ([]cost.Record,
 	return s.records, nil
 }
 
+func (s costReaderStub) SummarizeCosts(context.Context) (cost.Summary, error) {
+	summary := cost.Summary{Statuses: map[string]int{}}
+	var amount int64
+	hasAmount := false
+	for _, record := range s.records {
+		if summary.Currency == "" {
+			summary.Currency = record.Currency
+		}
+		summary.Statuses[record.Status]++
+		if record.AmountMicrousd != nil {
+			hasAmount = true
+			amount += *record.AmountMicrousd
+		}
+	}
+	if hasAmount {
+		summary.CalculatedAmountMicrousd = &amount
+	}
+	return summary, nil
+}
+
 func TestSessionAPIContract(t *testing.T) {
 	repo := sessionTestRepository(t)
 	server := httptest.NewServer(NewHandler(slog.Default(), repo))

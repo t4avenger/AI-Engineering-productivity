@@ -38,7 +38,7 @@ func Open(path string, calculators ...*cost.Calculator) (*Repository, error) {
 			}
 		}
 	}
-	db, err := sql.Open("sqlite", path)
+	db, err := sql.Open("sqlite", openDSN(path))
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
@@ -47,13 +47,13 @@ func Open(path string, calculators ...*cost.Calculator) (*Repository, error) {
 	if len(calculators) > 0 {
 		r.calculator = calculators[0]
 	}
-	if err := r.migrate(context.Background()); err != nil {
+	if err := r.applyConnectionPragmas(context.Background(), path); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
-	if err := r.rebuildAllSessions(context.Background()); err != nil {
+	if err := r.migrate(context.Background()); err != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("rebuild derived sessions: %w", err)
+		return nil, err
 	}
 	if path != ":memory:" {
 		if err := os.Chmod(path, 0o600); err != nil {
@@ -62,6 +62,32 @@ func Open(path string, calculators ...*cost.Calculator) (*Repository, error) {
 		}
 	}
 	return r, nil
+}
+
+// openDSN attaches modernc pragma URI parameters for on-disk databases. In-memory
+// databases skip WAL (unsupported) but still get busy_timeout via Exec.
+func openDSN(path string) string {
+	if path == ":memory:" {
+		return path
+	}
+	return path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)"
+}
+
+func (r *Repository) applyConnectionPragmas(ctx context.Context, path string) error {
+	if path == ":memory:" {
+		if _, err := r.db.ExecContext(ctx, "PRAGMA busy_timeout=5000"); err != nil {
+			return fmt.Errorf("set busy_timeout: %w", err)
+		}
+		return nil
+	}
+	var journal string
+	if err := r.db.QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&journal); err != nil {
+		return fmt.Errorf("read journal_mode: %w", err)
+	}
+	if !strings.EqualFold(journal, "wal") {
+		return fmt.Errorf("journal_mode=%q, want wal", journal)
+	}
+	return nil
 }
 
 func (r *Repository) Close() error { return r.db.Close() }
@@ -91,6 +117,9 @@ CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, session_json B
 		return err
 	}
 	if err := r.ensureAgentRelationsTable(ctx); err != nil {
+		return err
+	}
+	if err := r.ensureListAndCostColumns(ctx); err != nil {
 		return err
 	}
 	return nil
@@ -202,6 +231,120 @@ CREATE INDEX IF NOT EXISTS agent_relations_session ON agent_relations(session_id
 	return nil
 }
 
+// ensureListAndCostColumns is migration 6: denormalizes session list filters and
+// cost summary fields so dashboard queries avoid json_extract full-table sorts
+// and in-process aggregation over every cost row.
+func (r *Repository) ensureListAndCostColumns(ctx context.Context) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin migration 6: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := migrateSessionListColumns(ctx, tx); err != nil {
+		return err
+	}
+	if err := migrateCostSummaryColumns(ctx, tx); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO schema_migrations(version) VALUES (6)"); err != nil {
+		return fmt.Errorf("record migration 6: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit migration 6: %w", err)
+	}
+	return nil
+}
+
+func migrateSessionListColumns(ctx context.Context, tx *sql.Tx) error {
+	if err := addMissingColumns(ctx, tx, "sessions", [][2]string{
+		{"started_at", "ALTER TABLE sessions ADD COLUMN started_at TEXT"},
+		{"tool", "ALTER TABLE sessions ADD COLUMN tool TEXT"},
+		{"state", "ALTER TABLE sessions ADD COLUMN state TEXT"},
+		{"identity_scope", "ALTER TABLE sessions ADD COLUMN identity_scope TEXT"},
+		{"model", "ALTER TABLE sessions ADD COLUMN model TEXT"},
+	}); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE sessions SET
+started_at = COALESCE(started_at, json_extract(session_json, '$.started_at')),
+tool = COALESCE(tool, json_extract(session_json, '$.tool')),
+state = COALESCE(state, json_extract(session_json, '$.state')),
+identity_scope = COALESCE(identity_scope, json_extract(session_json, '$.attributes.identity_scope'), CASE
+	WHEN session_id GLOB 'codex-log:*' OR session_id GLOB 'codex:token:*' OR session_id GLOB 'codex:skill:*'
+		OR session_id GLOB 'codex:skill-turn:*' OR session_id GLOB 'codex:trace:*' OR session_id GLOB 'cursor:token:*'
+		OR session_id GLOB 'claude-code:trace:*' OR session_id GLOB '*:unknown' THEN 'observation'
+	ELSE 'unknown' END),
+model = COALESCE(model, json_extract(session_json, '$.attributes.model'))`); err != nil {
+		return fmt.Errorf("backfill session list columns: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS sessions_started_id ON sessions(started_at DESC, session_id DESC);
+CREATE INDEX IF NOT EXISTS sessions_tool_started ON sessions(tool, started_at DESC, session_id DESC);
+CREATE INDEX IF NOT EXISTS sessions_state_started ON sessions(state, started_at DESC, session_id DESC);
+CREATE INDEX IF NOT EXISTS sessions_scope_started ON sessions(identity_scope, started_at DESC, session_id DESC);
+CREATE INDEX IF NOT EXISTS sessions_model_started ON sessions(model, started_at DESC, session_id DESC)`); err != nil {
+		return fmt.Errorf("create session list indexes: %w", err)
+	}
+	return nil
+}
+
+func migrateCostSummaryColumns(ctx context.Context, tx *sql.Tx) error {
+	if err := addMissingColumns(ctx, tx, "cost_records", [][2]string{
+		{"currency", "ALTER TABLE cost_records ADD COLUMN currency TEXT"},
+		{"status", "ALTER TABLE cost_records ADD COLUMN status TEXT"},
+		{"amount_microusd", "ALTER TABLE cost_records ADD COLUMN amount_microusd INTEGER"},
+	}); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE cost_records SET
+currency = COALESCE(currency, json_extract(cost_json, '$.currency')),
+status = COALESCE(status, json_extract(cost_json, '$.status')),
+amount_microusd = COALESCE(amount_microusd, CAST(json_extract(cost_json, '$.amount_microusd') AS INTEGER))`); err != nil {
+		return fmt.Errorf("backfill cost summary columns: %w", err)
+	}
+	return nil
+}
+
+func addMissingColumns(ctx context.Context, tx *sql.Tx, table string, columns [][2]string) error {
+	for _, column := range columns {
+		has, err := tableHasColumn(ctx, tx, table, column[0])
+		if err != nil {
+			return err
+		}
+		if has {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, column[1]); err != nil {
+			return fmt.Errorf("add %s.%s: %w", table, column[0], err)
+		}
+	}
+	return nil
+}
+
+func tableHasColumn(ctx context.Context, tx *sql.Tx, table, column string) (bool, error) {
+	rows, err := tx.QueryContext(ctx, "PRAGMA table_info("+table+")")
+	if err != nil {
+		return false, fmt.Errorf("inspect %s schema: %w", table, err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var (
+			cid          int
+			name         string
+			columnType   string
+			notNull      int
+			defaultValue sql.NullString
+			primaryKey   int
+		)
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			return false, fmt.Errorf("scan %s schema: %w", table, err)
+		}
+		if name == column {
+			return true, rows.Err()
+		}
+	}
+	return false, rows.Err()
+}
+
 func (r *Repository) SaveEvents(ctx context.Context, events []canonical.Event) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -305,45 +448,18 @@ func (r *Repository) saveOperationsTx(ctx context.Context, tx *sql.Tx, operation
 	return nil
 }
 
-func (r *Repository) rebuildAllSessions(ctx context.Context) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-	rows, err := tx.QueryContext(ctx, "SELECT DISTINCT session_id FROM events ORDER BY session_id")
-	if err != nil {
-		return err
-	}
-	var ids []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			_ = rows.Close()
-			return err
-		}
-		ids = append(ids, id)
-	}
-	if err := rows.Close(); err != nil {
-		return err
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-	for _, id := range ids {
-		if err := r.rebuildSession(ctx, tx, id); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
-}
-
 func (r *Repository) saveCostRecord(ctx context.Context, tx *sql.Tx, record cost.Record) error {
 	payload, err := json.Marshal(record)
 	if err != nil {
 		return fmt.Errorf("marshal cost record: %w", err)
 	}
-	if _, err = tx.ExecContext(ctx, "INSERT INTO cost_records(event_id,session_id,cost_json) VALUES(?,?,?)", record.EventID, record.SessionID, payload); err != nil {
+	var amount any
+	if record.AmountMicrousd != nil {
+		amount = *record.AmountMicrousd
+	}
+	if _, err = tx.ExecContext(ctx,
+		"INSERT INTO cost_records(event_id,session_id,cost_json,currency,status,amount_microusd) VALUES(?,?,?,?,?,?)",
+		record.EventID, record.SessionID, payload, record.Currency, record.Status, amount); err != nil {
 		return fmt.Errorf("insert cost record: %w", err)
 	}
 	return nil
@@ -671,7 +787,19 @@ func upsertSession(ctx context.Context, tx *sql.Tx, session canonical.Session) e
 	if err != nil {
 		return fmt.Errorf("marshal reconstructed session: %w", err)
 	}
-	_, err = tx.ExecContext(ctx, "INSERT INTO sessions(session_id,session_json) VALUES(?,?) ON CONFLICT(session_id) DO UPDATE SET session_json=excluded.session_json", session.SessionID, data)
+	model, _ := session.Attributes["model"].(string)
+	scope, _ := session.Attributes[identityScopeKey].(string)
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO sessions(session_id,session_json,started_at,tool,state,identity_scope,model)
+VALUES(?,?,?,?,?,?,?)
+ON CONFLICT(session_id) DO UPDATE SET
+session_json=excluded.session_json,
+started_at=excluded.started_at,
+tool=excluded.tool,
+state=excluded.state,
+identity_scope=excluded.identity_scope,
+model=excluded.model`,
+		session.SessionID, data, session.StartedAt.UTC().Format(time.RFC3339Nano), session.Tool, session.State, scope, model)
 	return err
 }
 func lifecycle(t string) string {
@@ -736,32 +864,31 @@ func sessionListQuery(filter storage.SessionFilter) (string, []any, error) {
 		args = append(args, value)
 	}
 	if filter.Tool != "" {
-		appendCondition("json_extract(session_json, '$.tool') = ?", filter.Tool)
+		appendCondition("tool = ?", filter.Tool)
 	}
 	if filter.Outcome != "" {
-		appendCondition("json_extract(session_json, '$.state') = ?", filter.Outcome)
+		appendCondition("state = ?", filter.Outcome)
 	}
-	identityScopeExpression := "COALESCE(json_extract(session_json, '$.attributes.identity_scope'), CASE WHEN session_id GLOB 'codex-log:*' OR session_id GLOB 'codex:token:*' OR session_id GLOB 'codex:skill:*' OR session_id GLOB 'codex:skill-turn:*' OR session_id GLOB 'codex:trace:*' OR session_id GLOB 'cursor:token:*' OR session_id GLOB 'claude-code:trace:*' OR session_id GLOB '*:unknown' THEN 'observation' ELSE 'unknown' END)"
 	switch filter.Scope {
 	case storage.SessionScopePrimary:
-		conditions = append(conditions, identityScopeExpression+" != 'observation'")
+		conditions = append(conditions, "(identity_scope IS NULL OR identity_scope != 'observation')")
 	case storage.SessionScopeObservation:
-		conditions = append(conditions, identityScopeExpression+" = 'observation'")
+		conditions = append(conditions, "identity_scope = 'observation'")
 	case "":
 	default:
 		return "", nil, errors.New("session scope must be primary, observation, or empty")
 	}
 	if filter.Model != "" {
-		appendCondition("EXISTS (SELECT 1 FROM events WHERE events.session_id=sessions.session_id AND json_extract(events.event_json, '$.attributes.model') = ?)", filter.Model)
+		appendCondition("model = ?", filter.Model)
 	}
 	if filter.StartedAfter != nil {
-		appendCondition("json_extract(session_json, '$.started_at') >= ?", filter.StartedAfter.UTC().Format(time.RFC3339Nano))
+		appendCondition("started_at >= ?", filter.StartedAfter.UTC().Format(time.RFC3339Nano))
 	}
 	if filter.StartedBefore != nil {
-		appendCondition("json_extract(session_json, '$.started_at') < ?", filter.StartedBefore.UTC().Format(time.RFC3339Nano))
+		appendCondition("started_at < ?", filter.StartedBefore.UTC().Format(time.RFC3339Nano))
 	}
 	if filter.Cursor != nil {
-		conditions = append(conditions, "(json_extract(session_json, '$.started_at') < ? OR (json_extract(session_json, '$.started_at') = ? AND session_id < ?))")
+		conditions = append(conditions, "(started_at < ? OR (started_at = ? AND session_id < ?))")
 		cursorTime := filter.Cursor.StartedAt.UTC().Format(time.RFC3339Nano)
 		args = append(args, cursorTime, cursorTime, filter.Cursor.SessionID)
 	}
@@ -769,7 +896,7 @@ func sessionListQuery(filter storage.SessionFilter) (string, []any, error) {
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
-	query += " ORDER BY json_extract(session_json, '$.started_at') DESC, session_id DESC LIMIT ?"
+	query += " ORDER BY started_at DESC, session_id DESC LIMIT ?"
 	return query, append(args, filter.Limit+1), nil
 }
 
@@ -886,19 +1013,7 @@ func (r *Repository) DeleteSession(ctx context.Context, id string) error {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	if _, err = tx.ExecContext(ctx, "DELETE FROM cost_records WHERE session_id=?", id); err != nil {
-		return err
-	}
-	if _, err = tx.ExecContext(ctx, "DELETE FROM operations WHERE session_id=?", id); err != nil {
-		return err
-	}
-	if _, err = tx.ExecContext(ctx, "DELETE FROM agent_relations WHERE session_id=?", id); err != nil {
-		return err
-	}
-	if _, err = tx.ExecContext(ctx, "DELETE FROM events WHERE session_id=?", id); err != nil {
-		return err
-	}
-	if _, err = tx.ExecContext(ctx, "DELETE FROM sessions WHERE session_id=?", id); err != nil {
+	if err := deleteSessionRows(ctx, tx, id); err != nil {
 		return err
 	}
 	return tx.Commit()

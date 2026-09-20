@@ -442,7 +442,7 @@ func assertMode(t *testing.T, path string, want os.FileMode) {
 	}
 }
 
-func event(t *testing.T, id, sessionID, kind, at string) canonical.Event {
+func event(t testing.TB, id, sessionID, kind, at string) canonical.Event {
 	t.Helper()
 	occurred, err := time.Parse(time.RFC3339, at)
 	if err != nil {

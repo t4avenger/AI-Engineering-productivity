@@ -51,6 +51,13 @@ type Record struct {
 	ObservedTokens     map[string]int64 `json:"observed_tokens"`
 }
 
+// Summary is an aggregate over retained cost records without loading each row.
+type Summary struct {
+	Currency                 string         `json:"currency"`
+	CalculatedAmountMicrousd *int64         `json:"calculated_amount_microusd"`
+	Statuses                 map[string]int `json:"statuses"`
+}
+
 type Calculator struct{ catalog Catalog }
 
 func LoadDefault(overridePath string) (*Calculator, error) {
