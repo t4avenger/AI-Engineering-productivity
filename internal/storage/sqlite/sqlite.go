@@ -492,14 +492,15 @@ func (r *Repository) saveCostRecord(ctx context.Context, tx *sql.Tx, record cost
 }
 
 const (
-	timeFormat           = "2006-01-02T15:04:05.999999999Z07:00"
-	whereSessionIDClause = " WHERE session_id=?"
-	codexSessionPrefix   = "codex:"
-	identityScopeKey     = "identity_scope"
-	identitySourceKey    = "identity_source"
-	identityProvider     = "provider"
-	identityObservation  = "observation"
-	identityUnknown      = "unknown"
+	timeFormat                = "2006-01-02T15:04:05.999999999Z07:00"
+	whereSessionIDClause      = " WHERE session_id=?"
+	codexSessionPrefix        = "codex:"
+	codexConversationIDSource = "conversation.id"
+	identityScopeKey          = "identity_scope"
+	identitySourceKey         = "identity_source"
+	identityProvider          = "provider"
+	identityObservation       = "observation"
+	identityUnknown           = "unknown"
 )
 
 func (r *Repository) rebuildSession(ctx context.Context, tx *sql.Tx, id string) error {
@@ -647,7 +648,7 @@ func sessionIdentity(events []canonical.Event) (string, string) {
 	}
 	switch {
 	case first.Tool == "codex" && hasCodexLogSessionID(first):
-		return identityProvider, "conversation.id"
+		return identityProvider, codexConversationIDSource
 	case first.Tool == "claude-code" && strings.HasPrefix(id, "claude-code:"):
 		return identityProvider, "session.id"
 	case first.Tool == "cursor-agent" && strings.HasPrefix(id, "cursor-agent:"):
@@ -723,7 +724,7 @@ func attachSessionEnvironment(session *canonical.Session, event canonical.Event)
 	}
 	if hasCodexLogSessionID(event) {
 		observeSessionCorrelation(session, map[string]any{
-			"session_id_source":   "conversation.id",
+			"session_id_source":   codexConversationIDSource,
 			"provider_prefix":     codexSessionPrefix,
 			"provider_session_id": strings.TrimPrefix(event.SessionID, codexSessionPrefix),
 		})
@@ -756,7 +757,7 @@ func hasCodexLogSessionID(event canonical.Event) bool {
 		return true
 	}
 	correlation, ok := event.ProviderExtensions["correlation"].(map[string]any)
-	return ok && correlation["session_id_source"] == "conversation.id"
+	return ok && correlation["session_id_source"] == codexConversationIDSource
 }
 
 func observeSessionAttribute(session *canonical.Session, key, value string) {

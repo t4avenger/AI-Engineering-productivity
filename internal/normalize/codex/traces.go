@@ -143,8 +143,8 @@ func normalizeLiveTraceSpan(resource, scope, span, resourceAttributes map[string
 // session only when the provider supplied the exact identifier. All other
 // traces remain trace-scoped observations.
 func codexTraceSessionIdentity(resourceAttributes map[string]any, traceID string) (string, string) {
-	if conversationID, ok := normalize.ObservedString(resourceAttributes["conversation.id"]); ok {
-		return normalize.ProviderNativeSessionID("codex:", conversationID), "conversation.id"
+	if conversationID, ok := normalize.ObservedString(resourceAttributes[codexConversationIDKey]); ok {
+		return normalize.ProviderNativeSessionID("codex:", conversationID), codexConversationIDKey
 	}
 	return "codex:trace:" + traceID, "trace.id"
 }
@@ -188,7 +188,7 @@ func removeTraceUnavailable(values []string, target string) []string {
 func liveTraceCorrelation(fields traceSpanFields, sessionID, sessionIDSource string) map[string]any {
 	correlation := traceCorrelation(fields.eventID, fields.traceID, fields.spanID, fields.parentSpanID, fields.occurredAt)
 	correlation["session_id_source"] = sessionIDSource
-	if sessionIDSource == "conversation.id" {
+	if sessionIDSource == codexConversationIDKey {
 		correlation["provider_session_id"] = strings.TrimPrefix(sessionID, "codex:")
 	}
 	return correlation

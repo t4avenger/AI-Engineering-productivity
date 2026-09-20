@@ -27,6 +27,7 @@ var ErrUnsupportedLogs = errors.New("unsupported Codex log payload")
 
 const (
 	codexEventNameKey        = "event.name"
+	codexConversationIDKey   = "conversation.id"
 	codexServiceNameKey      = "service.name"
 	codexToolResultEvent     = "codex.tool_result"
 	codexSandboxOutcomeEvent = "codex.sandbox_outcome"
@@ -172,7 +173,7 @@ func attachCodexLogTokenCounts(attributes, fields map[string]any) {
 }
 
 func codexLogSessionID(fields map[string]any, fallback string) string {
-	if conversationID, ok := normalize.ObservedString(fields["conversation.id"]); ok {
+	if conversationID, ok := normalize.ObservedString(fields[codexConversationIDKey]); ok {
 		return normalize.ProviderNativeSessionID("codex:", conversationID)
 	}
 	return fallback
@@ -358,7 +359,7 @@ func codexLogAttributes(fields map[string]any) map[string]any {
 	if codexLifecycleEvent(eventName) {
 		return allowedCodexAttributes(fields, codexEventNameKey)
 	}
-	known := []string{"mcp_server", "conversation.id"}
+	known := []string{"mcp_server", codexConversationIDKey}
 	switch eventName {
 	case codexToolResultEvent:
 		known = append(known, codexToolResultFieldKeys()...)
