@@ -24,7 +24,7 @@ var modelInteractionEvents = map[string]struct{}{
 // duplicated between the typed record and its extensions. event.name is NOT
 // listed: it drives eligibility but has no typed field, so it is preserved as
 // evidence under provider_extensions.log_attributes rather than dropped.
-var extractedLogFields = []string{"model", "input_token_count", "output_token_count", "conversation.id"}
+var extractedLogFields = []string{"model", "input_token_count", "output_token_count", codexConversationIDKey}
 
 // ExtractLogModelInteractions maps the reviewed Codex OTLP log shape into
 // stable-primitive canonical.ModelInteraction records. It is the honest,
@@ -194,7 +194,7 @@ func operationLogAttributes(fields map[string]any) map[string]any {
 	if stringValue(fields[codexEventNameKey], "") == codexSandboxOutcomeEvent {
 		return allowedCodexAttributes(fields, codexEventNameKey)
 	}
-	known := []string{"conversation.id", "mcp_server"}
+	known := []string{codexConversationIDKey, "mcp_server"}
 	switch stringValue(fields[codexEventNameKey], "") {
 	case codexToolResultEvent:
 		known = append(known, codexToolResultFieldKeys()...)

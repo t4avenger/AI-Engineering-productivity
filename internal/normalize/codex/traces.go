@@ -109,6 +109,7 @@ func normalizeLiveTraceSpan(resource, scope, span, resourceAttributes map[string
 	}
 	spanAttributes := traceAttributeValues(span["attributes"])
 	attributes := codexTraceAttributes(spanAttributes)
+	sessionID, sessionIDSource := codexTraceSessionIdentity(resourceAttributes, fields.traceID)
 
 	return canonical.Event{
 		SchemaVersion: canonicalSchemaVersion,
@@ -122,11 +123,11 @@ func normalizeLiveTraceSpan(resource, scope, span, resourceAttributes map[string
 		SourceVersion: version,
 		ActorID:       unavailable,
 		DeviceID:      unavailable,
-		SessionID:     "codex:trace:" + fields.traceID,
+		SessionID:     sessionID,
 		PrivacyLevel:  "operational",
 		Attributes:    attributes,
 		ProviderExtensions: map[string]any{
-			"correlation":         liveTraceCorrelation(fields),
+			"correlation":         liveTraceCorrelation(fields, sessionID, sessionIDSource),
 			"resource_attributes": resourceAttributes,
 			"resource":            normalize.UnknownFields(resource, "scopeSpans"),
 			"scope":               normalize.UnknownFields(scope, "spans"),
@@ -134,6 +135,18 @@ func normalizeLiveTraceSpan(resource, scope, span, resourceAttributes map[string
 			"span_attributes":     spanAttributes,
 		},
 	}, nil
+}
+
+// codexTraceSessionIdentity promotes only the provider-emitted resource-level
+// conversation.id observed alongside Codex logs in CLI 0.155.1. It is the same
+// raw provider value used by log normalisation, so both surfaces share a
+// session only when the provider supplied the exact identifier. All other
+// traces remain trace-scoped observations.
+func codexTraceSessionIdentity(resourceAttributes map[string]any, traceID string) (string, string) {
+	if conversationID, ok := normalize.ObservedString(resourceAttributes[codexConversationIDKey]); ok {
+		return normalize.ProviderNativeSessionID("codex:", conversationID), codexConversationIDKey
+	}
+	return "codex:trace:" + traceID, "trace.id"
 }
 
 func codexTraceAttributes(fields map[string]any) map[string]any {
@@ -172,9 +185,12 @@ func removeTraceUnavailable(values []string, target string) []string {
 	return result
 }
 
-func liveTraceCorrelation(fields traceSpanFields) map[string]any {
+func liveTraceCorrelation(fields traceSpanFields, sessionID, sessionIDSource string) map[string]any {
 	correlation := traceCorrelation(fields.eventID, fields.traceID, fields.spanID, fields.parentSpanID, fields.occurredAt)
-	correlation["session_id_source"] = "trace.id"
+	correlation["session_id_source"] = sessionIDSource
+	if sessionIDSource == codexConversationIDKey {
+		correlation["provider_session_id"] = strings.TrimPrefix(sessionID, "codex:")
+	}
 	return correlation
 }
 

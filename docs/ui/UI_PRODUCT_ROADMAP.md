@@ -52,8 +52,7 @@ Status verified against GitHub on 2026-09-19; recheck before starting work.
 - Claude content is retained on the #94 log surface; JSONL/other prior drops
   remain coordinated with [#173](https://github.com/t4avenger/AI-Engineering-productivity/issues/173), #104 and #105. Missing content is not a
   product prohibition on local display.
-- Codex 0.154.0 span capture shipped in [#172](https://github.com/t4avenger/AI-Engineering-productivity/issues/172). Spans can be trace-only
-  observations, with no proven conversation join. Claude spans are available;
+- Codex 0.154.0 span capture shipped in [#172](https://github.com/t4avenger/AI-Engineering-productivity/issues/172). CLI 0.155.1 now proves an exact resource-level `conversation.id` join to same-run log conversations ([#209](https://github.com/t4avenger/AI-Engineering-productivity/issues/209)); traces without that key remain observations. Claude spans are available;
   neither fact supplies the missing common projection/UI.
 - File-operation evidence/projection [#156](https://github.com/t4avenger/AI-Engineering-productivity/issues/156) and span projection
   [#157](https://github.com/t4avenger/AI-Engineering-productivity/issues/157) remain open. The image's per-file +/- counts and task stages

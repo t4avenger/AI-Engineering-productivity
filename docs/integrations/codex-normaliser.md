@@ -7,9 +7,7 @@ a malformed supported span returns `422` for the whole batch instead of being
 accepted and silently dropped. The CLI 0.153.4 no-trace result remains valid
 for that version (#112); trace export is therefore version-dependent.
 
-For live traces, the event ID is `codex:<traceId>:<spanId>` and the trace-only
-session ID is `codex:trace:<traceId>`. Trace-only rows are observations with
-`identity_source=trace.id`; they are not fabricated conversation joins. The
+For live traces, the event ID is `codex:<traceId>:<spanId>`. CLI 0.155.1 proves a resource-level `conversation.id` shared exactly with the log surface from one isolated synthetic run, so those spans use `codex:<conversation.id>` and `identity_source=conversation.id`. The older 0.154.0 fixture has no such attribute and remains the trace-only `codex:trace:<traceId>` observation with `identity_source=trace.id`. No timestamp, model, ordering, tool, or content-based join is permitted. The
 adapter uses OTLP `startTimeUnixNano` plus receipt time and sorts spans by
 observed time plus stable identifiers, collapses duplicate trace/span IDs, and
 stores dedup, ordering, trace/span, parent-span, and task-boundary confidence
@@ -27,8 +25,7 @@ Resource, scope, span, and unknown attribute fields are preserved under
 sanitized synthetic-only evidence even though the local ingest path retains the
 raw values it receives under epic #87.
 
-`fixtures/codex/expected/codex-0.154.0-trace-spans.events.json` is the golden
-output for the version-pinned observed-sanitized trace fixture.
+`fixtures/codex/expected/codex-0.154.0-trace-spans.events.json` remains the golden output for the trace-only fixture. `fixtures/codex/observed-sanitised/codex-0.155.1-trace-conversation-otlp.json` and its same-run log companion record the reviewed exact join evidence.
 
 ## Observed log support
 
@@ -96,8 +93,7 @@ from both log `provider_extensions.resource_attributes` and metric
 under session `provider_extensions.resource_attributes`, while session attributes expose
 `service_name`, `service_version`, and the normalized entrypoint
 (`codex_cli_rs` -> `interactive`, `codex_exec` -> `codex exec`) for the sessions
-evidence browser. Only log-derived `codex:<conversation.id>` sessions get
-`session_id_source=conversation.id`; content-derived metric/trace IDs do not.
+evidence browser. Log-derived sessions and Codex CLI 0.155.1 traces carrying the observed resource-level `conversation.id` get `session_id_source=conversation.id`; content-derived metrics and traces without that exact provider key do not.
 Prompt/response/source-code content is not captured by
 default; its configurable capture is tracked in #94.
 

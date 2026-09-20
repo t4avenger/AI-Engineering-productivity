@@ -13,14 +13,28 @@ import (
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
-func TestNormalizeTracesGoldenObservedFixture(t *testing.T) {
-	payload := observedTracePayload(t)
-	receivedAt := time.Date(2026, 9, 17, 19, 6, 0, 0, time.UTC)
-	first, err := NormalizeTraces(payload, receivedAt)
+type traceGoldenFixture struct {
+	name, source, golden string
+	receivedAt           time.Time
+}
+
+func TestNormalizeTracesGoldenObservedFixtures(t *testing.T) {
+	for _, fixture := range []traceGoldenFixture{
+		{"trace-only", "codex-0.154.0-trace-spans-otlp.json", "codex-0.154.0-trace-spans.events.json", time.Date(2026, 9, 17, 19, 6, 0, 0, time.UTC)},
+		{"resource-conversation", "codex-0.155.1-trace-conversation-otlp.json", "codex-0.155.1-trace-conversation.events.json", time.Date(2026, 9, 20, 15, 26, 22, 0, time.UTC)},
+	} {
+		t.Run(fixture.name, func(t *testing.T) { assertTraceGolden(t, fixture) })
+	}
+}
+
+func assertTraceGolden(t *testing.T, fixture traceGoldenFixture) {
+	t.Helper()
+	payload := observedTracePayloadForFixture(t, fixture.source)
+	first, err := NormalizeTraces(payload, fixture.receivedAt)
 	if err != nil {
 		t.Fatalf("normalise observed traces: %v", err)
 	}
-	second, err := NormalizeTraces(payload, receivedAt)
+	second, err := NormalizeTraces(payload, fixture.receivedAt)
 	if err != nil {
 		t.Fatalf("normalise observed traces again: %v", err)
 	}
@@ -31,7 +45,7 @@ func TestNormalizeTracesGoldenObservedFixture(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal events: %v", err)
 	}
-	golden := filepath.Join(codexFixturesDir(t), "expected", "codex-0.154.0-trace-spans.events.json")
+	golden := filepath.Join(codexFixturesDir(t), "expected", fixture.golden)
 	if os.Getenv("UPDATE_GOLDEN") == "1" {
 		if err := os.WriteFile(golden, append(got, '\n'), 0o644); err != nil {
 			t.Fatalf("write golden: %v", err)
@@ -42,7 +56,7 @@ func TestNormalizeTracesGoldenObservedFixture(t *testing.T) {
 		t.Fatalf("read golden: %v", err)
 	}
 	if string(got) != strings.TrimSpace(string(want)) {
-		t.Fatalf("golden output mismatch\nwant: %s\n got: %s", want, got)
+		t.Fatalf("golden mismatch (-want +got):\nwant %s\ngot  %s", want, got)
 	}
 }
 
@@ -183,8 +197,12 @@ type testHelper interface {
 }
 
 func observedTracePayload(t testHelper) []byte {
+	return observedTracePayloadForFixture(t, "codex-0.154.0-trace-spans-otlp.json")
+}
+
+func observedTracePayloadForFixture(t testHelper, name string) []byte {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(codexFixturesDir(t), "observed-sanitised", "codex-0.154.0-trace-spans-otlp.json"))
+	data, err := os.ReadFile(filepath.Join(codexFixturesDir(t), "observed-sanitised", name))
 	if err != nil {
 		t.Fatalf("read observed trace fixture: %v", err)
 	}
