@@ -436,7 +436,22 @@ span never falsely declares those surfaces unavailable. Tool spans are
 intra-interaction operations, so their `task_boundary.confidence` is `observed`
 with `TaskID` nil (not themselves boundaries); `tool_use_id`/`gen_ai.tool.call.id`
 are the join keys for a later cross-signal correlation with `tool_result` /
-`tool_decision` logs (#92/#93). Hook span-type mapping remains owned by #103.
+`tool_decision` logs (#92/#93).
+
+Hook spans (`claude_code.hook`, `span.type=hook`) are mapped by `hookAttributes`
+into a present-only typed `attributes.hook` block reporting how user-configured
+hooks intervened in the turn: `hook_event`, `hook_name` (strings); `num_hooks`,
+`num_success`, `num_blocking`, `num_non_blocking_error`, `num_cancelled`,
+`duration_ms` (non-negative ints via `putSpanInt`); plus the
+`OTEL_LOG_TOOL_DETAILS`-gated `hook_definitions` retained raw. Absent fields are
+omitted, never fabricated as zero. Following the tool-span `file_path`/
+`full_command` precedent, the gated `hook_definitions` lives in the typed block
+only and is deliberately excluded from `safeSpanAttributeKeys`, so it never
+duplicates into the allow-listed `provider_extensions.span_attributes`
+passthrough. Hook spans genuinely carry none of the tool/file/command/content/
+cost surfaces, so `spanUnavailableFields` leaves the default `unavailable_fields`
+in place (no false widening). A hook is an intra-interaction intervention, not a
+task boundary, so its `task_boundary.confidence` is `observed` with `TaskID` nil.
 
 Because the raw `full_command` can carry a verbatim pull-request URL (e.g. a
 `gh pr view https://github.com/<org>/<repo>/pull/<n>` invocation), each span is

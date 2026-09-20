@@ -26,6 +26,7 @@ const (
 	spanTypeTool            = "tool"
 	spanTypeToolExecution   = "tool.execution"
 	spanTypeToolBlockedUser = "tool.blocked_on_user"
+	spanTypeHook            = "hook"
 )
 
 // Span attribute keys shared between the allow-list and the typed attribute
@@ -57,7 +58,8 @@ const (
 // identifiers (tool_name, tool_use_id, gen_ai.tool.call.id, result_tokens, …) are
 // allow-listed for verbatim passthrough (#101); the raw file_path/full_command/error
 // content lives only in the typed tool block (its canonical home, which governance
-// walks), so it is not duplicated here. Hook/sub-agent mapping is owned by #102–#103.
+// walks), so it is not duplicated here. The gated hook_definitions (#103) is
+// likewise kept only in its typed hook block, not duplicated in this allow-list.
 var safeSpanAttributeKeys = map[string]struct{}{
 	"span.type":               {},
 	"gen_ai.system":           {},
@@ -100,6 +102,13 @@ var safeSpanAttributeKeys = map[string]struct{}{
 	"parent.source":           {},
 	"queued_sends":            {},
 	"user_prompt_length":      {},
+	"hook_event":              {},
+	"hook_name":               {},
+	"num_hooks":               {},
+	"num_success":             {},
+	"num_blocking":            {},
+	"num_non_blocking_error":  {},
+	"num_cancelled":           {},
 }
 
 // claudePRLinkScanFields are the reviewed Claude span fields that can carry a
@@ -173,7 +182,8 @@ type spanContext struct {
 // Raw span identity (traceId/spanId/parentSpanId) and the raw session id are
 // retained verbatim; no ingest-time hiding is applied (epic #87). Span
 // attributes are reduced to safeSpanAttributeKeys. Per-span-type field mapping
-// (interaction/llm_request/tool/hook/sub-agent) is owned by #100–#103.
+// covers interaction/llm_request (#100), tool spans (#101), and hook spans
+// (#103); the sub-agent span tree is reconstructed by a separate post-pass (#102).
 func NormalizeTraces(data []byte, receivedAt time.Time) ([]canonical.Event, error) {
 	var payload tracesPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
@@ -269,13 +279,16 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 		attributes["model"] = model
 	}
 	// Dispatch on span.type so each span type gains a typed, present-only field
-	// block: the per-prompt interaction/llm_request spans (#100) and the tool /
-	// tool.execution / tool.blocked_on_user spans (#101). Every documented field
-	// is captured raw, including the gated file_path/full_command/error — this is
-	// a governance/timeline product and the raw values are the signal (epic #87);
+	// block: the per-prompt interaction/llm_request spans (#100), the tool /
+	// tool.execution / tool.blocked_on_user spans (#101), and the hook span (#103).
+	// Every documented field is captured raw, including the gated
+	// file_path/full_command/error and hook_definitions — this is a
+	// governance/timeline product and the raw values are the signal (epic #87);
 	// the per-field hide decision is deferred downstream. Tool spans carry
 	// file/command/tool_io surfaces, so spanUnavailableFields drops those from
-	// their unavailable set. Hook/sub-agent span mapping stays deferred (#102–#103).
+	// their unavailable set. The sub-agent span tree is reconstructed by a
+	// separate post-pass (claude.ReconstructSubAgentRelations, #102), not a
+	// span.type case here.
 	switch spanType {
 	case "interaction":
 		attributes["interaction"] = interactionAttributes(fields)
@@ -287,6 +300,8 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 		attributes["tool_execution"] = toolExecutionAttributes(fields)
 	case spanTypeToolBlockedUser:
 		attributes["tool_blocked_on_user"] = toolBlockedOnUserAttributes(fields)
+	case spanTypeHook:
+		attributes["hook"] = hookAttributes(fields)
 	}
 	extensions := map[string]any{
 		"correlation": spanCorrelation(eventID, occurredAt, traceID, spanID, parentSpanID, spanType),
@@ -338,11 +353,11 @@ func spanCorrelation(eventID string, occurredAt time.Time, traceID, spanID strin
 	// boundary — so its confidence is raised (#100). The llm_request span is a
 	// child of that root (one model request within the prompt), not itself a
 	// boundary, so it stays "unknown". Tool spans are intra-interaction operations,
-	// observed to not be task boundaries (#101); hook/sub-agent boundaries remain
-	// deferred to #102–#103.
+	// observed to not be task boundaries (#101); hook spans are intra-interaction
+	// interventions, likewise not task boundaries (#103).
 	boundary := map[string]any{
 		"confidence": "unknown",
-		"reason":     "Claude Code trace spans: per-span task-boundary mapping deferred to T-phase (#102–#103)",
+		"reason":     "Claude Code trace spans: per-span task-boundary mapping deferred to T-phase",
 	}
 	switch spanType {
 	case "interaction":
@@ -354,6 +369,11 @@ func spanCorrelation(eventID string, occurredAt time.Time, traceID, spanID strin
 		boundary = map[string]any{
 			"confidence": "observed",
 			"reason":     "Claude Code tool spans are intra-interaction operations, not task boundaries",
+		}
+	case spanTypeHook:
+		boundary = map[string]any{
+			"confidence": "observed",
+			"reason":     "Claude Code hook span is an intra-interaction intervention, not a task boundary",
 		}
 	}
 	return map[string]any{
@@ -523,6 +543,32 @@ func toolBlockedOnUserAttributes(fields map[string]any) map[string]any {
 	block := map[string]any{}
 	putSpanString(block, fields, "decision", "decision")
 	putSpanString(block, fields, "source", "source")
+	putSpanInt(block, fields, "duration_ms", "duration_ms")
+	return block
+}
+
+// hookAttributes maps a claude_code.hook span (detailed beta tracing, #103 T16)
+// into a present-only block. Hooks are user-configured automation that can block
+// or alter agent actions, so these counts and durations make an otherwise-
+// invisible intervention observable: hook_event/hook_name identify the hook,
+// num_hooks/num_success/num_blocking/num_non_blocking_error/num_cancelled are the
+// outcome breakdown, and duration_ms is the wall-clock cost of all matching hooks.
+// hook_definitions is the OTEL_LOG_TOOL_DETAILS-gated JSON-serialized hook
+// configuration; per the raw-capture stance (epic #87) it is retained verbatim
+// here — its canonical home is this typed block (not the allow-listed passthrough,
+// mirroring the gated tool file_path/full_command), and the per-field hide
+// decision is deferred downstream. Every field is present-only: a genuinely
+// absent attribute is omitted, never fabricated.
+func hookAttributes(fields map[string]any) map[string]any {
+	block := map[string]any{}
+	putSpanString(block, fields, "hook_event", "hook_event")
+	putSpanString(block, fields, "hook_name", "hook_name")
+	putSpanString(block, fields, "hook_definitions", "hook_definitions")
+	putSpanInt(block, fields, "num_hooks", "num_hooks")
+	putSpanInt(block, fields, "num_success", "num_success")
+	putSpanInt(block, fields, "num_blocking", "num_blocking")
+	putSpanInt(block, fields, "num_non_blocking_error", "num_non_blocking_error")
+	putSpanInt(block, fields, "num_cancelled", "num_cancelled")
 	putSpanInt(block, fields, "duration_ms", "duration_ms")
 	return block
 }
