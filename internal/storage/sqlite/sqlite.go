@@ -350,13 +350,14 @@ func (r *Repository) saveCostRecord(ctx context.Context, tx *sql.Tx, record cost
 }
 
 const (
-	timeFormat          = "2006-01-02T15:04:05.999999999Z07:00"
-	codexSessionPrefix  = "codex:"
-	identityScopeKey    = "identity_scope"
-	identitySourceKey   = "identity_source"
-	identityProvider    = "provider"
-	identityObservation = "observation"
-	identityUnknown     = "unknown"
+	timeFormat           = "2006-01-02T15:04:05.999999999Z07:00"
+	whereSessionIDClause = " WHERE session_id=?"
+	codexSessionPrefix   = "codex:"
+	identityScopeKey     = "identity_scope"
+	identitySourceKey    = "identity_source"
+	identityProvider     = "provider"
+	identityObservation  = "observation"
+	identityUnknown      = "unknown"
 )
 
 func (r *Repository) rebuildSession(ctx context.Context, tx *sql.Tx, id string) error {
@@ -794,7 +795,7 @@ func (r *Repository) ListOperations(ctx context.Context, filter storage.Operatio
 	query := "SELECT operation_json FROM operations"
 	args := []any{}
 	if filter.SessionID != "" {
-		query += " WHERE session_id=?"
+		query += whereSessionIDClause
 		args = append(args, filter.SessionID)
 	}
 	query += " ORDER BY session_id, operation_id"
@@ -824,7 +825,7 @@ func (r *Repository) ListAgentRelations(ctx context.Context, filter storage.Agen
 	query := "SELECT relation_json FROM agent_relations"
 	args := []any{}
 	if filter.SessionID != "" {
-		query += " WHERE session_id=?"
+		query += whereSessionIDClause
 		args = append(args, filter.SessionID)
 	}
 	query += " ORDER BY session_id, trace_id, agent_id"
@@ -852,7 +853,7 @@ func (r *Repository) ListCostRecords(ctx context.Context, sessionID string) ([]c
 	query := "SELECT cost_json FROM cost_records"
 	args := []any{}
 	if sessionID != "" {
-		query += " WHERE session_id=?"
+		query += whereSessionIDClause
 		args = append(args, sessionID)
 	}
 	query += " ORDER BY event_id"
