@@ -30,7 +30,7 @@ func TestDeleteAllSessionsRemovesRetainedTelemetry(t *testing.T) {
 	// Precondition: the sub-agent spans must have produced relations, otherwise the
 	// post-delete assertion below would pass even if rebuildSession stopped writing
 	// them (0 before, 0 after) — a silent regression.
-	if got := tableRowCount(t, repo, "agent_relations"); got == 0 {
+	if tableRowCount(t, repo, "agent_relations") == 0 {
 		t.Fatal("agent relations before delete = 0, want at least one")
 	}
 	if err := repo.DeleteAllSessions(ctx); err != nil {
