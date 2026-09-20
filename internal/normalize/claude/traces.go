@@ -563,7 +563,7 @@ func hookAttributes(fields map[string]any) map[string]any {
 	block := map[string]any{}
 	putSpanString(block, fields, "hook_event", "hook_event")
 	putSpanString(block, fields, "hook_name", "hook_name")
-	putSpanString(block, fields, "hook_definitions", "hook_definitions")
+	putSpanRaw(block, fields, "hook_definitions", "hook_definitions")
 	putSpanInt(block, fields, "num_hooks", "num_hooks")
 	putSpanInt(block, fields, "num_success", "num_success")
 	putSpanInt(block, fields, "num_blocking", "num_blocking")
@@ -579,6 +579,20 @@ func putSpanString(block, fields map[string]any, dst, src string) {
 	if value, ok := normalize.ObservedString(fields[src]); ok {
 		block[dst] = value
 	}
+}
+
+// putSpanRaw sets dst on block from the src span attribute preserving the
+// observed string byte-for-byte, unlike putSpanString which stores the trimmed
+// form. It still requires a genuinely non-blank value, so an absent or
+// whitespace-only attribute is omitted rather than fabricated. Reserved for raw
+// content fields (e.g. the gated hook_definitions) whose exact bytes must be
+// retained verbatim under the raw-capture stance (epic #87).
+func putSpanRaw(block, fields map[string]any, dst, src string) {
+	text, ok := fields[src].(string)
+	if !ok || strings.TrimSpace(text) == "" {
+		return
+	}
+	block[dst] = text
 }
 
 // putSpanInt sets dst on block from the src span attribute only when a

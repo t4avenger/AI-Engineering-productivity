@@ -754,3 +754,30 @@ func TestNormalizeTracesHookSpanFiltersSensitiveAttributes(t *testing.T) {
 	}
 	assertAbsentFromSpanAttributes(t, event, "hook_definitions")
 }
+
+// TestNormalizeTracesHookSpanPreservesRawDefinitions proves the gated
+// hook_definitions is retained byte-for-byte (epic #87 raw capture): surrounding
+// whitespace observed on the wire survives, unlike the trimmed form the shared
+// putSpanString helper would store.
+func TestNormalizeTracesHookSpanPreservesRawDefinitions(t *testing.T) {
+	const padded = "  [{\"type\":\"command\",\"command\":\"./scripts/guard.sh\"}]  \n"
+	event := singleSpanEvent(t, toolSpanPayload("hook", `,{"key":"hook_event","value":{"stringValue":"PreToolUse"}},{"key":"hook_definitions","value":{"stringValue":"  [{\"type\":\"command\",\"command\":\"./scripts/guard.sh\"}]  \n"}}`))
+	if block := toolBlock(t, event, "hook"); block["hook_definitions"] != padded {
+		t.Fatalf("hook_definitions must be retained verbatim (untrimmed): %q", block["hook_definitions"])
+	}
+}
+
+// FuzzNormalizeTraces keeps the OTLP trace/span normaliser boundary from
+// panicking on arbitrary input (QUALITY_GATES: fuzz smoke when a normalisation
+// boundary changes). Seeds cover a well-formed hook span, the interaction root,
+// and malformed envelopes so the span dispatch and typed mappers are exercised.
+func FuzzNormalizeTraces(f *testing.F) {
+	f.Add([]byte(toolSpanPayload("hook", `,{"key":"hook_event","value":{"stringValue":"PreToolUse"}},{"key":"hook_definitions","value":{"stringValue":"[]"}},{"key":"num_blocking","value":{"intValue":1}}`)))
+	f.Add([]byte(toolSpanPayload("tool", `,{"key":"tool_name","value":{"stringValue":"Bash"}},{"key":"full_command","value":{"stringValue":"echo hi"}}`)))
+	f.Add([]byte(`{"resourceSpans":[{"scopeSpans":[{"spans":[{}]}]}]}`))
+	f.Add([]byte("not json"))
+	f.Add([]byte(""))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		_, _ = NormalizeTraces(data, time.Unix(0, 0).UTC())
+	})
+}
