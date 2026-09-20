@@ -43,8 +43,8 @@
 {{if .NextCursor}}
 <p id="timeline-more">
   <a
-    href="/sessions/{{.SessionID}}?cursor={{.NextCursor}}{{if .Inspector.SelectedEventID}}&amp;event={{urlquery .Inspector.SelectedEventID}}&amp;inspector={{urlquery .Inspector.ActiveTab}}{{end}}"
-    hx-get="/sessions/{{.SessionID}}/timeline?cursor={{.NextCursor}}{{if .Inspector.SelectedEventID}}&amp;event={{urlquery .Inspector.SelectedEventID}}&amp;inspector={{urlquery .Inspector.ActiveTab}}{{end}}"
+    href="/sessions/{{.SessionID}}?cursor={{.NextCursor}}{{if .Inspector.SelectedEventID}}&amp;event={{urlquery .Inspector.SelectedEventID}}&amp;inspector={{urlquery .Inspector.ActiveTab}}&amp;source={{urlquery .Inspector.Source}}{{end}}"
+    hx-get="/sessions/{{.SessionID}}/timeline?cursor={{.NextCursor}}{{if .Inspector.SelectedEventID}}&amp;event={{urlquery .Inspector.SelectedEventID}}&amp;inspector={{urlquery .Inspector.ActiveTab}}&amp;source={{urlquery .Inspector.Source}}{{end}}"
     hx-target="#timeline"
     hx-swap="beforeend"
     hx-on::after-swap="this.closest('#timeline-more').remove()"

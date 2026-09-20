@@ -24,8 +24,8 @@
 {{if .ConversationNext}}
 <p id="conversation-more">
   <a
-    href="/sessions/{{.SessionID}}?conversation_cursor={{.ConversationNext}}{{if .Inspector.SelectedEventID}}&amp;event={{urlquery .Inspector.SelectedEventID}}&amp;inspector={{urlquery .Inspector.ActiveTab}}{{end}}"
-    hx-get="/sessions/{{.SessionID}}/conversation?cursor={{.ConversationNext}}{{if .Inspector.SelectedEventID}}&amp;event={{urlquery .Inspector.SelectedEventID}}&amp;inspector={{urlquery .Inspector.ActiveTab}}{{end}}"
+    href="/sessions/{{.SessionID}}?conversation_cursor={{.ConversationNext}}{{if .Inspector.SelectedEventID}}&amp;event={{urlquery .Inspector.SelectedEventID}}&amp;inspector={{urlquery .Inspector.ActiveTab}}&amp;source={{urlquery .Inspector.Source}}{{end}}"
+    hx-get="/sessions/{{.SessionID}}/conversation?cursor={{.ConversationNext}}{{if .Inspector.SelectedEventID}}&amp;event={{urlquery .Inspector.SelectedEventID}}&amp;inspector={{urlquery .Inspector.ActiveTab}}&amp;source={{urlquery .Inspector.Source}}{{end}}"
     hx-target="#conversation"
     hx-swap="beforeend"
     hx-on::after-swap="this.closest('#conversation-more').remove()"

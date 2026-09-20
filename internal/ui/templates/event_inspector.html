@@ -1,6 +1,6 @@
 {{define "event_inspector.html"}}
 {{if .Open}}
-<aside id="event-inspector" class="event-inspector" role="dialog" aria-modal="false" aria-labelledby="event-inspector-title" data-focus-return="{{.FocusTargetID}}">
+<dialog id="event-inspector" class="event-inspector" open aria-modal="false" aria-labelledby="event-inspector-title" data-focus-return="{{.FocusTargetID}}">
   <div class="event-inspector-header">
     <div>
       <h2 id="event-inspector-title">{{if .Missing}}Event unavailable{{else if .Error}}Event inspector{{else}}{{.Title}}{{end}}</h2>
@@ -70,12 +70,12 @@
   </div>
   {{end}}
   {{end}}
-</aside>
+</dialog>
 <script>
 (function () {
   var panel = document.getElementById('event-inspector');
   if (!panel) return;
-  var returnId = panel.getAttribute('data-focus-return');
+  var returnId = panel.dataset.focusReturn;
   var close = document.getElementById('event-inspector-close');
   if (close) close.focus();
   function restoreFocus() {

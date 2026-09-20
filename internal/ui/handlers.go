@@ -568,6 +568,7 @@ func (s *Server) sessionTimelinePartial(w http.ResponseWriter, r *http.Request) 
 		Inspector: eventInspectorView{
 			SelectedEventID: strings.TrimSpace(r.URL.Query().Get("event")),
 			ActiveTab:       parseInspectorTab(r.URL.Query().Get("inspector")),
+			Source:          parseInspectorSource(r.URL.Query().Get("source")),
 		},
 	}
 	attachSelectionPaths(&data, r)
@@ -609,6 +610,7 @@ func (s *Server) sessionConversationPartial(w http.ResponseWriter, r *http.Reque
 		Inspector: eventInspectorView{
 			SelectedEventID: strings.TrimSpace(r.URL.Query().Get("event")),
 			ActiveTab:       parseInspectorTab(r.URL.Query().Get("inspector")),
+			Source:          parseInspectorSource(r.URL.Query().Get("source")),
 		},
 	}
 	attachSelectionPaths(&data, r)

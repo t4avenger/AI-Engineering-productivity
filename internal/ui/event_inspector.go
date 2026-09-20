@@ -16,12 +16,16 @@ const (
 	inspectorTabDetails    = "details"
 	inspectorTabAttributes = "attributes"
 	inspectorTabEvents     = "events"
+
+	inspectorSourceTimeline     = "timeline"
+	inspectorSourceConversation = "conversation"
 )
 
 type eventInspectorView struct {
 	Open                bool
 	SelectedEventID     string
 	ActiveTab           string
+	Source              string
 	Missing             bool
 	Error               string
 	Title               string
@@ -67,34 +71,50 @@ func parseInspectorTab(raw string) string {
 	}
 }
 
+func parseInspectorSource(raw string) string {
+	if strings.EqualFold(strings.TrimSpace(raw), inspectorSourceConversation) {
+		return inspectorSourceConversation
+	}
+	return inspectorSourceTimeline
+}
+
+func inspectorFocusID(source, eventID string) string {
+	return source + "-event-" + eventID + "-select"
+}
+
 func (s *Server) populateEventInspector(r *http.Request, id string, events []canonical.Event, data *sessionDetailData) {
 	eventID := strings.TrimSpace(r.URL.Query().Get("event"))
 	if eventID == "" {
-		data.Inspector = eventInspectorView{CloseURL: sessionInspectorPath(id, "", "", r, false)}
+		data.Inspector = eventInspectorView{CloseURL: sessionInspectorPath(id, "", "", "", r, false)}
 		return
 	}
 	tab := parseInspectorTab(r.URL.Query().Get("inspector"))
+	source := parseInspectorSource(r.URL.Query().Get("source"))
 	expand := r.URL.Query().Get("expand") == "1"
+	focusID := inspectorFocusID(source, eventID)
 	view := eventInspectorView{
 		Open:             true,
 		SelectedEventID:  eventID,
 		ActiveTab:        tab,
-		FocusTargetID:    "timeline-event-" + eventID + "-select",
-		CloseURL:         sessionInspectorPath(id, "", "", r, false) + "#timeline-event-" + url.PathEscape(eventID) + "-select",
-		DetailsTabURL:    sessionInspectorPath(id, eventID, inspectorTabDetails, r, expand),
-		AttributesTabURL: sessionInspectorPath(id, eventID, inspectorTabAttributes, r, expand),
-		EventsTabURL:     sessionInspectorPath(id, eventID, inspectorTabEvents, r, expand),
-		ExpandURL:        sessionInspectorPath(id, eventID, tab, r, true),
+		Source:           source,
+		FocusTargetID:    focusID,
+		CloseURL:         sessionInspectorPath(id, "", "", "", r, false) + "#" + focusID,
+		DetailsTabURL:    sessionInspectorPath(id, eventID, inspectorTabDetails, source, r, expand),
+		AttributesTabURL: sessionInspectorPath(id, eventID, inspectorTabAttributes, source, r, expand),
+		EventsTabURL:     sessionInspectorPath(id, eventID, inspectorTabEvents, source, r, expand),
+		ExpandURL:        sessionInspectorPath(id, eventID, tab, source, r, true),
 	}
 	if s.events == nil {
 		view.Error = "Event inspector is unavailable because event storage is offline."
 		data.Inspector = view
+		markSelectedRows(data, eventID)
 		return
 	}
 	event, found, err := s.events.GetEvent(r.Context(), id, eventID)
 	if err != nil {
 		view.Error = "Unable to load the selected event."
 		data.Inspector = view
+		markSelectedRows(data, eventID)
 		return
 	}
 	if !found {
@@ -154,15 +174,19 @@ func markSelectedRows(data *sessionDetailData, eventID string) {
 
 func attachSelectionPaths(data *sessionDetailData, r *http.Request) {
 	for i := range data.Events {
-		data.Events[i].SelectPath = sessionInspectorPath(data.SessionID, data.Events[i].EventID, inspectorTabDetails, r, false)
+		data.Events[i].SelectPath = sessionInspectorPath(data.SessionID, data.Events[i].EventID, inspectorTabDetails, inspectorSourceTimeline, r, false)
 	}
 	for i := range data.Conversation {
-		data.Conversation[i].SelectPath = sessionInspectorPath(data.SessionID, data.Conversation[i].EventID, inspectorTabDetails, r, false)
+		data.Conversation[i].SelectPath = sessionInspectorPath(data.SessionID, data.Conversation[i].EventID, inspectorTabDetails, inspectorSourceConversation, r, false)
 	}
 }
 
 func fileRelationRows(sessionID string, detail inspector.Detail, r *http.Request) []inspectorRelationRow {
 	rows := make([]inspectorRelationRow, 0, len(detail.Relationships.Files))
+	source := ""
+	if r != nil {
+		source = parseInspectorSource(r.URL.Query().Get("source"))
+	}
 	for _, entry := range detail.Relationships.Files {
 		pathLabel := "path unavailable"
 		if entry.Path != nil {
@@ -175,7 +199,7 @@ func fileRelationRows(sessionID string, detail inspector.Detail, r *http.Request
 		rows = append(rows, inspectorRelationRow{
 			Label: pathLabel,
 			Meta:  action,
-			Href:  sessionInspectorPath(sessionID, entry.EventID, inspectorTabDetails, r, false),
+			Href:  sessionInspectorPath(sessionID, entry.EventID, inspectorTabDetails, source, r, false),
 		})
 	}
 	return rows
@@ -202,17 +226,21 @@ func spanRelationRows(detail inspector.Detail) []inspectorRelationRow {
 
 func relatedRelationRows(sessionID string, detail inspector.Detail, r *http.Request) []inspectorRelationRow {
 	rows := make([]inspectorRelationRow, 0, len(detail.Relationships.RelatedEvents))
+	source := ""
+	if r != nil {
+		source = parseInspectorSource(r.URL.Query().Get("source"))
+	}
 	for _, related := range detail.Relationships.RelatedEvents {
 		rows = append(rows, inspectorRelationRow{
 			Label: related.EventType,
 			Meta:  related.Relation + " · " + related.EventID,
-			Href:  sessionInspectorPath(sessionID, related.EventID, inspectorTabDetails, r, false),
+			Href:  sessionInspectorPath(sessionID, related.EventID, inspectorTabDetails, source, r, false),
 		})
 	}
 	return rows
 }
 
-func sessionInspectorPath(sessionID, eventID, tab string, r *http.Request, expand bool) string {
+func sessionInspectorPath(sessionID, eventID, tab, source string, r *http.Request, expand bool) string {
 	values := url.Values{}
 	if r != nil {
 		if cursor := r.URL.Query().Get("cursor"); cursor != "" {
@@ -231,6 +259,13 @@ func sessionInspectorPath(sessionID, eventID, tab string, r *http.Request, expan
 			tab = inspectorTabDetails
 		}
 		values.Set("inspector", tab)
+		if source == "" {
+			source = inspectorSourceTimeline
+			if r != nil {
+				source = parseInspectorSource(r.URL.Query().Get("source"))
+			}
+		}
+		values.Set("source", source)
 		if expand {
 			values.Set("expand", "1")
 		}

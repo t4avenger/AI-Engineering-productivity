@@ -53,11 +53,17 @@ func TestSessionEventInspectorDeepLinkAndMissingEvent(t *testing.T) {
 		`is-selected`,
 		`shared_operation`,
 		`evt-peer`,
-		`href="/sessions/inspect-session?event=evt-inspect&amp;inspector=details"`,
+		`href="/sessions/inspect-session?event=evt-inspect&amp;inspector=details&amp;source=timeline"`,
+		`data-focus-return="timeline-event-evt-inspect-select"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q in inspector body", want)
 		}
+	}
+
+	fromConversation := getAuthed(t, handler, cookie, "/sessions/inspect-session?event=evt-inspect&inspector=details&source=conversation")
+	if !strings.Contains(fromConversation.Body.String(), `data-focus-return="conversation-event-evt-inspect-select"`) {
+		t.Fatalf("conversation source focus target missing: %s", fromConversation.Body.String())
 	}
 
 	missing := getAuthed(t, handler, cookie, "/sessions/inspect-session?event=missing-event&inspector=details")

@@ -368,13 +368,19 @@ th, td {
   border-radius: var(--radius);
   bottom: 0;
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
-  left: var(--sidebar-width);
+  left: 0;
+  margin: 0;
   max-height: min(48vh, 28rem);
+  max-width: none;
   overflow: auto;
   padding: var(--space-4);
   position: sticky;
   right: 0;
+  width: 100%;
   z-index: 20;
+}
+dialog.event-inspector[open] {
+  display: block;
 }
 .event-inspector-header {
   align-items: flex-start;
@@ -396,9 +402,9 @@ th, td {
   font-size: var(--font-sm);
   max-height: 14rem;
   overflow: auto;
+  overflow-wrap: anywhere;
   padding: var(--space-3);
   white-space: pre-wrap;
-  word-break: break-word;
 }
 @media (max-width: 900px) {
   .event-inspector { left: 0; }
