@@ -242,40 +242,50 @@ func relatedRelationRows(sessionID string, detail inspector.Detail, r *http.Requ
 
 func sessionInspectorPath(sessionID, eventID, tab, source string, r *http.Request, expand bool) string {
 	values := url.Values{}
-	if r != nil {
-		if cursor := r.URL.Query().Get("cursor"); cursor != "" {
-			values.Set("cursor", cursor)
-		}
-		if conversationCursor := r.URL.Query().Get("conversation_cursor"); conversationCursor != "" {
-			values.Set("conversation_cursor", conversationCursor)
-		}
-		if r.URL.Query().Get("confirm") == "1" {
-			values.Set("confirm", "1")
-		}
-	}
-	if eventID != "" {
-		values.Set("event", eventID)
-		if tab == "" {
-			tab = inspectorTabDetails
-		}
-		values.Set("inspector", tab)
-		if source == "" {
-			source = inspectorSourceTimeline
-			if r != nil {
-				source = parseInspectorSource(r.URL.Query().Get("source"))
-			}
-		}
-		values.Set("source", source)
-		if expand {
-			values.Set("expand", "1")
-		}
-	}
+	preserveSessionQuery(values, r)
+	applyInspectorSelection(values, eventID, tab, source, r, expand)
 	path := "/sessions/" + url.PathEscape(sessionID)
 	encoded := values.Encode()
 	if encoded == "" {
 		return path
 	}
 	return path + "?" + encoded
+}
+
+func preserveSessionQuery(values url.Values, r *http.Request) {
+	if r == nil {
+		return
+	}
+	if cursor := r.URL.Query().Get("cursor"); cursor != "" {
+		values.Set("cursor", cursor)
+	}
+	if conversationCursor := r.URL.Query().Get("conversation_cursor"); conversationCursor != "" {
+		values.Set("conversation_cursor", conversationCursor)
+	}
+	if r.URL.Query().Get("confirm") == "1" {
+		values.Set("confirm", "1")
+	}
+}
+
+func applyInspectorSelection(values url.Values, eventID, tab, source string, r *http.Request, expand bool) {
+	if eventID == "" {
+		return
+	}
+	if tab == "" {
+		tab = inspectorTabDetails
+	}
+	if source == "" {
+		source = inspectorSourceTimeline
+		if r != nil {
+			source = parseInspectorSource(r.URL.Query().Get("source"))
+		}
+	}
+	values.Set("event", eventID)
+	values.Set("inspector", tab)
+	values.Set("source", source)
+	if expand {
+		values.Set("expand", "1")
+	}
 }
 
 func optionalDisplayString(value any) string {
