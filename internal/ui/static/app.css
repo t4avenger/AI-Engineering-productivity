@@ -207,20 +207,83 @@ body.has-sidebar .app-shell {
   gap: var(--space-4);
 }
 
-/* Reserved right-rail slot for Session Trace (#159); empty until that issue. */
+/* Session Trace right rail (#190): breakdown, governance, legend. */
 .right-rail {
   background: var(--color-bg);
   border-left: 1px solid var(--color-border);
   min-width: 0;
+  padding: var(--space-4);
+}
+.right-rail .rail-panel {
+  margin-bottom: var(--space-5);
+}
+.right-rail h2 {
+  font-size: var(--font-md);
+  margin: 0 0 var(--space-2);
+}
+.breakdown-total {
+  margin: 0 0 var(--space-3);
+}
+.breakdown-total-value {
+  font-size: var(--font-lg);
+  font-weight: 700;
+}
+.breakdown-donut {
+  aspect-ratio: 1;
+  background: var(--breakdown-conic, conic-gradient(#64748b 0 100%));
+  border-radius: 50%;
+  display: block;
+  margin: 0 auto var(--space-3);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 18px), #000 calc(100% - 17px));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 18px), #000 calc(100% - 17px));
+  max-width: 9rem;
+  width: 70%;
+}
+.breakdown-list,
+.legend-list {
+  display: grid;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.breakdown-list li,
+.legend-list li {
+  align-items: baseline;
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: auto 1fr auto;
+}
+.breakdown-swatch {
+  border-radius: 2px;
+  height: 0.75rem;
+  width: 0.75rem;
+}
+.breakdown-swatch-planning { background: #8b5cf6; }
+.breakdown-swatch-tool_calls { background: #3b82f6; }
+.breakdown-swatch-model_generation { background: #22d3ee; }
+.breakdown-swatch-user_wait { background: #94a3b8; }
+.breakdown-swatch-overlap { background: #f59e0b; }
+.breakdown-swatch-unclassified { background: #64748b; }
+.breakdown-meta,
+.legend-kind {
+  font-size: var(--font-sm);
+}
+.breakdown-evidence {
+  grid-column: 1 / -1;
+  font-size: var(--font-sm);
 }
 
 /* Compact labelled-on-focus navigation at tablet widths (S03). */
 @media (max-width: 1024px) {
   body.has-sidebar .app-shell {
     grid-template-columns: var(--compact-nav-width) minmax(0, 1fr);
+    grid-template-rows: auto auto;
   }
   .right-rail {
-    display: none;
+    border-left: 0;
+    border-top: 1px solid var(--color-border);
+    grid-column: 1 / -1;
   }
   .app-sidebar {
     padding: var(--space-3) var(--space-2);
@@ -286,7 +349,11 @@ body.has-sidebar .app-shell {
     width: auto;
   }
   .nav-link { justify-content: flex-start; }
-  .right-rail { display: none; }
+  .right-rail {
+    border-left: 0;
+    border-top: 1px solid var(--color-border);
+    grid-column: 1 / -1;
+  }
 }
 
 /* Daemon health — honest state, colour is never the sole cue (the word is). */

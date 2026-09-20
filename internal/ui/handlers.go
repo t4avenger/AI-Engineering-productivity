@@ -21,11 +21,12 @@ import (
 )
 
 type layoutData struct {
-	Title   string
-	Nav     string
-	Health  healthStatus
-	Content any
-	Error   string
+	Title     string
+	Nav       string
+	Health    healthStatus
+	Content   any
+	RightRail any
+	Error     string
 }
 
 // healthStatus is the honest daemon health rendered in the app shell. Text is
@@ -112,6 +113,9 @@ type sessionDetailData struct {
 	RiskyAccess       governance.RiskyAccess
 	UnapprovedMCP     governance.UnapprovedMCP
 	GovernanceError   string
+	Breakdown         breakdownView
+	BreakdownError    string
+	Legend            []legendEntry
 	Inspector         eventInspectorView
 	Error             string
 	Confirm           bool
@@ -511,7 +515,8 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 	s.populateSessionDetailEvidence(r, id, &data)
 	attachSelectionPaths(&data, r)
 	s.populateEventInspector(r, id, data.inspectorSessionEvents, &data)
-	s.render(w, tmplSessionDetail, layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(r), Content: data})
+	data.Legend = eventLegend(data.Events, data.SpanEvidence, data.Conversation)
+	s.render(w, tmplSessionDetail, layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(r), Content: data, RightRail: data})
 }
 
 func unavailableGovernanceChecklist() (governance.RiskyAccess, governance.UnapprovedMCP) {

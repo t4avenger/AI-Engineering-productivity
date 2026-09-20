@@ -17,6 +17,7 @@ func (s *Server) populateSessionDetailEvidence(r *http.Request, id string, data 
 		data.FilesError = "File evidence is unavailable because retained events could not be loaded."
 		data.ConversationError = "Retained conversation evidence is unavailable because session events could not be loaded."
 		data.SpansError = "Span evidence is unavailable because retained events could not be loaded."
+		data.BreakdownError = "Session duration breakdown is unavailable because retained events could not be loaded."
 		return
 	}
 	data.inspectorSessionEvents = events
@@ -25,6 +26,7 @@ func (s *Server) populateSessionDetailEvidence(r *http.Request, id string, data 
 	data.RiskyAccess = governance.RiskyAccessFromEvents(events)
 	data.UnapprovedMCP = governance.UnapprovedMCPFromEvents(events, s.currentMCPAllowlist())
 	s.populateFileEvidence(r, id, events, data)
+	data.Breakdown = populateBreakdownView(calculateSessionBreakdown(events, data.Session), id)
 }
 
 func (s *Server) populateConversationEvidence(r *http.Request, events []canonical.Event, data *sessionDetailData) {

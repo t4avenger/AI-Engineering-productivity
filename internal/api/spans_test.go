@@ -85,17 +85,61 @@ func getSpanPage(t *testing.T, address string) spanListResponse {
 }
 
 func apiSpanEvent(eventID, sessionID, traceID, spanID, parentID, start, end string) canonical.Event {
-	at := time.Unix(0, 1_000_000_000).UTC()
-	envelope := map[string]any{
-		"trace_id": traceID, "span_id": spanID, "name": "synthetic.span",
-		"start_unix_nano": start, "end_unix_nano": end, "status_code": int64(0),
+	return apiSpanEventOpts(apiSpanOpts{
+		EventID: eventID, SessionID: sessionID, TraceID: traceID, SpanID: spanID, ParentID: parentID,
+		StartUnixNano: start, EndUnixNano: end,
+	})
+}
+
+type apiSpanOpts struct {
+	EventID, SessionID, TraceID, SpanID, ParentID  string
+	StartUnixNano, EndUnixNano                     string
+	Name, EventType, Provider, Tool, SourceVersion string
+	OccurredAt                                     time.Time
+	Attributes                                     map[string]any
+}
+
+func apiSpanEventOpts(opts apiSpanOpts) canonical.Event {
+	at := opts.OccurredAt
+	if at.IsZero() {
+		at = time.Unix(0, 1_000_000_000).UTC()
 	}
-	if parentID != "" {
-		envelope["parent_span_id"] = parentID
+	name := opts.Name
+	if name == "" {
+		name = "synthetic.span"
+	}
+	eventType := opts.EventType
+	if eventType == "" {
+		eventType = "synthetic.span"
+	}
+	provider := opts.Provider
+	if provider == "" {
+		provider = "synthetic"
+	}
+	tool := opts.Tool
+	if tool == "" {
+		tool = "test"
+	}
+	version := opts.SourceVersion
+	if version == "" {
+		version = "1"
+	}
+	attributes := opts.Attributes
+	if attributes == nil {
+		attributes = map[string]any{}
+	}
+	envelope := map[string]any{
+		"trace_id": opts.TraceID, "span_id": opts.SpanID, "name": name,
+		"start_unix_nano": opts.StartUnixNano, "end_unix_nano": opts.EndUnixNano, "status_code": int64(0),
+	}
+	if opts.ParentID != "" {
+		envelope["parent_span_id"] = opts.ParentID
 	}
 	return canonical.Event{
-		SchemaVersion: "0.1.0", EventID: eventID, EventType: "synthetic.span", OccurredAt: at, ReceivedAt: at,
-		Provider: "synthetic", Tool: "test", SourceSchema: "otel", SourceVersion: "1", ActorID: "unavailable", DeviceID: "unavailable",
-		SessionID: sessionID, PrivacyLevel: "operational", Attributes: map[string]any{}, ProviderExtensions: map[string]any{"span": envelope},
+		SchemaVersion: "0.1.0", EventID: opts.EventID, EventType: eventType, OccurredAt: at, ReceivedAt: at,
+		Provider: provider, Tool: tool, SourceSchema: "otel", SourceVersion: version,
+		ActorID: "unavailable", DeviceID: "unavailable",
+		SessionID: opts.SessionID, PrivacyLevel: "operational", Attributes: attributes,
+		ProviderExtensions: map[string]any{"span": envelope},
 	}
 }

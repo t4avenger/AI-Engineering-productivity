@@ -126,6 +126,14 @@ Relationships never use temporal proximity. Session detail HTML shares
 `inspector.Build` and deep-links selection with
 `?event=<event_id>&inspector=details|attributes|events`.
 
+`GET /api/v1/sessions/{id}/breakdown` is the additive full-session duration
+partition (#190 / T09). It returns availability, observed wall window,
+exclusive category durations with percentages, overlap/unclassified segments,
+coverage, and `calculation_version`. The calculation uses all retained span
+evidence and is independent of UI page size. Unavailable results omit a
+misleading donut. See `docs/architecture/session-breakdown.md` for the interval
+contract.
+
 Timeline entries can also include optional approval fields for reviewed
 authorization decisions: `approval_id`, `approval_decision`,
 `approval_reason_class`, `tool_name`, and `tool_namespace`. `approval_id` is

@@ -4,6 +4,7 @@ import {
   claudeLivePRLinkURL,
   claudePRLinkOTLPTraces,
   claudeTranscriptNDJSON,
+  expectSessionDetailHeading,
   fetchLiveSessions,
   ingestClaudeTranscript,
   ingestOTLPTraces,
@@ -45,7 +46,7 @@ test('renders a Claude transcript session ingested through the live daemon', asy
     page.getByRole('cell', { name: 'claude-code' }).first(),
   ).toBeVisible();
   await page.locator('table tbody a').first().click();
-  await expect(page.getByRole('heading', { name: /^Session / })).toBeVisible();
+  await expectSessionDetailHeading(page);
   await expect(page.getByText('claude-code').first()).toBeVisible();
   await expect(page.getByText(liveModel).first()).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Environment' })).toBeVisible();

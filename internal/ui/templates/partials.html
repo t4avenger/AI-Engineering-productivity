@@ -78,7 +78,13 @@
 {{define "shell-end"}}
     {{if .Nav}}
     </div>
+    {{if .RightRail}}
+    <aside class="right-rail" aria-label="Session summary">
+      {{template "session_right_rail.html" .RightRail}}
+    </aside>
+    {{else}}
     <div class="right-rail" aria-hidden="true"></div>
+    {{end}}
     {{end}}
   </div>
   {{if .Nav}}
