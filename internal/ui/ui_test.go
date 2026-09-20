@@ -115,23 +115,7 @@ func (s *fullStub) ListCostRecords(context.Context, string) ([]cost.Record, erro
 }
 
 func (s *fullStub) SummarizeCosts(context.Context) (cost.Summary, error) {
-	summary := cost.Summary{Statuses: map[string]int{}}
-	var amount int64
-	hasAmount := false
-	for _, record := range s.costs {
-		if summary.Currency == "" {
-			summary.Currency = record.Currency
-		}
-		summary.Statuses[record.Status]++
-		if record.AmountMicrousd != nil {
-			hasAmount = true
-			amount += *record.AmountMicrousd
-		}
-	}
-	if hasAmount {
-		summary.CalculatedAmountMicrousd = &amount
-	}
-	return summary, nil
+	return cost.SummarizeRecords(s.costs), nil
 }
 
 func unlock(t *testing.T, handler http.Handler) *http.Cookie {

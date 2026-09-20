@@ -58,6 +58,28 @@ type Summary struct {
 	Statuses                 map[string]int `json:"statuses"`
 }
 
+// SummarizeRecords aggregates in-memory cost rows. Production storage prefers
+// SQL aggregation; test stubs and small in-process callers use this helper.
+func SummarizeRecords(records []Record) Summary {
+	summary := Summary{Statuses: map[string]int{}}
+	var amount int64
+	hasAmount := false
+	for _, record := range records {
+		if summary.Currency == "" {
+			summary.Currency = record.Currency
+		}
+		summary.Statuses[record.Status]++
+		if record.AmountMicrousd != nil {
+			hasAmount = true
+			amount += *record.AmountMicrousd
+		}
+	}
+	if hasAmount {
+		summary.CalculatedAmountMicrousd = &amount
+	}
+	return summary
+}
+
 type Calculator struct{ catalog Catalog }
 
 func LoadDefault(overridePath string) (*Calculator, error) {

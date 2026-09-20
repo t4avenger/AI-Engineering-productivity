@@ -26,8 +26,11 @@ type Repository struct {
 	calculator *cost.Calculator
 }
 
+// memoryDBPath is the SQLite in-memory DSN used by tests and ephemeral opens.
+const memoryDBPath = ":memory:"
+
 func Open(path string, calculators ...*cost.Calculator) (*Repository, error) {
-	if path != ":memory:" {
+	if path != memoryDBPath {
 		directory := filepath.Dir(path)
 		if err := os.MkdirAll(directory, 0o700); err != nil {
 			return nil, fmt.Errorf("create database directory: %w", err)
@@ -55,7 +58,7 @@ func Open(path string, calculators ...*cost.Calculator) (*Repository, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	if path != ":memory:" {
+	if path != memoryDBPath {
 		if err := os.Chmod(path, 0o600); err != nil {
 			_ = db.Close()
 			return nil, fmt.Errorf("secure database file: %w", err)
@@ -67,14 +70,14 @@ func Open(path string, calculators ...*cost.Calculator) (*Repository, error) {
 // openDSN attaches modernc pragma URI parameters for on-disk databases. In-memory
 // databases skip WAL (unsupported) but still get busy_timeout via Exec.
 func openDSN(path string) string {
-	if path == ":memory:" {
+	if path == memoryDBPath {
 		return path
 	}
 	return path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)"
 }
 
 func (r *Repository) applyConnectionPragmas(ctx context.Context, path string) error {
-	if path == ":memory:" {
+	if path == memoryDBPath {
 		if _, err := r.db.ExecContext(ctx, "PRAGMA busy_timeout=5000"); err != nil {
 			return fmt.Errorf("set busy_timeout: %w", err)
 		}
@@ -233,8 +236,16 @@ CREATE INDEX IF NOT EXISTS agent_relations_session ON agent_relations(session_id
 
 // ensureListAndCostColumns is migration 6: denormalizes session list filters and
 // cost summary fields so dashboard queries avoid json_extract full-table sorts
-// and in-process aggregation over every cost row.
+// and in-process aggregation over every cost row. Already-applied migrations are
+// skipped so Open does not re-scan sessions/cost_records on every restart.
 func (r *Repository) ensureListAndCostColumns(ctx context.Context) error {
+	applied, err := r.migrationApplied(ctx, 6)
+	if err != nil {
+		return err
+	}
+	if applied {
+		return nil
+	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin migration 6: %w", err)
@@ -253,6 +264,18 @@ func (r *Repository) ensureListAndCostColumns(ctx context.Context) error {
 		return fmt.Errorf("commit migration 6: %w", err)
 	}
 	return nil
+}
+
+func (r *Repository) migrationApplied(ctx context.Context, version int) (bool, error) {
+	var recorded int
+	err := r.db.QueryRowContext(ctx, "SELECT 1 FROM schema_migrations WHERE version=?", version).Scan(&recorded)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("check migration %d: %w", version, err)
+	}
+	return true, nil
 }
 
 func migrateSessionListColumns(ctx context.Context, tx *sql.Tx) error {
@@ -879,7 +902,10 @@ func sessionListQuery(filter storage.SessionFilter) (string, []any, error) {
 		return "", nil, errors.New("session scope must be primary, observation, or empty")
 	}
 	if filter.Model != "" {
-		appendCondition("model = ?", filter.Model)
+		// Match any observed event model (pre-existing API semantics). The
+		// denormalized sessions.model column stores only the first observed
+		// model for display, so a multi-model session must still hit events.
+		appendCondition("EXISTS (SELECT 1 FROM events WHERE events.session_id=sessions.session_id AND json_extract(events.event_json, '$.attributes.model') = ?)", filter.Model)
 	}
 	if filter.StartedAfter != nil {
 		appendCondition("started_at >= ?", filter.StartedAfter.UTC().Format(time.RFC3339Nano))
