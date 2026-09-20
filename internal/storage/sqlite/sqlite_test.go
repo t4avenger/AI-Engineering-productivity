@@ -541,6 +541,29 @@ func TestEventTimelineReads(t *testing.T) {
 	}
 }
 
+func TestGetEventScopedToSession(t *testing.T) {
+	repo, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = repo.Close() }()
+	owned := event(t, "owned", "session-a", "session.active", "2026-01-02T09:00:00Z")
+	foreign := event(t, "foreign", "session-b", "session.active", "2026-01-02T09:00:00Z")
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{owned, foreign}); err != nil {
+		t.Fatal(err)
+	}
+	got, found, err := repo.GetEvent(context.Background(), "session-a", "owned")
+	if err != nil || !found || got.EventID != "owned" {
+		t.Fatalf("owned = %#v found=%v err=%v", got, found, err)
+	}
+	if _, found, err := repo.GetEvent(context.Background(), "session-a", "foreign"); err != nil || found {
+		t.Fatalf("foreign leak found=%v err=%v", found, err)
+	}
+	if _, found, err := repo.GetEvent(context.Background(), "session-a", "missing"); err != nil || found {
+		t.Fatalf("missing found=%v err=%v", found, err)
+	}
+}
+
 func TestOperationsPersistIdempotentlyAndDeleteWithSessions(t *testing.T) {
 	repo, err := Open(":memory:")
 	if err != nil {

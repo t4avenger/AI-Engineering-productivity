@@ -1,8 +1,8 @@
 {{define "timeline_rows.html"}}
 {{range .Events}}
-<article class="timeline-item">
-  <h3>{{.Title}}</h3>
-  <p class="muted"><span title="{{.RawEventType}}">{{.RawEventType}}</span> · {{.OccurredAt}} · {{.Provider}} / {{.Tool}}</p>
+<article class="timeline-item{{if .Selected}} is-selected{{end}}" id="timeline-event-{{.EventID}}" data-event-id="{{.EventID}}">
+  <h3><a class="event-select" href="{{.SelectPath}}" id="timeline-event-{{.EventID}}-select">{{.Title}}</a></h3>
+  <p class="muted"><span title="{{.RawEventType}}">{{.RawEventType}}</span> · {{.OccurredAt}} · {{.Provider}} / {{.Tool}} · <code>{{.EventID}}</code></p>
   <dl class="timeline-facts">
     <div><dt>Model</dt><dd>{{.Model}}</dd></div>
     <div><dt>Input tokens</dt><dd>{{if .InputTokens.Observed}}{{.InputTokens.Text}}{{else}}{{template "status-badge" .InputTokens.Machine}}{{end}}</dd></div>
@@ -43,8 +43,8 @@
 {{if .NextCursor}}
 <p id="timeline-more">
   <a
-    href="/sessions/{{.SessionID}}?cursor={{.NextCursor}}"
-    hx-get="/sessions/{{.SessionID}}/timeline?cursor={{.NextCursor}}"
+    href="/sessions/{{.SessionID}}?cursor={{.NextCursor}}{{if .Inspector.SelectedEventID}}&amp;event={{urlquery .Inspector.SelectedEventID}}&amp;inspector={{urlquery .Inspector.ActiveTab}}{{end}}"
+    hx-get="/sessions/{{.SessionID}}/timeline?cursor={{.NextCursor}}{{if .Inspector.SelectedEventID}}&amp;event={{urlquery .Inspector.SelectedEventID}}&amp;inspector={{urlquery .Inspector.ActiveTab}}{{end}}"
     hx-target="#timeline"
     hx-swap="beforeend"
     hx-on::after-swap="this.closest('#timeline-more').remove()"

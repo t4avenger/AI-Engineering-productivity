@@ -99,6 +99,7 @@
       {{template "timeline_rows.html" .}}
     </div>
   </section>
+  {{template "event_inspector.html" .Inspector}}
   <section>
     <h2>Delete</h2>
     {{if .Confirm}}
@@ -115,5 +116,12 @@
   </section>
   {{end}}
 </main>
+<script>
+(function () {
+  if (!window.location.hash) return;
+  var target = document.getElementById(window.location.hash.slice(1));
+  if (target) target.focus();
+})();
+</script>
 {{template "shell-end" .}}
 {{end}}

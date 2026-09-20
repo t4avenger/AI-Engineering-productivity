@@ -5,6 +5,7 @@ The Phase 2 local management API provides authenticated session endpoints:
 - `GET /api/v1/sessions`
 - `GET /api/v1/sessions/{id}`
 - `GET /api/v1/sessions/{id}/events`
+- `GET /api/v1/sessions/{id}/events/{event_id}`
 - `GET /api/v1/sessions/{id}/files`
 - `GET /api/v1/sessions/{id}/conversation`
 - `GET /api/v1/sessions/{id}/spans`
@@ -113,6 +114,17 @@ The API does not parse raw request/response payloads into duplicate messages,
 fetch provider data, or join records by time. Claude transcript, tool-body, and
 other prior adapter gaps remain unavailable and are tracked by #173, #104, and
 #105.
+
+`GET /api/v1/sessions/{id}/events/{event_id}` is the additive session-scoped
+event inspector (#189 / T08). It returns one retained event (timeline fields plus
+raw `attributes` / `provider_extensions`), truncation metadata, and proven-only
+`relationships` (files, spans, related events). Missing, deleted, or
+cross-session event IDs share structured `404 event_not_found` without leaking
+foreign content. Large string values are truncated by default
+(`truncation.expand_available`); `?expand=1` returns full retained values.
+Relationships never use temporal proximity. Session detail HTML shares
+`inspector.Build` and deep-links selection with
+`?event=<event_id>&inspector=details|attributes|events`.
 
 Timeline entries can also include optional approval fields for reviewed
 authorization decisions: `approval_id`, `approval_decision`,

@@ -19,6 +19,7 @@ func (s *Server) populateSessionDetailEvidence(r *http.Request, id string, data 
 		data.SpansError = "Span evidence is unavailable because retained events could not be loaded."
 		return
 	}
+	data.inspectorSessionEvents = events
 	s.populateConversationEvidence(r, events, data)
 	data.SpanEvidence, data.SpansPartial = spanEvidenceRows(events)
 	data.RiskyAccess = governance.RiskyAccessFromEvents(events)

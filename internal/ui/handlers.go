@@ -112,8 +112,11 @@ type sessionDetailData struct {
 	RiskyAccess       governance.RiskyAccess
 	UnapprovedMCP     governance.UnapprovedMCP
 	GovernanceError   string
+	Inspector         eventInspectorView
 	Error             string
 	Confirm           bool
+	// Cached full-session events for the inspector relationship pass (#189).
+	inspectorSessionEvents []canonical.Event
 }
 
 type conversationRow struct {
@@ -128,6 +131,8 @@ type conversationRow struct {
 	Truncated    bool
 	Availability string
 	Source       string
+	Selected     bool
+	SelectPath   string
 }
 
 type fileEvidenceRow struct {
@@ -173,6 +178,8 @@ type timelineRow struct {
 	ApprovalDecision  string
 	ApprovalReason    string
 	ApprovalTool      string
+	Selected          bool
+	SelectPath        string
 	LifecycleKind     string
 	LifecyclePhase    string
 	LifecycleStatus   string
@@ -502,6 +509,8 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 		data.Error = "Unable to load timeline."
 	}
 	s.populateSessionDetailEvidence(r, id, &data)
+	attachSelectionPaths(&data, r)
+	s.populateEventInspector(r, id, data.inspectorSessionEvents, &data)
 	s.render(w, tmplSessionDetail, layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(r), Content: data})
 }
 
@@ -552,12 +561,21 @@ func (s *Server) sessionTimelinePartial(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "unable to load timeline", http.StatusInternalServerError)
 		return
 	}
+	data := sessionDetailData{
+		SessionID:  id,
+		Events:     rows,
+		NextCursor: next,
+		Inspector: eventInspectorView{
+			SelectedEventID: strings.TrimSpace(r.URL.Query().Get("event")),
+			ActiveTab:       parseInspectorTab(r.URL.Query().Get("inspector")),
+		},
+	}
+	attachSelectionPaths(&data, r)
+	if data.Inspector.SelectedEventID != "" {
+		markSelectedRows(&data, data.Inspector.SelectedEventID)
+	}
 	w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
-	_ = s.templates.ExecuteTemplate(w, tmplTimelineRows, struct {
-		SessionID  string
-		Events     []timelineRow
-		NextCursor string
-	}{SessionID: id, Events: rows, NextCursor: next})
+	_ = s.templates.ExecuteTemplate(w, tmplTimelineRows, data)
 }
 
 func (s *Server) sessionConversationPartial(w http.ResponseWriter, r *http.Request) {
@@ -584,12 +602,21 @@ func (s *Server) sessionConversationPartial(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "conversation cursor is invalid", http.StatusBadRequest)
 		return
 	}
+	data := sessionDetailData{
+		SessionID:        id,
+		Conversation:     rows,
+		ConversationNext: next,
+		Inspector: eventInspectorView{
+			SelectedEventID: strings.TrimSpace(r.URL.Query().Get("event")),
+			ActiveTab:       parseInspectorTab(r.URL.Query().Get("inspector")),
+		},
+	}
+	attachSelectionPaths(&data, r)
+	if data.Inspector.SelectedEventID != "" {
+		markSelectedRows(&data, data.Inspector.SelectedEventID)
+	}
 	w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
-	_ = s.templates.ExecuteTemplate(w, tmplConversationRows, struct {
-		SessionID        string
-		Conversation     []conversationRow
-		ConversationNext string
-	}{SessionID: id, Conversation: rows, ConversationNext: next})
+	_ = s.templates.ExecuteTemplate(w, tmplConversationRows, data)
 }
 
 func (s *Server) sessionDelete(w http.ResponseWriter, r *http.Request) {

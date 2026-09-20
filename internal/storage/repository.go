@@ -80,8 +80,12 @@ type SessionDeleter interface {
 // EventReader exposes raw canonical events (epic #87 — no ingest-time hiding).
 // ListEvents returns at most EventFilter.Limit+1 events so callers can detect
 // whether another cursor page exists without issuing a separate count query.
+// GetEvent returns the retained event for the given session-scoped identity.
+// found is false when the event is missing, deleted, or belongs to another
+// session — callers must not distinguish those cases to callers of the API.
 type EventReader interface {
 	ListEvents(context.Context, EventFilter) ([]canonical.Event, error)
+	GetEvent(ctx context.Context, sessionID, eventID string) (canonical.Event, bool, error)
 }
 
 // OperationFilter constrains operation queries. Empty SessionID returns every

@@ -1,7 +1,7 @@
 {{define "conversation_rows.html"}}
 {{range .Conversation}}
-<article class="conversation-item" data-event-id="{{.EventID}}">
-  <h3>{{.Title}}</h3>
+<article class="conversation-item{{if .Selected}} is-selected{{end}}" id="conversation-event-{{.EventID}}" data-event-id="{{.EventID}}">
+  <h3><a class="event-select" href="{{.SelectPath}}" id="conversation-event-{{.EventID}}-select">{{.Title}}</a></h3>
   <p class="muted">{{.OccurredAt}} · {{.Source}} · <code>{{.EventID}}</code></p>
   <p>Content {{template "status-badge" .Availability}}</p>
   {{if .HasText}}
@@ -24,8 +24,8 @@
 {{if .ConversationNext}}
 <p id="conversation-more">
   <a
-    href="/sessions/{{.SessionID}}?conversation_cursor={{.ConversationNext}}"
-    hx-get="/sessions/{{.SessionID}}/conversation?cursor={{.ConversationNext}}"
+    href="/sessions/{{.SessionID}}?conversation_cursor={{.ConversationNext}}{{if .Inspector.SelectedEventID}}&amp;event={{urlquery .Inspector.SelectedEventID}}&amp;inspector={{urlquery .Inspector.ActiveTab}}{{end}}"
+    hx-get="/sessions/{{.SessionID}}/conversation?cursor={{.ConversationNext}}{{if .Inspector.SelectedEventID}}&amp;event={{urlquery .Inspector.SelectedEventID}}&amp;inspector={{urlquery .Inspector.ActiveTab}}{{end}}"
     hx-target="#conversation"
     hx-swap="beforeend"
     hx-on::after-swap="this.closest('#conversation-more').remove()"
