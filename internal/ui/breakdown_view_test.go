@@ -35,7 +35,12 @@ func TestSessionRightRailShowsBreakdownGovernanceAndLegend(t *testing.T) {
 		`id="session-legend-heading"`,
 		"Event Legend",
 		"Evidence",
+		"conic-gradient(",
+		"breakdown-donut",
 	})
+	if strings.Contains(body, "Zgotmplz") {
+		t.Fatalf("html/template sanitised the donut CSS: %q", body)
+	}
 	if strings.Count(body, `id="session-governance-heading"`) != 1 {
 		t.Fatalf("governance heading duplicated: %q", body)
 	}

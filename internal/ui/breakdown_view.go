@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"html/template"
 	"net/url"
 	"strings"
 	"time"
@@ -17,7 +18,7 @@ type breakdownView struct {
 	Coverage      string
 	TotalLabel    string
 	ShowDonut     bool
-	ConicGradient string
+	ConicGradient template.CSS
 	DonutLabel    string
 	Categories    []breakdownCategoryView
 	Overlap       *breakdownSegmentView
@@ -66,7 +67,9 @@ func populateBreakdownView(result breakdown.Result, sessionID string) breakdownV
 	})
 	if len(parts) > 0 {
 		view.ShowDonut = true
-		view.ConicGradient = "conic-gradient(" + strings.Join(parts, ", ") + ")"
+		// html/template sanitises plain strings in style= to "Zgotmplz"; typed CSS
+		// is required for the server-built conic-gradient to reach the browser.
+		view.ConicGradient = template.CSS("conic-gradient(" + strings.Join(parts, ", ") + ")")
 		view.DonutLabel = "Session duration breakdown totaling " + view.TotalLabel
 	}
 	return view
