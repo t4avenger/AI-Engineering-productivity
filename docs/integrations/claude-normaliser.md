@@ -436,8 +436,43 @@ span never falsely declares those surfaces unavailable. Tool spans are
 intra-interaction operations, so their `task_boundary.confidence` is `observed`
 with `TaskID` nil (not themselves boundaries); `tool_use_id`/`gen_ai.tool.call.id`
 are the join keys for a later cross-signal correlation with `tool_result` /
-`tool_decision` logs (#92/#93). Hook/sub-agent span-type mapping remains owned by
-#102–#103.
+`tool_decision` logs (#92/#93). Hook span-type mapping remains owned by #103.
+
+Issue #102 (T15) reconstructs the **sub-agent tree** from those span attributes.
+The per-span sub-agent correlation `agent_id`/`parent_agent_id`/`subagent_type`/
+`workflow.*` that #100/#101 already capture rides only on `claude_code.llm_request`
+and `claude_code.tool` spans (never on `interaction`/`tool.execution`); `agent_id`
+is absent on the main session, and `parent_agent_id` is absent for a sub-agent
+spawned directly by the main session (requires v2.1.268).
+`claude.ReconstructSubAgentRelations(events []canonical.Event)` is a pure function
+over a session's canonical span events that produces one
+`canonical.AgentRelation` (schema `0.1.0`) per distinct sub-agent — a span
+carrying a non-empty `agent_id` — grouped by `(trace_id, agent_id)` (an `agent_id`
+is unique only within a trace, so a session spanning multiple traces never
+collides). `RelationID` is namespaced `"<trace_id>:<agent_id>"`. The tree root is
+unambiguous via `ParentKind`: `sub_agent` when `parent_agent_id` is present,
+`main_session` otherwise. Rollups are nullable (nil when never observed, never a
+fabricated zero) and summed present-only from the agent's spans: `SpanCount`/
+`LLMRequestCount`/`ToolCount`, the four token counts, and — labelled honestly —
+`LLMDurationMsTotal`/`ToolDurationMsTotal` (summed per-span durations, which
+overlap) versus `WallClockMs` (the true elapsed `max(end_unix_nano) −
+min(start_unix_nano)`), so a summed value is never mistaken for wall-clock. All
+present-only metadata takes the value from the earliest span (by
+`provider_extensions.correlation.ordering_key`) for determinism, and the output is
+sorted by `(trace_id, agent_id)`.
+
+The relation is a **derived** record, not a payload-scoped extraction. The SQLite
+repository re-derives it inside `rebuildSession` from the session's full persisted
+event set and **REPLACE**s the `agent_relations` rows (DELETE then INSERT), so a
+rollup is complete and idempotent no matter how a trace's spans were split across
+OTLP batches — an `INSERT OR IGNORE` keyed on a first partial row would undercount.
+Only `claude-code` sessions carry sub-agent spans, but every tool's rebuild clears
+any stale rows. `ListAgentRelations(storage.AgentRelationFilter{SessionID})` reads
+them back; HTTP/UI exposure of the tree is downstream (#157/#159). See
+`fixtures/claude/observed-sanitised/claude-code-2.1.268-subagent-spans-otlp.json` →
+`fixtures/claude/expected/claude-code-2.1.268-subagent-spans.relations.json` (tool
+2.1.268; `fixture_origin: synthetic` — the non-interactive sub-agent tool execution
+could not be captured live in this environment).
 
 As with metrics, #88 removed storage-side sanitising, so the adapter is the sole
 guard: span attributes are also reduced to an **allow-list**

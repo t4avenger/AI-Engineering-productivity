@@ -24,6 +24,15 @@ func TestDeleteAllSessionsRemovesRetainedTelemetry(t *testing.T) {
 	if err := repo.SaveOperations(ctx, []canonical.Operation{{SchemaVersion: canonical.RecordSchemaVersion, OperationID: "op-1", SessionID: "session-1", Provider: "openai", Tool: "codex", Category: canonical.OperationCategoryShellCommand, Outcome: "success", Provenance: canonical.ProvenanceObserved, ProviderExtensions: map[string]any{}}}); err != nil {
 		t.Fatalf("SaveOperations() error = %v", err)
 	}
+	if err := repo.SaveEvents(ctx, normalizeTwoSpanAgent(t)); err != nil {
+		t.Fatalf("SaveEvents(sub-agent spans) error = %v", err)
+	}
+	// Precondition: the sub-agent spans must have produced relations, otherwise the
+	// post-delete assertion below would pass even if rebuildSession stopped writing
+	// them (0 before, 0 after) — a silent regression.
+	if tableRowCount(t, repo, "agent_relations") == 0 {
+		t.Fatal("agent relations before delete = 0, want at least one")
+	}
 	if err := repo.DeleteAllSessions(ctx); err != nil {
 		t.Fatalf("DeleteAllSessions() error = %v", err)
 	}
@@ -31,12 +40,20 @@ func TestDeleteAllSessionsRemovesRetainedTelemetry(t *testing.T) {
 	if err != nil || len(sessions) != 0 {
 		t.Fatalf("ListSessions() = %#v, %v", sessions, err)
 	}
-	var events int
-	if err := repo.db.QueryRow("SELECT COUNT(*) FROM events").Scan(&events); err != nil || events != 0 {
-		t.Fatalf("event count = %d, %v", events, err)
+	for _, table := range []string{"events", "operations", "agent_relations"} {
+		if got := tableRowCount(t, repo, table); got != 0 {
+			t.Fatalf("%s count after delete = %d, want 0", table, got)
+		}
 	}
-	var operations int
-	if err := repo.db.QueryRow("SELECT COUNT(*) FROM operations").Scan(&operations); err != nil || operations != 0 {
-		t.Fatalf("operation count = %d, %v", operations, err)
+}
+
+// tableRowCount returns the number of rows in table, failing the test on a query
+// error so callers assert only on the count.
+func tableRowCount(t *testing.T, repo *Repository, table string) int {
+	t.Helper()
+	var count int
+	if err := repo.db.QueryRow("SELECT COUNT(*) FROM " + table).Scan(&count); err != nil {
+		t.Fatalf("count %s: %v", table, err)
 	}
+	return count
 }

@@ -81,3 +81,56 @@ type Operation struct {
 	Provenance         Provenance        `json:"provenance"`
 	ProviderExtensions map[string]any    `json:"provider_extensions"`
 }
+
+// AgentParentKind names how a sub-agent was spawned, so the reconstructed tree
+// has an unambiguous root: ParentKindMainSession is a sub-agent spawned directly
+// by the main session (no parent_agent_id, but its spans nest under a
+// main-session tool span), ParentKindSubAgent is a sub-agent spawned by another
+// sub-agent (parent_agent_id present).
+type AgentParentKind string
+
+const (
+	ParentKindMainSession AgentParentKind = "main_session"
+	ParentKindSubAgent    AgentParentKind = "sub_agent"
+)
+
+// AgentRelation is a stable-primitive record of one sub-agent in a session's
+// sub-agent tree, at schema version 0.1.0 (RecordSchemaVersion). It reconstructs
+// the parent→child agent hierarchy from the enhanced-telemetry span tree
+// (agent_id / parent_agent_id on claude_code.llm_request and claude_code.tool
+// spans) and rolls up that agent's own token/duration cost.
+//
+// RelationID is namespaced as "<trace_id>:<agent_id>": agent_id is unique only
+// within a trace, so a session that spans multiple traces (or a provider that
+// reuses an agent_id) would otherwise collide. Rollups are nullable so an absent
+// value is distinguishable from a genuine zero and never fabricated. Durations
+// are labelled explicitly: LLMDurationMsTotal / ToolDurationMsTotal are summed
+// per-span durations (which overlap and so overcount elapsed time), while
+// WallClockMs is the true elapsed span from the agent's earliest span start to
+// its latest span end. Anything provider-specific stays in ProviderExtensions.
+type AgentRelation struct {
+	SchemaVersion       string          `json:"schema_version"`
+	RelationID          string          `json:"relation_id"`
+	SessionID           string          `json:"session_id"`
+	TraceID             string          `json:"trace_id"`
+	Provider            string          `json:"provider"`
+	Tool                string          `json:"tool"`
+	AgentID             string          `json:"agent_id"`
+	ParentAgentID       *string         `json:"parent_agent_id"`
+	ParentKind          AgentParentKind `json:"parent_kind"`
+	SubagentType        *string         `json:"subagent_type"`
+	WorkflowRunID       *string         `json:"workflow_run_id"`
+	WorkflowName        *string         `json:"workflow_name"`
+	SpanCount           int             `json:"span_count"`
+	LLMRequestCount     int             `json:"llm_request_count"`
+	ToolCount           int             `json:"tool_count"`
+	InputTokens         *int64          `json:"input_tokens"`
+	OutputTokens        *int64          `json:"output_tokens"`
+	CacheReadTokens     *int64          `json:"cache_read_tokens"`
+	CacheCreationTokens *int64          `json:"cache_creation_tokens"`
+	LLMDurationMsTotal  *int64          `json:"llm_duration_ms_total"`
+	ToolDurationMsTotal *int64          `json:"tool_duration_ms_total"`
+	WallClockMs         *int64          `json:"wall_clock_ms"`
+	Provenance          Provenance      `json:"provenance"`
+	ProviderExtensions  map[string]any  `json:"provider_extensions"`
+}

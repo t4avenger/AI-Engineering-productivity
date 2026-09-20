@@ -173,6 +173,54 @@ func assertRetainedConversationProjection(t *testing.T, conversation conversatio
 	}
 }
 
+// TestClaudeSubAgentTracesPersistRelationsEndToEnd proves the #102 sub-agent tree
+// holds through the live daemon: the sub-agent spans fixture POSTed to /v1/traces
+// is normalised, persisted, and — via the rebuildSession derivation — reconstructed
+// into agent_relations, so ListAgentRelations returns the parent→child tree with
+// per-agent rollups. It exercises the derive-from-events path, not a fixture
+// round-trip in isolation.
+func TestClaudeSubAgentTracesPersistRelationsEndToEnd(t *testing.T) {
+	server, repository := newPersistentTestServer(t)
+	payload := metricsFixturePayloadBytes(t, "claude-code-2.1.268-subagent-spans-otlp.json")
+	response := postOTLPToPath(t, server.URL, "/v1/traces", payload, "application/json")
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("ingest status = %d", response.StatusCode)
+	}
+	closeBody(t, response)
+
+	const sessionID = "claude-code:00000000-0000-4000-8000-000000000201"
+	relations, err := repository.ListAgentRelations(context.Background(), storage.AgentRelationFilter{SessionID: sessionID})
+	if err != nil {
+		t.Fatalf("list agent relations: %v", err)
+	}
+	if len(relations) != 2 {
+		t.Fatalf("relation count = %d, want 2 (agent_a, agent_b)", len(relations))
+	}
+	byAgent := map[string]canonical.AgentRelation{}
+	for _, relation := range relations {
+		byAgent[relation.AgentID] = relation
+	}
+
+	agentA, ok := byAgent["agent_a"]
+	if !ok {
+		t.Fatalf("agent_a missing from persisted relations: %#v", relations)
+	}
+	if agentA.ParentKind != canonical.ParentKindMainSession || agentA.ParentAgentID != nil {
+		t.Fatalf("agent_a parent = %q/%v, want main_session/nil", agentA.ParentKind, agentA.ParentAgentID)
+	}
+	if agentA.InputTokens == nil || *agentA.InputTokens != 100 {
+		t.Fatalf("agent_a input_tokens = %v, want 100", agentA.InputTokens)
+	}
+
+	agentB, ok := byAgent["agent_b"]
+	if !ok {
+		t.Fatalf("agent_b missing from persisted relations: %#v", relations)
+	}
+	if agentB.ParentKind != canonical.ParentKindSubAgent || agentB.ParentAgentID == nil || *agentB.ParentAgentID != "agent_a" {
+		t.Fatalf("agent_b parent = %q/%v, want sub_agent/agent_a", agentB.ParentKind, agentB.ParentAgentID)
+	}
+}
+
 func newPersistentTestServer(t *testing.T) (*httptest.Server, storage.Repository) {
 	t.Helper()
 	repository, err := sqlite.Open(":memory:")

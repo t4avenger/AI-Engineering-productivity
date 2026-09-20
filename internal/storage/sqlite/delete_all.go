@@ -16,6 +16,9 @@ func (r *Repository) DeleteAllSessions(ctx context.Context) error {
 	if _, err = tx.ExecContext(ctx, "DELETE FROM operations"); err != nil {
 		return err
 	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM agent_relations"); err != nil {
+		return err
+	}
 	if _, err = tx.ExecContext(ctx, "DELETE FROM events"); err != nil {
 		return err
 	}

@@ -1,0 +1,504 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "synthetic",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.268",
+  "captured_at": "2026-09-20T10:05:50Z",
+  "sanitisation_reviewed": true,
+  "capture_note": "Sub-agent span tree (#102 T15). The Agent tool span spawns sub-agent llm_request/tool spans that nest under it and carry agent_id / parent_agent_id / subagent_type / workflow.* . These attributes ride only on claude_code.llm_request and claude_code.tool spans (not interaction / tool.execution); agent_id is absent on the main session, and parent_agent_id is absent for an agent spawned directly by the main session (requires v2.1.268). Non-interactive sub-agent tool execution could not be captured live in this environment (requires --dangerously-skip-permissions, blocked by the harness unsafe-agent classifier); the interaction/llm_request tracing pipeline WAS exercised live (enhanced-telemetry beta, OTEL_TRACES_EXPORTER=otlp). Reproduced from the documented schema at https://code.claude.com/docs/en/monitoring-usage (attributes verified 2026-09-20). Tree: main session -> agent_a (code-reviewer, spawned by main) -> agent_b (spawned by agent_a). All values synthetic (epic #87).",
+  "payload": {
+    "resourceSpans": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "host.arch",
+              "value": {
+                "stringValue": "amd64"
+              }
+            },
+            {
+              "key": "os.type",
+              "value": {
+                "stringValue": "linux"
+              }
+            },
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "claude-code"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "2.1.268"
+              }
+            }
+          ],
+          "droppedAttributesCount": 0
+        },
+        "scopeSpans": [
+          {
+            "scope": {
+              "name": "com.anthropic.claude_code.tracing",
+              "version": "1.0.0"
+            },
+            "spans": [
+              {
+                "traceId": "00000000000000000000000000000201",
+                "spanId": "0000000000000a01",
+                "name": "claude_code.interaction",
+                "kind": 1,
+                "startTimeUnixNano": "1789117600000000000",
+                "endTimeUnixNano": "1789117610000000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000201"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "interaction"
+                    }
+                  },
+                  {
+                    "key": "interaction.sequence",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "interaction.duration_ms",
+                    "value": {
+                      "intValue": 10000
+                    }
+                  },
+                  {
+                    "key": "user_prompt_length",
+                    "value": {
+                      "intValue": 55
+                    }
+                  },
+                  {
+                    "key": "parent.source",
+                    "value": {
+                      "stringValue": "none"
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 0
+                }
+              },
+              {
+                "traceId": "00000000000000000000000000000201",
+                "spanId": "0000000000000a02",
+                "parentSpanId": "0000000000000a01",
+                "name": "claude_code.tool",
+                "kind": 1,
+                "startTimeUnixNano": "1789117600500000000",
+                "endTimeUnixNano": "1789117609000000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000201"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Agent"
+                    }
+                  },
+                  {
+                    "key": "tool_name_safe",
+                    "value": {
+                      "stringValue": "Agent"
+                    }
+                  },
+                  {
+                    "key": "subagent_type",
+                    "value": {
+                      "stringValue": "code-reviewer"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_agent_a"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_agent_a"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 8500
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 0
+                }
+              },
+              {
+                "traceId": "00000000000000000000000000000201",
+                "spanId": "0000000000000a03",
+                "parentSpanId": "0000000000000a02",
+                "name": "claude_code.llm_request",
+                "kind": 1,
+                "startTimeUnixNano": "1789117601000000000",
+                "endTimeUnixNano": "1789117602500000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000201"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "llm_request"
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "claude-haiku-4-5-20251001"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.system",
+                    "value": {
+                      "stringValue": "anthropic"
+                    }
+                  },
+                  {
+                    "key": "agent_id",
+                    "value": {
+                      "stringValue": "agent_a"
+                    }
+                  },
+                  {
+                    "key": "subagent_type",
+                    "value": {
+                      "stringValue": "code-reviewer"
+                    }
+                  },
+                  {
+                    "key": "workflow.run_id",
+                    "value": {
+                      "stringValue": "wf_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "workflow.name",
+                    "value": {
+                      "stringValue": "custom"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 1500
+                    }
+                  },
+                  {
+                    "key": "ttft_ms",
+                    "value": {
+                      "intValue": 900
+                    }
+                  },
+                  {
+                    "key": "input_tokens",
+                    "value": {
+                      "intValue": 100
+                    }
+                  },
+                  {
+                    "key": "output_tokens",
+                    "value": {
+                      "intValue": 200
+                    }
+                  },
+                  {
+                    "key": "cache_read_tokens",
+                    "value": {
+                      "intValue": 10
+                    }
+                  },
+                  {
+                    "key": "cache_creation_tokens",
+                    "value": {
+                      "intValue": 20
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  },
+                  {
+                    "key": "stop_reason",
+                    "value": {
+                      "stringValue": "end_turn"
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 0
+                }
+              },
+              {
+                "traceId": "00000000000000000000000000000201",
+                "spanId": "0000000000000a04",
+                "parentSpanId": "0000000000000a02",
+                "name": "claude_code.tool",
+                "kind": 1,
+                "startTimeUnixNano": "1789117602600000000",
+                "endTimeUnixNano": "1789117602900000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000201"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Read"
+                    }
+                  },
+                  {
+                    "key": "tool_name_safe",
+                    "value": {
+                      "stringValue": "Read"
+                    }
+                  },
+                  {
+                    "key": "agent_id",
+                    "value": {
+                      "stringValue": "agent_a"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_read_a1"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_read_a1"
+                    }
+                  },
+                  {
+                    "key": "file_path",
+                    "value": {
+                      "stringValue": "internal/service/handler.go"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 300
+                    }
+                  },
+                  {
+                    "key": "result_tokens",
+                    "value": {
+                      "intValue": 512
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 0
+                }
+              },
+              {
+                "traceId": "00000000000000000000000000000201",
+                "spanId": "0000000000000a05",
+                "parentSpanId": "0000000000000a02",
+                "name": "claude_code.tool",
+                "kind": 1,
+                "startTimeUnixNano": "1789117603000000000",
+                "endTimeUnixNano": "1789117605000000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000201"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Agent"
+                    }
+                  },
+                  {
+                    "key": "tool_name_safe",
+                    "value": {
+                      "stringValue": "Agent"
+                    }
+                  },
+                  {
+                    "key": "agent_id",
+                    "value": {
+                      "stringValue": "agent_a"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_agent_b"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_agent_b"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 2000
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 0
+                }
+              },
+              {
+                "traceId": "00000000000000000000000000000201",
+                "spanId": "0000000000000a06",
+                "parentSpanId": "0000000000000a05",
+                "name": "claude_code.llm_request",
+                "kind": 1,
+                "startTimeUnixNano": "1789117603500000000",
+                "endTimeUnixNano": "1789117604300000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000201"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "llm_request"
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "claude-haiku-4-5-20251001"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.system",
+                    "value": {
+                      "stringValue": "anthropic"
+                    }
+                  },
+                  {
+                    "key": "agent_id",
+                    "value": {
+                      "stringValue": "agent_b"
+                    }
+                  },
+                  {
+                    "key": "parent_agent_id",
+                    "value": {
+                      "stringValue": "agent_a"
+                    }
+                  },
+                  {
+                    "key": "workflow.run_id",
+                    "value": {
+                      "stringValue": "wf_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "workflow.name",
+                    "value": {
+                      "stringValue": "custom"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 800
+                    }
+                  },
+                  {
+                    "key": "input_tokens",
+                    "value": {
+                      "intValue": 50
+                    }
+                  },
+                  {
+                    "key": "output_tokens",
+                    "value": {
+                      "intValue": 80
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  },
+                  {
+                    "key": "stop_reason",
+                    "value": {
+                      "stringValue": "end_turn"
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

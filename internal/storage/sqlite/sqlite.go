@@ -17,6 +17,7 @@ import (
 
 	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
+	"github.com/wayne/telemetryiq/internal/normalize/claude"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
@@ -87,6 +88,9 @@ CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, session_json B
 		return err
 	}
 	if err := r.ensureOperationsTable(ctx); err != nil {
+		return err
+	}
+	if err := r.ensureAgentRelationsTable(ctx); err != nil {
 		return err
 	}
 	return nil
@@ -170,6 +174,30 @@ CREATE INDEX IF NOT EXISTS operations_session ON operations(session_id);`); err 
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit migration 4: %w", err)
+	}
+	return nil
+}
+
+// ensureAgentRelationsTable is migration 5: it creates the derived
+// agent_relations table (#102) that holds the reconstructed sub-agent tree. The
+// row is keyed by (session_id, trace_id, agent_id) — an agent_id is unique only
+// within its trace — and rebuildSession REPLACEs a session's rows from its full
+// event set, so the table stays complete and idempotent across OTLP batches.
+func (r *Repository) ensureAgentRelationsTable(ctx context.Context) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin migration 5: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS agent_relations (session_id TEXT NOT NULL, trace_id TEXT NOT NULL, agent_id TEXT NOT NULL, relation_json BLOB NOT NULL, PRIMARY KEY(session_id, trace_id, agent_id));
+CREATE INDEX IF NOT EXISTS agent_relations_session ON agent_relations(session_id);`); err != nil {
+		return fmt.Errorf("create agent_relations table: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO schema_migrations(version) VALUES (5)"); err != nil {
+		return fmt.Errorf("record migration 5: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit migration 5: %w", err)
 	}
 	return nil
 }
@@ -322,13 +350,14 @@ func (r *Repository) saveCostRecord(ctx context.Context, tx *sql.Tx, record cost
 }
 
 const (
-	timeFormat          = "2006-01-02T15:04:05.999999999Z07:00"
-	codexSessionPrefix  = "codex:"
-	identityScopeKey    = "identity_scope"
-	identitySourceKey   = "identity_source"
-	identityProvider    = "provider"
-	identityObservation = "observation"
-	identityUnknown     = "unknown"
+	timeFormat           = "2006-01-02T15:04:05.999999999Z07:00"
+	whereSessionIDClause = " WHERE session_id=?"
+	codexSessionPrefix   = "codex:"
+	identityScopeKey     = "identity_scope"
+	identitySourceKey    = "identity_source"
+	identityProvider     = "provider"
+	identityObservation  = "observation"
+	identityUnknown      = "unknown"
 )
 
 func (r *Repository) rebuildSession(ctx context.Context, tx *sql.Tx, id string) error {
@@ -339,7 +368,38 @@ func (r *Repository) rebuildSession(ctx context.Context, tx *sql.Tx, id string) 
 	if len(events) == 0 {
 		return nil
 	}
-	return upsertSession(ctx, tx, reconstructSession(id, events))
+	if err := upsertSession(ctx, tx, reconstructSession(id, events)); err != nil {
+		return err
+	}
+	return rebuildAgentRelations(ctx, tx, id, events)
+}
+
+// rebuildAgentRelations re-derives the session's sub-agent tree (#102) from its
+// full event set and REPLACEs the stored rows (DELETE then INSERT), so a rollup
+// is complete and idempotent no matter how the trace's spans were split across
+// OTLP batches — an INSERT OR IGNORE would let a first partial row win and
+// undercount. Only claude-code sessions carry sub-agent spans; other tools skip
+// the reconstruction but still clear any stale rows.
+func rebuildAgentRelations(ctx context.Context, tx *sql.Tx, id string, events []canonical.Event) error {
+	if _, err := tx.ExecContext(ctx, "DELETE FROM agent_relations WHERE session_id=?", id); err != nil {
+		return fmt.Errorf("clear agent relations: %w", err)
+	}
+	if events[0].Tool != "claude-code" {
+		return nil
+	}
+	for _, relation := range claude.ReconstructSubAgentRelations(events) {
+		payload, err := json.Marshal(relation)
+		if err != nil {
+			return fmt.Errorf("marshal agent relation: %w", err)
+		}
+		// Key the row on the authoritative id being rebuilt (the same value the
+		// DELETE above cleared), not relation.SessionID, so a malformed relation
+		// can never insert rows for a different session than the one in flight.
+		if _, err := tx.ExecContext(ctx, "INSERT INTO agent_relations(session_id,trace_id,agent_id,relation_json) VALUES(?,?,?,?)", id, relation.TraceID, relation.AgentID, payload); err != nil {
+			return fmt.Errorf("insert agent relation: %w", err)
+		}
+	}
+	return nil
 }
 
 func loadSessionEvents(ctx context.Context, tx *sql.Tx, id string) ([]canonical.Event, error) {
@@ -738,7 +798,7 @@ func (r *Repository) ListOperations(ctx context.Context, filter storage.Operatio
 	query := "SELECT operation_json FROM operations"
 	args := []any{}
 	if filter.SessionID != "" {
-		query += " WHERE session_id=?"
+		query += whereSessionIDClause
 		args = append(args, filter.SessionID)
 	}
 	query += " ORDER BY session_id, operation_id"
@@ -762,11 +822,41 @@ func (r *Repository) ListOperations(ctx context.Context, filter storage.Operatio
 	return operations, rows.Err()
 }
 
+// ListAgentRelations returns the reconstructed sub-agent tree (#102), ordered
+// deterministically by (session_id, trace_id, agent_id) to match the golden.
+func (r *Repository) ListAgentRelations(ctx context.Context, filter storage.AgentRelationFilter) ([]canonical.AgentRelation, error) {
+	query := "SELECT relation_json FROM agent_relations"
+	args := []any{}
+	if filter.SessionID != "" {
+		query += whereSessionIDClause
+		args = append(args, filter.SessionID)
+	}
+	query += " ORDER BY session_id, trace_id, agent_id"
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	relations := []canonical.AgentRelation{}
+	for rows.Next() {
+		var data []byte
+		if err := rows.Scan(&data); err != nil {
+			return nil, err
+		}
+		var relation canonical.AgentRelation
+		if err := json.Unmarshal(data, &relation); err != nil {
+			return nil, err
+		}
+		relations = append(relations, relation)
+	}
+	return relations, rows.Err()
+}
+
 func (r *Repository) ListCostRecords(ctx context.Context, sessionID string) ([]cost.Record, error) {
 	query := "SELECT cost_json FROM cost_records"
 	args := []any{}
 	if sessionID != "" {
-		query += " WHERE session_id=?"
+		query += whereSessionIDClause
 		args = append(args, sessionID)
 	}
 	query += " ORDER BY event_id"
@@ -800,6 +890,9 @@ func (r *Repository) DeleteSession(ctx context.Context, id string) error {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, "DELETE FROM operations WHERE session_id=?", id); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM agent_relations WHERE session_id=?", id); err != nil {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, "DELETE FROM events WHERE session_id=?", id); err != nil {
