@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wayne/telemetryiq/internal/normalize"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
@@ -205,7 +206,7 @@ func TestNormalizeLogsRetainsToolEvidenceAndFindsProviderNeutralPRLinks(t *testi
 }
 
 func TestPRLinkURLsAcceptsSupportedHostsAndRejectsNonPRURLs(t *testing.T) {
-	got := prLinkURLs("https://bitbucket.org/workspace/repo/pull-requests/5 https://dev.azure.com/org/project/_git/repo/pullrequest/9 https://example.test/docs/pull/10 https://example.test/issues/10")
+	got := normalize.PRLinkURLs("https://bitbucket.org/workspace/repo/pull-requests/5 https://dev.azure.com/org/project/_git/repo/pullrequest/9 https://example.test/docs/pull/10 https://example.test/issues/10")
 	want := []string{"https://bitbucket.org/workspace/repo/pull-requests/5", "https://dev.azure.com/org/project/_git/repo/pullrequest/9", "https://example.test/docs/pull/10"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("urls = %#v, want %#v", got, want)

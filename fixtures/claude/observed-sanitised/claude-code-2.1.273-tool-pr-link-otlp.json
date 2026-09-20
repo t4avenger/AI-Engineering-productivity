@@ -1,0 +1,190 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "synthetic",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.273",
+  "captured_at": "2026-09-20T11:20:00Z",
+  "sanitisation_reviewed": true,
+  "capture_note": "PR-URL-in-tool-span proof for #183. Tool spans could not be captured live in this environment: non-interactive tool execution requires --dangerously-skip-permissions (blocked by the harness unsafe-agent classifier). This fixture is reproduced from the documented span schema at https://code.claude.com/docs/en/monitoring-usage (attributes verified 2026-09-20), reusing the OTEL_LOG_TOOL_DETAILS-gated full_command surface already proven raw by #101 (fixtures/claude/observed-sanitised/claude-code-2.1.268-tool-spans-otlp.json). The Bash tool span's full_command carries a verbatim `gh pr view <url>` invocation, so a pull-request URL is present on the wire and extracted by normalize.AttachPRLinkEvidence into pr_link_candidates. All values are synthetic; the org/repo are placeholders (epic #87).",
+  "payload": {
+    "resourceSpans": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "host.arch",
+              "value": {
+                "stringValue": "amd64"
+              }
+            },
+            {
+              "key": "os.type",
+              "value": {
+                "stringValue": "linux"
+              }
+            },
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "claude-code"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "2.1.273"
+              }
+            }
+          ],
+          "droppedAttributesCount": 0
+        },
+        "scopeSpans": [
+          {
+            "scope": {
+              "name": "com.anthropic.claude_code.tracing",
+              "version": "1.0.0"
+            },
+            "spans": [
+              {
+                "traceId": "00000000000000000000000000000183",
+                "spanId": "0000000000000b01",
+                "name": "claude_code.interaction",
+                "kind": 1,
+                "startTimeUnixNano": "1789289400000000000",
+                "endTimeUnixNano": "1789289404000000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000183"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "interaction"
+                    }
+                  },
+                  {
+                    "key": "interaction.sequence",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "interaction.duration_ms",
+                    "value": {
+                      "intValue": 4000
+                    }
+                  },
+                  {
+                    "key": "user_prompt_length",
+                    "value": {
+                      "intValue": 37
+                    }
+                  },
+                  {
+                    "key": "queued_sends",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "parent.source",
+                    "value": {
+                      "stringValue": "none"
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 0
+                }
+              },
+              {
+                "traceId": "00000000000000000000000000000183",
+                "spanId": "0000000000000b02",
+                "parentSpanId": "0000000000000b01",
+                "name": "claude_code.tool",
+                "kind": 1,
+                "startTimeUnixNano": "1789289400500000000",
+                "endTimeUnixNano": "1789289402500000000",
+                "attributes": [
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000183"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Bash"
+                    }
+                  },
+                  {
+                    "key": "tool_name_safe",
+                    "value": {
+                      "stringValue": "Bash"
+                    }
+                  },
+                  {
+                    "key": "bash_command_class",
+                    "value": {
+                      "stringValue": "other"
+                    }
+                  },
+                  {
+                    "key": "bash_argv0",
+                    "value": {
+                      "stringValue": "gh"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_bash_0183"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_bash_0183"
+                    }
+                  },
+                  {
+                    "key": "full_command",
+                    "value": {
+                      "stringValue": "gh pr view https://github.com/acme-synthetic/telemetryiq/pull/183 --json state"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 2000
+                    }
+                  },
+                  {
+                    "key": "result_tokens",
+                    "value": {
+                      "intValue": 64
+                    }
+                  }
+                ],
+                "status": {
+                  "code": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

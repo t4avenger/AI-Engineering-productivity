@@ -1,0 +1,161 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:span:755475c735782db809da38b5b652fe71d178faaea871d6c00a4269ed450dd76b",
+    "event_type": "claude_code.interaction",
+    "occurred_at": "2026-09-13T08:50:00Z",
+    "received_at": "2026-09-20T11:20:01Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.273",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000183",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "interaction": {
+        "duration_ms": 4000,
+        "parent_source": "none",
+        "queued_sends": 0,
+        "sequence": 1,
+        "user_prompt_length": 37
+      },
+      "span_type": "interaction",
+      "unavailable_fields": [
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "command_execution",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:span:755475c735782db809da38b5b652fe71d178faaea871d6c00a4269ed450dd76b",
+        "ordering_key": "01789289400000000000:claude-code:span:755475c735782db809da38b5b652fe71d178faaea871d6c00a4269ed450dd76b",
+        "parent_span_id": null,
+        "span_id": "0000000000000b01",
+        "task_boundary": {
+          "confidence": "observed",
+          "reason": "Claude Code interaction span is the per-user-prompt root, a genuine task boundary"
+        },
+        "trace_id": "00000000000000000000000000000183"
+      },
+      "resource": {
+        "host.arch": "amd64",
+        "os.type": "linux"
+      },
+      "span": {
+        "end_unix_nano": "1789289404000000000",
+        "kind": 1,
+        "name": "claude_code.interaction",
+        "parent_span_id": null,
+        "scope": "com.anthropic.claude_code.tracing",
+        "span_id": "0000000000000b01",
+        "start_unix_nano": "1789289400000000000",
+        "status_code": 0,
+        "trace_id": "00000000000000000000000000000183"
+      },
+      "span_attributes": {
+        "interaction.duration_ms": 4000,
+        "interaction.sequence": 1,
+        "parent.source": "none",
+        "queued_sends": 0,
+        "span.type": "interaction",
+        "user_prompt_length": 37
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:span:cc919da036843a41bf686a8ab74254a51fb4980f84f06fc5530fde01acd16264",
+    "event_type": "claude_code.tool",
+    "occurred_at": "2026-09-13T08:50:00.5Z",
+    "received_at": "2026-09-20T11:20:01Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.273",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000183",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "pr_link_candidates": [
+        "https://github.com/acme-synthetic/telemetryiq/pull/183"
+      ],
+      "span_type": "tool",
+      "tool": {
+        "bash_argv0": "gh",
+        "bash_command_class": "other",
+        "duration_ms": 2000,
+        "full_command": "gh pr view https://github.com/acme-synthetic/telemetryiq/pull/183 --json state",
+        "gen_ai_tool_call_id": "toolu_synthetic_bash_0183",
+        "result_tokens": 64,
+        "tool_name": "Bash",
+        "tool_name_safe": "Bash",
+        "tool_use_id": "toolu_synthetic_bash_0183"
+      },
+      "unavailable_fields": [
+        "mcp_calls",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:span:cc919da036843a41bf686a8ab74254a51fb4980f84f06fc5530fde01acd16264",
+        "ordering_key": "01789289400500000000:claude-code:span:cc919da036843a41bf686a8ab74254a51fb4980f84f06fc5530fde01acd16264",
+        "parent_span_id": "0000000000000b01",
+        "span_id": "0000000000000b02",
+        "task_boundary": {
+          "confidence": "observed",
+          "reason": "Claude Code tool spans are intra-interaction operations, not task boundaries"
+        },
+        "trace_id": "00000000000000000000000000000183"
+      },
+      "pr_link_evidence": [
+        {
+          "field": "full_command",
+          "url": "https://github.com/acme-synthetic/telemetryiq/pull/183"
+        }
+      ],
+      "resource": {
+        "host.arch": "amd64",
+        "os.type": "linux"
+      },
+      "span": {
+        "end_unix_nano": "1789289402500000000",
+        "kind": 1,
+        "name": "claude_code.tool",
+        "parent_span_id": "0000000000000b01",
+        "scope": "com.anthropic.claude_code.tracing",
+        "span_id": "0000000000000b02",
+        "start_unix_nano": "1789289400500000000",
+        "status_code": 0,
+        "trace_id": "00000000000000000000000000000183"
+      },
+      "span_attributes": {
+        "bash_argv0": "gh",
+        "bash_command_class": "other",
+        "duration_ms": 2000,
+        "gen_ai.tool.call.id": "toolu_synthetic_bash_0183",
+        "result_tokens": 64,
+        "span.type": "tool",
+        "tool_name": "Bash",
+        "tool_name_safe": "Bash",
+        "tool_use_id": "toolu_synthetic_bash_0183"
+      }
+    }
+  }
+]

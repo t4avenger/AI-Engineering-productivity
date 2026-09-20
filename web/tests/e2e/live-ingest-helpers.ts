@@ -393,9 +393,18 @@ export function claudeToolResultOTLPLogs(): string {
   });
 }
 
-// Claude enhanced-telemetry tool span with a retained file_path (#156 / T06).
-// Session id is live-e2e-specific so file evidence assertions stay isolated.
-export function claudeToolSpanFilePathOTLPTraces(): string {
+// Builds a single Claude enhanced-telemetry tool span, parameterised so the
+// file-path (#156) and PR-link (#183) live gates share one OTLP shape instead
+// of pasting two near-identical span builders (SonarCloud CPD hard rule).
+// extraAttributes carries the surface under test (file_path / full_command).
+function claudeToolSpanOTLPTraces(opts: {
+  traceId: string;
+  spanId: string;
+  sessionId: string;
+  toolName: string;
+  toolUseId: string;
+  extraAttributes: Array<{ key: string; value: { stringValue: string } }>;
+}): string {
   return JSON.stringify({
     resourceSpans: [
       {
@@ -415,8 +424,8 @@ export function claudeToolSpanFilePathOTLPTraces(): string {
             },
             spans: [
               {
-                traceId: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
-                spanId: 'aaaaaaaaaaaaaaaa',
+                traceId: opts.traceId,
+                spanId: opts.spanId,
                 name: 'claude_code.tool',
                 kind: 1,
                 startTimeUnixNano: '1789117600500000000',
@@ -424,27 +433,23 @@ export function claudeToolSpanFilePathOTLPTraces(): string {
                 attributes: [
                   {
                     key: 'session.id',
-                    value: {
-                      stringValue: 'tiq-live-e2e-session-files',
-                    },
+                    value: { stringValue: opts.sessionId },
                   },
                   { key: 'span.type', value: { stringValue: 'tool' } },
-                  { key: 'tool_name', value: { stringValue: 'Read' } },
-                  { key: 'tool_name_safe', value: { stringValue: 'Read' } },
+                  { key: 'tool_name', value: { stringValue: opts.toolName } },
+                  {
+                    key: 'tool_name_safe',
+                    value: { stringValue: opts.toolName },
+                  },
                   {
                     key: 'tool_use_id',
-                    value: { stringValue: 'toolu_live_session_files_read' },
+                    value: { stringValue: opts.toolUseId },
                   },
                   {
                     key: 'gen_ai.tool.call.id',
-                    value: { stringValue: 'toolu_live_session_files_read' },
+                    value: { stringValue: opts.toolUseId },
                   },
-                  {
-                    key: 'file_path',
-                    value: {
-                      stringValue: '/workspace/tiq-live-e2e-session-files.go',
-                    },
-                  },
+                  ...opts.extraAttributes,
                   { key: 'duration_ms', value: { intValue: '200' } },
                   { key: 'result_tokens', value: { intValue: '64' } },
                 ],
@@ -453,6 +458,49 @@ export function claudeToolSpanFilePathOTLPTraces(): string {
             ],
           },
         ],
+      },
+    ],
+  });
+}
+
+// Claude enhanced-telemetry tool span with a retained file_path (#156 / T06).
+// Session id is live-e2e-specific so file evidence assertions stay isolated.
+export function claudeToolSpanFilePathOTLPTraces(): string {
+  return claudeToolSpanOTLPTraces({
+    traceId: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+    spanId: 'aaaaaaaaaaaaaaaa',
+    sessionId: 'tiq-live-e2e-session-files',
+    toolName: 'Read',
+    toolUseId: 'toolu_live_session_files_read',
+    extraAttributes: [
+      {
+        key: 'file_path',
+        value: { stringValue: '/workspace/tiq-live-e2e-session-files.go' },
+      },
+    ],
+  });
+}
+
+// Claude enhanced-telemetry Bash tool span whose raw full_command carries a
+// verbatim pull-request URL (#183). Proves the shared provider-agnostic
+// extractor (normalize.AttachPRLinkEvidence) promotes availability.pr_link to
+// observed from a tool span — the same header cell the Codex path fills. A
+// distinct session id keeps the /pull-requests assertion isolated.
+export const claudeLivePRLinkURL =
+  'https://github.com/acme-synthetic/telemetryiq/pull/183';
+export function claudePRLinkOTLPTraces(): string {
+  return claudeToolSpanOTLPTraces({
+    traceId: '00000000000000000000000000000183',
+    spanId: '0000000000000b02',
+    sessionId: 'tiq-live-e2e-session-pr-link',
+    toolName: 'Bash',
+    toolUseId: 'toolu_live_session_pr_link_bash',
+    extraAttributes: [
+      {
+        key: 'full_command',
+        value: {
+          stringValue: `gh pr view ${claudeLivePRLinkURL} --json state`,
+        },
       },
     ],
   });
@@ -572,6 +620,31 @@ async function clearSessions(): Promise<void> {
 export function resetDaemonBetweenTests(): void {
   test.beforeEach(clearSessions);
   test.afterEach(clearSessions);
+}
+
+// A retained session row as returned by GET /api/v1/sessions, narrowed to the
+// fields the live gates assert. Kept here so specs share one fetch+parse shape
+// instead of copying the list request (SonarCloud CPD hard rule).
+export interface LiveSessionRow {
+  tool?: string;
+  session_id?: string;
+  state?: string;
+  completed_at?: string | null;
+  attributes?: Record<string, string>;
+  provider_extensions?: Record<string, Record<string, string>>;
+  availability?: Record<string, string>;
+}
+
+// fetchLiveSessions reads the authenticated session list from the live daemon
+// and asserts a 200 before returning the rows.
+export async function fetchLiveSessions(limit = 100): Promise<LiveSessionRow[]> {
+  const response = await fetch(
+    `${daemonBase}/api/v1/sessions?limit=${limit}`,
+    { headers: { Authorization: `Bearer ${authToken}` } },
+  );
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as { data: LiveSessionRow[] };
+  return body.data;
 }
 
 // ingestOTLPLogs POSTs a raw OTLP log payload to the live /v1/logs receiver and

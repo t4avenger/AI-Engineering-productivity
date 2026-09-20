@@ -438,6 +438,24 @@ with `TaskID` nil (not themselves boundaries); `tool_use_id`/`gen_ai.tool.call.i
 are the join keys for a later cross-signal correlation with `tool_result` /
 `tool_decision` logs (#92/#93). Hook span-type mapping remains owned by #103.
 
+Because the raw `full_command` can carry a verbatim pull-request URL (e.g. a
+`gh pr view https://github.com/<org>/<repo>/pull/<n>` invocation), each span is
+run through the provider-neutral `normalize.AttachPRLinkEvidence` over
+`claudePRLinkScanFields` (`full_command`). A recognised HTTP(S)
+pull/merge-request URL is recorded as `attributes.pr_link_candidates` plus
+`provider_extensions.pr_link_evidence` (field + url provenance); a span with no
+such URL stays silent (no empty slice, no fabricated value). The storage layer's
+`attachSessionPRLink` then aggregates candidates across a session into
+`session.Attributes["pr_link"]` — promoted only when exactly one distinct URL
+exists, else `partial` — and `canonical.PRLinkAvailability` maps that to the
+session `pr_link` availability the enterprise header (#158) renders. The URL
+grammar lives once in `internal/normalize/prlink.go`, shared with the Codex
+adapter (#205), so there is no CPD-duplicated regex. The metric
+`claude_code.pull_request.count` is a counter and never stands in for a URL
+(#98); the `tool_decision` `tool_parameters` and session-JSONL tool-output
+surfaces can also carry a URL but are dropped at ingest until #173 / #105 retain
+them raw (#183).
+
 Issue #102 (T15) reconstructs the **sub-agent tree** from those span attributes.
 The per-span sub-agent correlation `agent_id`/`parent_agent_id`/`subagent_type`/
 `workflow.*` that #100/#101 already capture rides only on `claude_code.llm_request`
