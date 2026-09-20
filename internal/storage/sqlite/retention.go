@@ -55,6 +55,7 @@ func listExpiredSessionIDs(ctx context.Context, tx *sql.Tx, cutoff string) ([]st
 
 func deleteSessionRows(ctx context.Context, tx *sql.Tx, id string) error {
 	for _, statement := range []string{
+		"DELETE FROM insight_signals WHERE session_id=?",
 		"DELETE FROM cost_records WHERE session_id=?",
 		"DELETE FROM operations WHERE session_id=?",
 		"DELETE FROM agent_relations WHERE session_id=?",

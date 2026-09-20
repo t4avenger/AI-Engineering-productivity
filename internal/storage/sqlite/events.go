@@ -44,6 +44,14 @@ func (r *Repository) ListEvents(ctx context.Context, filter storage.EventFilter)
 func eventListQuery(filter storage.EventFilter) (string, []any) {
 	conditions := []string{"session_id=?"}
 	args := []any{filter.SessionID}
+	if len(filter.EventTypes) > 0 {
+		placeholders := make([]string, 0, len(filter.EventTypes))
+		for _, eventType := range filter.EventTypes {
+			placeholders = append(placeholders, "?")
+			args = append(args, eventType)
+		}
+		conditions = append(conditions, "event_type IN ("+strings.Join(placeholders, ",")+")")
+	}
 	if filter.Cursor != nil {
 		conditions = append(conditions, "(occurred_at > ? OR (occurred_at = ? AND event_id > ?))")
 		cursorTime := filter.Cursor.OccurredAt.UTC().Format(timeFormat)

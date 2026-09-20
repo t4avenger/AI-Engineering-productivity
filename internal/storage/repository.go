@@ -45,17 +45,24 @@ type SessionCursor struct {
 
 // EventFilter constrains a chronological event timeline for one session.
 // Limit is the number of events visible to the caller, not the repository
-// result size.
+// result size. EventTypes, when non-empty, restricts rows to those types.
 type EventFilter struct {
-	SessionID string
-	Cursor    *EventCursor
-	Limit     int
+	SessionID  string
+	EventTypes []string
+	Cursor     *EventCursor
+	Limit      int
 }
 
 // EventCursor identifies the last event returned by a chronological page.
 type EventCursor struct {
 	OccurredAt time.Time
 	EventID    string
+}
+
+// InsightSourceReader returns thin events for dashboard insight engines without
+// scanning the full retained event_json corpus.
+type InsightSourceReader interface {
+	ListInsightSourceEvents(context.Context) ([]canonical.Event, error)
 }
 
 // SessionReader is the read-only session contract used by the local API.
@@ -133,5 +140,6 @@ type Repository interface {
 	OperationReader
 	AgentRelationReader
 	CostReader
+	InsightSourceReader
 	Close() error
 }

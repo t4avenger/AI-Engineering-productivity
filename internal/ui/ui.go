@@ -72,6 +72,7 @@ type Server struct {
 	events                 storage.EventReader
 	operations             storage.OperationReader
 	costs                  storage.CostReader
+	insightSources         storage.InsightSourceReader
 	contextWasteThresholds insights.ContextWasteThresholds
 	mcpAllowlist           []string
 	mcpAllowlistController MCPAllowlistController
@@ -127,6 +128,7 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 	events, _ := sessions.(storage.EventReader)
 	operations, _ := sessions.(storage.OperationReader)
 	costs, _ := sessions.(storage.CostReader)
+	insightSources, _ := sessions.(storage.InsightSourceReader)
 	var controller MCPAllowlistController
 	if len(controllers) > 0 {
 		controller = controllers[0]
@@ -139,6 +141,7 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 		events:                 events,
 		operations:             operations,
 		costs:                  costs,
+		insightSources:         insightSources,
 		contextWasteThresholds: contextWasteThresholds,
 		mcpAllowlist:           append([]string(nil), mcpAllowlist...),
 		mcpAllowlistController: controller,

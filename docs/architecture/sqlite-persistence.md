@@ -29,12 +29,16 @@ existing rows across so they remain queryable (see `migrate_test.go`). Migration
 6 denormalises session list columns (`started_at`, `tool`, `state`,
 `identity_scope`, `model`) and cost summary columns (`currency`, `status`,
 `amount_microusd`) with compound indexes so dashboard list/filter/order queries
-do not `json_extract`-scan the whole table. Deleting a session removes its
-events and reconstructed session in one transaction.
+do not `json_extract`-scan the whole table. Migration 7 adds
+`sessions.last_event_at`, denormalised `events.event_type` (with
+`events_session_type_occurred`), and `insight_signals` — thin payloads rebuilt
+on each `SaveEvents` session rebuild so Home, Insights, Models, Governance, and
+insight API endpoints do not scan raw `event_json`. Deleting a session removes
+its events, signals, and reconstructed session in one transaction.
 
 ## Retention
 
 `storage.retention_days` (default 30) is enforced at daemon start and hourly:
 sessions with `started_at` older than the cutoff are deleted with cascaded
-events, costs, operations, and agent relations. Sessions with a NULL
-`started_at` are retained.
+events, costs, operations, agent relations, and insight signals. Sessions with a
+NULL `started_at` are retained.

@@ -33,6 +33,9 @@ func TestDeleteAllSessionsRemovesRetainedTelemetry(t *testing.T) {
 	if tableRowCount(t, repo, "agent_relations") == 0 {
 		t.Fatal("agent relations before delete = 0, want at least one")
 	}
+	if tableRowCount(t, repo, "insight_signals") == 0 {
+		t.Fatal("insight signals before delete = 0, want at least one")
+	}
 	if err := repo.DeleteAllSessions(ctx); err != nil {
 		t.Fatalf("DeleteAllSessions() error = %v", err)
 	}
@@ -40,7 +43,7 @@ func TestDeleteAllSessionsRemovesRetainedTelemetry(t *testing.T) {
 	if err != nil || len(sessions) != 0 {
 		t.Fatalf("ListSessions() = %#v, %v", sessions, err)
 	}
-	for _, table := range []string{"events", "operations", "agent_relations"} {
+	for _, table := range []string{"events", "operations", "agent_relations", "insight_signals"} {
 		if got := tableRowCount(t, repo, table); got != 0 {
 			t.Fatalf("%s count after delete = %d, want 0", table, got)
 		}

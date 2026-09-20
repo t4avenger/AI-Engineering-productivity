@@ -65,7 +65,10 @@ rather than claiming that a provider has been detected.
 Home emphasises orchestration usage (sessions today, tools observed, insight
 highlights) and does not surface cost labels or links. Costs remains a utility
 page available at `/costs` from other authenticated pages, outside the primary
-navigation.
+navigation. Home, Insights, Models, Governance, and Integrations read
+write-time `insight_signals` and session `last_event_at` rather than draining
+raw `event_json`; session detail and conversation/timeline HTMX still page the
+event store (conversation filters by `event_type`).
 
 The Governance primary destination renders detect-and-report findings from the
 existing risky-access and unapproved-MCP engines over retained events. Each

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/cost"
+	"github.com/wayne/telemetryiq/internal/governance"
 	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/storage"
@@ -48,13 +49,15 @@ func (c *testAllowlistController) SaveMCPAllowlist(names []string) error {
 }
 
 type fullStub struct {
-	sessions   []canonical.Session
-	events     map[string][]canonical.Event
-	eventErr   error
-	operations []canonical.Operation
-	costs      []cost.Record
-	deleted    []string
-	cleared    bool
+	sessions        []canonical.Session
+	events          map[string][]canonical.Event
+	eventErr        error
+	operations      []canonical.Operation
+	costs           []cost.Record
+	deleted         []string
+	cleared         bool
+	listEventsCalls int
+	insightCalls    int
 }
 
 func (s *fullStub) Session(_ context.Context, id string) (canonical.Session, bool, error) {
@@ -76,9 +79,34 @@ func (s *fullStub) ListSessions(_ context.Context, filter storage.SessionFilter)
 		if filter.Scope == storage.SessionScopeObservation && scope != "observation" {
 			continue
 		}
+		session = withStubLastEventAt(session, s.events[session.SessionID])
 		result = append(result, session)
 	}
 	return result, nil
+}
+
+func withStubLastEventAt(session canonical.Session, events []canonical.Event) canonical.Session {
+	if session.Attributes != nil {
+		if raw, ok := session.Attributes["last_event_at"].(string); ok && raw != "" {
+			return session
+		}
+	}
+	var latest time.Time
+	for _, event := range events {
+		if latest.IsZero() || event.OccurredAt.After(latest) {
+			latest = event.OccurredAt
+		}
+	}
+	if latest.IsZero() {
+		return session
+	}
+	attrs := map[string]any{}
+	for key, value := range session.Attributes {
+		attrs[key] = value
+	}
+	attrs["last_event_at"] = latest.UTC().Format(time.RFC3339Nano)
+	session.Attributes = attrs
+	return session
 }
 
 func (s *fullStub) DeleteSession(_ context.Context, id string) error {
@@ -100,10 +128,38 @@ func (s *fullStub) DeleteAllSessions(context.Context) error {
 }
 
 func (s *fullStub) ListEvents(_ context.Context, filter storage.EventFilter) ([]canonical.Event, error) {
+	s.listEventsCalls++
 	if s.eventErr != nil {
 		return nil, s.eventErr
 	}
-	return append([]canonical.Event(nil), s.events[filter.SessionID]...), nil
+	events := append([]canonical.Event(nil), s.events[filter.SessionID]...)
+	if len(filter.EventTypes) == 0 {
+		return events, nil
+	}
+	allowed := make(map[string]struct{}, len(filter.EventTypes))
+	for _, eventType := range filter.EventTypes {
+		allowed[eventType] = struct{}{}
+	}
+	filtered := make([]canonical.Event, 0, len(events))
+	for _, event := range events {
+		if _, ok := allowed[event.EventType]; ok {
+			filtered = append(filtered, event)
+		}
+	}
+	return filtered, nil
+}
+
+func (s *fullStub) ListInsightSourceEvents(context.Context) ([]canonical.Event, error) {
+	s.insightCalls++
+	if s.eventErr != nil {
+		return nil, s.eventErr
+	}
+	out := []canonical.Event{}
+	for _, sessionEvents := range s.events {
+		out = append(out, insights.SourceEventsFromSession(sessionEvents)...)
+		out = append(out, governance.ThinAccessEvents(sessionEvents)...)
+	}
+	return out, nil
 }
 
 func (s *fullStub) ListOperations(context.Context, storage.OperationFilter) ([]canonical.Operation, error) {
@@ -2002,5 +2058,46 @@ func assertContainsAll(t *testing.T, body string, want []string) {
 		if !strings.Contains(body, fragment) {
 			t.Fatalf("missing %q in body: %q", fragment, body)
 		}
+	}
+}
+
+func TestCorpusPagesAvoidListEvents(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fullStub{
+		sessions: []canonical.Session{{
+			SessionID: "spy-session", Provider: "anthropic", Tool: "claude-code", State: "completed", StartedAt: now,
+		}},
+		events: map[string][]canonical.Event{
+			"spy-session": {{
+				EventID: "spy-mcp", EventType: "mcp_server_connection", SessionID: "spy-session",
+				OccurredAt: now, ReceivedAt: now, Provider: "anthropic", Tool: "claude-code",
+				ProviderExtensions: map[string]any{"event": map[string]any{"server_name": "filesystem", "status": "connected"}},
+			}},
+		},
+	}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	for _, path := range []string{"/", "/insights", "/models", "/governance", "/integrations"} {
+		repo.listEventsCalls = 0
+		repo.insightCalls = 0
+		rec := getAuthed(t, handler, cookie, path)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s status = %d", path, rec.Code)
+		}
+		if repo.listEventsCalls != 0 {
+			t.Fatalf("%s ListEvents calls = %d, want 0", path, repo.listEventsCalls)
+		}
+		if path != "/integrations" && repo.insightCalls == 0 {
+			t.Fatalf("%s ListInsightSourceEvents calls = 0, want at least 1", path)
+		}
+	}
+	repo.listEventsCalls = 0
+	_ = getAuthed(t, handler, cookie, "/sessions/spy-session")
+	if repo.listEventsCalls == 0 {
+		t.Fatal("session detail must still read retained events via ListEvents")
 	}
 }

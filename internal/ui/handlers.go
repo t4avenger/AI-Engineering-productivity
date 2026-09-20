@@ -328,17 +328,18 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	data := homeData{}
-	sessions, err := s.listAllSessions(r, storage.SessionScopePrimary)
+	sessions, err := s.listAllSessions(r, "")
 	if err != nil {
 		data.InsightErr = homeInsightUnavailable
 		data.IntegrationErr = "Integration health unavailable."
 		s.render(w, tmplHome, layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(r), Error: "Unable to load sessions.", Content: data})
 		return
 	}
-	data.Empty = len(sessions) == 0
+	primary := filterSessionsByScope(sessions, storage.SessionScopePrimary)
+	data.Empty = len(primary) == 0
 	tools := map[string]struct{}{}
 	today := time.Now().UTC().Truncate(24 * time.Hour)
-	for _, session := range sessions {
+	for _, session := range primary {
 		tools[session.Tool] = struct{}{}
 		if session.StartedAt.UTC().Before(today) {
 			continue
@@ -359,15 +360,8 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Strings(data.Tools)
 
-	allSessions, err := s.listAllSessions(r, "")
-	if err != nil {
-		data.InsightErr = homeInsightUnavailable
-		data.IntegrationErr = "Integration health unavailable."
-		s.render(w, tmplHome, layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(r), Content: data})
-		return
-	}
-	data.Integrations = homeIntegrationRows(allSessions, nil)
-	events, err := s.insightEventsForSessions(r, allSessions)
+	data.Integrations = homeIntegrationRows(sessions, nil)
+	events, err := s.insightSourceEvents(r)
 	if err != nil {
 		data.InsightErr = homeInsightUnavailable
 	} else {
@@ -377,7 +371,6 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		data.ContextWaste = insights.ContextWasteFromEvents(events, s.contextWasteThresholds)
 		data.RiskyAccess = governance.RiskyAccessFromEvents(events)
 		data.UnapprovedMCP = governance.UnapprovedMCPFromEvents(events, s.currentMCPAllowlist())
-		data.Integrations = homeIntegrationRows(allSessions, events)
 	}
 	s.render(w, tmplHome, layoutData{Title: "Home", Nav: "home", Health: s.healthLabel(r), Content: data})
 }
@@ -404,6 +397,11 @@ func homeSessionIntegrationActivities(sessions []canonical.Session) (map[string]
 		latest := session.StartedAt
 		if session.CompletedAt != nil && session.CompletedAt.After(latest) {
 			latest = *session.CompletedAt
+		}
+		if raw, ok := session.Attributes["last_event_at"].(string); ok && raw != "" {
+			if at, err := time.Parse(time.RFC3339Nano, raw); err == nil && at.After(latest) {
+				latest = at
+			}
 		}
 		bySession[session.SessionID] = homeIntegrationActivity{provider: provider, tool: tool}
 		recordHomeIntegrationActivity(byKey, provider, tool, latest)
@@ -576,7 +574,7 @@ func (s *Server) sessionConversationPartial(w http.ResponseWriter, r *http.Reque
 		http.NotFound(w, r)
 		return
 	}
-	events, err := s.listSessionEvents(r, id)
+	events, err := s.listConversationEvents(r, id)
 	if err != nil {
 		http.Error(w, "unable to load retained conversation evidence", http.StatusInternalServerError)
 		return
@@ -620,7 +618,7 @@ func (s *Server) sessionDelete(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) insightsPage(w http.ResponseWriter, r *http.Request) {
 	data := insightsData{}
-	events, err := s.insightEvents(r)
+	events, err := s.insightSourceEvents(r)
 	if err != nil {
 		data.Error = "Unable to load insights."
 	} else {
@@ -640,7 +638,7 @@ func (s *Server) insightsPage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) modelsPage(w http.ResponseWriter, r *http.Request) {
 	data := modelsData{}
-	events, err := s.insightEvents(r)
+	events, err := s.insightSourceEvents(r)
 	if err != nil {
 		data.Error = "Unable to load model performance."
 	} else {
@@ -776,7 +774,7 @@ func (s *Server) governancePageData(r *http.Request, selected []string) governan
 		SaveAvailable:  s.mcpAllowlistController != nil,
 		ActiveRulesTab: rulesTabMCP,
 	}
-	events, err := s.insightEvents(r)
+	events, err := s.insightSourceEvents(r)
 	if err != nil {
 		data.Error = "Unable to load governance findings."
 		data.RiskyAccess = governance.RiskyAccess{Findings: []governance.Finding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable"}
@@ -897,13 +895,9 @@ func (s *Server) sessionLastActivity(r *http.Request, session canonical.Session)
 	if session.CompletedAt != nil && session.CompletedAt.After(latest) {
 		latest = *session.CompletedAt
 	}
-	events, err := s.listSessionEvents(r, session.SessionID)
-	if err != nil {
-		return latest
-	}
-	for _, event := range events {
-		if !event.OccurredAt.IsZero() && (latest.IsZero() || event.OccurredAt.After(latest)) {
-			latest = event.OccurredAt
+	if raw, ok := session.Attributes["last_event_at"].(string); ok && raw != "" {
+		if at, err := time.Parse(time.RFC3339Nano, raw); err == nil && at.After(latest) {
+			return at
 		}
 	}
 	return latest
@@ -1015,30 +1009,33 @@ func (s *Server) listAllSessions(r *http.Request, scope storage.SessionScope) ([
 	}
 }
 
-func (s *Server) insightEvents(r *http.Request) ([]canonical.Event, error) {
-	if s.sessions == nil || s.events == nil {
-		return nil, errUnavailable
+func filterSessionsByScope(sessions []canonical.Session, scope storage.SessionScope) []canonical.Session {
+	if scope == "" {
+		return sessions
 	}
-	sessions, err := s.listAllSessions(r, "")
-	if err != nil {
-		return nil, err
+	out := make([]canonical.Session, 0, len(sessions))
+	for _, session := range sessions {
+		identityScope, _ := session.Attributes["identity_scope"].(string)
+		switch scope {
+		case storage.SessionScopePrimary:
+			if identityScope == "observation" {
+				continue
+			}
+		case storage.SessionScopeObservation:
+			if identityScope != "observation" {
+				continue
+			}
+		}
+		out = append(out, session)
 	}
-	return s.insightEventsForSessions(r, sessions)
+	return out
 }
 
-func (s *Server) insightEventsForSessions(r *http.Request, sessions []canonical.Session) ([]canonical.Event, error) {
-	if s.events == nil {
+func (s *Server) insightSourceEvents(r *http.Request) ([]canonical.Event, error) {
+	if s.insightSources == nil {
 		return nil, errUnavailable
 	}
-	var events []canonical.Event
-	for _, session := range sessions {
-		batch, err := s.listSessionEvents(r, session.SessionID)
-		if err != nil {
-			return nil, err
-		}
-		events = append(events, batch...)
-	}
-	return events, nil
+	return s.insightSources.ListInsightSourceEvents(r.Context())
 }
 
 func (s *Server) listOperations(r *http.Request) ([]canonical.Operation, error) {
@@ -1056,6 +1053,33 @@ func (s *Server) listSessionEvents(r *http.Request, sessionID string) ([]canonic
 	var cursor *storage.EventCursor
 	for {
 		page, err := s.events.ListEvents(r.Context(), storage.EventFilter{SessionID: sessionID, Limit: 1000, Cursor: cursor})
+		if err != nil {
+			return nil, err
+		}
+		batch := page
+		cursor = nil
+		if len(page) > 1000 {
+			batch = page[:1000]
+			last := batch[len(batch)-1]
+			cursor = &storage.EventCursor{OccurredAt: last.OccurredAt, EventID: last.EventID}
+		}
+		events = append(events, batch...)
+		if cursor == nil {
+			break
+		}
+	}
+	return events, nil
+}
+
+func (s *Server) listConversationEvents(r *http.Request, sessionID string) ([]canonical.Event, error) {
+	if s.events == nil {
+		return nil, errUnavailable
+	}
+	var events []canonical.Event
+	var cursor *storage.EventCursor
+	types := []string{"user_prompt", "assistant_response", "api_request_body", "api_response_body"}
+	for {
+		page, err := s.events.ListEvents(r.Context(), storage.EventFilter{SessionID: sessionID, EventTypes: types, Limit: 1000, Cursor: cursor})
 		if err != nil {
 			return nil, err
 		}

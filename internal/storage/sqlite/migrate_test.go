@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	// Registers the "sqlite" driver so the test can seed a v2 database directly.
@@ -36,8 +37,8 @@ func TestMigrationDropsProvenanceFromV2Database(t *testing.T) {
 	if err := repo.db.QueryRowContext(ctx, "SELECT MAX(version) FROM schema_migrations").Scan(&version); err != nil {
 		t.Fatalf("read migration version: %v", err)
 	}
-	if version != 6 {
-		t.Fatalf("schema version = %d, want 6", version)
+	if version != 7 {
+		t.Fatalf("schema version = %d, want 7", version)
 	}
 	if _, err := repo.ListOperations(ctx, storage.OperationFilter{}); err != nil {
 		t.Fatalf("operations table after migration: %v", err)
@@ -53,6 +54,14 @@ func TestMigrationDropsProvenanceFromV2Database(t *testing.T) {
 	}
 	if len(page) != 1 || page[0].EventID != "legacy-event" {
 		t.Fatalf("migrated events = %#v", page)
+	}
+
+	session, found, err := repo.Session(ctx, "legacy-session")
+	if err != nil || !found {
+		t.Fatalf("Session(legacy-session) = found=%v err=%v", found, err)
+	}
+	if raw, _ := session.Attributes["last_event_at"].(string); !strings.HasPrefix(raw, "2026-01-02T10:00:00") {
+		t.Fatalf("last_event_at = %q, want event occurred_at hydrated into session attributes", raw)
 	}
 }
 
