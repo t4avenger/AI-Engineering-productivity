@@ -1,0 +1,62 @@
+{{define "session_trace_lanes.html"}}
+<section class="session-trace" aria-labelledby="session-trace-heading">
+  <div class="session-trace-toolbar">
+    <p class="muted">Time origin: {{.Trace.OriginLabel}}{{if .Trace.WindowMs}} · Window {{.Trace.WindowLabel}}{{end}}</p>
+    {{if .Trace.PartialCapture}}<output class="muted">Partial capture: some lanes or timestamps are unavailable.</output>{{end}}
+  </div>
+  <div class="trace-scroll" aria-label="Shared session time axis">
+    <div class="trace-axis"{{if .Trace.WindowMs}} style="--trace-window-ms: {{.Trace.WindowMs}}"{{end}}>
+      <div class="trace-ruler" aria-hidden="true">
+        <span>00:00</span>
+        {{if .Trace.WindowLabel}}<span class="trace-ruler-end">{{.Trace.WindowLabel}}</span>{{end}}
+      </div>
+      {{range .Trace.Lanes}}
+      <div class="trace-lane" data-lane="{{.ID}}" aria-label="{{.Label}} lane">
+        <div class="trace-lane-label">
+          <h3>{{.Label}}</h3>
+          {{if eq .ID "files"}}<span class="visually-hidden">File evidence</span>{{end}}
+          {{if eq .ID "spans"}}<span class="visually-hidden">Span evidence</span>{{end}}
+          {{if eq .ID "conversation"}}<span class="visually-hidden">Retained conversation evidence</span>{{end}}
+          {{if and (eq .ID "agent") (eq .Availability "unavailable")}}<p class="muted">Planning telemetry unavailable</p>{{end}}
+          {{if and (eq .ID "agent") (eq .Availability "partial")}}<p class="muted">Planning telemetry unavailable; observed model work only</p>{{end}}
+        </div>
+        <div class="trace-lane-track" style="--trace-stack-rows: {{.TrackHeight}}">
+          {{range .Markers}}
+          <a
+            class="trace-marker trace-marker-{{.Kind}}{{if .Selected}} is-selected{{end}}{{if not .HasDuration}} is-point{{end}}"
+            href="{{.SelectPath}}"
+            id="{{.DOMID}}"
+            data-event-id="{{.EventID}}"
+            {{if .SpanID}}data-span-id="{{.SpanID}}"{{end}}
+            {{if .ParentSpanID}}data-parent-span-id="{{.ParentSpanID}}"{{end}}
+            style="left: {{printf "%.3f" .LeftPercent}}%; width: {{printf "%.3f" .WidthPercent}}%; --trace-stack-index: {{.StackIndex}}; --trace-nest-depth: {{.NestDepth}}"
+            title="{{.Label}} · {{.OffsetLabel}}"
+          >
+            <span class="trace-marker-label">{{.Label}}</span>
+            {{if .Preview}}<span class="trace-marker-preview">{{.Preview}}</span>{{end}}
+            {{if .Detail}}<span class="muted trace-marker-detail">{{.Detail}}</span>{{end}}
+          </a>
+          {{else}}
+          {{if .EmptyMessage}}<p class="muted trace-lane-empty">{{.EmptyMessage}}</p>{{end}}
+          {{end}}
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{if .Trace.Unplaced}}
+  <section class="trace-unplaced" aria-labelledby="trace-unplaced-heading">
+    <h3 id="trace-unplaced-heading">Unplaced events</h3>
+    <p class="muted">These retained events have no usable timestamp for the shared axis.</p>
+    <ul class="trace-unplaced-list">
+      {{range .Trace.Unplaced}}
+      <li class="{{if .Selected}}is-selected{{end}}">
+        <a class="event-select" href="{{.SelectPath}}" id="{{.DOMID}}">{{.Label}}</a>
+        <span class="muted">{{.Detail}} · <code>{{.EventID}}</code></span>
+      </li>
+      {{end}}
+    </ul>
+  </section>
+  {{end}}
+</section>
+{{end}}

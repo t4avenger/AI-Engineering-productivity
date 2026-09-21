@@ -72,10 +72,14 @@ func parseInspectorTab(raw string) string {
 }
 
 func parseInspectorSource(raw string) string {
-	if strings.EqualFold(strings.TrimSpace(raw), inspectorSourceConversation) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case inspectorSourceConversation:
 		return inspectorSourceConversation
+	case inspectorSourceTrace:
+		return inspectorSourceTrace
+	default:
+		return inspectorSourceTimeline
 	}
-	return inspectorSourceTimeline
 }
 
 func inspectorFocusID(source, eventID string) string {
@@ -170,6 +174,7 @@ func markSelectedRows(data *sessionDetailData, eventID string) {
 	for i := range data.Conversation {
 		data.Conversation[i].Selected = data.Conversation[i].EventID == eventID
 	}
+	markSelectedTrace(data, eventID)
 }
 
 func attachSelectionPaths(data *sessionDetailData, r *http.Request) {

@@ -116,6 +116,7 @@ type sessionDetailData struct {
 	Breakdown         breakdownView
 	BreakdownError    string
 	Legend            []legendEntry
+	Trace             sessionTraceView
 	Inspector         eventInspectorView
 	Error             string
 	Confirm           bool
@@ -515,7 +516,7 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 	s.populateSessionDetailEvidence(r, id, &data)
 	attachSelectionPaths(&data, r)
 	s.populateEventInspector(r, id, data.inspectorSessionEvents, &data)
-	data.Legend = eventLegend(data.Events, data.SpanEvidence, data.Conversation)
+	data.Legend = eventLegend(data.Events, data.SpanEvidence, data.Conversation, data.Trace)
 	s.render(w, tmplSessionDetail, layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(r), Content: data, RightRail: data})
 }
 

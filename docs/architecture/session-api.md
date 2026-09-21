@@ -124,7 +124,9 @@ foreign content. Large string values are truncated by default
 (`truncation.expand_available`); `?expand=1` returns full retained values.
 Relationships never use temporal proximity. Session detail HTML shares
 `inspector.Build` and deep-links selection with
-`?event=<event_id>&inspector=details|attributes|events`.
+`?event=<event_id>&inspector=details|attributes|events`. Session detail HTML
+composes the five-lane Session Trace (#159) over these projections; see
+`docs/architecture/session-trace.md`.
 
 `GET /api/v1/sessions/{id}/breakdown` is the additive full-session duration
 partition (#190 / T09). It returns availability, observed wall window,

@@ -25,8 +25,9 @@ func (s *Server) populateSessionDetailEvidence(r *http.Request, id string, data 
 	data.SpanEvidence, data.SpansPartial = spanEvidenceRows(events)
 	data.RiskyAccess = governance.RiskyAccessFromEvents(events)
 	data.UnapprovedMCP = governance.UnapprovedMCPFromEvents(events, s.currentMCPAllowlist())
-	s.populateFileEvidence(r, id, events, data)
+	operations := s.populateFileEvidence(r, id, events, data)
 	data.Breakdown = populateBreakdownView(calculateSessionBreakdown(events, data.Session), id)
+	data.Trace = buildSessionTrace(data.Session, events, operations, id, r)
 }
 
 func (s *Server) populateConversationEvidence(r *http.Request, events []canonical.Event, data *sessionDetailData) {
@@ -39,15 +40,16 @@ func (s *Server) populateConversationEvidence(r *http.Request, events []canonica
 	data.ConversationNext = next
 }
 
-func (s *Server) populateFileEvidence(r *http.Request, id string, events []canonical.Event, data *sessionDetailData) {
+func (s *Server) populateFileEvidence(r *http.Request, id string, events []canonical.Event, data *sessionDetailData) []canonical.Operation {
 	operations := []canonical.Operation{}
 	if s.operations != nil {
 		listed, err := s.operations.ListOperations(r.Context(), storage.OperationFilter{SessionID: id})
 		if err != nil {
 			data.FilesError = "File evidence is unavailable because retained operations could not be loaded."
-			return
+			return operations
 		}
 		operations = listed
 	}
 	data.FileEvidence = fileEvidenceRows(insights.SessionFilesFromEvidence(events, operations))
+	return operations
 }
