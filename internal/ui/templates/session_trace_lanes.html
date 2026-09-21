@@ -2,9 +2,9 @@
 <section class="session-trace" aria-labelledby="session-trace-heading">
   <div class="session-trace-toolbar">
     <p class="muted">Time origin: {{.Trace.OriginLabel}}{{if .Trace.WindowMs}} · Window {{.Trace.WindowLabel}}{{end}}</p>
-    {{if .Trace.PartialCapture}}<p class="muted" role="status">Partial capture: some lanes or timestamps are unavailable. Loaded-page totals are not full-session totals.</p>{{end}}
+    {{if .Trace.PartialCapture}}<output class="muted">Partial capture: some lanes or timestamps are unavailable.</output>{{end}}
   </div>
-  <div class="trace-scroll" tabindex="0" aria-label="Shared session time axis">
+  <div class="trace-scroll" aria-label="Shared session time axis">
     <div class="trace-axis"{{if .Trace.WindowMs}} style="--trace-window-ms: {{.Trace.WindowMs}}"{{end}}>
       <div class="trace-ruler" aria-hidden="true">
         <span>00:00</span>
@@ -27,7 +27,9 @@
             href="{{.SelectPath}}"
             id="{{.DOMID}}"
             data-event-id="{{.EventID}}"
-            style="left: {{printf "%.3f" .LeftPercent}}%; width: {{printf "%.3f" .WidthPercent}}%; --trace-stack-index: {{.StackIndex}}"
+            {{if .SpanID}}data-span-id="{{.SpanID}}"{{end}}
+            {{if .ParentSpanID}}data-parent-span-id="{{.ParentSpanID}}"{{end}}
+            style="left: {{printf "%.3f" .LeftPercent}}%; width: {{printf "%.3f" .WidthPercent}}%; --trace-stack-index: {{.StackIndex}}; --trace-nest-depth: {{.NestDepth}}"
             title="{{.Label}} · {{.OffsetLabel}}"
           >
             <span class="trace-marker-label">{{.Label}}</span>

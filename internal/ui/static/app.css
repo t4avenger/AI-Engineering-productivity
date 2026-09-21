@@ -632,6 +632,7 @@ section { margin: 1.5rem 0; }
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
+  margin-left: calc(var(--trace-nest-depth, 0) * 0.75rem);
   max-width: 100%;
   min-height: 2.4rem;
   overflow: hidden;
@@ -641,6 +642,7 @@ section { margin: 1.5rem 0; }
   top: calc(var(--trace-stack-index, 0) * var(--trace-row-height));
   z-index: 1;
 }
+.trace-marker-lifecycle { border-left: 3px solid #94a3b8; }
 .trace-marker:hover,
 .trace-marker:focus-visible {
   border-color: var(--color-accent);

@@ -75,6 +75,9 @@ type traceMarkerView struct {
 	LeftPercent    float64
 	WidthPercent   float64
 	StackIndex     int
+	NestDepth      int
+	SpanID         string
+	ParentSpanID   string
 	Selected       bool
 	SelectPath     string
 	SourceEventIDs string
@@ -83,17 +86,19 @@ type traceMarkerView struct {
 }
 
 type timedTraceItem struct {
-	eventID     string
-	lane        string
-	kind        string
-	label       string
-	detail      string
-	preview     string
-	start       time.Time
-	durationMs  int64
-	hasDuration bool
-	placed      bool
-	sourceIDs   string
+	eventID      string
+	lane         string
+	kind         string
+	label        string
+	detail       string
+	preview      string
+	start        time.Time
+	durationMs   int64
+	hasDuration  bool
+	placed       bool
+	sourceIDs    string
+	spanID       string
+	parentSpanID string
 }
 
 func buildSessionTrace(
@@ -111,7 +116,7 @@ func buildSessionTrace(
 		WindowMs:             windowMs,
 		WindowLabel:          formatDurationMs(windowMs),
 		PlanningAvailability: planningAvailability(items),
-		Header:               buildTraceHeader(session),
+		Header:               buildTraceHeader(session, events),
 	}
 	markers := make([]traceMarkerView, 0, len(items))
 	for _, item := range items {
@@ -132,19 +137,7 @@ func computePartialCapture(view sessionTraceView, items []timedTraceItem, window
 	if len(view.Unplaced) > 0 {
 		return true
 	}
-	if windowMs == 0 && len(items) > 0 {
-		return true
-	}
-	if view.PlanningAvailability == "partial" || view.PlanningAvailability == "unavailable" {
-		populated := 0
-		for _, lane := range view.Lanes {
-			if len(lane.Markers) > 0 {
-				populated++
-			}
-		}
-		return populated > 0
-	}
-	return false
+	return windowMs == 0 && len(items) > 0
 }
 
 func collectTraceItems(events []canonical.Event, operations []canonical.Operation) []timedTraceItem {
@@ -214,7 +207,7 @@ func classifyEventLane(event canonical.Event) (lane, kind string, ok bool) {
 	case "tool_decision", "codex.tool_decision":
 		return traceLaneTools, "tool", true
 	case "session.active", "session.completed":
-		return traceLaneAgent, "agent", true
+		return traceLaneAgent, "lifecycle", true
 	}
 	if _, hasOp := observedString(event.Attributes["operation_id"]); hasOp {
 		kind = "tool"
@@ -268,7 +261,8 @@ func fileTraceItems(events []canonical.Event, operations []canonical.Operation) 
 		if entry.Action != nil && *entry.Action != "" {
 			detail = *entry.Action
 		}
-		start, placed := parseTraceTime(entry.OccurredAt)
+		start, ok := parseTraceTime(entry.OccurredAt)
+		placed := ok && !start.IsZero()
 		durationMs := int64(0)
 		hasDuration := false
 		if entry.DurationMs != nil {
@@ -296,27 +290,32 @@ func spanTraceItems(events []canonical.Event) []timedTraceItem {
 		if record.Name != nil && *record.Name != "" {
 			label = *record.Name
 		}
-		start, placed := parseOptionalTraceTime(record.StartAt)
+		start, hasStart := parseOptionalTraceTime(record.StartAt)
+		placed := hasStart && !start.IsZero()
 		durationMs := int64(0)
 		hasDuration := false
-		if record.DurationMs != nil {
+		if record.DurationMs != nil && record.IntervalAvailability == spans.IntervalAvailable {
 			durationMs = *record.DurationMs
 			hasDuration = true
 		}
 		detail := "trace " + record.TraceID + " · span " + record.SpanID
 		sourceIDs := strings.Join(record.SourceEventIDs, ", ")
+		parentID := ""
+		if record.ParentSpanID != nil {
+			parentID = *record.ParentSpanID
+		}
 		items = append(items, timedTraceItem{
 			eventID: eventID, lane: traceLaneSpans, kind: "span",
 			label: label, detail: detail, start: start, durationMs: durationMs,
-			hasDuration: hasDuration, placed: placed && record.IntervalAvailability != spans.IntervalMissing,
-			sourceIDs: sourceIDs,
+			hasDuration: hasDuration, placed: placed,
+			sourceIDs: sourceIDs, spanID: record.SpanID, parentSpanID: parentID,
 		})
 		if lane, kind, ok := spanLaneFromRecord(record); ok {
 			items = append(items, timedTraceItem{
 				eventID: eventID, lane: lane, kind: kind,
 				label: label, detail: detail, start: start, durationMs: durationMs,
-				hasDuration: hasDuration, placed: placed && record.IntervalAvailability == spans.IntervalAvailable,
-				sourceIDs: sourceIDs,
+				hasDuration: hasDuration, placed: placed,
+				sourceIDs: sourceIDs, spanID: record.SpanID, parentSpanID: parentID,
 			})
 		}
 	}
@@ -433,6 +432,8 @@ func markerFromItem(item timedTraceItem, origin time.Time, windowMs int64, sessi
 		DurationMs:     item.durationMs,
 		Placed:         item.placed && !origin.IsZero() && windowMs > 0,
 		SourceEventIDs: item.sourceIDs,
+		SpanID:         item.spanID,
+		ParentSpanID:   item.parentSpanID,
 		SelectPath:     sessionInspectorPath(sessionID, item.eventID, inspectorTabDetails, inspectorSourceTrace, r, false),
 		WidthPercent:   tracePointWidthPercent,
 	}
@@ -479,6 +480,9 @@ func buildTraceLanes(placed []traceMarkerView, planningAvailability string) []tr
 	lanes := make([]traceLaneView, 0, len(defs))
 	for _, def := range defs {
 		markers := markersForLane(placed, def.id)
+		if def.id == traceLaneSpans {
+			assignSpanNestDepth(markers)
+		}
 		assignOverlapStacks(markers)
 		lane := traceLaneView{
 			ID: def.id, Label: def.label, Markers: markers, TrackHeight: maxStack(markers) + 1,
@@ -511,11 +515,43 @@ func planningAvailability(items []timedTraceItem) string {
 		}
 	}
 	for _, item := range items {
-		if item.lane == traceLaneAgent {
+		if item.lane == traceLaneAgent && item.kind == "agent" {
 			return "partial"
 		}
 	}
 	return "unavailable"
+}
+
+func assignSpanNestDepth(markers []traceMarkerView) {
+	bySpan := map[string]int{}
+	for i := range markers {
+		if markers[i].SpanID == "" {
+			continue
+		}
+		bySpan[markers[i].SpanID] = i
+	}
+	var depthOf func(spanID string, seen map[string]struct{}) int
+	depthOf = func(spanID string, seen map[string]struct{}) int {
+		index, ok := bySpan[spanID]
+		if !ok {
+			return 0
+		}
+		parent := markers[index].ParentSpanID
+		if parent == "" {
+			return 0
+		}
+		if _, loop := seen[spanID]; loop {
+			return 0
+		}
+		seen[spanID] = struct{}{}
+		return depthOf(parent, seen) + 1
+	}
+	for i := range markers {
+		if markers[i].SpanID == "" {
+			continue
+		}
+		markers[i].NestDepth = depthOf(markers[i].SpanID, map[string]struct{}{})
+	}
 }
 
 func markersForLane(markers []traceMarkerView, lane string) []traceMarkerView {
@@ -584,23 +620,23 @@ func assignOverlapStacks(markers []traceMarkerView) {
 }
 
 func maxStack(markers []traceMarkerView) int {
-	max := 0
+	highest := 0
 	for _, marker := range markers {
-		if marker.StackIndex > max {
-			max = marker.StackIndex
+		if marker.StackIndex > highest {
+			highest = marker.StackIndex
 		}
 	}
-	return max
+	return highest
 }
 
-func buildTraceHeader(session canonical.Session) sessionTraceHeader {
+func buildTraceHeader(session canonical.Session, events []canonical.Event) sessionTraceHeader {
 	header := sessionTraceHeader{
 		SessionID:  session.SessionID,
 		StateLabel: sessionStateLabel(session.State),
 		Metadata:   sessionMetadata(session),
 		OccurredAt: formatTimestamp(session.StartedAt),
 	}
-	if model := sessionAttribute(session, "model"); model != "" {
+	if model, observed := sessionModelLabel(session, events); observed {
 		header.Model = model
 		header.ModelObserved = true
 	}
@@ -618,8 +654,31 @@ func buildTraceHeader(session canonical.Session) sessionTraceHeader {
 	return header
 }
 
+func sessionModelLabel(session canonical.Session, events []canonical.Event) (string, bool) {
+	models := map[string]struct{}{}
+	if model := sessionAttribute(session, "model"); model != "" {
+		models[model] = struct{}{}
+	}
+	for _, event := range events {
+		if model, ok := observedString(event.Attributes["model"]); ok {
+			models[model] = struct{}{}
+		}
+	}
+	switch len(models) {
+	case 0:
+		return "", false
+	case 1:
+		for model := range models {
+			return model, true
+		}
+		return "", false
+	default:
+		return "multiple models", true
+	}
+}
+
 func sessionTokenTotal(session canonical.Session) string {
-	for _, key := range []string{"total_tokens", "token_count", "input_token_count"} {
+	for _, key := range []string{"total_tokens", "token_count"} {
 		if value, ok := int64Attr(session.Attributes[key]); ok {
 			return strconv.FormatInt(value, 10)
 		}

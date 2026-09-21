@@ -12,11 +12,13 @@ invent stage sequences, per-file diffs, or session joins.
 | Agent | Model / lifecycle events plus `planning` / `llm_request` spans |
 | Tools & MCP | Operations, skills, MCP events, and tool spans |
 | Files | `insights.SessionFilesFromEvidence` |
-| Spans | `spans.Project` flat nodes (client nesting by parent id only) |
+| Spans | `spans.Project` flat nodes with retained parent span IDs; nest depth is
+  derived from parent links in the current page (invalid cycles stop at depth 0) |
 
 Shared relative time uses session `started_at` when present, otherwise the earliest
 retained timestamp labelled as an observed-window origin. Events without usable
-timestamps render in **Unplaced events**. Point events stay points; durations are
+timestamps (including zero-time file rows) render in **Unplaced events**. Point
+events stay points; known starts with missing ends stay points; durations are
 never inferred.
 
 Selection deep links use `?event=&inspector=&source=trace` and keep the #189

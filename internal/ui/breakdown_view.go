@@ -188,6 +188,8 @@ func legendKindLabel(kind string) string {
 		return "File"
 	case "span":
 		return "Span"
+	case "lifecycle":
+		return "Lifecycle"
 	default:
 		return "Event"
 	}

@@ -102,14 +102,90 @@ func TestSessionTraceRendersFiveLanesAndSharedAxis(t *testing.T) {
 		"Operation",
 		"/workspace/trace.go",
 		"llm_request",
+		"data-parent-span-id",
 		"Unplaced events",
 		"unplaced-1",
 		"Accessible chronological lists",
 		"source=trace",
 	})
+	if strings.Contains(body, "Loaded-page totals are not full-session totals") {
+		t.Fatalf("partial-capture copy must not claim page totals: %q", body)
+	}
 	if strings.Contains(body, "Plan -> Inspect") {
 		t.Fatalf("trace must not invent stage sequences: %q", body)
 	}
+}
+
+func TestSessionTraceDoesNotPlaceZeroTimeFileMarkers(t *testing.T) {
+	now := time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)
+	session := syntheticSession("zero-file", now)
+	events := []canonical.Event{
+		{
+			EventID: "anchor", EventType: "model_interaction", SessionID: "zero-file",
+			OccurredAt: now, ReceivedAt: now, Provider: "anthropic", Tool: "claude-code",
+		},
+		{
+			EventID: "zero-file-event", EventType: "claude_code.tool", SessionID: "zero-file",
+			Provider: "anthropic", Tool: "claude-code",
+			Attributes: map[string]any{
+				"tool": map[string]any{"file_path": "/workspace/zero.go", "tool_name": "Read"},
+			},
+		},
+	}
+	body := renderSessionDetail(t, &fullStub{
+		sessions: []canonical.Session{session},
+		events:   map[string][]canonical.Event{"zero-file": events},
+	}, nil, "zero-file")
+	assertContainsAll(t, body, []string{"Unplaced events", "/workspace/zero.go", "zero-file-event"})
+}
+
+func TestSessionTraceHeaderUsesTotalTokensAndMultipleModels(t *testing.T) {
+	now := time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)
+	session := syntheticSession("multi-model", now)
+	session.Attributes = map[string]any{
+		"model":             "model-a",
+		"input_token_count": int64(99),
+		"total_tokens":      int64(250),
+	}
+	events := []canonical.Event{
+		{
+			EventID: "m1", EventType: "model_interaction", SessionID: "multi-model",
+			OccurredAt: now, ReceivedAt: now, Provider: "anthropic", Tool: "claude-code",
+			Attributes: map[string]any{"model": "model-a"},
+		},
+		{
+			EventID: "m2", EventType: "model_interaction", SessionID: "multi-model",
+			OccurredAt: now.Add(time.Second), ReceivedAt: now.Add(time.Second),
+			Provider: "anthropic", Tool: "claude-code",
+			Attributes: map[string]any{"model": "model-b"},
+		},
+	}
+	body := renderSessionDetail(t, &fullStub{
+		sessions: []canonical.Session{session},
+		events:   map[string][]canonical.Event{"multi-model": events},
+	}, nil, "multi-model")
+	assertContainsAll(t, body, []string{"multiple models", "Tokens 250"})
+	if strings.Contains(body, "Tokens 99") {
+		t.Fatalf("header must not treat input_token_count as total tokens: %q", body)
+	}
+}
+
+func TestSessionTraceLifecycleDoesNotClaimObservedModelWork(t *testing.T) {
+	now := time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)
+	session := syntheticSession("lifecycle-only", now)
+	events := []canonical.Event{{
+		EventID: "life", EventType: "session.active", SessionID: "lifecycle-only",
+		OccurredAt: now, ReceivedAt: now, Provider: "openai", Tool: "codex",
+		Attributes: map[string]any{"lifecycle_kind": "session_start"},
+	}}
+	body := renderSessionDetail(t, &fullStub{
+		sessions: []canonical.Session{session},
+		events:   map[string][]canonical.Event{"lifecycle-only": events},
+	}, nil, "lifecycle-only")
+	if strings.Contains(body, "observed model work only") {
+		t.Fatalf("lifecycle-only sessions must not claim observed model work: %q", body)
+	}
+	assertContainsAll(t, body, []string{"Planning telemetry unavailable", "Session active"})
 }
 
 func TestSessionTraceSelectionHighlightsLaneMarker(t *testing.T) {
