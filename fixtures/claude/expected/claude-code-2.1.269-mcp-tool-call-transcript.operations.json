@@ -1,0 +1,111 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "operation_id": "claude-code:22222222-2222-4222-8222-222222222222:tool:toolu_mcp_pending",
+    "session_id": "claude-code:22222222-2222-4222-8222-222222222222",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "category": "MCP call",
+    "outcome": "unknown",
+    "provenance": "observed",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:22222222-2222-4222-8222-222222222222:tool:toolu_mcp_pending",
+        "ordering_key": "01789207205000000000:claude-code:22222222-2222-4222-8222-222222222222:tool:toolu_mcp_pending",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript tool_use records have no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "tool_name": "mcp__synthetic-github__list_issues",
+        "tool_use_id": "toolu_mcp_pending"
+      },
+      "mcp_call": {
+        "arguments": {
+          "state": "open"
+        },
+        "server_name": "synthetic-github",
+        "tool_name": "list_issues",
+        "tool_use_id": "toolu_mcp_pending"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "operation_id": "claude-code:22222222-2222-4222-8222-222222222222:tool:toolu_mcp_read",
+    "session_id": "claude-code:22222222-2222-4222-8222-222222222222",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "category": "MCP call",
+    "outcome": "success",
+    "provenance": "observed",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:22222222-2222-4222-8222-222222222222:tool:toolu_mcp_read",
+        "ordering_key": "01789207202000000000:claude-code:22222222-2222-4222-8222-222222222222:tool:toolu_mcp_read",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript tool_use records have no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "tool_name": "mcp__synthetic-fs__read_file",
+        "tool_use_id": "toolu_mcp_read"
+      },
+      "mcp_call": {
+        "arguments": {
+          "path": "docs/architecture/overview.md"
+        },
+        "result": [
+          {
+            "text": "# Overview\nIngest, normalise, storage.",
+            "type": "text"
+          }
+        ],
+        "server_name": "synthetic-fs",
+        "tool_name": "read_file",
+        "tool_use_id": "toolu_mcp_read"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "operation_id": "claude-code:22222222-2222-4222-8222-222222222222:tool:toolu_mcp_write",
+    "session_id": "claude-code:22222222-2222-4222-8222-222222222222",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "category": "MCP call",
+    "outcome": "failed",
+    "provenance": "observed",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:22222222-2222-4222-8222-222222222222:tool:toolu_mcp_write",
+        "ordering_key": "01789207205000000000:claude-code:22222222-2222-4222-8222-222222222222:tool:toolu_mcp_write",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript tool_use records have no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "tool_name": "mcp__synthetic-fs__write_file",
+        "tool_use_id": "toolu_mcp_write"
+      },
+      "mcp_call": {
+        "arguments": {
+          "contents": "Layout: ingest, normalise, storage.",
+          "path": "notes.md"
+        },
+        "result": [
+          {
+            "text": "write denied by policy",
+            "type": "text"
+          }
+        ],
+        "server_name": "synthetic-fs",
+        "tool_name": "write_file",
+        "tool_use_id": "toolu_mcp_write"
+      }
+    }
+  }
+]

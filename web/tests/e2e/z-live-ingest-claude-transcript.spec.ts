@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
 
 import {
+  authToken,
   claudeLivePRLinkURL,
+  claudeMCPTranscriptNDJSON,
   claudePRLinkOTLPTraces,
   claudeTranscriptNDJSON,
   expectSessionDetailHeading,
@@ -97,4 +99,77 @@ test('promotes a Claude tool-span PR URL to an observed pr_link on the live daem
   await expect(
     page.getByRole('link', { name: claudeLivePRLinkURL }),
   ).toBeVisible();
+});
+
+// J17 (#104): an MCP tool call reconstructed from the JSONL transcript must
+// surface as an MCP-call operation and mark its server used with an invocation
+// count on the Insights UI — the connected-but-unused vs used state the
+// MCP-inventory matcher was previously dead scaffolding for. No content mocking.
+const liveMCPServer = 'tiq-live-mcp-fs';
+
+test('surfaces an MCP tool call from a transcript as a used server and MCP-call operation', async ({
+  page,
+}) => {
+  await ingestClaudeTranscript(claudeMCPTranscriptNDJSON(liveMCPServer));
+
+  const inventory = await fetch(
+    'http://localhost:18080/api/v1/insights/mcp-inventory',
+    { headers: { Authorization: `Bearer ${authToken}` } },
+  );
+  expect(inventory.status).toBe(200);
+  const inventoryBody = (await inventory.json()) as {
+    data: {
+      servers: Array<{
+        server_name: string;
+        used: boolean;
+        invocation_count: number;
+        tool_names: string[];
+        usage_state: string;
+      }>;
+      totals: { used_servers: number };
+    };
+  };
+  const usedServer = inventoryBody.data.servers.find(
+    (server) => server.server_name === liveMCPServer,
+  );
+  expect(usedServer?.used).toBe(true);
+  expect(usedServer?.invocation_count).toBe(1);
+  expect(usedServer?.usage_state).toBe('observed');
+  expect(usedServer?.tool_names).toContain('read_file');
+
+  const operations = await fetch(
+    'http://localhost:18080/api/v1/insights/operations',
+    { headers: { Authorization: `Bearer ${authToken}` } },
+  );
+  expect(operations.status).toBe(200);
+  const operationsBody = (await operations.json()) as {
+    data: {
+      by_category: Array<{ category: string; count: number }>;
+      totals: { total_operations: number };
+    };
+  };
+  expect(operationsBody.data.totals.total_operations).toBe(1);
+  expect(
+    operationsBody.data.by_category.some(
+      (row) => row.category === 'MCP call' && row.count === 1,
+    ),
+  ).toBe(true);
+
+  await unlockDashboard(page, authToken);
+  await page.goto('/insights');
+  await expect(page.getByRole('heading', { name: 'MCP inventory' })).toBeVisible();
+  await expect(page.getByText(liveMCPServer).first()).toBeVisible();
+  await expect(page.getByText('1 invocations').first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Operations' })).toBeVisible();
+  await expect(page.getByText('MCP call').first()).toBeVisible();
+
+  const pageText = await page.locator('body').innerText();
+  for (const canary of [
+    'tiq-canary-live-mcp-prompt',
+    'tiq-canary-live-mcp-cwd',
+    'tiq-canary-live-mcp-command',
+    'toolu_live_bash',
+  ]) {
+    expect(pageText).not.toContain(canary);
+  }
 });

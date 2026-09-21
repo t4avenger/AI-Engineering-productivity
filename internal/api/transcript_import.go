@@ -63,7 +63,8 @@ func (i *transcriptIngest) handler(w http.ResponseWriter, r *http.Request) {
 	// 202 so a SessionEnd hook shipping an early, assistant-less transcript is
 	// not retried. Idempotent re-ingest (a later complete ship) is safe via
 	// event_id + INSERT OR IGNORE.
-	events, err := claude.NormalizeTranscript(body, time.Now().UTC())
+	receivedAt := time.Now().UTC()
+	events, err := claude.NormalizeTranscript(body, receivedAt)
 	if err != nil {
 		if errors.Is(err, claude.ErrMalformedTranscript) {
 			i.counters.reject(w, http.StatusBadRequest, "malformed_payload", "request body must be valid newline-delimited JSON")
@@ -72,8 +73,18 @@ func (i *transcriptIngest) handler(w http.ResponseWriter, r *http.Request) {
 		i.counters.reject(w, http.StatusUnprocessableEntity, "normalization_failed", "supported transcript records could not be normalised")
 		return
 	}
-	if i.repository != nil && len(events) > 0 {
-		if err := i.repository.SaveEvents(r.Context(), events); err != nil {
+	// The MCP tool calls in the transcript also become canonical Operations (#104);
+	// they are persisted alongside the events in one batch so the operations and
+	// MCP-inventory read paths see them atomically. A re-walk (mirroring the OTLP
+	// NormalizeLogs / ExtractLogOperations pair) is safe: a body that normalised
+	// cleanly above cannot fail structural extraction here.
+	operations, err := claude.ExtractTranscriptOperations(body, receivedAt)
+	if err != nil {
+		i.counters.reject(w, http.StatusUnprocessableEntity, "normalization_failed", "supported transcript records could not be normalised")
+		return
+	}
+	if i.repository != nil && (len(events) > 0 || len(operations) > 0) {
+		if err := i.repository.SaveEventsAndOperations(r.Context(), events, operations); err != nil {
 			i.counters.reject(w, http.StatusInternalServerError, "persistence_failed", "supported telemetry could not be stored")
 			return
 		}

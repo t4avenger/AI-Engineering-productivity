@@ -129,6 +129,7 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 	attachOutcomeContract(extensions, raw, name)
 	attachGovernanceContext(extensions, raw, name)
 	attachToolDecision(extensions, attributes, raw, name, nativeSessionID, eventID)
+	attachMCPCorrelation(attributes, extensions, raw, name)
 	return canonical.Event{
 		SchemaVersion: canonicalSchemaVersion, EventID: eventID, EventType: name,
 		OccurredAt: occurredAt, ReceivedAt: capturedAt, Provider: provider, Tool: tool,
@@ -216,6 +217,23 @@ func attachToolDecision(extensions, attributes, raw map[string]any, eventName, n
 		}
 	}
 	extensions["tool_decision"] = extension
+}
+
+// attachMCPCorrelation stamps MCP-call correlation on a tool_result event whose
+// tool_name is an MCP tool (mcp__server__tool), so an MCP call ingested over OTLP
+// reaches the same MCP-inventory insight (insights.mcpUseEvent) as one
+// reconstructed from the JSONL transcript (#104). A non-MCP tool_result — or a
+// tool_result whose name does not parse as mcp__server__tool — is left untouched,
+// so a generic tool call is never mislabelled an MCP call.
+func attachMCPCorrelation(attributes, extensions, raw map[string]any, eventName string) {
+	if eventName != eventToolResult {
+		return
+	}
+	server, toolName, ok := parseMCPToolName(firstString(raw, "tool_name"))
+	if !ok {
+		return
+	}
+	stampMCPCorrelation(attributes, extensions, server, toolName)
 }
 
 // claudeApprovalDecisionStatus normalises the wire decision onto the

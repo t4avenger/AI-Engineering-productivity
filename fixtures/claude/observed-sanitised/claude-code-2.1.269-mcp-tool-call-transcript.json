@@ -1,0 +1,186 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.269",
+  "captured_at": "2026-09-12T10:00:07Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "source_type": "session_jsonl_transcript",
+    "capture": {
+      "workspace": "isolated_tmp",
+      "note": "MCP tool calls appear in the JSONL transcript as assistant tool_use blocks named mcp__<server>__<tool> paired with later user tool_result blocks by tool_use_id; #104 reconstructs the invocation, outcome, and raw arguments/result. Non-MCP tool_use blocks (Bash) are left to J18/#105 and must not become MCP operations."
+    },
+    "transcript_lines": [
+      {
+        "type": "user",
+        "uuid": "10000000-0000-4000-8000-000000000001",
+        "parentUuid": null,
+        "sessionId": "22222222-2222-4222-8222-222222222222",
+        "timestamp": "2026-09-12T10:00:00.000Z",
+        "cwd": "/home/synthetic/project",
+        "gitBranch": "main",
+        "version": "2.1.269",
+        "userType": "external",
+        "isSidechain": false,
+        "entrypoint": "cli",
+        "message": {
+          "role": "user",
+          "content": "Read the overview doc, list the docs directory, then record notes."
+        }
+      },
+      {
+        "type": "assistant",
+        "uuid": "20000000-0000-4000-8000-000000000002",
+        "parentUuid": "10000000-0000-4000-8000-000000000001",
+        "sessionId": "22222222-2222-4222-8222-222222222222",
+        "timestamp": "2026-09-12T10:00:02.000Z",
+        "cwd": "/home/synthetic/project",
+        "gitBranch": "main",
+        "version": "2.1.269",
+        "userType": "external",
+        "isSidechain": false,
+        "entrypoint": "cli",
+        "requestId": "req_mcp_0001",
+        "apiBlockIndex": 0,
+        "message": {
+          "role": "assistant",
+          "id": "msg_mcp_0001",
+          "type": "message",
+          "model": "claude-opus-4-8",
+          "stop_reason": "tool_use",
+          "content": [
+            {
+              "type": "text",
+              "text": "I'll read the overview and list the directory."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_mcp_read",
+              "name": "mcp__synthetic-fs__read_file",
+              "input": {
+                "path": "docs/architecture/overview.md"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_bash_ls",
+              "name": "Bash",
+              "input": {
+                "command": "ls docs"
+              }
+            }
+          ],
+          "usage": {
+            "input_tokens": 900,
+            "output_tokens": 40,
+            "cache_read_input_tokens": 4096
+          }
+        }
+      },
+      {
+        "type": "user",
+        "uuid": "30000000-0000-4000-8000-000000000003",
+        "parentUuid": "20000000-0000-4000-8000-000000000002",
+        "sessionId": "22222222-2222-4222-8222-222222222222",
+        "timestamp": "2026-09-12T10:00:03.000Z",
+        "message": {
+          "role": "user",
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_mcp_read",
+              "is_error": false,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "# Overview\nIngest, normalise, storage."
+                }
+              ]
+            },
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_bash_ls",
+              "is_error": false,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "architecture\ndecisions"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "type": "assistant",
+        "uuid": "40000000-0000-4000-8000-000000000004",
+        "parentUuid": "30000000-0000-4000-8000-000000000003",
+        "sessionId": "22222222-2222-4222-8222-222222222222",
+        "timestamp": "2026-09-12T10:00:05.000Z",
+        "cwd": "/home/synthetic/project",
+        "gitBranch": "main",
+        "version": "2.1.269",
+        "userType": "external",
+        "isSidechain": false,
+        "entrypoint": "cli",
+        "requestId": "req_mcp_0002",
+        "apiBlockIndex": 1,
+        "message": {
+          "role": "assistant",
+          "id": "msg_mcp_0002",
+          "type": "message",
+          "model": "claude-opus-4-8",
+          "stop_reason": "tool_use",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_mcp_write",
+              "name": "mcp__synthetic-fs__write_file",
+              "input": {
+                "path": "notes.md",
+                "contents": "Layout: ingest, normalise, storage."
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_mcp_pending",
+              "name": "mcp__synthetic-github__list_issues",
+              "input": {
+                "state": "open"
+              }
+            }
+          ],
+          "usage": {
+            "input_tokens": 120,
+            "output_tokens": 30
+          }
+        }
+      },
+      {
+        "type": "user",
+        "uuid": "50000000-0000-4000-8000-000000000005",
+        "parentUuid": "40000000-0000-4000-8000-000000000004",
+        "sessionId": "22222222-2222-4222-8222-222222222222",
+        "timestamp": "2026-09-12T10:00:06.000Z",
+        "message": {
+          "role": "user",
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_mcp_write",
+              "is_error": true,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "write denied by policy"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

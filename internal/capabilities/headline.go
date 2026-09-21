@@ -8,7 +8,7 @@ func HeadlineMatrix() []Row {
 		{Name: "Model identity", Codex: StateSupported, Claude: StateSupported, Cursor: StatePartial},
 		{Name: "Token: input/output", Codex: StateSupported, Claude: StateSupported, Cursor: StateSupported},
 		{Name: "Tool calls (generic)", Codex: StatePartial, Claude: StatePartial, Cursor: StateUnknown},
-		{Name: "MCP calls", Codex: StateUnknown, Claude: StatePartial, Cursor: StateUnknown},
+		{Name: "MCP calls", Codex: StateUnknown, Claude: StateSupported, Cursor: StateUnknown},
 		{Name: "Skill invocations", Codex: StateVersionDependent, Claude: StateSupported, Cursor: StateUnknown},
 		{Name: "Session boundaries", Codex: StatePartial, Claude: StatePartial, Cursor: StatePartial},
 	}

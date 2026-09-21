@@ -228,7 +228,13 @@ evidence of an executed tool call (capability matrix "Tool calls (generic)",
   `mcp_server_scope`) → `MCP call`; `Bash` → shell command; `Read`/`Glob`/`Grep`
   → filesystem read; `Write`/`Edit` → filesystem write; `WebFetch`/`WebSearch` →
   network request; anything else stays `unknown` (still promoted as a generic
-  tool call). MCP-call correlation detail is owned by #104.
+  tool call). The `mcp__…` prefix split (`mcp__<server>__<tool>`) is factored
+  through the shared `parseMCPToolName` helper (`mcp.go`), and where an OTLP
+  `tool_result` classifies as an MCP call `stampMCPCorrelation` also stamps the
+  correlation event's `attributes.category` + `provider_extensions.mcp_call`
+  `{server_name, tool_name}` so `insights.mcpUseEvent` marks the server *used*
+  (J17 #104 — the same helper serves the JSONL transcript path below, so the
+  inventory "used" state is honest regardless of ingest route).
 - **OperationID** prefers the provider `tool_use_id`, then the integral
   `event_sequence`, then a content hash, so operations never silently collide.
 - **ProviderExtensions** preserve every raw field verbatim (`tool_name`,
@@ -602,14 +608,34 @@ it to canonical events and is served live at `POST /v1/claude/transcript`
   and `reasoning_token_count` (from `output_tokens_details.thinking_tokens`). The
   ephemeral cache-window counts (`cache_creation.ephemeral_*`), which have no
   canonical key, are carried under `provider_extensions.cache_usage_extra`.
-- **Content deferred, not silently dropped.** Prompt/response text, tool
+- **Content deferred, not silently dropped.** Prompt/response text, non-MCP tool
   `input`/results, and file diffs are never read into an event; they are listed in
   `attributes.unavailable_fields`. Ownership: prompts/responses → E7 (#94);
-  MCP calls → J17 (#104); tool IO / diffs / sub-agents → J18 (#105). The
+  generic (non-MCP) tool IO / diffs / sub-agents → J18 (#105). The
   per-adapter allow-list is the sole guard (epic #88 removed ingest-time hiding):
   only safe scalar envelope fields (`git_branch`, `entrypoint`, `user_type`,
   `request_id`, `effort`, `api_block_index`, `is_sidechain`) reach
   `provider_extensions.transcript` — `cwd` and every content body are excluded.
+- **MCP tool calls (J17 #104).** MCP invocations are the one tool body read here.
+  Each assistant `message.content[]` `tool_use` block named `mcp__<server>__<tool>`
+  is paired with its later `user` `tool_result` (by `tool_use_id`, in a single
+  cross-line pass that buffers pending calls) and reconstructed by
+  `ExtractTranscriptOperations(data, receivedAt)` — the transcript sibling of
+  `ExtractLogOperations` — into one `canonical.Operation` per invocation
+  (`Category = MCP call`, `Tool = mcp__<server>__<tool>`, `Provenance = observed`).
+  **Outcome** comes from the paired result's `is_error` (`success`/`failed`); an
+  unpaired call stays `unknown`, never fabricated. Per epic #87 the raw
+  arguments/result are captured verbatim under `provider_extensions.mcp_call`
+  (`{server_name, tool_name, arguments, result}`; `result` omitted when unpaired) —
+  MCP arguments/results are in scope for #104, distinct from the generic tool IO
+  J18/#105 still defers. `NormalizeTranscript` additionally emits one **content-free**
+  `mcp_call` correlation event per invocation (`stampMCPCorrelation` sets
+  `attributes.category` + `provider_extensions.mcp_call` `{server_name, tool_name}`
+  only — no arguments/result), which `insights.mcpUseEvent` consumes to mark the
+  server *used* with an invocation count. Non-MCP `tool_use` blocks (Bash, Read,
+  Write, …) are left unread. The route persists events **and** operations in one
+  `SaveEventsAndOperations` batch so the operations and MCP-inventory read paths
+  see them atomically.
 - **Contract.** An `assistant` record missing a structural field (`uuid`,
   `sessionId`, `timestamp`) — including whitespace-only values — is a hard error
   that aborts the whole import (matching the traces adapter — supported data is
@@ -628,7 +654,8 @@ it to canonical events and is served live at `POST /v1/claude/transcript`
 ## Out of scope
 
 Sub-agent/sidechain transcripts (sibling `<session>/subagents/agent-*.jsonl`
-files) and the transcript content bodies above are out of scope here (owned by the
-J-phase and E7). The sample-event fixture shape remains the reviewed golden path
-for `NormalizeEvents`.
+files) and the non-MCP transcript content bodies above are out of scope here
+(generic tool IO / diffs / sub-agents → J18 #105; prompts/responses → E7 #94).
+MCP tool-call invocations and results are now in scope (J17 #104, above). The
+sample-event fixture shape remains the reviewed golden path for `NormalizeEvents`.
 
