@@ -1,85 +1,112 @@
 {{define "session_detail.html"}}
 {{template "shell-start" .}}
 {{template "nav" .}}
-<main id="main-content" class="page">
-  <p><a href="/sessions">← Sessions</a></p>
+<main id="main-content" class="page session-trace-page">
+  <p class="breadcrumb"><a href="/sessions">Sessions</a> <span aria-hidden="true">/</span> <span>{{with .Content}}{{.Session.SessionID}}{{end}}</span></p>
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
   {{with .Content}}
-  <h1>Session {{.Session.SessionID}}</h1>
-  <p>{{.Session.Tool}} · {{.Session.Provider}} · {{.Session.State}}</p>
-  <p><span class="muted">Session ID</span> <code>{{.Session.SessionID}}</code></p>
-  {{if .SessionMetadata}}
-  <section>
-    <h2>Environment</h2>
-    <dl class="metadata-list">
-      {{range .SessionMetadata}}
-      <div><dt>{{.Label}}</dt><dd>{{if .Observed}}{{.Value}}{{else}}{{template "status-badge" .Machine}}{{end}}</dd></div>
-      {{end}}
-    </dl>
-  </section>
-  {{end}}
-  <section>
-    <h2>Availability</h2>
+  <header class="session-trace-header">
+    <div class="session-trace-title-row">
+      <div>
+        <p class="eyebrow">Session Trace</p>
+        <h1 id="session-trace-heading">Session {{.Session.SessionID}}</h1>
+        <p class="session-trace-meta">
+          <span>{{template "status-badge" .Session.State}}</span>
+          <span>{{.Session.Tool}} · {{.Session.Provider}}</span>
+          {{if .Trace.Header.ModelObserved}}<span>Model {{.Trace.Header.Model}}</span>{{else}}<span>Model {{template "status-badge" "unavailable"}}</span>{{end}}
+          {{if .Trace.Header.DurationOK}}<span>Duration {{.Trace.Header.Duration}}</span>{{else}}<span>Duration {{template "status-badge" "unavailable"}}</span>{{end}}
+          {{if .Trace.Header.TokensOK}}<span>Tokens {{.Trace.Header.Tokens}}</span>{{else}}<span>Tokens {{template "status-badge" "unavailable"}}</span>{{end}}
+          {{if .Trace.Header.OccurredAt}}<span>{{.Trace.Header.OccurredAt}}</span>{{end}}
+        </p>
+      </div>
+      <details class="session-overflow">
+        <summary>Actions</summary>
+        <ul>
+          <li><a href="{{.SessionPath}}?confirm=1">Delete this session</a></li>
+          <li><span class="muted" title="Share requires the environments and session-sharing architecture gate">Share unavailable</span></li>
+        </ul>
+      </details>
+    </div>
+    {{if .SessionMetadata}}
+    <section aria-labelledby="session-environment-heading">
+      <h2 id="session-environment-heading">Environment</h2>
+      <dl class="metadata-list session-trace-metadata">
+        {{range .SessionMetadata}}
+        <div><dt>{{.Label}}</dt><dd>{{if .Observed}}{{.Value}}{{else}}{{template "status-badge" .Machine}}{{end}}</dd></div>
+        {{end}}
+      </dl>
+    </section>
+    {{end}}
     {{if .Availability}}
-    <ul class="availability-list">
-      {{range .Availability}}
-      <li><span>{{.Label}}</span> {{template "status-badge" .State}}</li>
-      {{end}}
-    </ul>
-    {{else}}
-    <p>No availability map on this session.</p>
+    <section aria-labelledby="session-availability-heading">
+      <h2 id="session-availability-heading">Availability</h2>
+      <ul class="availability-list compact-availability" aria-label="Session capability availability">
+        {{range .Availability}}
+        <li><span>{{.Label}}</span> {{template "status-badge" .State}}</li>
+        {{end}}
+      </ul>
+    </section>
     {{end}}
-  </section>
-  <section aria-labelledby="session-files-heading">
-    <h2 id="session-files-heading">File evidence</h2>
-    <p class="muted">Observed file paths and filesystem operations from retained telemetry. Aggregate lines-of-code counters are not shown as per-file diffs. Full five-lane Session Trace assembly is owned by a later issue.</p>
-    {{if .FilesError}}<p class="error" role="alert">{{.FilesError}}</p>{{else if .FileEvidence}}
-    <ul class="file-evidence-list" aria-label="File evidence">
-      {{range .FileEvidence}}
-      <li>
-        <div><span class="muted">Path</span> {{if eq .PathState "observed"}}<code>{{.Path}}</code>{{else}}{{template "status-badge" .PathState}}{{end}}</div>
-        <div><span class="muted">Action</span> {{if .Action}}{{.Action}}{{else}}{{template "status-badge" .ActionState}}{{end}}</div>
-        {{if .Duration}}<div><span class="muted">Duration</span> {{.Duration}}</div>{{end}}
-        {{if .OperationID}}<div><span class="muted">Operation</span> <code>{{.OperationID}}</code></div>{{end}}
-        <div><span class="muted">Event</span> <code>{{.EventID}}</code></div>
-      </li>
-      {{end}}
-    </ul>
-    {{else}}
-    <p>No retained file-operation evidence for this session.</p>
-    {{end}}
-  </section>
-  <section aria-labelledby="session-spans-heading">
-  <h2 id="session-spans-heading">Span evidence</h2>
-  <p class="muted">Flat, retained trace evidence. Parent nesting is not inferred; the first 50 spans are shown.</p>
-  {{if .SpansError}}<p class="error" role="alert">{{.SpansError}}</p>{{else if .SpanEvidence}}
-  <ul class="file-evidence-list" aria-label="Span evidence">{{range .SpanEvidence}}
-    <li><div><span class="muted">Trace / span</span> <code>{{.TraceID}} / {{.SpanID}}</code></div>
-    {{if .Name}}<div><span class="muted">Name</span> {{.Name}}</div>{{end}}
-    <div><span class="muted">Parent</span> {{if .ParentID}}<code>{{.ParentID}}</code> · {{end}}{{template "status-badge" .ParentAvailability}}</div>
-    <div><span class="muted">Interval</span> {{if .Duration}}{{.Duration}} · {{end}}{{template "status-badge" .IntervalState}}</div>
-    {{if .Status}}<div><span class="muted">Status</span> {{.Status}}</div>{{end}}
-    <div><span class="muted">Source events</span> <code>{{.SourceEvents}}</code></div>
-    </li>{{end}}</ul>
-  {{if .SpansPartial}}<p class="muted">Additional retained span evidence is available through the API cursor.</p>{{end}}
-  {{else}}<p>No retained trace span evidence for this session.</p>{{end}}
-</section>
-<section aria-labelledby="session-conversation-heading">
-    <h2 id="session-conversation-heading">Retained conversation evidence</h2>
-    <p class="muted">Fixture-backed Claude Code log content only. API request and response bodies are shown as evidence, not inferred messages; JSONL and tool-body coverage remains unavailable.</p>
-    {{if .ConversationError}}<p class="error" role="alert">{{.ConversationError}}</p>{{end}}
-    <div id="conversation">
-      {{template "conversation_rows.html" .}}
-    </div>
-  </section>
-  <section>
-    <h2>Timeline</h2>
-    {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
-    <div id="timeline">
-      {{template "timeline_rows.html" .}}
-    </div>
-  </section>
+  </header>
+
+  {{if .FilesError}}<p class="error" role="alert">{{.FilesError}}</p>{{end}}
+  {{if .SpansError}}<p class="error" role="alert">{{.SpansError}}</p>{{end}}
+  {{if .ConversationError}}<p class="error" role="alert">{{.ConversationError}}</p>{{end}}
+  {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+
+  {{template "session_trace_lanes.html" .}}
+
   {{template "event_inspector.html" .Inspector}}
+
+  <details class="trace-chronological" id="chronological-list" open>
+    <summary>Accessible chronological lists</summary>
+    <p class="muted">Server-rendered alternatives to the lane axis. Selection and load-more preserve the current inspector query.</p>
+    <section aria-labelledby="session-conversation-heading">
+      <h2 id="session-conversation-heading">Retained conversation evidence</h2>
+      <div id="conversation">
+        {{template "conversation_rows.html" .}}
+      </div>
+    </section>
+    <section aria-labelledby="session-files-heading">
+      <h2 id="session-files-heading">File evidence</h2>
+      {{if .FileEvidence}}
+      <ul class="file-evidence-list" aria-label="File evidence">
+        {{range .FileEvidence}}
+        <li>
+          <div><span class="muted">Path</span> {{if eq .PathState "observed"}}<code>{{.Path}}</code>{{else}}{{template "status-badge" .PathState}}{{end}}</div>
+          <div><span class="muted">Action</span> {{if .Action}}{{.Action}}{{else}}{{template "status-badge" .ActionState}}{{end}}</div>
+          {{if .Duration}}<div><span class="muted">Duration</span> {{.Duration}}</div>{{end}}
+          {{if .OperationID}}<div><span class="muted">Operation</span> <code>{{.OperationID}}</code></div>{{end}}
+          <div><span class="muted">Event</span> <code>{{.EventID}}</code></div>
+        </li>
+        {{end}}
+      </ul>
+      {{else}}
+      <p>No retained file-operation evidence for this session.</p>
+      {{end}}
+    </section>
+    <section aria-labelledby="session-spans-heading">
+      <h2 id="session-spans-heading">Span evidence</h2>
+      {{if .SpanEvidence}}
+      <ul class="file-evidence-list" aria-label="Span evidence">{{range .SpanEvidence}}
+        <li><div><span class="muted">Trace / span</span> <code>{{.TraceID}} / {{.SpanID}}</code></div>
+        {{if .Name}}<div><span class="muted">Name</span> {{.Name}}</div>{{end}}
+        <div><span class="muted">Parent</span> {{if .ParentID}}<code>{{.ParentID}}</code> · {{end}}{{template "status-badge" .ParentAvailability}}</div>
+        <div><span class="muted">Interval</span> {{if .Duration}}{{.Duration}} · {{end}}{{template "status-badge" .IntervalState}}</div>
+        {{if .Status}}<div><span class="muted">Status</span> {{.Status}}</div>{{end}}
+        <div><span class="muted">Source events</span> <code>{{.SourceEvents}}</code></div>
+        </li>{{end}}</ul>
+      {{if .SpansPartial}}<p class="muted">Additional retained span evidence is available through the API cursor.</p>{{end}}
+      {{else}}<p>No retained trace span evidence for this session.</p>{{end}}
+    </section>
+    <section>
+      <h2>Timeline</h2>
+      <div id="timeline">
+        {{template "timeline_rows.html" .}}
+      </div>
+    </section>
+  </details>
+
   <section>
     <h2>Delete</h2>
     {{if .Confirm}}

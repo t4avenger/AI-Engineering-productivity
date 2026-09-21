@@ -26,6 +26,27 @@ export async function expectSessionDetailHeading(page: Page): Promise<void> {
   await expect(
     page.getByRole('heading', { level: 1, name: /^Session / }),
   ).toBeVisible();
+  await expect(page.getByText('Session Trace', { exact: true }).first()).toBeVisible();
+}
+
+/** Chronological lists under the Session Trace (T10 accessible alternative). */
+export function chronologicalLists(page: Page) {
+  return page.locator('#chronological-list');
+}
+
+/** Five-lane Session Trace shell (#159 / T02); shared to avoid Sonar CPD. */
+export async function expectSessionTraceLanes(page: Page): Promise<void> {
+  const trace = page.getByLabel('Shared session time axis');
+  await expect(trace).toBeVisible();
+  for (const lane of [
+    'Conversation lane',
+    'Agent lane',
+    'Tools & MCP lane',
+    'Files lane',
+    'Spans lane',
+  ]) {
+    await expect(page.getByLabel(lane)).toBeVisible();
+  }
 }
 
 /** Follow a shell navigation link and verify the destination heading. */

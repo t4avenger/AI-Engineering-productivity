@@ -55,7 +55,7 @@ Status verified against GitHub on 2026-09-19; recheck before starting work.
 - Codex 0.154.0 span capture shipped in [#172](https://github.com/t4avenger/AI-Engineering-productivity/issues/172). CLI 0.155.1 now proves an exact resource-level `conversation.id` join to same-run log conversations ([#209](https://github.com/t4avenger/AI-Engineering-productivity/issues/209)); traces without that key remain observations. Claude spans are available;
   neither fact supplies the missing common projection/UI.
 - File-operation evidence/projection [#156](https://github.com/t4avenger/AI-Engineering-productivity/issues/156) and span projection
-  [#157](https://github.com/t4avenger/AI-Engineering-productivity/issues/157) remain open. The image's per-file +/- counts and task stages
+  [#157](https://github.com/t4avenger/AI-Engineering-productivity/issues/157) are closed. The image's per-file +/- counts and task stages
   must not be inferred from aggregate metrics.
 - [#186](https://github.com/t4avenger/AI-Engineering-productivity/issues/186) Models
   destination is delivered over the existing model-performance reader and is a
@@ -68,8 +68,10 @@ Status verified against GitHub on 2026-09-19; recheck before starting work.
   required dark sidebar and five-destination primary navigation (S01–S04, N01)
   is delivered; screenshot baselines live under
   [docs/ui/evidence/161](evidence/161/README.md).
-- No full Session Trace, matching local skill/path/prompt editors or enterprise
-  controls are declared delivered here.
+- [#190](https://github.com/t4avenger/AI-Engineering-productivity/issues/190) Session
+  Breakdown right rail is delivered. [#159](https://github.com/t4avenger/AI-Engineering-productivity/issues/159)
+  assembles the five-lane Session Trace over existing projections.
+- Matching local skill/path/prompt editors and enterprise controls remain open.
 
 ## 4. Delivery order and ownership
 
@@ -128,12 +130,10 @@ Finishing local visual work cannot close these requirements.
 
 ## 6. Next smallest task
 
-With [#190](https://github.com/t4avenger/AI-Engineering-productivity/issues/190)
-delivered, prefer Session Trace assembly
-[#159](https://github.com/t4avenger/AI-Engineering-productivity/issues/159),
-or governance composition
-[#191](https://github.com/t4avenger/AI-Engineering-productivity/issues/191)
-in parallel. Remaining local policy editors are #192–#194 after #191.
+With [#159](https://github.com/t4avenger/AI-Engineering-productivity/issues/159)
+Session Trace assembly delivered, prefer governance composition
+[#191](https://github.com/t4avenger/AI-Engineering-productivity/issues/191).
+Remaining local policy editors are #192–#194 after #191.
 
 This documentation update changes no runtime APIs or schemas. Planned additive
 interfaces are specified in the implementation specification and owned by the

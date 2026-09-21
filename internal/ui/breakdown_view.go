@@ -69,6 +69,9 @@ func populateBreakdownView(result breakdown.Result, sessionID string) breakdownV
 		view.ShowDonut = true
 		// html/template sanitises plain strings in style= to "Zgotmplz"; typed CSS
 		// is required for the server-built conic-gradient to reach the browser.
+		// Values are fixed category colour tokens + float percentages from
+		// breakdown.Calculate — not request-controlled markup.
+		// nosemgrep: go.lang.security.audit.xss.template-html-does-not-escape.unsafe-template-type
 		view.ConicGradient = template.CSS("conic-gradient(" + strings.Join(parts, ", ") + ")")
 		view.DonutLabel = "Session duration breakdown totaling " + view.TotalLabel
 	}
@@ -127,7 +130,7 @@ func conicSlice(color string, start, width float64) string {
 	return fmt.Sprintf("%s %.2f%% %.2f%%", color, start, start+width)
 }
 
-func eventLegend(events []timelineRow, spans []spanEvidenceRow, conversation []conversationRow) []legendEntry {
+func eventLegend(events []timelineRow, spans []spanEvidenceRow, conversation []conversationRow, trace sessionTraceView) []legendEntry {
 	seen := map[string]struct{}{}
 	entries := make([]legendEntry, 0)
 	add := func(label, detail string) {
@@ -137,6 +140,17 @@ func eventLegend(events []timelineRow, spans []spanEvidenceRow, conversation []c
 		}
 		seen[key] = struct{}{}
 		entries = append(entries, legendEntry{Label: label, Detail: detail})
+	}
+	for _, lane := range trace.Lanes {
+		for _, marker := range lane.Markers {
+			add(legendKindLabel(marker.Kind), marker.Label)
+		}
+	}
+	for _, marker := range trace.Unplaced {
+		add(legendKindLabel(marker.Kind)+" (unplaced)", marker.Label)
+	}
+	if len(entries) > 0 {
+		return entries
 	}
 	for _, row := range conversation {
 		add("Conversation", row.Role)
@@ -156,6 +170,27 @@ func eventLegend(events []timelineRow, spans []spanEvidenceRow, conversation []c
 		add("Timeline", detail)
 	}
 	return entries
+}
+
+func legendKindLabel(kind string) string {
+	switch kind {
+	case "conversation":
+		return "Conversation"
+	case "agent":
+		return "Agent"
+	case "tool":
+		return "Tool"
+	case "mcp":
+		return "MCP"
+	case "skill":
+		return "Skill"
+	case "file":
+		return "File"
+	case "span":
+		return "Span"
+	default:
+		return "Event"
+	}
 }
 
 func formatDurationMs(ms int64) string {

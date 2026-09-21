@@ -54,12 +54,13 @@ test('renders a Claude transcript session ingested through the live daemon', asy
   await expect(page.getByRole('heading', { name: 'Environment' })).toBeVisible();
   await expect(page.getByText('cli', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('main', { exact: true }).first()).toBeVisible();
+  const timeline = page.locator('#timeline');
   await expect(
-    page.getByRole('heading', { name: 'Assistant message' }),
+    timeline.getByRole('heading', { name: 'Assistant message' }),
   ).toBeVisible();
-  await expect(page.getByText('assistant_message').first()).toBeVisible();
-  await expect(page.getByText('2048 tokens').first()).toBeVisible();
-  await expect(page.getByText('256 tokens').first()).toBeVisible();
+  await expect(timeline.getByText('assistant_message')).toBeVisible();
+  await expect(timeline.getByText('2048 tokens')).toBeVisible();
+  await expect(timeline.getByText('256 tokens')).toBeVisible();
 
   const pageText = await page.locator('body').innerText();
   for (const canary of [

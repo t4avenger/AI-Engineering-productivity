@@ -40,10 +40,18 @@ test('renders retained Claude conversation evidence ingested through the live da
   await unlockDashboard(page, authToken);
   await page.goto(`/sessions/${encodeURIComponent(sessionId)}`);
   await expect(page.getByRole('heading', { name: 'Retained conversation evidence' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'User message' })).toBeVisible();
-  await expect(page.getByText('tiq-live-e2e retained user\nsecond line')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Assistant response', exact: true })).toBeVisible();
-  await expect(page.getByText('<REDACTED>', { exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'API content evidence' })).toBeVisible();
-  await expect(page.getByText('tiq-live-e2e raw API evidence')).toBeVisible();
+  await expect(page.getByLabel('Conversation lane')).toBeVisible();
+  const conversation = page.locator('#conversation');
+  await expect(conversation.getByRole('heading', { name: 'User message' })).toBeVisible();
+  await expect(
+    conversation.getByText('tiq-live-e2e retained user\nsecond line'),
+  ).toBeVisible();
+  await expect(
+    conversation.getByRole('heading', { name: 'Assistant response', exact: true }),
+  ).toBeVisible();
+  await expect(conversation.getByText('<REDACTED>', { exact: true })).toBeVisible();
+  await expect(
+    conversation.getByRole('heading', { name: 'API content evidence' }),
+  ).toBeVisible();
+  await expect(conversation.getByText('tiq-live-e2e raw API evidence')).toBeVisible();
 });
