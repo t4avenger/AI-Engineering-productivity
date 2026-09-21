@@ -608,3 +608,138 @@ func TestOperationsPersistIdempotentlyAndDeleteWithSessions(t *testing.T) {
 		t.Fatalf("operations after delete = %#v", got)
 	}
 }
+
+// otlpMCPOperation is the same MCP call as observed on the OTLP tool_result route:
+// it carries the timing/size scalars but not the raw arguments/result body.
+func otlpMCPOperation() canonical.Operation {
+	return canonical.Operation{
+		SchemaVersion: canonical.RecordSchemaVersion,
+		OperationID:   "session-mcp:tool:toolu_read",
+		SessionID:     "session-mcp",
+		Provider:      "anthropic",
+		Tool:          "claude-code",
+		Category:      canonical.OperationCategoryMCPCall,
+		Outcome:       "success",
+		Provenance:    canonical.ProvenanceObserved,
+		ProviderExtensions: map[string]any{
+			"tool_call": map[string]any{"duration_ms": "92", "input_tokens": "10"},
+			"mcp_call":  map[string]any{"server_name": "synthetic-fs", "tool_name": "read_file"},
+		},
+	}
+}
+
+// transcriptMCPOperation is the same MCP call as reconstructed from the JSONL
+// transcript route: it carries the raw arguments/result but not the OTLP timing.
+func transcriptMCPOperation() canonical.Operation {
+	return canonical.Operation{
+		SchemaVersion: canonical.RecordSchemaVersion,
+		OperationID:   "session-mcp:tool:toolu_read",
+		SessionID:     "session-mcp",
+		Provider:      "anthropic",
+		Tool:          "claude-code",
+		Category:      canonical.OperationCategoryMCPCall,
+		Outcome:       "success",
+		Provenance:    canonical.ProvenanceObserved,
+		ProviderExtensions: map[string]any{
+			"event": map[string]any{"tool_name": "mcp__synthetic-fs__read_file"},
+			"mcp_call": map[string]any{
+				"server_name": "synthetic-fs",
+				"tool_name":   "read_file",
+				"arguments":   map[string]any{"path": "docs/architecture/overview.md"},
+				"result":      "# Overview",
+			},
+		},
+	}
+}
+
+// TestMCPOperationCrossRouteUnionIsOrderIndependent proves that when the same MCP
+// call lands on both ingest routes under one operation ID (#104), the stored row
+// is the union of both observations regardless of arrival order: the OTLP timing
+// scalars and the transcript's raw arguments/result both survive, so neither
+// route silently drops the other's evidence (epic #87 raw capture).
+func TestMCPOperationCrossRouteUnionIsOrderIndependent(t *testing.T) {
+	orders := map[string][]canonical.Operation{
+		"otlp-then-transcript": {otlpMCPOperation(), transcriptMCPOperation()},
+		"transcript-then-otlp": {transcriptMCPOperation(), otlpMCPOperation()},
+	}
+	for name, sequence := range orders {
+		t.Run(name, func(t *testing.T) {
+			repo, err := Open(":memory:")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = repo.Close() }()
+			ctx := context.Background()
+			for _, operation := range sequence {
+				if err := repo.SaveOperations(ctx, []canonical.Operation{operation}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			got, err := repo.ListOperations(ctx, storage.OperationFilter{SessionID: "session-mcp"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertUnifiedMCPRow(t, got)
+		})
+	}
+}
+
+// assertUnifiedMCPRow proves a single stored operation carries the union of both
+// ingest routes: the transcript's raw arguments/result and the OTLP timing scalar.
+func assertUnifiedMCPRow(t *testing.T, got []canonical.Operation) {
+	t.Helper()
+	if len(got) != 1 {
+		t.Fatalf("operation count = %d, want 1 unified row", len(got))
+	}
+	if got[0].Category != canonical.OperationCategoryMCPCall {
+		t.Errorf("category = %q, want MCP call", got[0].Category)
+	}
+	call, ok := got[0].ProviderExtensions["mcp_call"].(map[string]any)
+	if !ok {
+		t.Fatalf("mcp_call missing: %#v", got[0].ProviderExtensions)
+	}
+	arguments, _ := call["arguments"].(map[string]any)
+	if arguments["path"] != "docs/architecture/overview.md" {
+		t.Errorf("transcript arguments lost after merge: %#v", call["arguments"])
+	}
+	if call["result"] != "# Overview" {
+		t.Errorf("transcript result lost after merge: %#v", call["result"])
+	}
+	toolCall, _ := got[0].ProviderExtensions["tool_call"].(map[string]any)
+	if toolCall["duration_ms"] != "92" {
+		t.Errorf("OTLP timing lost after merge: %#v", got[0].ProviderExtensions["tool_call"])
+	}
+}
+
+// TestMCPOperationMergeNeverDowngradesOutcome proves the enrichment never weakens
+// a proven signal: an unpaired transcript call (outcome unknown) that lands after
+// the OTLP route already proved success keeps success rather than regressing.
+func TestMCPOperationMergeNeverDowngradesOutcome(t *testing.T) {
+	repo, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = repo.Close() }()
+	ctx := context.Background()
+	unpaired := transcriptMCPOperation()
+	unpaired.Outcome = "unknown"
+	unpaired.Provenance = canonical.ProvenanceInferred
+	for _, operation := range []canonical.Operation{otlpMCPOperation(), unpaired} {
+		if err := repo.SaveOperations(ctx, []canonical.Operation{operation}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := repo.ListOperations(ctx, storage.OperationFilter{SessionID: "session-mcp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("operation count = %d, want 1", len(got))
+	}
+	if got[0].Outcome != "success" {
+		t.Errorf("outcome = %q, want success (must not downgrade to unknown)", got[0].Outcome)
+	}
+	if got[0].Provenance != canonical.ProvenanceObserved {
+		t.Errorf("provenance = %q, want observed (must not downgrade)", got[0].Provenance)
+	}
+}

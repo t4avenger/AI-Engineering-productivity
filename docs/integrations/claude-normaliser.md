@@ -622,7 +622,10 @@ it to canonical events and is served live at `POST /v1/claude/transcript`
   cross-line pass that buffers pending calls) and reconstructed by
   `ExtractTranscriptOperations(data, receivedAt)` — the transcript sibling of
   `ExtractLogOperations` — into one `canonical.Operation` per invocation
-  (`Category = MCP call`, `Tool = mcp__<server>__<tool>`, `Provenance = observed`).
+  (`Category = MCP call`, `Tool = claude-code` — the integration, as for every
+  Claude operation; the `mcp__<server>__<tool>` name is retained under
+  `provider_extensions.event.tool_name` and split into `provider_extensions.mcp_call`
+  `{server_name, tool_name}` — `Provenance = observed`).
   **Outcome** comes from the paired result's `is_error` (`success`/`failed`); an
   unpaired call stays `unknown`, never fabricated. Per epic #87 the raw
   arguments/result are captured verbatim under `provider_extensions.mcp_call`

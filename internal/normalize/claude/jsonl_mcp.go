@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"time"
@@ -171,14 +172,20 @@ func decodeMCPContent(line []byte) (mcpContentEnvelope, []mcpContentBlock, bool)
 
 // decodeRawContent decodes a tool_use input or tool_result body into a generic
 // value so it round-trips deterministically under provider_extensions (epic #87 —
-// MCP arguments and results are captured raw for #104). An absent or unparseable
-// payload yields nil rather than a fabricated empty object.
+// MCP arguments and results are captured raw for #104). It decodes with
+// UseNumber so a large integer argument (e.g. an id or offset beyond a float64's
+// 53-bit mantissa) round-trips exactly as a json.Number rather than being
+// rounded through float64 — silent precision loss would be a raw-capture
+// violation. An absent or unparseable payload yields nil rather than a fabricated
+// empty object.
 func decodeRawContent(raw json.RawMessage) any {
 	if len(raw) == 0 {
 		return nil
 	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
 	var value any
-	if err := json.Unmarshal(raw, &value); err != nil {
+	if err := decoder.Decode(&value); err != nil {
 		return nil
 	}
 	return value

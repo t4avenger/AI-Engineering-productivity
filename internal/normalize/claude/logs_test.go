@@ -179,6 +179,59 @@ func TestNormalizeLogsRecognisesToolResultEvent(t *testing.T) {
 	}
 }
 
+// TestNormalizeLogsStampsMCPCorrelationOnOTLPToolResult proves the OTLP
+// tool_result path reaches the MCP-inventory insight the same way the JSONL
+// transcript path does (#104): the one tool_result whose tool_name is an MCP name
+// (mcp__synthetic-fs__read_file) is stamped with the shared "MCP call" category
+// and provider_extensions.mcp_call {server_name, tool_name}, and drops mcp_calls
+// from its unavailable-field list; the two generic (non-MCP) tool_result events
+// are left untouched so a generic tool call is never mislabelled an MCP call.
+func TestNormalizeLogsStampsMCPCorrelationOnOTLPToolResult(t *testing.T) {
+	events := normalizeObservedOTLPLogs(t, "claude-code-2.1.263-tool-result-otlp.json")
+	var mcpStamped int
+	for _, event := range events {
+		toolName, _ := event.ProviderExtensions["event"].(map[string]any)["tool_name"].(string)
+		if strings.HasPrefix(toolName, "mcp__") {
+			mcpStamped++
+			assertMCPStampedEvent(t, event)
+		} else {
+			assertNotMCPStampedEvent(t, event, toolName)
+		}
+	}
+	if mcpStamped != 1 {
+		t.Fatalf("stamped MCP tool_result count = %d, want 1", mcpStamped)
+	}
+}
+
+// assertMCPStampedEvent checks the one OTLP tool_result whose tool_name is an MCP
+// name carries the shared category, the mcp_call server/tool split, and no longer
+// reports mcp_calls as unavailable.
+func assertMCPStampedEvent(t *testing.T, event canonical.Event) {
+	t.Helper()
+	if event.Attributes["category"] != string(canonical.OperationCategoryMCPCall) {
+		t.Errorf("MCP tool_result category = %#v, want %q", event.Attributes["category"], canonical.OperationCategoryMCPCall)
+	}
+	call, _ := event.ProviderExtensions["mcp_call"].(map[string]any)
+	if call == nil || call["server_name"] != "synthetic-fs" || call["tool_name"] != "read_file" {
+		t.Errorf("MCP tool_result mcp_call = %#v, want server synthetic-fs tool read_file", call)
+	}
+	for _, field := range event.Attributes["unavailable_fields"].([]string) {
+		if field == "mcp_calls" {
+			t.Errorf("mcp_calls must not be unavailable on a stamped MCP tool_result")
+		}
+	}
+}
+
+// assertNotMCPStampedEvent proves a generic (non-MCP) tool_result is never
+// mislabelled an MCP call.
+func assertNotMCPStampedEvent(t *testing.T, event canonical.Event, toolName string) {
+	t.Helper()
+	_, hasCall := event.ProviderExtensions["mcp_call"]
+	if hasCall || event.Attributes["category"] == string(canonical.OperationCategoryMCPCall) {
+		t.Fatalf("non-MCP tool_result %q mislabelled: category=%v mcp_call=%#v", toolName, event.Attributes["category"], event.ProviderExtensions["mcp_call"])
+	}
+}
+
 func TestNormalizeLogsRejectsPayloadWithoutClaudeResources(t *testing.T) {
 	other := `{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_cli_rs"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}}]}]}]}]}`
 	if _, err := NormalizeLogs([]byte(other), time.Unix(0, 0).UTC()); err != ErrUnsupportedLogs {
