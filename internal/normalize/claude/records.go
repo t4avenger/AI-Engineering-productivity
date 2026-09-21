@@ -229,15 +229,24 @@ func sampleOperation(index int, raw map[string]any) (canonical.Operation, bool, 
 
 func operationExtensions(raw map[string]any, operationID string, occurredAt time.Time) map[string]any {
 	return map[string]any{
-		"correlation": map[string]any{
-			"dedup_key":    operationID,
-			"ordering_key": fmt.Sprintf("%020d:%s", occurredAt.UnixNano(), operationID),
-			"task_boundary": map[string]any{
-				"confidence": "unknown",
-				"reason":     "Claude Code tool_result telemetry has no reviewed task-boundary signal",
-			},
+		"correlation": operationCorrelation(operationID, occurredAt, "Claude Code tool_result telemetry has no reviewed task-boundary signal"),
+		"event":       safeOperationEventFields(normalize.UnknownFields(raw, operationStructuralFields...)),
+	}
+}
+
+// operationCorrelation builds the correlation block shared by every canonical
+// Operation (dedup/ordering keys plus the task-boundary contract). The reason
+// string names the telemetry surface, so the OTLP tool_result path and the JSONL
+// transcript path can each explain why no task boundary is proven while sharing
+// one key shape.
+func operationCorrelation(operationID string, occurredAt time.Time, reason string) map[string]any {
+	return map[string]any{
+		"dedup_key":    operationID,
+		"ordering_key": fmt.Sprintf("%020d:%s", occurredAt.UnixNano(), operationID),
+		"task_boundary": map[string]any{
+			"confidence": "unknown",
+			"reason":     reason,
 		},
-		"event": safeOperationEventFields(normalize.UnknownFields(raw, operationStructuralFields...)),
 	}
 }
 
@@ -290,7 +299,7 @@ func toolResultOutcome(raw map[string]any) string {
 // tools map to their filesystem/shell/network category; anything else stays
 // "unknown" — a generic tool call still promoted as an Operation.
 func operationCategory(toolName string, raw map[string]any) canonical.OperationCategory {
-	if strings.HasPrefix(toolName, "mcp__") || firstString(raw, "mcp_server_scope") != "" {
+	if strings.HasPrefix(toolName, mcpToolNamePrefix) || firstString(raw, "mcp_server_scope") != "" {
 		return canonical.OperationCategoryMCPCall
 	}
 	switch toolName {

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/storage"
 	"github.com/wayne/telemetryiq/internal/storage/sqlite"
@@ -63,6 +64,98 @@ func TestTranscriptImportMergesWithOTLPSession(t *testing.T) {
 	if sessions[0].State == "" {
 		t.Fatalf("session state must not be empty: %#v", sessions[0])
 	}
+}
+
+// mcpTranscriptE2ENDJSON is a synthetic MCP-bearing transcript: an assistant
+// record invoking one MCP tool (mcp__canary-fs__read_file) alongside a non-MCP
+// Bash tool_use, paired with a later user tool_result. The cwd, prompt, and the
+// non-MCP Bash command carry canaries that must never reach the read API; the MCP
+// arguments/result are synthetic, ordinary data (captured raw per #104).
+const mcpTranscriptE2ENDJSON = `{"type":"user","uuid":"mcp-e2e-user-1","sessionId":"mcp-transcript-e2e-session","timestamp":"2026-09-12T10:00:00.000Z","version":"2.1.269","message":{"role":"user","content":"tiq-canary-mcp-prompt"}}
+{"type":"assistant","uuid":"mcp-e2e-assistant-1","parentUuid":"mcp-e2e-user-1","sessionId":"mcp-transcript-e2e-session","timestamp":"2026-09-12T10:00:02.000Z","version":"2.1.269","cwd":"/home/tiq-canary-mcp-cwd/project","gitBranch":"main","entrypoint":"cli","requestId":"req_mcp_e2e_1","message":{"role":"assistant","model":"claude-opus-4-8","stop_reason":"tool_use","content":[{"type":"tool_use","id":"toolu_mcp_e2e","name":"mcp__canary-fs__read_file","input":{"path":"docs/overview.md"}},{"type":"tool_use","id":"toolu_bash_e2e","name":"Bash","input":{"command":"tiq-canary-mcp-command"}}],"usage":{"input_tokens":64,"output_tokens":8}}}
+{"type":"user","uuid":"mcp-e2e-user-2","parentUuid":"mcp-e2e-assistant-1","sessionId":"mcp-transcript-e2e-session","timestamp":"2026-09-12T10:00:03.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_mcp_e2e","is_error":false,"content":[{"type":"text","text":"# Overview"}]}]}}`
+
+var mcpTranscriptContentCanaries = []string{
+	"tiq-canary-mcp-prompt",
+	"tiq-canary-mcp-cwd",
+	"tiq-canary-mcp-command",
+	"toolu_bash_e2e",
+}
+
+// TestTranscriptImportSurfacesMCPCallsThroughReadAPI is the live ingest→read gate
+// for #104: it POSTs an MCP-bearing JSONL transcript to /v1/claude/transcript,
+// then proves the reconstructed MCP call surfaces through both the operations
+// insight (an MCP-call operation) and the MCP-inventory insight (the connected-but-
+// unused vs used state now reports the server as used with its invocation count),
+// while the non-MCP tool body and envelope canaries never reach the read API.
+func TestTranscriptImportSurfacesMCPCallsThroughReadAPI(t *testing.T) {
+	repository, server := transcriptTestServer(t, true)
+	postAcceptedTranscript(t, server.URL, mcpTranscriptE2ENDJSON)
+
+	stats := getInsightJSON[operationStatsResponse](t, server.URL+"/api/v1/insights/operations")
+	if stats.Data.Totals.TotalOperations != 1 {
+		t.Fatalf("operation totals = %#v, want 1 MCP-call operation", stats.Data.Totals)
+	}
+	if count := operationCategoryCount(stats.Data.ByCategory, string(canonical.OperationCategoryMCPCall)); count != 1 {
+		t.Fatalf("MCP-call category count = %d, want 1: %#v", count, stats.Data.ByCategory)
+	}
+
+	inventory := fetchMCPInventory(t, server.URL)
+	usedServer := requireMCPServer(t, inventory, "canary-fs")
+	if !usedServer.Used || usedServer.InvocationCount != 1 {
+		t.Fatalf("server used/invocations = %v/%d, want true/1: %#v", usedServer.Used, usedServer.InvocationCount, usedServer)
+	}
+	if usedServer.UsageState != "observed" {
+		t.Fatalf("usage state = %q, want observed", usedServer.UsageState)
+	}
+	if !containsString(usedServer.ToolNames, "read_file") {
+		t.Fatalf("tool names = %#v, want read_file", usedServer.ToolNames)
+	}
+	if inventory.Data.Totals.UsedServers != 1 {
+		t.Fatalf("used servers = %d, want 1", inventory.Data.Totals.UsedServers)
+	}
+
+	storedEvents, err := repository.ListEvents(context.Background(), storage.EventFilter{SessionID: "claude-code:mcp-transcript-e2e-session", Limit: 20})
+	if err != nil {
+		t.Fatalf("list events: %v", err)
+	}
+	storedOperations, err := repository.ListOperations(context.Background(), storage.OperationFilter{})
+	if err != nil {
+		t.Fatalf("list operations: %v", err)
+	}
+	assertNoRawIdentifiers(t, mcpTranscriptContentCanaries,
+		marshalJSON(t, stats), marshalJSON(t, inventory), marshalJSON(t, storedEvents), marshalJSON(t, storedOperations))
+	lastIngest := getInsightJSON[map[string]any](t, server.URL+"/api/v1/development/last-ingest")
+	assertNoRawIdentifiers(t, mcpTranscriptContentCanaries, marshalJSON(t, lastIngest))
+}
+
+func operationCategoryCount(categories []insights.OperationCategoryStat, category string) int {
+	for _, stat := range categories {
+		if stat.Category == category {
+			return stat.Count
+		}
+	}
+	return 0
+}
+
+func requireMCPServer(t *testing.T, inventory mcpInventoryResponse, serverName string) insights.MCPServer {
+	t.Helper()
+	for _, server := range inventory.Data.Servers {
+		if server.ServerName == serverName {
+			return server
+		}
+	}
+	t.Fatalf("no MCP server %q in inventory: %#v", serverName, inventory.Data.Servers)
+	return insights.MCPServer{}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 // TestTranscriptImportRejectsWrongMediaType proves the route rejects a body that

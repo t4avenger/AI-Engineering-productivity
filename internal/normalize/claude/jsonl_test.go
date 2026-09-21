@@ -10,15 +10,23 @@ import (
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
-// FuzzNormalizeTranscript keeps the JSONL normaliser boundary from panicking on
-// arbitrary input (QUALITY_GATES: fuzz smoke when normalisation changes).
+// FuzzNormalizeTranscript keeps the JSONL normaliser boundaries from panicking on
+// arbitrary input (QUALITY_GATES: fuzz smoke when normalisation changes). Both the
+// event path (NormalizeTranscript) and the MCP operation path
+// (ExtractTranscriptOperations) share the same line walk, so both are exercised.
 func FuzzNormalizeTranscript(f *testing.F) {
 	f.Add([]byte(`{"type":"assistant","uuid":"a1","sessionId":"s1","timestamp":"2026-09-12T09:00:00Z","version":"2.1.269","message":{"model":"claude-opus-4-8","usage":{"input_tokens":1,"output_tokens":2}}}`))
 	f.Add([]byte("not json\n{\"type\":\"user\"}"))
 	f.Add([]byte(""))
 	f.Add([]byte("{\"type\":\"assistant\"}"))
+	// An MCP tool_use with no paired tool_result, then the pairing result — exercises
+	// the cross-line MCP pairing/outcome walk added by #104 (J17).
+	f.Add([]byte(`{"type":"assistant","uuid":"a1","sessionId":"s1","timestamp":"2026-09-12T09:00:00Z","version":"2.1.269","message":{"model":"claude-opus-4-8","content":[{"type":"tool_use","id":"t1","name":"mcp__srv__do","input":{"k":"v"}}]}}` +
+		"\n" +
+		`{"type":"user","uuid":"u1","sessionId":"s1","timestamp":"2026-09-12T09:00:01Z","message":{"content":[{"type":"tool_result","tool_use_id":"t1","is_error":true,"content":[{"type":"text","text":"x"}]}]}}`))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		_, _ = NormalizeTranscript(data, time.Unix(0, 0).UTC())
+		_, _ = ExtractTranscriptOperations(data, time.Unix(0, 0).UTC())
 	})
 }
 

@@ -2,6 +2,7 @@
 package sqlite
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -463,15 +464,124 @@ func (r *Repository) saveCostForInsertedEvent(ctx context.Context, tx *sql.Tx, e
 
 func (r *Repository) saveOperationsTx(ctx context.Context, tx *sql.Tx, operations []canonical.Operation) error {
 	for _, operation := range operations {
-		payload, err := json.Marshal(operation)
-		if err != nil {
-			return fmt.Errorf("marshal operation: %w", err)
-		}
-		if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO operations(session_id,operation_id,operation_json) VALUES(?,?,?)", operation.SessionID, operation.OperationID, payload); err != nil {
+		if err := saveOperationTx(ctx, tx, operation); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// saveOperationTx inserts an operation, or — when a row for the same
+// (session_id, operation_id) already exists — enriches the stored row with the
+// incoming observation instead of discarding it. The same MCP call is observed on
+// two ingest routes under one operation ID (#104): the OTLP tool_result carries
+// timing and size counters, while the JSONL transcript carries the raw arguments
+// and result. A plain INSERT OR IGNORE would let whichever landed first win and
+// silently drop the other route's evidence — an epic #87 raw-capture violation.
+// The merge is order-independent (both orderings converge to the union) and
+// identical re-ingest is a no-op, preserving the idempotency other providers rely
+// on.
+func saveOperationTx(ctx context.Context, tx *sql.Tx, operation canonical.Operation) error {
+	payload, err := json.Marshal(operation)
+	if err != nil {
+		return fmt.Errorf("marshal operation: %w", err)
+	}
+	result, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO operations(session_id,operation_id,operation_json) VALUES(?,?,?)", operation.SessionID, operation.OperationID, payload)
+	if err != nil {
+		return err
+	}
+	inserted, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("determine operation insertion: %w", err)
+	}
+	if inserted > 0 {
+		return nil
+	}
+	var storedJSON []byte
+	if err := tx.QueryRowContext(ctx, "SELECT operation_json FROM operations WHERE session_id=? AND operation_id=?", operation.SessionID, operation.OperationID).Scan(&storedJSON); err != nil {
+		return fmt.Errorf("load stored operation: %w", err)
+	}
+	var stored canonical.Operation
+	if err := json.Unmarshal(storedJSON, &stored); err != nil {
+		return fmt.Errorf("decode stored operation: %w", err)
+	}
+	mergedJSON, err := json.Marshal(mergeOperationEvidence(stored, operation))
+	if err != nil {
+		return fmt.Errorf("marshal merged operation: %w", err)
+	}
+	if bytes.Equal(mergedJSON, storedJSON) {
+		return nil
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE operations SET operation_json=? WHERE session_id=? AND operation_id=?", mergedJSON, operation.SessionID, operation.OperationID); err != nil {
+		return err
+	}
+	return nil
+}
+
+// mergeOperationEvidence unions an incoming observation into the stored operation
+// for the same operation ID, never downgrading: a known outcome or category
+// replaces an unset/unknown one, provenance rises toward observed, and
+// provider_extensions are deep-merged so the incoming observation fills gaps
+// (notably the raw mcp_call arguments/result the OTLP tool_result path cannot
+// carry) without clobbering a value the stored row already proved.
+func mergeOperationEvidence(stored, incoming canonical.Operation) canonical.Operation {
+	merged := stored
+	if merged.Outcome == "" || merged.Outcome == "unknown" {
+		merged.Outcome = incoming.Outcome
+	}
+	if merged.Category == "" || merged.Category == canonical.OperationCategoryUnknown {
+		merged.Category = incoming.Category
+	}
+	merged.Provenance = higherProvenance(stored.Provenance, incoming.Provenance)
+	merged.ProviderExtensions = deepMergeMaps(stored.ProviderExtensions, incoming.ProviderExtensions)
+	return merged
+}
+
+// higherProvenance returns the more authoritative of two provenance values
+// (observed > inferred > unknown/unset), so a merge never weakens a proven signal.
+func higherProvenance(a, b canonical.Provenance) canonical.Provenance {
+	if provenanceRank(b) > provenanceRank(a) {
+		return b
+	}
+	return a
+}
+
+func provenanceRank(p canonical.Provenance) int {
+	switch p {
+	case canonical.ProvenanceObserved:
+		return 2
+	case canonical.ProvenanceInferred:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// deepMergeMaps returns a recursive union of two generic maps: the incoming map
+// fills keys the base lacks and nested maps are merged, but a leaf value already
+// set in the base is kept — the base is the stored row, so the route that landed
+// first is never silently overwritten. A nil base yields the incoming map's keys.
+func deepMergeMaps(base, incoming map[string]any) map[string]any {
+	if base == nil && incoming == nil {
+		return nil
+	}
+	merged := make(map[string]any, len(base)+len(incoming))
+	for key, value := range base {
+		merged[key] = value
+	}
+	for key, value := range incoming {
+		existing, present := merged[key]
+		if !present {
+			merged[key] = value
+			continue
+		}
+		existingMap, existingIsMap := existing.(map[string]any)
+		incomingMap, incomingIsMap := value.(map[string]any)
+		if existingIsMap && incomingIsMap {
+			merged[key] = deepMergeMaps(existingMap, incomingMap)
+		}
+	}
+	return merged
 }
 
 func (r *Repository) saveCostRecord(ctx context.Context, tx *sql.Tx, record cost.Record) error {

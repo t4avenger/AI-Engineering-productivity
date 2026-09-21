@@ -113,7 +113,29 @@ var transcriptContentFields = []string{
 // hiding): only safe scalar envelope fields are copied into provider_extensions,
 // and no content body is ever read.
 func NormalizeTranscript(data []byte, receivedAt time.Time) ([]canonical.Event, error) {
+	events, calls, err := walkTranscript(data, receivedAt)
+	if err != nil {
+		return nil, err
+	}
+	// Each reconstructed MCP tool call also emits a correlation event so the
+	// MCP-inventory insight can mark a connected server as actually used (#104);
+	// the invocation detail (arguments/result) rides on the Operation instead.
+	for _, call := range calls {
+		events = append(events, call.correlationEvent(receivedAt))
+	}
+	return normalize.CorrelateEvents(events), nil
+}
+
+// walkTranscript is the single-pass reader shared by the transcript event path
+// (NormalizeTranscript) and the operation path (ExtractTranscriptOperations). It
+// walks the NDJSON one line at a time (no bytes.Split, so a newline-dense 32 MiB
+// body cannot amplify into slice headers), emits an event per assistant record,
+// and reconstructs every MCP tool call by pairing an assistant tool_use with its
+// later user tool_result by tool_use_id. A malformed line or a malformed supported
+// (assistant) record aborts the whole walk rather than being silently dropped.
+func walkTranscript(data []byte, receivedAt time.Time) ([]canonical.Event, []mcpTranscriptCall, error) {
 	var events []canonical.Event
+	collector := newMCPCallCollector()
 	lineNum := 0
 	for remaining := data; len(remaining) > 0; {
 		lineNum++
@@ -135,18 +157,21 @@ func NormalizeTranscript(data []byte, receivedAt time.Time) ([]canonical.Event, 
 			Type string `json:"type"`
 		}
 		if err := json.Unmarshal(trimmed, &discriminator); err != nil {
-			return nil, fmt.Errorf("%w: line %d is not valid JSON", ErrMalformedTranscript, lineNum)
+			return nil, nil, fmt.Errorf("%w: line %d is not valid JSON", ErrMalformedTranscript, lineNum)
 		}
-		if discriminator.Type != "assistant" {
-			continue
+		switch discriminator.Type {
+		case "assistant":
+			event, err := assistantEvent(trimmed, receivedAt)
+			if err != nil {
+				return nil, nil, err
+			}
+			events = append(events, event)
+			collector.collectToolUses(trimmed)
+		case "user":
+			collector.collectToolResults(trimmed)
 		}
-		event, err := assistantEvent(trimmed, receivedAt)
-		if err != nil {
-			return nil, err
-		}
-		events = append(events, event)
 	}
-	return normalize.CorrelateEvents(events), nil
+	return events, collector.reconstructed(), nil
 }
 
 // assistantEvent maps one assistant transcript record into a canonical event.

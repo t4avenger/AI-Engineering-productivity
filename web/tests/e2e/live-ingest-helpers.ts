@@ -804,6 +804,78 @@ export function claudeTranscriptNDJSON(model: string): string {
   ].join('\n');
 }
 
+/**
+ * Synthetic Claude Code session JSONL bearing one MCP tool call (J17, #104): an
+ * assistant `tool_use` named mcp__<server>__read_file alongside a non-MCP Bash
+ * tool_use, paired with a later user `tool_result`. Drives the transcript path to
+ * reconstruct one MCP-call operation and mark the server used. The prompt, cwd,
+ * and the non-MCP Bash command carry canaries that must never reach the UI; the
+ * MCP arguments/result are synthetic, ordinary data (captured raw per #104).
+ */
+export function claudeMCPTranscriptNDJSON(serverName: string): string {
+  const session = 'tiq-live-e2e-mcp-transcript-session';
+  return [
+    JSON.stringify({
+      type: 'user',
+      uuid: 'tiq-live-mcp-user-1',
+      sessionId: session,
+      timestamp: '2026-09-12T13:00:00.000Z',
+      version: '2.1.269',
+      message: { role: 'user', content: 'tiq-canary-live-mcp-prompt' },
+    }),
+    JSON.stringify({
+      type: 'assistant',
+      uuid: 'tiq-live-mcp-assistant-1',
+      parentUuid: 'tiq-live-mcp-user-1',
+      sessionId: session,
+      timestamp: '2026-09-12T13:00:02.000Z',
+      version: '2.1.269',
+      cwd: '/home/tiq-canary-live-mcp-cwd/project',
+      gitBranch: 'main',
+      entrypoint: 'cli',
+      requestId: 'req_live_mcp_e2e_1',
+      message: {
+        role: 'assistant',
+        model: 'claude-opus-4-8',
+        stop_reason: 'tool_use',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'toolu_live_mcp_read',
+            name: `mcp__${serverName}__read_file`,
+            input: { path: 'docs/overview.md' },
+          },
+          {
+            type: 'tool_use',
+            id: 'toolu_live_bash',
+            name: 'Bash',
+            input: { command: 'tiq-canary-live-mcp-command' },
+          },
+        ],
+        usage: { input_tokens: 64, output_tokens: 8 },
+      },
+    }),
+    JSON.stringify({
+      type: 'user',
+      uuid: 'tiq-live-mcp-user-2',
+      parentUuid: 'tiq-live-mcp-assistant-1',
+      sessionId: session,
+      timestamp: '2026-09-12T13:00:03.000Z',
+      message: {
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'toolu_live_mcp_read',
+            is_error: false,
+            content: [{ type: 'text', text: '# Overview' }],
+          },
+        ],
+      },
+    }),
+  ].join('\n');
+}
+
 type OTLPAttributeValue =
   | { stringValue: string }
   | { intValue: string }
