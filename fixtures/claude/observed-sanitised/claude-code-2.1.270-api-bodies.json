@@ -13,7 +13,7 @@
       "telemetry_endpoint": "loopback_dump_receiver",
       "outcome_signal": "api_request_body / api_response_body",
       "content_gates": "OTEL_LOG_RAW_API_BODIES=1 (inline body, truncated at CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH) for the inline events; OTEL_LOG_RAW_API_BODIES=file:<dir> (body written to disk, event carries body_ref) for the body_ref event",
-      "note": "api_request_body / api_response_body are emitted only under OTEL_LOG_RAW_API_BODIES; there is no length-only shape (the events are simply absent when the gate is off). The request body is the full Messages API request (the conversation/prompts); the response body is the model output. body is captured raw and body_ref is a pointer, both echoed verbatim (epic #87 / #94), never re-redacted at ingest. Bodies here are synthetic and truncated. See the -otlp fixture for the wire form and the dropped prompt.id/message.uuid correlation ids."
+      "note": "api_request_body / api_response_body are emitted only under OTEL_LOG_RAW_API_BODIES; there is no length-only shape (the events are simply absent when the gate is off). The request body is the full Messages API request (the conversation/prompts); the response body is the model output. body is captured raw and body_ref is a pointer, both echoed verbatim (epic #87 / #94), never re-redacted at ingest. Bodies here are synthetic and truncated. See the -otlp fixture for the wire form and the prompt.id/message.uuid correlation ids retained under provider_extensions.correlation (#106)."
     },
     "observations": [
       {

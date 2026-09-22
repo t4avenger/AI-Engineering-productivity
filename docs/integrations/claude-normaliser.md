@@ -112,9 +112,10 @@ per-field visibility policy):
 available on `assistant_response` and `api_response_body` (the response body is the
 model output). No content key is added to `gatedEventFields()`, and none is in
 `logs.go` `droppedKeys`, so content survives both the reviewed-fixture and live-wire
-paths. The bare `prompt.id`/`message.uuid` correlation identifiers **are** dropped
-at the wire boundary — mapping those into canonical correlation is #106 (X19)'s job,
-not E7.
+paths. The `prompt.id`/`message.uuid` correlation identifiers **are** retained under
+`provider_extensions.correlation` (#106 (X19), see Correlation keys below), not E7's
+concern; the only remaining `droppedKeys` entry is `tool_parameters` (gated command /
+MCP argument content, owned by #173).
 
 To let synthetic content-present fixtures be committed, the shared fixture
 validator (`internal/fixture/validator.go`) no longer prohibits the field names
@@ -123,6 +124,35 @@ validator (`internal/fixture/validator.go`) no longer prohibits the field names
 every string, so no real credential can ride under a prompt/response key; the
 credential/path/command field-name blocks (`password`, `token`, `command*`,
 `file_path*`, …) also remain.
+
+### Correlation keys — `#106` (X19)
+
+The per-prompt / per-message identifiers Claude Code emits on the wire are retained
+raw so a downstream consumer can group a session's records, without adding storage
+columns or migrations (they ride the existing `provider_extensions.correlation`
+block, not new canonical fields):
+
+- **Log events** (`NormalizeLogs` / `NormalizeEvents`, shared `normaliseSampleEvent`):
+  `prompt.id` → `correlation.prompt_id` and `message.uuid` → `correlation.message_uuid`.
+  `correlationKeys` lifts them present-only (a non-empty `string`; absent, blank, or
+  non-string values are skipped, never coerced into an id), and `correlationEventFields`
+  excludes them from the `provider_extensions.event` echo so each value has exactly one
+  typed home. `request_id` is unchanged — it is already retained/namespaced elsewhere.
+- **Trace spans** (`NormalizeTraces`, `spanCorrelation`): `workflow.run_id` →
+  `correlation.workflow_run_id` and `workflow.name` → `correlation.workflow_name`,
+  present-only, so a sub-agent workflow's spans expose the same key. These are the same
+  wire values already read into the typed span block and the `AgentRelation` rollup;
+  #106 only adds the span-level correlation home.
+
+Correlation is retained **metadata** — it is *not* a sort key. The shared
+`CorrelateEvents` / `CorrelateModelInteractions` timeline ordering and single-ID dedup
+are untouched (a tiebreak after the timestamp would only cluster identical-instant
+siblings, not group interleaved records, and reordering could change which duplicate
+survives across providers); grouping by a correlation key is a downstream query concern.
+`internal/normalize/normalize_test.go` pins this: attaching correlation metadata leaves
+the correlated order byte-for-byte identical. `client_request_id` is **not** in the code:
+no committed fixture on any captured version carries it (only `request_id` is observed),
+so it stays `unknown` pending a real sanitised recapture — never zero-filled or invented.
 
 ## Provider-completion outcome contract — `attachOutcomeContract`
 

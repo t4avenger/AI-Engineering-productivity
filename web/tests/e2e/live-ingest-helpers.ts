@@ -711,6 +711,30 @@ export async function fetchSessionBreakdown(
   return body.data;
 }
 
+/** Event-detail payload (#189 T08) exposing retained attributes + extensions. */
+export type LiveEventDetail = {
+  event_id: string;
+  event_type: string;
+  attributes: Record<string, unknown>;
+  provider_extensions: Record<string, Record<string, unknown>>;
+};
+
+// fetchEventDetail reads one retained session event from the live daemon's
+// inspector API and asserts a 200 before returning it, so specs can assert on the
+// served attributes / provider_extensions without repeating the fetch boilerplate.
+export async function fetchEventDetail(
+  sessionId: string,
+  eventId: string,
+): Promise<LiveEventDetail> {
+  const response = await fetch(
+    `${daemonBase}/api/v1/sessions/${encodeURIComponent(sessionId)}/events/${encodeURIComponent(eventId)}`,
+    { headers: { Authorization: `Bearer ${authToken}` } },
+  );
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as { data: LiveEventDetail };
+  return body.data;
+}
+
 /** Right-rail T09 assertions shared by live breakdown coverage. */
 export async function expectSessionBreakdownRail(
   page: Page,
@@ -944,16 +968,35 @@ function claudeContentEvent(
   sessionId: string,
   contentKey: string,
   content: string,
+  promptId?: string,
 ): { attributes: OTLPAttribute[] } {
-  return {
-    attributes: [
-      { key: 'event.name', value: { stringValue: eventName } },
-      { key: 'event.timestamp', value: { stringValue: timestamp } },
-      { key: 'event.sequence', value: { intValue: sequence } },
-      { key: 'session.id', value: { stringValue: sessionId } },
-      { key: contentKey, value: { stringValue: content } },
-    ],
-  };
+  const attributes: OTLPAttribute[] = [
+    { key: 'event.name', value: { stringValue: eventName } },
+    { key: 'event.timestamp', value: { stringValue: timestamp } },
+    { key: 'event.sequence', value: { intValue: sequence } },
+    { key: 'session.id', value: { stringValue: sessionId } },
+    { key: contentKey, value: { stringValue: content } },
+  ];
+  if (promptId) {
+    attributes.push({ key: 'prompt.id', value: { stringValue: promptId } });
+  }
+  return { attributes };
+}
+
+// claudeLiveCorrelationPromptID is the single prompt.id shared by the two events
+// claudeCorrelationOTLPLogs builds, so the live ingest→read gate can assert #106
+// retains it under provider_extensions.correlation on every event. Synthetic.
+export const claudeLiveCorrelationPromptID = 'tiq-live-e2e-shared-prompt-id';
+
+// claudeCorrelationOTLPLogs builds two user_prompt events in one session that
+// share a single prompt.id, so the non-mocked live path can prove the correlation
+// id is retained (and identical across the two events) end to end (#106 X19).
+export function claudeCorrelationOTLPLogs(): string {
+  const sessionId = 'tiq-live-e2e-correlation';
+  return claudeOTLPLogs([
+    claudeContentEvent('user_prompt', '2026-09-19T12:00:00Z', '1', sessionId, 'prompt', 'tiq-live-e2e first prompt', claudeLiveCorrelationPromptID),
+    claudeContentEvent('user_prompt', '2026-09-19T12:00:03Z', '2', sessionId, 'prompt', 'tiq-live-e2e second prompt', claudeLiveCorrelationPromptID),
+  ]);
 }
 
 type ClaudeApiRequestOptions = {

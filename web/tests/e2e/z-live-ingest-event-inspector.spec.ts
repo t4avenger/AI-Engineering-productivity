@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import {
   authToken,
   claudeContentOTLPLogs,
+  fetchEventDetail,
   ingestOTLPLogs,
   resetDaemonBetweenTests,
   unlockDashboard,
@@ -18,16 +19,9 @@ test('opens session event inspector from live retained conversation evidence', a
   const sessionId = 'claude-code:tiq-live-e2e-conversation-content';
   const eventId = `${sessionId}:1`;
 
-  const api = await fetch(
-    `http://localhost:18080/api/v1/sessions/${encodeURIComponent(sessionId)}/events/${encodeURIComponent(eventId)}`,
-    { headers: { Authorization: `Bearer ${authToken}` } },
-  );
-  expect(api.status).toBe(200);
-  const payload = (await api.json()) as {
-    data: { event_id: string; event_type: string; attributes: Record<string, unknown> };
-  };
-  expect(payload.data.event_id).toBe(eventId);
-  expect(payload.data.event_type).toBe('user_prompt');
+  const detail = await fetchEventDetail(sessionId, eventId);
+  expect(detail.event_id).toBe(eventId);
+  expect(detail.event_type).toBe('user_prompt');
 
   await unlockDashboard(page, authToken);
   await page.goto(

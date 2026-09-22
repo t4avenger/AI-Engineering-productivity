@@ -13,7 +13,7 @@
       "telemetry_endpoint": "loopback_dump_receiver",
       "outcome_signal": "user_prompt",
       "content_gates": "OTEL_LOG_USER_PROMPTS=1 and OTEL_LOG_TOOL_DETAILS=1 for the content-present event; both unset for the length-only event",
-      "note": "user_prompt always carries prompt_length; command_name/command_source describe a slash/MCP command. The prompt text is present only under OTEL_LOG_USER_PROMPTS=1 (event_sequence 2) and simply absent by default (event_sequence 8) — it is never fabricated or zero-filled. Prompts here are synthetic. prompt is captured raw (epic #87 / #94), not re-redacted at ingest; see the -otlp fixture for the wire form and the dropped prompt.id/message.uuid correlation ids."
+      "note": "user_prompt always carries prompt_length; command_name/command_source describe a slash/MCP command. The prompt text is present only under OTEL_LOG_USER_PROMPTS=1 (event_sequence 2) and simply absent by default (event_sequence 8) — it is never fabricated or zero-filled. Prompts here are synthetic. prompt is captured raw (epic #87 / #94), not re-redacted at ingest; see the -otlp fixture for the wire form and the prompt.id/message.uuid correlation ids retained under provider_extensions.correlation (#106)."
     },
     "observations": [
       {

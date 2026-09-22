@@ -2,6 +2,7 @@ package claude
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -151,11 +152,11 @@ func TestNormalizeEventsAPIBodiesCaptureRaw(t *testing.T) {
 	}
 }
 
-// TestNormalizeLogsContentEventsPassThroughRawAndDropCorrelationIDs runs the raw
+// TestNormalizeLogsContentEventsPassThroughRawAndRetainCorrelationIDs runs the raw
 // OTLP captures through the wire adapter and proves the content survives verbatim
-// while the bare prompt.id/message.uuid correlation identifiers are dropped at the
-// wire boundary (those are #106 (X19)'s job, not E7).
-func TestNormalizeLogsContentEventsPassThroughRawAndDropCorrelationIDs(t *testing.T) {
+// and the prompt.id/message.uuid correlation identifiers are retained under
+// provider_extensions.correlation (#106 (X19)).
+func TestNormalizeLogsContentEventsPassThroughRawAndRetainCorrelationIDs(t *testing.T) {
 	for _, test := range []struct {
 		fixture string
 		want    []string
@@ -173,7 +174,8 @@ func TestNormalizeLogsContentEventsPassThroughRawAndDropCorrelationIDs(t *testin
 }
 
 // assertWireContentRaw runs one -otlp fixture through NormalizeLogs and asserts
-// its content survives verbatim while the bare correlation ids are dropped.
+// its content survives verbatim and the prompt.id/message.uuid correlation ids are
+// retained under provider_extensions.correlation (#106).
 func assertWireContentRaw(t *testing.T, fixture string, want []string) {
 	t.Helper()
 	serialized, err := json.Marshal(normalizeObservedOTLPLogs(t, fixture))
@@ -185,9 +187,53 @@ func assertWireContentRaw(t *testing.T, fixture string, want []string) {
 			t.Fatalf("content not captured raw through wire path: %q", content)
 		}
 	}
-	for _, dropped := range []string{"synthetic-prompt-id", "synthetic-message-uuid"} {
-		if strings.Contains(string(serialized), dropped) {
-			t.Fatalf("bare correlation identifier leaked through wire path: %q", dropped)
+	for _, retained := range []string{`"prompt_id":"synthetic-prompt-id"`, `"message_uuid":"synthetic-message-uuid"`} {
+		if !strings.Contains(string(serialized), retained) {
+			t.Fatalf("correlation identifier not retained under provider_extensions.correlation: %q; events=%s", retained, serialized)
+		}
+	}
+}
+
+// TestNormalizeLogsEventsSharingPromptIDExposeSameCorrelation proves the #106
+// grouping invariant on a constructed (deliberately non-captured, inline) payload:
+// two user_prompt events carrying the same prompt.id on the wire both expose the
+// identical prompt_id under provider_extensions.correlation, so a downstream
+// consumer can group them. The shared timeline ordering stays untouched — proven
+// separately by TestCorrelateEventsIgnoresCorrelationMetadata. Synthetic values only.
+func TestNormalizeLogsEventsSharingPromptIDExposeSameCorrelation(t *testing.T) {
+	const sharedPromptID = "constructed-shared-prompt-id"
+	payload := fmt.Sprintf(`{"resourceLogs":[{"resource":{"attributes":[
+	  {"key":"service.name","value":{"stringValue":"claude-code"}},
+	  {"key":"service.version","value":{"stringValue":"2.1.270"}}]},
+	 "scopeLogs":[{"logRecords":[
+	   {"attributes":[
+	     {"key":"event.name","value":{"stringValue":"user_prompt"}},
+	     {"key":"event.timestamp","value":{"stringValue":"2026-09-13T18:53:02.100Z"}},
+	     {"key":"event.sequence","value":{"intValue":"2"}},
+	     {"key":"session.id","value":{"stringValue":"constructed-session"}},
+	     {"key":"prompt.id","value":{"stringValue":%[1]q}},
+	     {"key":"prompt_length","value":{"intValue":"12"}}]},
+	   {"attributes":[
+	     {"key":"event.name","value":{"stringValue":"user_prompt"}},
+	     {"key":"event.timestamp","value":{"stringValue":"2026-09-13T18:53:05.400Z"}},
+	     {"key":"event.sequence","value":{"intValue":"3"}},
+	     {"key":"session.id","value":{"stringValue":"constructed-session"}},
+	     {"key":"prompt.id","value":{"stringValue":%[1]q}},
+	     {"key":"prompt_length","value":{"intValue":"34"}}]}]}]}]}`, sharedPromptID)
+	events, err := NormalizeLogs([]byte(payload), time.Unix(0, 0).UTC())
+	if err != nil {
+		t.Fatalf("normalise: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(events))
+	}
+	for _, event := range events {
+		correlation, ok := event.ProviderExtensions["correlation"].(map[string]any)
+		if !ok {
+			t.Fatalf("event %q missing correlation extension: %#v", event.EventID, event.ProviderExtensions)
+		}
+		if correlation["prompt_id"] != sharedPromptID {
+			t.Fatalf("event %q prompt_id = %#v, want shared %q", event.EventID, correlation["prompt_id"], sharedPromptID)
 		}
 	}
 }

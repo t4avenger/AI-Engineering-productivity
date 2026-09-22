@@ -221,9 +221,9 @@ func TestNormalizeLogsToolDecisionFallbackApprovalIDsAreUnique(t *testing.T) {
 }
 
 // TestNormalizeLogsRecognisesToolDecisionEvent runs the raw OTLP capture through
-// the wire adapter and proves gated content is dropped: the tool_parameters
-// canary (full command / MCP server+tool names on the wire) and the prompt.id
-// identifier never reach canonical output.
+// the wire adapter and proves the gated tool_parameters content (full command /
+// MCP server+tool names on the wire) stays dropped (#173) while the prompt.id
+// correlation id is retained under provider_extensions.correlation (#106).
 func TestNormalizeLogsRecognisesToolDecisionEvent(t *testing.T) {
 	events := normalizeObservedOTLPLogs(t, "claude-code-2.1.270-tool-decision-otlp.json")
 	if len(events) != 3 {
@@ -243,9 +243,14 @@ func TestNormalizeLogsRecognisesToolDecisionEvent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal events: %v", err)
 	}
-	for _, leaked := range []string{"tool_parameters", "drop-me", "synthetic-prompt-id"} {
+	for _, leaked := range []string{"tool_parameters", "drop-me"} {
 		if strings.Contains(string(serialized), leaked) {
 			t.Fatalf("gated content leaked into canonical events: %q", leaked)
 		}
+	}
+	// The prompt.id correlation id is retained under provider_extensions.correlation
+	// (#106), while the gated tool_parameters content above stays dropped (#173).
+	if !strings.Contains(string(serialized), `"prompt_id":"synthetic-prompt-id"`) {
+		t.Fatalf("prompt.id correlation id not retained under correlation: %s", serialized)
 	}
 }

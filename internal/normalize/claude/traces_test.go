@@ -172,6 +172,61 @@ func spanField(t *testing.T, event canonical.Event, key string) string {
 	return value
 }
 
+// correlationField reads a string value from provider_extensions.correlation,
+// reporting whether the key is present (so present-only promotion can be asserted
+// without treating an absent key as an empty string).
+func correlationField(t *testing.T, event canonical.Event, key string) (string, bool) {
+	t.Helper()
+	correlation, ok := event.ProviderExtensions["correlation"].(map[string]any)
+	if !ok {
+		t.Fatalf("event %q missing correlation extension: %#v", event.EventType, event.ProviderExtensions)
+	}
+	value, present := correlation[key].(string)
+	return value, present
+}
+
+// TestNormalizeTracesPromotesWorkflowCorrelation proves the sub-agent workflow
+// identifiers ride into span provider_extensions.correlation (#106): every span in
+// the sub-agent fixture that carries workflow.run_id/workflow.name on the wire
+// exposes the same workflow_run_id/workflow_name under correlation, so a consumer
+// can group a workflow's spans. Present-only: a main-session span set that never
+// carries workflow.* exposes no such key (never fabricated or zero-filled).
+func TestNormalizeTracesPromotesWorkflowCorrelation(t *testing.T) {
+	events, err := NormalizeTraces(tracesFixturePayload(t, "claude-code-2.1.268-subagent-spans-otlp.json"), subAgentReceivedAt)
+	if err != nil {
+		t.Fatalf("normalize sub-agent spans: %v", err)
+	}
+	var promoted int
+	for _, event := range events {
+		runID, present := correlationField(t, event, "workflow_run_id")
+		if !present {
+			continue
+		}
+		promoted++
+		if runID != "wf_synthetic0001" {
+			t.Fatalf("workflow_run_id = %q, want wf_synthetic0001", runID)
+		}
+		if name, ok := correlationField(t, event, "workflow_name"); !ok || name != "custom" {
+			t.Fatalf("workflow_name = %q (present=%v), want custom", name, ok)
+		}
+	}
+	if promoted == 0 {
+		t.Fatal("no span exposed workflow_run_id under correlation; #106 promotion missing")
+	}
+
+	// Present-only: the main-session trace-spans fixture carries no workflow.*, so
+	// no span may fabricate a workflow_run_id.
+	mainSession, err := NormalizeTraces(tracesFixturePayload(t, "claude-code-2.1.268-trace-spans-otlp.json"), subAgentReceivedAt)
+	if err != nil {
+		t.Fatalf("normalize main-session spans: %v", err)
+	}
+	for _, event := range mainSession {
+		if _, present := correlationField(t, event, "workflow_run_id"); present {
+			t.Fatalf("main-session span fabricated workflow_run_id: %#v", event.ProviderExtensions["correlation"])
+		}
+	}
+}
+
 // TestNormalizeTracesRejectsNonClaudeService proves a non-Claude spans payload
 // yields the skip sentinel (not misattributed), so a mixed/other-tool batch is
 // safe — matching the metrics/logs routing contract.
