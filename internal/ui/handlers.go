@@ -269,9 +269,10 @@ const (
 )
 
 type mcpAllowlistOption struct {
-	Name     string
-	Observed bool
-	Checked  bool
+	Name          string
+	Observed      bool
+	Checked       bool
+	ActiveChecked bool
 }
 
 const (
@@ -812,28 +813,29 @@ func (s *Server) renderGovernanceError(w http.ResponseWriter, r *http.Request, s
 }
 
 func (s *Server) governancePageData(r *http.Request, selected []string) governanceData {
-	allowlist := s.currentMCPAllowlist()
+	activeAllowlist := s.currentMCPAllowlist()
+	draftAllowlist := activeAllowlist
 	if selected != nil {
-		allowlist = selected
+		draftAllowlist = selected
 	}
 	data := governanceData{
 		SaveAvailable:       s.mcpAllowlistController != nil,
 		ActiveRulesTab:      rulesTabMCP,
-		MCPConfiguredCount:  len(allowlist),
-		MCPPolicyConfigured: len(allowlist) > 0,
+		MCPConfiguredCount:  len(activeAllowlist),
+		MCPPolicyConfigured: len(activeAllowlist) > 0,
 	}
 	events, err := s.insightSourceEvents(r)
 	if err != nil {
 		data.Error = "Unable to load governance findings."
 		data.RiskyAccess = governance.RiskyAccess{Findings: []governance.Finding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable"}
 		data.UnapprovedMCP = governance.UnapprovedMCP{Findings: []governance.MCPServerFinding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable"}
+		data.MCPServers = mcpAllowlistOptions(insights.MCPInventory{}, draftAllowlist, activeAllowlist)
 	} else {
 		data.RiskyAccess = governance.RiskyAccessFromEvents(events)
-		data.UnapprovedMCP = governance.UnapprovedMCPFromEvents(events, allowlist)
-		data.MCPServers = mcpAllowlistOptions(insights.MCPInventoryFromEvents(events), allowlist)
-	}
-	if data.MCPServers == nil {
-		data.MCPServers = mcpAllowlistOptions(insights.MCPInventory{}, allowlist)
+		// Findings and preview always evaluate the active (saved) allowlist; selected
+		// is only a draft for checkbox rendering until save succeeds.
+		data.UnapprovedMCP = governance.UnapprovedMCPFromEvents(events, activeAllowlist)
+		data.MCPServers = mcpAllowlistOptions(insights.MCPInventoryFromEvents(events), draftAllowlist, activeAllowlist)
 	}
 	data.MCPPreview = governancePreviewFor(data.UnapprovedMCP)
 	return data
@@ -859,14 +861,24 @@ func governancePreviewFor(result governance.UnapprovedMCP) governancePreview {
 	}
 }
 
-func mcpAllowlistOptions(inventory insights.MCPInventory, allowlist []string) []mcpAllowlistOption {
-	options := make(map[string]mcpAllowlistOption, len(inventory.Servers)+len(allowlist))
-	for _, name := range allowlist {
+func mcpAllowlistOptions(inventory insights.MCPInventory, draft, active []string) []mcpAllowlistOption {
+	options := make(map[string]mcpAllowlistOption, len(inventory.Servers)+len(draft)+len(active))
+	for _, name := range active {
 		name = strings.TrimSpace(name)
 		if name == "" {
 			continue
 		}
-		options[strings.ToLower(name)] = mcpAllowlistOption{Name: name, Checked: true}
+		options[strings.ToLower(name)] = mcpAllowlistOption{Name: name, ActiveChecked: true}
+	}
+	for _, name := range draft {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		option := options[strings.ToLower(name)]
+		option.Name = name
+		option.Checked = true
+		options[strings.ToLower(name)] = option
 	}
 	for _, server := range inventory.Servers {
 		name := strings.TrimSpace(server.ServerName)

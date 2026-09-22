@@ -12,7 +12,7 @@
     {{if and .SaveAvailable (eq .ActiveRulesTab "mcp")}}<button type="submit" form="mcp-allowlist-form" id="save-local-changes" disabled>Save local changes</button>{{else}}<p class="muted">Local configuration saving is unavailable.</p>{{end}}
   </header>
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
-  {{if .Saved}}<output class="success" role="status">MCP allowlist saved. Findings now use the updated local policy.</output>{{end}}
+  {{if .Saved}}<output class="success">MCP allowlist saved. Findings now use the updated local policy.</output>{{end}}
 
   <nav class="governance-main-tabs" aria-label="Governance policy areas">
     <a href="#access-rules" aria-current="page">Access Rules</a>
@@ -147,13 +147,13 @@
             <tbody>
               {{$policyConfigured := .MCPPolicyConfigured}}
               {{range .MCPServers}}
-              <tr class="mcp-rule-row" data-mcp-name="{{.Name}}" data-mcp-policy="{{if .Checked}}allowlisted{{else}}not-allowlisted{{end}}">
+              <tr class="mcp-rule-row" data-mcp-name="{{.Name}}" data-mcp-policy="{{if $policyConfigured}}{{if .ActiveChecked}}allowlisted{{else}}not-allowlisted{{end}}{{else}}unconfigured{{end}}">
                 <td><code>{{.Name}}</code></td>
-                <td>{{if $policyConfigured}}{{if .Checked}}Allowlisted{{else}}Not allowlisted{{end}}{{else}}{{template "status-badge" "policy_unconfigured"}}{{end}}</td>
+                <td>{{if $policyConfigured}}{{if .ActiveChecked}}Allowlisted{{else}}Not allowlisted{{end}}{{else}}{{template "status-badge" "policy_unconfigured"}}{{end}}</td>
                 <td>Local daemon</td>
                 <td>{{if .Observed}}Observed provider identity{{else}}Configured; not currently observed{{end}}</td>
                 <td>{{template "status-badge" "unavailable"}}</td>
-                <td><label class="mcp-rule-edit" aria-label="{{.Name}}"><input type="checkbox" name="mcp_server" value="{{.Name}}"{{if .Checked}} checked{{end}}> Allowlist</label></td>
+                <td><label class="mcp-rule-edit" aria-label="{{.Name}}"><input type="checkbox" name="mcp_server" value="{{.Name}}" data-active-checked="{{.ActiveChecked}}"{{if .Checked}} checked{{end}}> Allowlist</label></td>
               </tr>
               {{end}}
             </tbody>
@@ -196,31 +196,41 @@
     var form = document.getElementById("mcp-allowlist-form");
     if (!form) return;
     var checks = Array.prototype.slice.call(form.querySelectorAll("input[name=mcp_server]"));
-    var initial = checks.map(function (input) { return input.checked; });
+    var initial = checks.map(function (input) { return input.dataset.activeChecked === "true"; });
     var summary = document.getElementById("mcp-dirty-summary");
     var saveButtons = [document.getElementById("save-local-changes"), document.getElementById("save-local-changes-inline")].filter(Boolean);
     var search = document.getElementById("mcp-rule-search");
     var filter = document.getElementById("mcp-rule-filter");
     function dirty() { return checks.some(function (input, index) { return input.checked !== initial[index]; }); }
+    function changedNames() {
+      return checks.filter(function (input, index) { return input.checked !== initial[index]; }).map(function (input) { return input.value; });
+    }
     function refreshRows() {
       var query = search ? search.value.toLowerCase() : "";
       var policy = filter ? filter.value : "all";
+      var configured = checks.some(function (input) { return input.checked; });
       Array.prototype.forEach.call(form.querySelectorAll(".mcp-rule-row"), function (row) {
-        var matchesName = row.dataset.mcpName.toLowerCase().indexOf(query) !== -1;
-        var matchesPolicy = policy === "all" || row.dataset.mcpPolicy === policy;
-        row.hidden = !(matchesName && matchesPolicy);
+        var checkbox = row.querySelector("input[name=mcp_server]");
+        var matchesName = !query || row.dataset.mcpName.toLowerCase().includes(query);
+        var effectivePolicy = configured ? (checkbox.checked ? "allowlisted" : "not-allowlisted") : "unconfigured";
+        row.dataset.mcpPolicy = effectivePolicy;
+        row.hidden = !(matchesName && (policy === "all" || effectivePolicy === policy));
       });
     }
     function refresh() {
-      var changed = dirty();
-      if (summary) { summary.hidden = !changed; summary.textContent = changed ? "Unsaved local MCP allowlist changes." : ""; }
+      var names = changedNames();
+      var changed = names.length > 0;
+      if (summary) {
+        summary.hidden = !changed;
+        summary.textContent = changed ? names.length + " unsaved local MCP allowlist change(s): " + names.join(", ") + "." : "";
+      }
       saveButtons.forEach(function (button) { button.disabled = !changed; });
       refreshRows();
     }
     checks.forEach(function (input) { input.addEventListener("change", refresh); });
     if (search) search.addEventListener("input", refreshRows);
     if (filter) filter.addEventListener("change", refreshRows);
-    form.addEventListener("reset", function () { window.setTimeout(refresh, 0); });
+    form.addEventListener("reset", function () { window.setTimeout(function () { checks.forEach(function (input, index) { input.checked = initial[index]; }); refresh(); }, 0); });
     document.querySelectorAll("a[href]").forEach(function (link) {
       link.addEventListener("click", function (event) {
         if (dirty() && !window.confirm("Discard unsaved local MCP allowlist changes?")) event.preventDefault();

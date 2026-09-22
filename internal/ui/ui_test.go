@@ -1835,15 +1835,25 @@ func TestGovernanceFindingsPage(t *testing.T) {
 			">MCP servers</a>",
 			`id="rules-panel-mcp"`,
 			"MCP access rules",
+			`data-mcp-policy="unconfigured"`,
+			`data-active-checked="false"`,
 		})
 		if strings.Contains(body, "Governance findings are not available") {
 			t.Fatalf("placeholder copy must be gone: %q", body)
+		}
+		if strings.Contains(body, `data-mcp-policy="not-allowlisted"`) {
+			t.Fatalf("empty allowlist must not mark rows as explicitly not-allowlisted: %q", body)
 		}
 	})
 
 	t.Run("allowlist_flags_unapproved_server", func(t *testing.T) {
 		body := renderGovernance(t, repo, []string{"filesystem"})
-		assertContainsAll(t, body, []string{"Unapproved", "rogue-tool", "Violation"})
+		assertContainsAll(t, body, []string{
+			"Unapproved", "rogue-tool", "Violation",
+			`data-mcp-policy="allowlisted"`,
+			`data-mcp-policy="not-allowlisted"`,
+			`data-active-checked="true"`,
+		})
 		if strings.Contains(body, "Allowlist not configured") {
 			t.Fatalf("configured allowlist must not show policy_unconfigured: %q", body)
 		}
@@ -1928,9 +1938,9 @@ func TestGovernanceAllowlistSaveRoundTrip(t *testing.T) {
 
 	initial := getAuthed(t, handler, cookie, "/governance").Body.String()
 	assertContainsAll(t, initial, []string{
-		`value="configured-only" checked`,
+		`value="configured-only" data-active-checked="true" checked`,
 		"Configured; not currently observed",
-		`value="rogue-tool"`,
+		`value="rogue-tool" data-active-checked="false"`,
 		"Observed",
 		"Save local changes",
 	})
@@ -1990,11 +2000,23 @@ func TestGovernanceAllowlistWriteFailureKeepsActivePolicy(t *testing.T) {
 	cookie := unlock(t, handler)
 
 	response := postAllowlist(t, handler, cookie, url.Values{"mcp_server": {"rogue-tool"}})
-	if response.Code != http.StatusInternalServerError || !strings.Contains(response.Body.String(), "active policy was not changed") {
-		t.Fatalf("write failure response = %d: %q", response.Code, response.Body.String())
+	body := response.Body.String()
+	if response.Code != http.StatusInternalServerError || !strings.Contains(body, "active policy was not changed") {
+		t.Fatalf("write failure response = %d: %q", response.Code, body)
 	}
 	if got := controller.MCPAllowlist(); !equalStrings(got, []string{"configured-only"}) {
 		t.Fatalf("failed write changed allowlist: %#v", got)
+	}
+	// Draft keeps the submitted edit; active baseline stays on the saved policy so
+	// dirty/reset/retry remain meaningful. Preview still evaluates the active allowlist.
+	assertContainsAll(t, body, []string{
+		`value="rogue-tool" data-active-checked="false" checked`,
+		`value="configured-only" data-active-checked="true"`,
+		"Finding",
+		"An observed MCP server is outside the local allowlist",
+	})
+	if strings.Contains(body, `value="configured-only" data-active-checked="true" checked`) {
+		t.Fatalf("failed save draft must not keep configured-only checked when omitted from submit: %q", body)
 	}
 }
 

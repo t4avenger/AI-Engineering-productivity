@@ -119,6 +119,56 @@ export async function expectGovernanceAccessRulesShells(
   await expect(page.getByRole('button', { name: 'Enforce' })).toHaveCount(0);
 }
 
+/**
+ * Client-side MCP editor behaviours for #191 / G03+G05: dirty count/diff, filter
+ * without dropping hidden selections, reset to the active baseline, and
+ * keep/discard navigation. Shared to avoid Sonar CPD across live specs.
+ */
+export async function expectGovernanceMCPEditorInteractions(
+  page: Page,
+  serverName: string,
+): Promise<void> {
+  const checkbox = page.getByRole('checkbox', { name: serverName });
+  const row = page.locator('.mcp-rule-row', { hasText: serverName });
+  const filter = page.locator('#mcp-rule-filter');
+  const summary = page.locator('#mcp-dirty-summary');
+  const save = page.getByRole('button', { name: 'Save local changes' }).first();
+
+  await checkbox.check();
+  await expect(summary).toBeVisible();
+  await expect(summary).toContainText('1 unsaved local MCP allowlist change(s)');
+  await expect(summary).toContainText(serverName);
+  await expect(save).toBeEnabled();
+
+  await filter.selectOption('not-allowlisted');
+  await expect(row).toBeHidden();
+  await expect(checkbox).toBeChecked();
+  await filter.selectOption('allowlisted');
+  await expect(row).toBeVisible();
+  await filter.selectOption('all');
+
+  await page.getByRole('button', { name: 'Reset changes' }).click();
+  await expect(summary).toBeHidden();
+  await expect(checkbox).not.toBeChecked();
+  await expect(save).toBeDisabled();
+
+  await checkbox.check();
+  page.once('dialog', (dialog) => dialog.dismiss());
+  await page
+    .getByLabel('Primary navigation')
+    .getByRole('link', { name: 'Overview', exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/governance/);
+  await expect(checkbox).toBeChecked();
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await page
+    .getByLabel('Primary navigation')
+    .getByRole('link', { name: 'Overview', exact: true })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Orchestration overview' })).toBeVisible();
+}
+
 // codexOTLPLogs builds a raw codex_cli_rs OTLP/HTTP log payload carrying a
 // single sse_event that reports the given model, in the observed wire shape.
 export function codexOTLPLogs(model: string): string {
