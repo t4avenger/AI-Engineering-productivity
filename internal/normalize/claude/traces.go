@@ -304,7 +304,7 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 		attributes["hook"] = hookAttributes(fields)
 	}
 	extensions := map[string]any{
-		"correlation": spanCorrelation(eventID, occurredAt, traceID, spanID, parentSpanID, spanType),
+		"correlation": spanCorrelation(fields, eventID, occurredAt, traceID, spanID, parentSpanID, spanType),
 		"span": map[string]any{
 			"trace_id":        traceID,
 			"span_id":         spanID,
@@ -348,7 +348,7 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 // spanCorrelation carries the span-tree linkage (trace/span/parent) alongside
 // the dedup/ordering keys, so downstream consumers can rebuild the interaction
 // → llm_request/tool/hook hierarchy that spans expose and logs do not.
-func spanCorrelation(eventID string, occurredAt time.Time, traceID, spanID string, parentSpanID any, spanType string) map[string]any {
+func spanCorrelation(fields map[string]any, eventID string, occurredAt time.Time, traceID, spanID string, parentSpanID any, spanType string) map[string]any {
 	// The interaction span is the per-user-prompt root — a genuine, observed task
 	// boundary — so its confidence is raised (#100). The llm_request span is a
 	// child of that root (one model request within the prompt), not itself a
@@ -376,7 +376,7 @@ func spanCorrelation(eventID string, occurredAt time.Time, traceID, spanID strin
 			"reason":     "Claude Code hook span is an intra-interaction intervention, not a task boundary",
 		}
 	}
-	return map[string]any{
+	correlation := map[string]any{
 		"dedup_key":      eventID,
 		"ordering_key":   fmt.Sprintf("%020d:%s", occurredAt.UnixNano(), eventID),
 		"trace_id":       traceID,
@@ -384,6 +384,15 @@ func spanCorrelation(eventID string, occurredAt time.Time, traceID, spanID strin
 		"parent_span_id": parentSpanID,
 		"task_boundary":  boundary,
 	}
+	// workflow.run_id / workflow.name group a sub-agent workflow's spans (#106).
+	// Present-only: absent on a non-subagent span, so it never appears there.
+	if value, ok := normalize.ObservedString(fields[attrWorkflowRunID]); ok {
+		correlation["workflow_run_id"] = value
+	}
+	if value, ok := normalize.ObservedString(fields[attrWorkflowName]); ok {
+		correlation["workflow_name"] = value
+	}
+	return correlation
 }
 
 // spanStartTime requires a positive Unix-nanoseconds start time. A span's

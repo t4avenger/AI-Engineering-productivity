@@ -166,6 +166,84 @@ func TestCorrelateModelInteractionsOrdersAndDedupes(t *testing.T) {
 	}
 }
 
+// assertCorrelationInert proves two correlated slices are element-for-element
+// identical by stable id, then pins the pure-timeline order. It is the shared
+// guard for the #106 invariant that provider_extensions.correlation metadata is
+// inert to the shared Correlate* ordering — a "grouped" regression (shared-key
+// records pulled adjacent) fails on wantOrder, not just any drift.
+func assertCorrelationInert[T any](t *testing.T, plain, tagged []T, id func(T) string, wantOrder ...string) {
+	t.Helper()
+	if len(plain) != len(tagged) {
+		t.Fatalf("length changed with correlation metadata: %d vs %d", len(plain), len(tagged))
+	}
+	for i := range plain {
+		if id(plain[i]) != id(tagged[i]) {
+			t.Fatalf("order changed with correlation metadata at %d: %q vs %q", i, id(plain[i]), id(tagged[i]))
+		}
+	}
+	if len(tagged) != len(wantOrder) {
+		t.Fatalf("result length = %d, want %d", len(tagged), len(wantOrder))
+	}
+	for i, want := range wantOrder {
+		if id(tagged[i]) != want {
+			t.Fatalf("timeline order[%d] = %q, want %q (correlation must not group)", i, id(tagged[i]), want)
+		}
+	}
+}
+
+// correlationExtensions is the provider_extensions shape #106 attaches so a
+// consumer can group by prompt; the regression tests below prove attaching it
+// leaves the shared timeline ordering untouched.
+func correlationExtensions(promptID string) map[string]any {
+	return map[string]any{"correlation": map[string]any{"prompt_id": promptID}}
+}
+
+// TestCorrelateEventsIgnoresCorrelationMetadata proves provider_extensions.correlation
+// (the #106 prompt_id/workflow_run_id retention) is inert to CorrelateEvents: two
+// interleaved events sharing one prompt_id are NOT pulled adjacent, and the result
+// is byte-for-byte the same order as without the metadata. Grouping by a
+// correlation key is a downstream consumer concern, never the shared sort's job.
+func TestCorrelateEventsIgnoresCorrelationMetadata(t *testing.T) {
+	base := time.Date(2026, 8, 31, 13, 37, 0, 0, time.UTC)
+	build := func(withCorrelation bool) []canonical.Event {
+		events := []canonical.Event{
+			{EventID: "c", OccurredAt: base.Add(2 * time.Second)},
+			{EventID: "a", OccurredAt: base},
+			{EventID: "b", OccurredAt: base.Add(time.Second)},
+		}
+		if withCorrelation {
+			// a and c share one prompt with b interleaved between them in time.
+			events[0].ProviderExtensions = correlationExtensions("p1")
+			events[1].ProviderExtensions = correlationExtensions("p1")
+			events[2].ProviderExtensions = correlationExtensions("p2")
+		}
+		return events
+	}
+	assertCorrelationInert(t, CorrelateEvents(build(false)), CorrelateEvents(build(true)),
+		func(e canonical.Event) string { return e.EventID }, "a", "b", "c")
+}
+
+// TestCorrelateModelInteractionsIgnoresCorrelationMetadata is the model-interaction
+// analogue: correlation metadata must not reorder or regroup the shared timeline.
+func TestCorrelateModelInteractionsIgnoresCorrelationMetadata(t *testing.T) {
+	base := time.Date(2026, 8, 31, 13, 37, 0, 0, time.UTC)
+	build := func(withCorrelation bool) []canonical.ModelInteraction {
+		records := []canonical.ModelInteraction{
+			{RequestID: "c", StartedAt: base.Add(2 * time.Second)},
+			{RequestID: "a", StartedAt: base},
+			{RequestID: "b", StartedAt: base.Add(time.Second)},
+		}
+		if withCorrelation {
+			records[0].ProviderExtensions = correlationExtensions("p1")
+			records[1].ProviderExtensions = correlationExtensions("p1")
+			records[2].ProviderExtensions = correlationExtensions("p2")
+		}
+		return records
+	}
+	assertCorrelationInert(t, CorrelateModelInteractions(build(false)), CorrelateModelInteractions(build(true)),
+		func(r canonical.ModelInteraction) string { return r.RequestID }, "a", "b", "c")
+}
+
 func int64Ptr(value int64) *int64 { return &value }
 
 func TestCorrelateOperationsOrdersAndDedupesBySessionAndOperation(t *testing.T) {

@@ -64,13 +64,15 @@ var wireKeyMapping = map[string]string{
 // under the local-only exception).
 var droppedKeyPrefixes = []string{"user.", "organization.", "terminal."}
 
-// droppedKeys are attributes dropped at the wire boundary. prompt.id/message.uuid
-// are bare identifiers with no behavioural value. tool_parameters is gated
-// content: on tool_decision (and with OTEL_LOG_TOOL_DETAILS=1 more broadly) it
-// carries the full command and MCP server/tool names, so it is dropped here
-// rather than surfaced under provider_extensions (epic #87 keeps behaviour, not
-// prompt/command bodies).
-var droppedKeys = map[string]struct{}{"prompt.id": {}, "message.uuid": {}, "tool_parameters": {}}
+// droppedKeys are attributes dropped at the wire boundary. tool_parameters is
+// gated content: on tool_decision (and with OTEL_LOG_TOOL_DETAILS=1 more broadly)
+// it carries the full command and MCP server/tool names, so it is not surfaced
+// here. That drop is pre-existing and owned by #173; whether the epic #87
+// raw-capture stance should retain it is #173's decision, not settled here.
+// prompt.id/message.uuid are the per-prompt / per-message correlation ids: they
+// are retained under provider_extensions.correlation (#106), not dropped — the
+// normaliser lifts them there and excludes them from the event echo.
+var droppedKeys = map[string]struct{}{"tool_parameters": {}}
 
 // serverIdentityKeys carry a provider-reported MCP server identity. The raw name
 // is retained for local inventory display and correlation (epic #87 — no hiding).

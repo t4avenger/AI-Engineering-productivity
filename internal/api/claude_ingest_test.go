@@ -102,7 +102,8 @@ func TestClaudeLogsIngestEndToEnd(t *testing.T) {
 // sqlite repository, returning both for ingest→read gates.
 // rawClaudeUserPromptLogs is a raw Claude Code OTLP/HTTP log payload carrying a
 // single content-present user_prompt event (content logging enabled) plus a
-// prompt.id drop canary. The prompt is synthetic.
+// prompt.id correlation canary (retained under provider_extensions.correlation,
+// #106). The prompt is synthetic.
 const rawClaudeUserPromptLogs = `{"resourceLogs":[{"resource":{"attributes":[
   {"key":"service.name","value":{"stringValue":"claude-code"}},
   {"key":"service.version","value":{"stringValue":"2.1.270"}}]},
@@ -121,9 +122,9 @@ const rawClaudeUserPromptLogs = `{"resourceLogs":[{"resource":{"attributes":[
 // TestClaudeUserPromptContentPersistsRawEndToEnd proves the E7 content path holds
 // through the live daemon: a user_prompt event POSTed to /v1/logs persists as a
 // canonical.Event whose prompt text survives raw in provider_extensions.event
-// (epic #87 — capture raw, no ingest-time re-redaction), the bare prompt.id
-// correlation id is dropped, and the timeline read API reports the event with
-// prompt_content marked available.
+// (epic #87 — capture raw, no ingest-time re-redaction), the prompt.id
+// correlation id is retained under provider_extensions.correlation (#106), and
+// the timeline read API reports the event with prompt_content marked available.
 func TestClaudeUserPromptContentPersistsRawEndToEnd(t *testing.T) {
 	server, repository := newPersistentTestServer(t)
 	response := postOTLPToPath(t, server.URL, "/v1/logs", []byte(rawClaudeUserPromptLogs), "application/json")
@@ -147,9 +148,15 @@ func TestClaudeUserPromptContentPersistsRawEndToEnd(t *testing.T) {
 		t.Fatalf("prompt content not persisted raw: %#v", echo)
 	}
 
-	// The bare prompt.id correlation id never reaches storage (owned by #106).
-	if strings.Contains(string(marshalJSON(t, events)), "tiq-content-prompt-id") {
-		t.Fatal("prompt.id correlation id leaked into persisted event")
+	// The prompt.id correlation id is retained under provider_extensions.correlation
+	// end-to-end (#106), so a downstream consumer can group a session's events by
+	// their prompt.
+	correlation, ok := events[0].ProviderExtensions["correlation"].(map[string]any)
+	if !ok {
+		t.Fatalf("provider_extensions.correlation missing: %#v", events[0].ProviderExtensions)
+	}
+	if correlation["prompt_id"] != "tiq-content-prompt-id" {
+		t.Fatalf("prompt.id not retained under correlation: %#v", correlation)
 	}
 
 	// The timeline read API reports the event with prompt_content available.

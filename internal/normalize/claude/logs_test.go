@@ -101,7 +101,7 @@ func TestNormalizeLogsPromotesPriceableRequestAttributes(t *testing.T) {
 	}
 }
 
-func TestNormalizeLogsKeepsNativeSessionAndDropsOperatorFields(t *testing.T) {
+func TestNormalizeLogsRetainsCorrelationAndDropsOperatorFields(t *testing.T) {
 	events, err := NormalizeLogs([]byte(rawClaudeLogs), time.Unix(0, 0).UTC())
 	if err != nil {
 		t.Fatalf("normalise: %v", err)
@@ -125,15 +125,20 @@ func TestNormalizeLogsKeepsNativeSessionAndDropsOperatorFields(t *testing.T) {
 		t.Fatalf("server_fingerprint must not be emitted; raw server_name is retained instead: %#v", connection)
 	}
 
-	// No operator, machine, or prompt identifier reaches canonical output; local provider session IDs are retained by policy.
+	// No operator or machine identifier reaches canonical output; local provider
+	// session IDs are retained by policy, and the prompt.id correlation id is
+	// retained under provider_extensions.correlation (#106).
 	serialized, err := json.Marshal(events)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, prohibited := range []string{"synthetic-user-hash", "synthetic-org", "synthetic-prompt"} {
+	for _, prohibited := range []string{"synthetic-user-hash", "synthetic-org"} {
 		if strings.Contains(string(serialized), prohibited) {
 			t.Fatalf("identity leaked into canonical events: %q", prohibited)
 		}
+	}
+	if !strings.Contains(string(serialized), `"prompt_id":"synthetic-prompt"`) {
+		t.Fatalf("prompt.id correlation id not retained under correlation: %s", serialized)
 	}
 }
 
@@ -237,4 +242,22 @@ func TestNormalizeLogsRejectsPayloadWithoutClaudeResources(t *testing.T) {
 	if _, err := NormalizeLogs([]byte(other), time.Unix(0, 0).UTC()); err != ErrUnsupportedLogs {
 		t.Fatalf("expected ErrUnsupportedLogs, got %v", err)
 	}
+}
+
+// FuzzNormalizeLogs smoke-fuzzes the OTLP/HTTP log normalisation boundary that
+// #106 widened (prompt.id/message.uuid now flow through into correlation). Seeds
+// cover a string correlation id, a non-string (intValue) prompt.id that must be
+// skipped rather than coerced into an identifier, blank/whitespace ids, and
+// malformed/empty input. The target only asserts NormalizeLogs never panics on
+// arbitrary bytes (parsing hardness, epic #87 raw boundary).
+func FuzzNormalizeLogs(f *testing.F) {
+	f.Add([]byte(rawClaudeLogs))
+	f.Add([]byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"user_prompt"}},{"key":"prompt.id","value":{"intValue":"5"}}]}]}]}]}`))
+	f.Add([]byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"user_prompt"}},{"key":"prompt.id","value":{"stringValue":""}},{"key":"message.uuid","value":{"stringValue":"  "}}]}]}]}]}`))
+	f.Add([]byte(`{"resourceLogs":[{"scopeLogs":[{"logRecords":[{}]}]}]}`))
+	f.Add([]byte("not json"))
+	f.Add([]byte(""))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		_, _ = NormalizeLogs(data, time.Unix(0, 0).UTC())
+	})
 }

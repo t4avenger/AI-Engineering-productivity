@@ -116,9 +116,15 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 	nativeSessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, sessionID)
 	eventID := nativeSessionID + ":" + sequenceKey(raw, index)
 
+	correlation := eventCorrelation(eventID, occurredAt)
+	for key, value := range correlationKeys(raw) {
+		correlation[key] = value
+	}
+	echoExcluded := append(promotedEventFields(name), gatedEventFields()...)
+	echoExcluded = append(echoExcluded, correlationEventFields()...)
 	extensions := map[string]any{
-		"correlation": eventCorrelation(eventID, occurredAt),
-		"event":       normalize.UnknownFields(raw, append(promotedEventFields(name), gatedEventFields()...)...),
+		"correlation": correlation,
+		"event":       normalize.UnknownFields(raw, echoExcluded...),
 	}
 	if requestID := normalize.OptionalString(raw, "request_id"); requestID != nil {
 		extensions["request_id"] = nativeSessionPrefix + *requestID
@@ -628,6 +634,42 @@ func unavailableFields(eventName string) []string {
 	default:
 		return append([]string{"model", "token_usage", "cache_usage", "task_outcome"}, common...)
 	}
+}
+
+// correlationRawKeys maps the wire attribute keys carrying per-prompt /
+// per-message correlation identifiers (#106) onto their canonical snake_case
+// names under provider_extensions.correlation. Events sharing a prompt.id thus
+// expose the same prompt_id, so a downstream consumer can group by it; the shared
+// normalise ordering is left untouched (correlation is retained metadata, not a
+// sort key).
+var correlationRawKeys = map[string]string{
+	"prompt.id":    "prompt_id",
+	"message.uuid": "message_uuid",
+}
+
+// correlationKeys returns the present, observed correlation identifiers from a
+// raw sample event, keyed by their canonical name. Absent, non-string, or blank
+// values are skipped — never coerced into an id (provider rule: do not invent
+// telemetry fields).
+func correlationKeys(raw map[string]any) map[string]any {
+	keys := make(map[string]any, len(correlationRawKeys))
+	for rawKey, canonicalKey := range correlationRawKeys {
+		if value, ok := normalize.ObservedString(raw[rawKey]); ok {
+			keys[canonicalKey] = value
+		}
+	}
+	return keys
+}
+
+// correlationEventFields lists the raw keys the correlation block owns, so they
+// are excluded from the provider_extensions.event echo and each value has exactly
+// one typed home.
+func correlationEventFields() []string {
+	keys := make([]string, 0, len(correlationRawKeys))
+	for rawKey := range correlationRawKeys {
+		keys = append(keys, rawKey)
+	}
+	return keys
 }
 
 func eventCorrelation(eventID string, occurredAt time.Time) map[string]any {

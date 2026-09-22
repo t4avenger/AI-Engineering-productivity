@@ -1,0 +1,98 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:constructed-session:2",
+    "event_type": "user_prompt",
+    "occurred_at": "2026-09-13T18:53:02.1Z",
+    "received_at": "1970-01-01T00:00:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.270",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:constructed-session",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "reasoning_tokens",
+        "repository_context",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:constructed-session:2",
+        "ordering_key": "01789325582100000000:claude-code:constructed-session:2",
+        "prompt_id": "constructed-shared-prompt-id",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "prompt_length": 12
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:constructed-session:3",
+    "event_type": "user_prompt",
+    "occurred_at": "2026-09-13T18:53:05.4Z",
+    "received_at": "1970-01-01T00:00:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "otel",
+    "source_version": "2.1.270",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:constructed-session",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "tool_calls",
+        "mcp_calls",
+        "file_operations",
+        "reasoning_tokens",
+        "repository_context",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:constructed-session:3",
+        "ordering_key": "01789325585400000000:claude-code:constructed-session:3",
+        "prompt_id": "constructed-shared-prompt-id",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code event telemetry has no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "prompt_length": 34
+      }
+    }
+  }
+]

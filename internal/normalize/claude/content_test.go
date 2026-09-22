@@ -151,11 +151,11 @@ func TestNormalizeEventsAPIBodiesCaptureRaw(t *testing.T) {
 	}
 }
 
-// TestNormalizeLogsContentEventsPassThroughRawAndDropCorrelationIDs runs the raw
+// TestNormalizeLogsContentEventsPassThroughRawAndRetainCorrelationIDs runs the raw
 // OTLP captures through the wire adapter and proves the content survives verbatim
-// while the bare prompt.id/message.uuid correlation identifiers are dropped at the
-// wire boundary (those are #106 (X19)'s job, not E7).
-func TestNormalizeLogsContentEventsPassThroughRawAndDropCorrelationIDs(t *testing.T) {
+// and the prompt.id/message.uuid correlation identifiers are retained under
+// provider_extensions.correlation (#106 (X19)).
+func TestNormalizeLogsContentEventsPassThroughRawAndRetainCorrelationIDs(t *testing.T) {
 	for _, test := range []struct {
 		fixture string
 		want    []string
@@ -173,7 +173,8 @@ func TestNormalizeLogsContentEventsPassThroughRawAndDropCorrelationIDs(t *testin
 }
 
 // assertWireContentRaw runs one -otlp fixture through NormalizeLogs and asserts
-// its content survives verbatim while the bare correlation ids are dropped.
+// its content survives verbatim and the prompt.id/message.uuid correlation ids are
+// retained under provider_extensions.correlation (#106).
 func assertWireContentRaw(t *testing.T, fixture string, want []string) {
 	t.Helper()
 	serialized, err := json.Marshal(normalizeObservedOTLPLogs(t, fixture))
@@ -185,9 +186,41 @@ func assertWireContentRaw(t *testing.T, fixture string, want []string) {
 			t.Fatalf("content not captured raw through wire path: %q", content)
 		}
 	}
-	for _, dropped := range []string{"synthetic-prompt-id", "synthetic-message-uuid"} {
-		if strings.Contains(string(serialized), dropped) {
-			t.Fatalf("bare correlation identifier leaked through wire path: %q", dropped)
+	for _, retained := range []string{`"prompt_id":"synthetic-prompt-id"`, `"message_uuid":"synthetic-message-uuid"`} {
+		if !strings.Contains(string(serialized), retained) {
+			t.Fatalf("correlation identifier not retained under provider_extensions.correlation: %q; events=%s", retained, serialized)
+		}
+	}
+}
+
+// TestNormalizeLogsEventsSharingPromptIDExposeSameCorrelation proves the #106
+// retention invariant against a committed synthetic fixture + golden: two
+// user_prompt events carrying the same prompt.id on the wire both expose the
+// identical prompt_id under provider_extensions.correlation, so a downstream
+// session/prompt view can group them (issue #106's per-prompt UI rollup non-goal
+// consumes this key; it is not the shared cross-provider comparator's concern —
+// that ordering stays untouched, proven by TestCorrelateEventsIgnoresCorrelationMetadata).
+// Byte-exact golden coverage lives in fixtures/claude/expected; the input is a
+// clearly-labelled synthetic fixture (not under observed-sanitised) so it never
+// implies a real capture. Synthetic values only.
+func TestNormalizeLogsEventsSharingPromptIDExposeSameCorrelation(t *testing.T) {
+	const sharedPromptID = "constructed-shared-prompt-id"
+	events := normalizeOTLPLogsFixture(t, "synthetic", "claude-code-synthetic-shared-prompt-otlp.json")
+	if len(events) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(events))
+	}
+	const golden = "claude-code-synthetic-shared-prompt.events.json"
+	if updateGolden() {
+		writeGolden(t, golden, events)
+	}
+	assertMatchesGolden(t, golden, events)
+	for _, event := range events {
+		correlation, ok := event.ProviderExtensions["correlation"].(map[string]any)
+		if !ok {
+			t.Fatalf("event %q missing correlation extension: %#v", event.EventID, event.ProviderExtensions)
+		}
+		if correlation["prompt_id"] != sharedPromptID {
+			t.Fatalf("event %q prompt_id = %#v, want shared %q", event.EventID, correlation["prompt_id"], sharedPromptID)
 		}
 	}
 }

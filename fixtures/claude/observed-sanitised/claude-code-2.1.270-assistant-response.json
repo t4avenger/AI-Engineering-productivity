@@ -13,7 +13,7 @@
       "telemetry_endpoint": "loopback_dump_receiver",
       "outcome_signal": "assistant_response",
       "content_gates": "OTEL_LOG_ASSISTANT_RESPONSES=1 for the content-present event; unset (default) for the redacted event",
-      "note": "assistant_response always carries response_length, model, and request_id. The response text is present verbatim under OTEL_LOG_ASSISTANT_RESPONSES=1 (event_sequence 12); by default the wire carries the literal string \"<REDACTED>\" (event_sequence 20), which is captured as received and never re-redacted or dropped (epic #87 / #94). Responses here are synthetic. See the -otlp fixture for the wire form and the dropped message.uuid correlation id."
+      "note": "assistant_response always carries response_length, model, and request_id. The response text is present verbatim under OTEL_LOG_ASSISTANT_RESPONSES=1 (event_sequence 12); by default the wire carries the literal string \"<REDACTED>\" (event_sequence 20), which is captured as received and never re-redacted or dropped (epic #87 / #94). Responses here are synthetic. See the -otlp fixture for the wire form and the message.uuid correlation id retained under provider_extensions.correlation (#106)."
     },
     "observations": [
       {
