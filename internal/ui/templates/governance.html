@@ -205,6 +205,11 @@
     function changedNames() {
       return checks.filter(function (input, index) { return input.checked !== initial[index]; }).map(function (input) { return input.value; });
     }
+    function rowPolicy(checkbox, configured) {
+      if (!configured) return "unconfigured";
+      if (checkbox.checked) return "allowlisted";
+      return "not-allowlisted";
+    }
     function refreshRows() {
       var query = search ? search.value.toLowerCase() : "";
       var policy = filter ? filter.value : "all";
@@ -212,7 +217,7 @@
       Array.prototype.forEach.call(form.querySelectorAll(".mcp-rule-row"), function (row) {
         var checkbox = row.querySelector("input[name=mcp_server]");
         var matchesName = !query || row.dataset.mcpName.toLowerCase().includes(query);
-        var effectivePolicy = configured ? (checkbox.checked ? "allowlisted" : "not-allowlisted") : "unconfigured";
+        var effectivePolicy = rowPolicy(checkbox, configured);
         row.dataset.mcpPolicy = effectivePolicy;
         row.hidden = !(matchesName && (policy === "all" || effectivePolicy === policy));
       });
