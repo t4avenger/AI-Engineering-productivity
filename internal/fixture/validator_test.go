@@ -94,6 +94,7 @@ func providerFixturePaths(t *testing.T) []string {
 	roots := []string{
 		filepath.Join(root, "fixtures", "codex", "synthetic"),
 		filepath.Join(root, "fixtures", "codex", "observed-sanitised"),
+		filepath.Join(root, "fixtures", "claude", "synthetic"),
 		filepath.Join(root, "fixtures", "claude", "observed-sanitised"),
 		filepath.Join(root, "fixtures", "cursor", "observed-sanitised"),
 	}

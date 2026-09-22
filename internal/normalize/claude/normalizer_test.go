@@ -182,17 +182,32 @@ func writeGolden(t *testing.T, name string, value any) {
 
 func readFixture(t *testing.T, name string) []byte {
 	t.Helper()
-	return readFile(t, filepath.Join(repositoryRoot(t), "fixtures", "claude", "observed-sanitised", name))
+	return readFixtureFrom(t, "observed-sanitised", name)
+}
+
+// readFixtureFrom reads a wrapped fixture from a named fixtures/claude subdir
+// (e.g. "observed-sanitised" for real captures, "synthetic" for constructed
+// inputs), keeping a single path-resolution site for both.
+func readFixtureFrom(t *testing.T, subdir, name string) []byte {
+	t.Helper()
+	return readFile(t, filepath.Join(repositoryRoot(t), "fixtures", "claude", subdir, name))
 }
 
 // normalizeObservedOTLPLogs unwraps a reviewed observed-sanitised fixture and
 // runs its raw OTLP payload through NormalizeLogs.
 func normalizeObservedOTLPLogs(t *testing.T, name string) []canonical.Event {
 	t.Helper()
+	return normalizeOTLPLogsFixture(t, "observed-sanitised", name)
+}
+
+// normalizeOTLPLogsFixture unwraps a wrapped OTLP-log fixture from the given
+// fixtures/claude subdir and runs its raw payload through NormalizeLogs.
+func normalizeOTLPLogsFixture(t *testing.T, subdir, name string) []canonical.Event {
+	t.Helper()
 	var wrapper struct {
 		Payload json.RawMessage `json:"payload"`
 	}
-	if err := json.Unmarshal(readFixture(t, name), &wrapper); err != nil {
+	if err := json.Unmarshal(readFixtureFrom(t, subdir, name), &wrapper); err != nil {
 		t.Fatalf("decode fixture: %v", err)
 	}
 	events, err := NormalizeLogs([]byte(wrapper.Payload), time.Unix(0, 0).UTC())

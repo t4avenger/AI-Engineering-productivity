@@ -2,7 +2,6 @@ package claude
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -195,38 +194,26 @@ func assertWireContentRaw(t *testing.T, fixture string, want []string) {
 }
 
 // TestNormalizeLogsEventsSharingPromptIDExposeSameCorrelation proves the #106
-// grouping invariant on a constructed (deliberately non-captured, inline) payload:
-// two user_prompt events carrying the same prompt.id on the wire both expose the
+// retention invariant against a committed synthetic fixture + golden: two
+// user_prompt events carrying the same prompt.id on the wire both expose the
 // identical prompt_id under provider_extensions.correlation, so a downstream
-// consumer can group them. The shared timeline ordering stays untouched — proven
-// separately by TestCorrelateEventsIgnoresCorrelationMetadata. Synthetic values only.
+// session/prompt view can group them (issue #106's per-prompt UI rollup non-goal
+// consumes this key; it is not the shared cross-provider comparator's concern —
+// that ordering stays untouched, proven by TestCorrelateEventsIgnoresCorrelationMetadata).
+// Byte-exact golden coverage lives in fixtures/claude/expected; the input is a
+// clearly-labelled synthetic fixture (not under observed-sanitised) so it never
+// implies a real capture. Synthetic values only.
 func TestNormalizeLogsEventsSharingPromptIDExposeSameCorrelation(t *testing.T) {
 	const sharedPromptID = "constructed-shared-prompt-id"
-	payload := fmt.Sprintf(`{"resourceLogs":[{"resource":{"attributes":[
-	  {"key":"service.name","value":{"stringValue":"claude-code"}},
-	  {"key":"service.version","value":{"stringValue":"2.1.270"}}]},
-	 "scopeLogs":[{"logRecords":[
-	   {"attributes":[
-	     {"key":"event.name","value":{"stringValue":"user_prompt"}},
-	     {"key":"event.timestamp","value":{"stringValue":"2026-09-13T18:53:02.100Z"}},
-	     {"key":"event.sequence","value":{"intValue":"2"}},
-	     {"key":"session.id","value":{"stringValue":"constructed-session"}},
-	     {"key":"prompt.id","value":{"stringValue":%[1]q}},
-	     {"key":"prompt_length","value":{"intValue":"12"}}]},
-	   {"attributes":[
-	     {"key":"event.name","value":{"stringValue":"user_prompt"}},
-	     {"key":"event.timestamp","value":{"stringValue":"2026-09-13T18:53:05.400Z"}},
-	     {"key":"event.sequence","value":{"intValue":"3"}},
-	     {"key":"session.id","value":{"stringValue":"constructed-session"}},
-	     {"key":"prompt.id","value":{"stringValue":%[1]q}},
-	     {"key":"prompt_length","value":{"intValue":"34"}}]}]}]}]}`, sharedPromptID)
-	events, err := NormalizeLogs([]byte(payload), time.Unix(0, 0).UTC())
-	if err != nil {
-		t.Fatalf("normalise: %v", err)
-	}
+	events := normalizeOTLPLogsFixture(t, "synthetic", "claude-code-synthetic-shared-prompt-otlp.json")
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
+	const golden = "claude-code-synthetic-shared-prompt.events.json"
+	if updateGolden() {
+		writeGolden(t, golden, events)
+	}
+	assertMatchesGolden(t, golden, events)
 	for _, event := range events {
 		correlation, ok := event.ProviderExtensions["correlation"].(map[string]any)
 		if !ok {
