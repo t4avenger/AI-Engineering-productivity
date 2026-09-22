@@ -29,7 +29,7 @@ test('unlocks and walks the local dashboard journey', async ({ page }) => {
     .getByRole('link', { name: 'Governance', exact: true })
     .click();
   await expect(
-    page.getByRole('heading', { name: 'Governance', exact: true }),
+    page.getByRole('heading', { name: 'Governance Policies', exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole('heading', { name: 'Risky access' }),

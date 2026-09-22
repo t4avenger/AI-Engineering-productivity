@@ -1820,7 +1820,11 @@ func TestGovernanceFindingsPage(t *testing.T) {
 			"Findings",
 			"Risky access",
 			"Unapproved MCP",
+			"Governance Policies",
+			"Local configuration",
 			"Access Rules",
+			"Policy Preview",
+			`aria-label="Local policy summary"`,
 			"Violation",
 			"/home/dev/app/.env",
 			`href="/sessions/gov-session-1"`,
@@ -1830,7 +1834,7 @@ func TestGovernanceFindingsPage(t *testing.T) {
 			`aria-selected="true"`,
 			">MCP servers</a>",
 			`id="rules-panel-mcp"`,
-			"Allowed MCP servers",
+			"MCP access rules",
 		})
 		if strings.Contains(body, "Governance findings are not available") {
 			t.Fatalf("placeholder copy must be gone: %q", body)
@@ -1860,7 +1864,7 @@ func TestGovernanceAccessRulesTabShells(t *testing.T) {
 		body := getAuthed(t, handler, cookie, "/governance").Body.String()
 		assertContainsAll(t, body, []string{
 			`id="rules-panel-mcp"`,
-			"Save allowlist",
+			"Save local changes",
 			`href="/governance?rules=skills"`,
 			`href="/governance?rules=paths"`,
 			`href="/governance?rules=prompts"`,
@@ -1869,7 +1873,6 @@ func TestGovernanceAccessRulesTabShells(t *testing.T) {
 			"No allow or block counts are shown",
 			`id="rules-panel-skills"`,
 			"Publish",
-			"Enforce",
 		})
 	})
 
@@ -1885,7 +1888,7 @@ func TestGovernanceAccessRulesTabShells(t *testing.T) {
 			body := getAuthed(t, handler, cookie, tc.path).Body.String()
 			assertContainsAll(t, body, []string{`id="` + tc.panel + `"`})
 			if tc.schema == "" {
-				assertContainsAll(t, body, []string{"Save allowlist"})
+				assertContainsAll(t, body, []string{"Save local changes"})
 				assertOmitsAll(t, body, []string{"No allow or block counts are shown"})
 				return
 			}
@@ -1896,10 +1899,9 @@ func TestGovernanceAccessRulesTabShells(t *testing.T) {
 				"#148",
 			})
 			assertOmitsAll(t, body, []string{
-				"Save allowlist",
+				"Save local changes",
 				`name="mcp_server"`,
 				"Publish",
-				"Enforce",
 			})
 		})
 	}
@@ -1930,7 +1932,7 @@ func TestGovernanceAllowlistSaveRoundTrip(t *testing.T) {
 		"Configured; not currently observed",
 		`value="rogue-tool"`,
 		"Observed",
-		"Save allowlist",
+		"Save local changes",
 	})
 
 	response := postAllowlist(t, handler, cookie, url.Values{

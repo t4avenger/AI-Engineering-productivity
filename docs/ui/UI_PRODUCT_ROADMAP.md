@@ -90,6 +90,8 @@ Dependencies indicate required contracts, not permission to skip unavailable sta
 | Trace part | [#190](https://github.com/t4avenger/AI-Engineering-productivity/issues/190) — T09 interval breakdown | Delivered: full-session `/breakdown` + right-rail Session Breakdown / Governance / Event Legend |
 | Trace assembly | [#159](https://github.com/t4avenger/AI-Engineering-productivity/issues/159) — T01–T10 | #156, #157, #161, #188, #189, #190; all five lanes and honest partial states |
 | Local governance | [#191](https://github.com/t4avenger/AI-Engineering-productivity/issues/191) — G01–G03, G05, G08 | #161 and integration of #160/PR #185; preserve working MCP Save |
+Implementation note for [#191](https://github.com/t4avenger/AI-Engineering-productivity/issues/191): its Governance composition reuses the existing `governance.mcp_allowlist` save path and retained findings reader. MCP summary values are configuration-derived; Skills, Files, and Prompt cards remain unavailable until their owning detector/editor issues land.
+
 | Local policy | [#192](https://github.com/t4avenger/AI-Engineering-productivity/issues/192) — G06 skills | #191 plus explicit skill fixtures; schema/detector/save/editor |
 | Local policy | [#193](https://github.com/t4avenger/AI-Engineering-productivity/issues/193) — G04/G06 files & paths | #191 and #156; exact/glob semantics and detect-only preview |
 | Local policy | [#194](https://github.com/t4avenger/AI-Engineering-productivity/issues/194) — G07 prompts | #191 and #188; RE2/literal rules over retained content |

@@ -106,12 +106,15 @@ export async function expectGovernanceAccessRulesShells(
     'Files & Paths',
     'Prompt Keywords',
   ]);
-  await expect(page.getByRole('button', { name: 'Save allowlist' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Governance Policies' })).toBeVisible();
+  await expect(page.getByLabel('Local policy summary')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Policy Preview' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save local changes' }).first()).toBeVisible();
 
   await page.getByRole('tab', { name: 'Skills' }).click();
   await expect(page).toHaveURL(/\/governance\?rules=skills$/);
   await expect(page.getByText('No allow or block counts are shown')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Save allowlist' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Save local changes' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Publish' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Enforce' })).toHaveCount(0);
 }

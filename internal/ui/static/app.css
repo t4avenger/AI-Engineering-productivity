@@ -723,3 +723,31 @@ section { margin: 1.5rem 0; }
     scroll-behavior: auto !important;
   }
 }
+
+
+/* Governance local policy composition (#191 / G01-G03, G05, G08). */
+button:disabled { cursor: not-allowed; opacity: .55; }
+button.secondary { background: transparent; border: 1px solid var(--color-border); color: var(--color-text); }
+.governance-header { align-items: start; border-bottom: 1px solid var(--color-border); display: flex; gap: var(--space-4); justify-content: space-between; margin-bottom: var(--space-4); padding-bottom: var(--space-4); }
+.governance-header h1 { margin: 0 0 var(--space-2); }
+.governance-header p { max-width: 52rem; }
+.governance-main-tabs, .governance-summary { display: grid; gap: var(--space-2); margin-bottom: var(--space-4); }
+.governance-main-tabs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.governance-main-tabs a { border-bottom: 2px solid var(--color-border); color: var(--color-muted); min-height: 44px; padding: var(--space-3); text-decoration: none; }
+.governance-main-tabs a[aria-current="page"] { border-color: var(--color-accent); color: var(--color-text); font-weight: 700; }
+.governance-main-tabs .status { display: block; margin-top: var(--space-1); }
+.governance-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.governance-summary-card, .governance-preview-rail section { background: var(--color-panel); border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-4); }
+.governance-summary-card h2, .governance-preview-rail h2 { font-size: var(--font-base); margin: 0 0 var(--space-2); }
+.governance-summary-card p { margin: var(--space-2) 0 0; }
+.summary-value { color: var(--color-accent); font-size: var(--font-lg); font-weight: 700; }
+.governance-workspace { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1fr) minmax(16rem, var(--rail-width)); margin-top: var(--space-5); }
+.governance-preview-rail { display: grid; align-content: start; gap: var(--space-3); }
+.mcp-rule-toolbar, .governance-save-bar { align-items: end; display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: space-between; margin-bottom: var(--space-3); }
+.mcp-rule-toolbar label { color: var(--color-muted); display: grid; gap: var(--space-1); min-width: 12rem; }
+.mcp-rule-toolbar select { background: var(--color-panel); border: 1px solid var(--color-border); border-radius: var(--radius); color: var(--color-text); font: inherit; min-height: 2.5rem; padding: .45rem .65rem; }
+.mcp-rule-edit { align-items: center; display: flex; gap: var(--space-1); white-space: nowrap; }
+.governance-save-bar { border-top: 1px solid var(--color-border); margin-top: var(--space-3); padding-top: var(--space-3); }
+.governance-save-bar > div { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+@media (max-width: 1024px) { .governance-workspace { grid-template-columns: 1fr; } .governance-preview-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 767px) { .governance-header, .mcp-rule-toolbar { align-items: stretch; flex-direction: column; } .governance-main-tabs, .governance-summary, .governance-preview-rail { grid-template-columns: 1fr; } .governance-main-tabs a { min-height: var(--target-min); } }

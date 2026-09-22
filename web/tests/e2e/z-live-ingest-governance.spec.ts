@@ -96,7 +96,7 @@ test('saves an observed MCP server and reloads findings without mocks', async ({
   const checkbox = page.getByRole('checkbox', { name: serverName });
   await expect(checkbox).toBeVisible();
   await checkbox.check();
-  await page.getByRole('button', { name: 'Save allowlist' }).click();
+  await page.getByRole('button', { name: 'Save local changes' }).first().click();
 
   await expect(page).toHaveURL(/\/governance\?saved=1$/);
   await expect(page.getByRole('status')).toContainText('MCP allowlist saved');
@@ -113,6 +113,6 @@ test('saves an observed MCP server and reloads findings without mocks', async ({
   });
 
   await checkbox.uncheck();
-  await page.getByRole('button', { name: 'Save allowlist' }).click();
+  await page.getByRole('button', { name: 'Save local changes' }).first().click();
   await expect(page.getByRole('status')).toContainText('MCP allowlist saved');
 });

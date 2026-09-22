@@ -231,14 +231,25 @@ type pullRequestsData struct {
 // governanceData is the server-rendered Governance findings view (#151)
 // plus Access Rules tab shells (#160).
 type governanceData struct {
-	RiskyAccess    governance.RiskyAccess
-	UnapprovedMCP  governance.UnapprovedMCP
-	MCPServers     []mcpAllowlistOption
-	SaveAvailable  bool
-	Saved          bool
-	Error          string
-	ActiveRulesTab string
-	RulesShell     *accessRulesShell // set for unavailable Access Rules tabs
+	RiskyAccess         governance.RiskyAccess
+	UnapprovedMCP       governance.UnapprovedMCP
+	MCPServers          []mcpAllowlistOption
+	MCPConfiguredCount  int
+	MCPPolicyConfigured bool
+	MCPPreview          governancePreview
+	SaveAvailable       bool
+	Saved               bool
+	Error               string
+	ActiveRulesTab      string
+	RulesShell          *accessRulesShell // set for unavailable Access Rules tabs
+}
+
+// governancePreview explains the current local MCP policy evaluation. It is
+// deliberately a finding state, not an enforcement decision (#191 / G05).
+type governancePreview struct {
+	State       string
+	Title       string
+	Description string
 }
 
 // accessRulesShell is honest unavailable copy for Skills / Paths / Prompt tabs (#160).
@@ -806,8 +817,10 @@ func (s *Server) governancePageData(r *http.Request, selected []string) governan
 		allowlist = selected
 	}
 	data := governanceData{
-		SaveAvailable:  s.mcpAllowlistController != nil,
-		ActiveRulesTab: rulesTabMCP,
+		SaveAvailable:       s.mcpAllowlistController != nil,
+		ActiveRulesTab:      rulesTabMCP,
+		MCPConfiguredCount:  len(allowlist),
+		MCPPolicyConfigured: len(allowlist) > 0,
 	}
 	events, err := s.insightSourceEvents(r)
 	if err != nil {
@@ -822,7 +835,28 @@ func (s *Server) governancePageData(r *http.Request, selected []string) governan
 	if data.MCPServers == nil {
 		data.MCPServers = mcpAllowlistOptions(insights.MCPInventory{}, allowlist)
 	}
+	data.MCPPreview = governancePreviewFor(data.UnapprovedMCP)
 	return data
+}
+
+func governancePreviewFor(result governance.UnapprovedMCP) governancePreview {
+	switch result.Outcome {
+	case governance.OutcomeViolation:
+		return governancePreview{
+			State: "violation", Title: "Finding",
+			Description: "An observed MCP server is outside the local allowlist. This records evidence only; it does not block use.",
+		}
+	case governance.OutcomeNotViolation:
+		return governancePreview{
+			State: "not_violation", Title: "No finding",
+			Description: "Identifiable observed MCP servers match the local allowlist.",
+		}
+	default:
+		return governancePreview{
+			State: "indeterminate", Title: "Indeterminate",
+			Description: "A local finding cannot be decided until an allowlist and identifiable MCP evidence are available.",
+		}
+	}
 }
 
 func mcpAllowlistOptions(inventory insights.MCPInventory, allowlist []string) []mcpAllowlistOption {
