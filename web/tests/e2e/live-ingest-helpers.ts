@@ -106,14 +106,69 @@ export async function expectGovernanceAccessRulesShells(
     'Files & Paths',
     'Prompt Keywords',
   ]);
-  await expect(page.getByRole('button', { name: 'Save allowlist' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Governance Policies' })).toBeVisible();
+  await expect(page.getByLabel('Local policy summary')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Policy Preview' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save local changes' }).first()).toBeVisible();
 
   await page.getByRole('tab', { name: 'Skills' }).click();
   await expect(page).toHaveURL(/\/governance\?rules=skills$/);
   await expect(page.getByText('No allow or block counts are shown')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Save allowlist' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Save local changes' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Publish' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Enforce' })).toHaveCount(0);
+}
+
+/**
+ * Client-side MCP editor behaviours for #191 / G03+G05: dirty count/diff, filter
+ * without dropping hidden selections, reset to the active baseline, and
+ * keep/discard navigation. Shared to avoid Sonar CPD across live specs.
+ */
+export async function expectGovernanceMCPEditorInteractions(
+  page: Page,
+  serverName: string,
+): Promise<void> {
+  const row = page.locator('.mcp-rule-row', { hasText: serverName });
+  const checkbox = row.locator('input[name="mcp_server"]');
+  const filter = page.locator('#mcp-rule-filter');
+  const summary = page.locator('#mcp-dirty-summary');
+  const save = page.getByRole('button', { name: 'Save local changes' }).first();
+
+  await checkbox.check();
+  await expect(summary).toBeVisible();
+  await expect(summary).toContainText('1 unsaved local MCP allowlist change(s)');
+  await expect(summary).toContainText(serverName);
+  await expect(save).toBeEnabled();
+
+  await filter.selectOption('not-allowlisted');
+  await expect(row).toBeHidden();
+  // Row is aria-hidden while filtered out; assert via the row locator so the
+  // selection is proven retained (getByRole skips hidden controls).
+  await expect(checkbox).toBeChecked();
+  await filter.selectOption('allowlisted');
+  await expect(row).toBeVisible();
+  await filter.selectOption('all');
+
+  await page.getByRole('button', { name: 'Reset changes' }).click();
+  await expect(summary).toBeHidden();
+  await expect(checkbox).not.toBeChecked();
+  await expect(save).toBeDisabled();
+
+  await checkbox.check();
+  page.once('dialog', (dialog) => dialog.dismiss());
+  await page
+    .getByLabel('Primary navigation')
+    .getByRole('link', { name: 'Overview', exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/governance/);
+  await expect(checkbox).toBeChecked();
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await page
+    .getByLabel('Primary navigation')
+    .getByRole('link', { name: 'Overview', exact: true })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Orchestration overview' })).toBeVisible();
 }
 
 // codexOTLPLogs builds a raw codex_cli_rs OTLP/HTTP log payload carrying a
