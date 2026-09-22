@@ -716,7 +716,10 @@ export type LiveEventDetail = {
   event_id: string;
   event_type: string;
   attributes: Record<string, unknown>;
-  provider_extensions: Record<string, Record<string, unknown>>;
+  // provider_extensions is heterogeneous: object blocks like `correlation`/`event`
+  // sit alongside scalar entries such as the namespaced `request_id` string
+  // (see normaliseSampleEvent), so values are `unknown` and narrowed at the callsite.
+  provider_extensions: Record<string, unknown>;
 };
 
 // fetchEventDetail reads one retained session event from the live daemon's
