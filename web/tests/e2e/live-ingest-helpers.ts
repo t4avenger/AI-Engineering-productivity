@@ -128,8 +128,8 @@ export async function expectGovernanceMCPEditorInteractions(
   page: Page,
   serverName: string,
 ): Promise<void> {
-  const checkbox = page.getByRole('checkbox', { name: serverName });
   const row = page.locator('.mcp-rule-row', { hasText: serverName });
+  const checkbox = row.locator('input[name="mcp_server"]');
   const filter = page.locator('#mcp-rule-filter');
   const summary = page.locator('#mcp-dirty-summary');
   const save = page.getByRole('button', { name: 'Save local changes' }).first();
@@ -142,6 +142,8 @@ export async function expectGovernanceMCPEditorInteractions(
 
   await filter.selectOption('not-allowlisted');
   await expect(row).toBeHidden();
+  // Row is aria-hidden while filtered out; assert via the row locator so the
+  // selection is proven retained (getByRole skips hidden controls).
   await expect(checkbox).toBeChecked();
   await filter.selectOption('allowlisted');
   await expect(row).toBeVisible();
