@@ -215,6 +215,60 @@ export function codexOTLPLogs(model: string): string {
   });
 }
 
+// Paired Codex trace/log evidence for #218. The trace thread.id exactly joins
+// the log conversation.id, while turn.id identifies the one model response
+// whose span interval may be shown as Model generation.
+export function codexThreadTurnOTLPLogs(): string {
+  return codexExecOTLPLogs(
+    [
+      {
+        attributes: codexStringAttrs([
+          ['event.name', 'codex.sse_event'],
+          ['conversation.id', 'tiq-live-e2e-thread-218'],
+          ['turn.id', 'tiq-live-e2e-turn-218'],
+          ['model', 'gpt-5-codex-live'],
+        ]),
+      },
+    ],
+    '0.155.1',
+  );
+}
+
+export function codexThreadTurnOTLPTraces(): string {
+  return JSON.stringify({
+    resourceSpans: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'codex_exec' } },
+            { key: 'service.version', value: { stringValue: '0.155.1' } },
+          ],
+        },
+        scopeSpans: [
+          {
+            scope: { name: 'codex_exec' },
+            spans: [
+              {
+                traceId: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+                spanId: '4444444444444444',
+                parentSpanId: '',
+                name: 'session_task.turn',
+                startTimeUnixNano: '1790416800000000000',
+                endTimeUnixNano: '1790416802000000000',
+                attributes: [
+                  { key: 'thread.id', value: { stringValue: 'tiq-live-e2e-thread-218' } },
+                  { key: 'turn.id', value: { stringValue: 'tiq-live-e2e-turn-218' } },
+                ],
+                status: { code: 0 },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
+
 // codexPRLinkOTLPLogs is the reviewed 0.155.1 tool-result shape where Codex
 // retains a provider-emitted pull-request URL inside the tool arguments.
 export function codexPRLinkOTLPLogs(): string {
@@ -397,8 +451,11 @@ function otlpLogs(
   });
 }
 
-function codexExecOTLPLogs(logRecords: OTLPLogRecord[]): string {
-  return otlpLogs('codex_exec', '0.153.4', logRecords);
+function codexExecOTLPLogs(
+  logRecords: OTLPLogRecord[],
+  version = '0.153.4',
+): string {
+  return otlpLogs('codex_exec', version, logRecords);
 }
 
 function codexExecOTLPLog(attributes: OTLPAttribute[], body: string): string {

@@ -48,6 +48,17 @@ func TestNormalizeLogsAcceptsExecService(t *testing.T) {
 	}
 }
 
+func TestNormalizeLogsUsesObservedThreadIdentityWhenConversationIsAbsent(t *testing.T) {
+	data := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"thread.id","value":{"stringValue":"thread-only-session"}},{"key":"model","value":{"stringValue":"synthetic-model"}}]}]}]}]}`)
+	events, err := NormalizeLogs(data, time.Date(2026, 9, 26, 10, 0, 0, 0, time.UTC))
+	if err != nil || len(events) != 1 {
+		t.Fatalf("events = %#v, %v", events, err)
+	}
+	if events[0].SessionID != "codex:thread-only-session" {
+		t.Fatalf("session id = %q", events[0].SessionID)
+	}
+}
+
 func TestNormalizeLogsMapsCachedAndReasoningTokens(t *testing.T) {
 	data := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.version","value":{"stringValue":"0.153.4"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"model","value":{"stringValue":"gpt-5-codex-synthetic"}},{"key":"input_token_count","value":{"stringValue":"1200"}},{"key":"cached_token_count","value":{"stringValue":"300"}},{"key":"output_token_count","value":{"stringValue":"144"}},{"key":"reasoning_token_count","value":{"stringValue":"55"}}],"severityText":"INFO"}]}]}]}`)
 	events, err := NormalizeLogs(data, time.Date(2026, 9, 10, 20, 9, 20, 0, time.UTC))

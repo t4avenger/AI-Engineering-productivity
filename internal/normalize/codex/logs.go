@@ -28,6 +28,8 @@ var ErrUnsupportedLogs = errors.New("unsupported Codex log payload")
 const (
 	codexEventNameKey        = "event.name"
 	codexConversationIDKey   = "conversation.id"
+	codexThreadIDKey         = "thread.id"
+	codexTurnIDKey           = "turn.id"
 	codexServiceNameKey      = "service.name"
 	codexToolResultEvent     = "codex.tool_result"
 	codexSandboxOutcomeEvent = "codex.sandbox_outcome"
@@ -61,9 +63,10 @@ type logRecord struct {
 }
 
 // NormalizeLogs maps the reviewed Codex OTLP log shape directly to canonical
-// events. When a conversation.id is present, it becomes the provider-prefixed
-// native session ID. Records without that field fall back to a non-keyed
-// content ID for uniqueness only (epic #87 — no ingest-time hiding).
+// events. A conversation.id or thread.id becomes the provider-prefixed native
+// session ID; the latter permits the reviewed trace-to-log correlation path.
+// Records without either field fall back to a non-keyed content ID for
+// uniqueness only (epic #87 — no ingest-time hiding).
 func NormalizeLogs(data []byte, receivedAt time.Time) ([]canonical.Event, error) {
 	var payload logsPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
@@ -173,8 +176,10 @@ func attachCodexLogTokenCounts(attributes, fields map[string]any) {
 }
 
 func codexLogSessionID(fields map[string]any, fallback string) string {
-	if conversationID, ok := normalize.ObservedString(fields[codexConversationIDKey]); ok {
-		return normalize.ProviderNativeSessionID("codex:", conversationID)
+	for _, key := range []string{codexConversationIDKey, codexThreadIDKey} {
+		if providerID, ok := normalize.ObservedString(fields[key]); ok {
+			return normalize.ProviderNativeSessionID("codex:", providerID)
+		}
 	}
 	return fallback
 }

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"net/http"
 	"testing"
+
+	"github.com/wayne/telemetryiq/internal/breakdown"
 )
 
 func TestCodexTraceWithObservedConversationIDJoinsLogSession(t *testing.T) {
@@ -26,5 +28,30 @@ func TestCodexTraceWithObservedConversationIDJoinsLogSession(t *testing.T) {
 	spans := getSpanPage(t, server.URL+"/api/v1/sessions/codex:synthetic-conversation/spans?limit=10")
 	if len(spans.Data) != 2 || spans.Data[0].TraceID != "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" {
 		t.Fatalf("joined spans = %#v", spans.Data)
+	}
+}
+
+func TestCodexThreadTurnTraceProjectsObservedModelGeneration(t *testing.T) {
+	server, _ := newPersistentTestServer(t)
+	for _, ingest := range []struct {
+		path, fixture string
+	}{
+		{path: "/v1/logs", fixture: "codex-0.155.1-log-thread-turn-otlp.json"},
+		{path: "/v1/traces", fixture: "codex-0.155.1-trace-thread-turn-otlp.json"},
+	} {
+		response := postOTLPToPath(t, server.URL, ingest.path, metricsFixturePayloadBytes(t, ingest.fixture), otlpContentTypeJSON)
+		if response.StatusCode != http.StatusAccepted {
+			t.Fatalf("%s ingest status = %d", ingest.path, response.StatusCode)
+		}
+		closeBody(t, response)
+	}
+
+	result := getBreakdown(t, server.URL+"/api/v1/sessions/codex:tiq-thread-218/breakdown")
+	if result.Availability != breakdown.AvailabilityAvailable || len(result.Categories) != 1 {
+		t.Fatalf("breakdown = %#v", result)
+	}
+	category := result.Categories[0]
+	if category.ID != breakdown.CategoryModelGeneration || category.DurationMs != 2_000 || len(category.SourceEventIDs) != 1 {
+		t.Fatalf("category = %#v", category)
 	}
 }

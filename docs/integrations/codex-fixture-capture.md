@@ -58,6 +58,18 @@ Committed evidence:
 - `fixtures/codex/observed-sanitised/codex-0.154.0-trace-spans-otlp.json`
 - `fixtures/codex/expected/codex-0.154.0-trace-spans.events.json`
 
+## Trace turn-to-model correlation capture
+
+For a Codex Session Breakdown category, capture one isolated synthetic
+`codex exec` run with both logs and traces. Retain only structural fixture data
+that proves: the `session_task.turn` span's `thread.id` exactly equals a paired
+log's provider session value, and the span's `turn.id` exactly equals a paired
+`codex.sse_event` log `turn.id` that reports `model`. Sanitise every identifier
+and timestamp before commit. Do not substitute matching timestamps, model/token
+values, span names, or a thread match alone for the exact turn key. Committed
+0.155.1 evidence is `codex-0.155.1-trace-thread-turn-otlp.json` and
+`codex-0.155.1-log-thread-turn-otlp.json`.
+
 ## Skill injection capture
 
 To raise Skill invocations above `unknown`, add a synthetic skill under the

@@ -109,7 +109,7 @@ func normalizeLiveTraceSpan(resource, scope, span, resourceAttributes map[string
 	}
 	spanAttributes := traceAttributeValues(span["attributes"])
 	attributes := codexTraceAttributes(spanAttributes)
-	sessionID, sessionIDSource := codexTraceSessionIdentity(resourceAttributes, fields.traceID)
+	sessionID, sessionIDSource := codexTraceSessionIdentity(resourceAttributes, spanAttributes, fields.traceID)
 
 	return canonical.Event{
 		SchemaVersion: canonicalSchemaVersion,
@@ -137,14 +137,16 @@ func normalizeLiveTraceSpan(resource, scope, span, resourceAttributes map[string
 	}, nil
 }
 
-// codexTraceSessionIdentity promotes only the provider-emitted resource-level
-// conversation.id observed alongside Codex logs in CLI 0.155.1. It is the same
-// raw provider value used by log normalisation, so both surfaces share a
-// session only when the provider supplied the exact identifier. All other
-// traces remain trace-scoped observations.
-func codexTraceSessionIdentity(resourceAttributes map[string]any, traceID string) (string, string) {
+// codexTraceSessionIdentity promotes only reviewed provider-emitted identity
+// keys. CLI 0.155.1 supplies conversation.id at the resource level and a
+// session_task.turn can instead carry thread.id, whose raw value is observed on
+// the log surface. All other traces remain trace-scoped observations.
+func codexTraceSessionIdentity(resourceAttributes, spanAttributes map[string]any, traceID string) (string, string) {
 	if conversationID, ok := normalize.ObservedString(resourceAttributes[codexConversationIDKey]); ok {
 		return normalize.ProviderNativeSessionID("codex:", conversationID), codexConversationIDKey
+	}
+	if threadID, ok := normalize.ObservedString(spanAttributes[codexThreadIDKey]); ok {
+		return normalize.ProviderNativeSessionID("codex:", threadID), codexThreadIDKey
 	}
 	return "codex:trace:" + traceID, "trace.id"
 }
@@ -188,7 +190,7 @@ func removeTraceUnavailable(values []string, target string) []string {
 func liveTraceCorrelation(fields traceSpanFields, sessionID, sessionIDSource string) map[string]any {
 	correlation := traceCorrelation(fields.eventID, fields.traceID, fields.spanID, fields.parentSpanID, fields.occurredAt)
 	correlation["session_id_source"] = sessionIDSource
-	if sessionIDSource == codexConversationIDKey {
+	if sessionIDSource == codexConversationIDKey || sessionIDSource == codexThreadIDKey {
 		correlation["provider_session_id"] = strings.TrimPrefix(sessionID, "codex:")
 	}
 	return correlation

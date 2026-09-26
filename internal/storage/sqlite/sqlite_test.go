@@ -53,6 +53,19 @@ func TestReconstructedCodexSessionCarriesEnvironmentMetadata(t *testing.T) {
 	}
 }
 
+func TestSessionIdentityUsesCodexThreadID(t *testing.T) {
+	event := canonical.Event{
+		Tool: "codex", SessionID: "codex:thread-only-session",
+		ProviderExtensions: map[string]any{
+			"log_attributes": map[string]any{"thread.id": "thread-only-session"},
+		},
+	}
+	scope, source := sessionIdentity([]canonical.Event{event})
+	if scope != identityProvider || source != codexThreadIDSource {
+		t.Fatalf("identity = %q, %q", scope, source)
+	}
+}
+
 func TestReconstructedSessionPromotesOnlyUnambiguousPRLink(t *testing.T) {
 	tests := []struct {
 		name       string

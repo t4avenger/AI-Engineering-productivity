@@ -253,6 +253,46 @@ func TestCalculateKeepsFirstCategoryForDuplicateIdentity(t *testing.T) {
 	}
 }
 
+func TestCalculateCodexTurnRequiresExactObservedModelResponse(t *testing.T) {
+	base := time.Date(2026, 9, 26, 10, 0, 0, 0, time.UTC)
+	for _, test := range []struct {
+		name, logTurnID, availability string
+	}{
+		{name: "exact turn id is model generation", logTurnID: "turn-218", availability: AvailabilityAvailable},
+		{name: "mismatched turn id stays unavailable", logTurnID: "other-turn", availability: AvailabilityUnavailable},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			result := Calculate(codexTurnEvents(base, test.logTurnID), nil)
+			if result.Availability != test.availability {
+				t.Fatalf("availability = %#v", result)
+			}
+			if test.availability == AvailabilityAvailable {
+				if len(result.Categories) != 1 || result.Categories[0].ID != CategoryModelGeneration || result.Categories[0].DurationMs != 2_000 {
+					t.Fatalf("categories = %#v", result.Categories)
+				}
+				return
+			}
+			assertUnavailableResult(t, result, "no valid classified intervals")
+		})
+	}
+}
+
+func codexTurnEvents(base time.Time, logTurnID string) []canonical.Event {
+	span := typedSpan("codex-turn", "codex-trace", "span", "", "interaction", base, base.Add(2*time.Second))
+	span.Provider = "openai"
+	span.Tool = "codex"
+	span.EventType = "session_task.turn"
+	span.SessionID = "codex:thread-218"
+	span.ProviderExtensions["span_attributes"] = map[string]any{"thread.id": "thread-218", "turn.id": "turn-218"}
+	log := canonical.Event{
+		SchemaVersion: "0.1.0", EventID: "codex-log", EventType: "codex.sse_event",
+		OccurredAt: base, ReceivedAt: base, Provider: "openai", Tool: "codex",
+		SessionID: "codex:thread-218", Attributes: map[string]any{"model": "gpt-synthetic"},
+		ProviderExtensions: map[string]any{"log_attributes": map[string]any{"turn.id": logTurnID}},
+	}
+	return []canonical.Event{span, log}
+}
+
 func TestCalculateSubMillisecondFragmentsStillPartition(t *testing.T) {
 	base := time.Date(2026, 9, 20, 10, 0, 0, 0, time.UTC)
 	// 1500µs tool span inside a 2ms window leaves sub-ms unclassified residue that
