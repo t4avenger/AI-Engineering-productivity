@@ -122,6 +122,34 @@ func TestManagerDoesNotPublishFailedSave(t *testing.T) {
 	}
 }
 
+func TestManagerPersistsExactSkillsAllowlist(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	manager, err := NewManager(path, Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.SaveSkillsAllowlist([]string{"Deploy", "deploy"}); err != nil {
+		t.Fatalf("save skills allowlist: %v", err)
+	}
+	want := []string{"Deploy", "deploy"}
+	if got := manager.SkillsAllowlist(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("skills allowlist = %#v, want %#v", got, want)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(loaded.Governance.SkillsAllowlist, want) {
+		t.Fatalf("reloaded skills allowlist = %#v", loaded.Governance.SkillsAllowlist)
+	}
+	if err := manager.SaveSkillsAllowlist([]string{" "}); err == nil {
+		t.Fatal("expected invalid skills allowlist error")
+	}
+	if got := manager.SkillsAllowlist(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("failed skill save changed active policy: %#v", got)
+	}
+}
+
 func TestManagerDoesNotPublishWriteFailure(t *testing.T) {
 	root := t.TempDir()
 	blockedParent := filepath.Join(root, "not-a-directory")

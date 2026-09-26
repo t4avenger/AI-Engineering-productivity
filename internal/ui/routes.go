@@ -2,6 +2,7 @@ package ui
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -51,13 +52,18 @@ func (s *Server) servePublic(w http.ResponseWriter, r *http.Request) bool {
 }
 
 type route struct {
-	match  func(method, path string) bool
-	handle func(*Server, http.ResponseWriter, *http.Request)
+	match              func(method, path string) bool
+	handle             func(*Server, http.ResponseWriter, *http.Request)
+	requiresSameOrigin bool
 }
 
 func (s *Server) serveProtected(w http.ResponseWriter, r *http.Request) {
 	for _, route := range protectedRoutes {
 		if route.match(r.Method, r.URL.Path) {
+			if route.requiresSameOrigin && !s.sameOriginCookieMutation(r) {
+				http.Error(w, "Cross-origin dashboard mutations are not allowed.", http.StatusForbidden)
+				return
+			}
 			route.handle(s, w, r)
 			return
 		}
@@ -76,11 +82,41 @@ var protectedRoutes = []route{
 	{match: exact(http.MethodGet, pathModels), handle: (*Server).modelsPage},
 	{match: exact(http.MethodGet, pathPullRequests), handle: (*Server).pullRequestsPage},
 	{match: exact(http.MethodGet, pathGovernance), handle: (*Server).governancePage},
-	{match: exact(http.MethodPost, pathMCPAllowlist), handle: (*Server).governanceMCPAllowlistSave},
+	{match: exact(http.MethodPost, pathMCPAllowlist), handle: (*Server).governanceMCPAllowlistSave, requiresSameOrigin: true},
+	{match: exact(http.MethodPost, pathSkillsAllowlist), handle: (*Server).governanceSkillsAllowlistSave, requiresSameOrigin: true},
 	{match: exact(http.MethodGet, pathIntegrations), handle: (*Server).integrationsPage},
 	{match: exact(http.MethodGet, pathPrivacy), handle: (*Server).privacyPage},
 	{match: exact(http.MethodPost, pathPrivacyDelete), handle: (*Server).privacyDeleteAll},
 	{match: exact(http.MethodGet, pathCosts), handle: (*Server).costsPage},
+}
+
+// sameOriginCookieMutation requires browser form posts authenticated by the
+// dashboard cookie to come from this local daemon. Bearer-token management
+// clients are deliberately exempt because they do not rely on ambient cookie
+// credentials and may not have a browser Origin or Referer header.
+func (s *Server) sameOriginCookieMutation(r *http.Request) bool {
+	if s.bearerAuthenticated(r) {
+		return true
+	}
+	return sameRequestOrigin(r, r.Header.Get("Origin")) || sameRequestOrigin(r, r.Header.Get("Referer"))
+}
+
+func (s *Server) bearerAuthenticated(r *http.Request) bool {
+	const bearerPrefix = "Bearer "
+	header := r.Header.Get("Authorization")
+	return strings.HasPrefix(header, bearerPrefix) && tokenMatches(s.expected, strings.TrimPrefix(header, bearerPrefix))
+}
+
+func sameRequestOrigin(r *http.Request, source string) bool {
+	origin, err := url.Parse(source)
+	if err != nil || origin.Scheme == "" || origin.Host == "" || origin.User != nil {
+		return false
+	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	return strings.EqualFold(origin.Scheme, scheme) && strings.EqualFold(origin.Host, r.Host)
 }
 
 func exact(method, path string) func(string, string) bool {
@@ -101,7 +137,7 @@ func prefixSuffix(method, prefixPath, suffix string) func(string, string) bool {
 
 func (s *Server) isDashboardPath(path string) bool {
 	switch path {
-	case pathHome, pathSessions, pathInsights, pathModels, pathPullRequests, pathGovernance, pathMCPAllowlist, pathIntegrations, pathPrivacy, pathPrivacyDelete, pathCosts:
+	case pathHome, pathSessions, pathInsights, pathModels, pathPullRequests, pathGovernance, pathMCPAllowlist, pathSkillsAllowlist, pathIntegrations, pathPrivacy, pathPrivacyDelete, pathCosts:
 		return true
 	}
 	return strings.HasPrefix(path, pathSessionsPrefix) || strings.HasPrefix(path, pathEventsPrefix)

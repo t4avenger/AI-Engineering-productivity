@@ -50,6 +50,22 @@ func TestLoadAcceptsGovernanceMCPAllowlist(t *testing.T) {
 	}
 }
 
+func TestLoadAcceptsExactSkillsAllowlist(t *testing.T) {
+	path := writeConfig(t, validConfiguration+`governance:
+  skills_allowlist:
+    - Deploy
+    - review
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("load configuration: %v", err)
+	}
+	want := []string{"Deploy", "review"}
+	if !reflect.DeepEqual(cfg.Governance.SkillsAllowlist, want) {
+		t.Fatalf("skills allowlist = %#v, want %#v", cfg.Governance.SkillsAllowlist, want)
+	}
+}
+
 func TestLoadRejectsInvalidConfigurationWithActionableError(t *testing.T) {
 	path := writeConfig(t, strings.Replace(validConfiguration, "prompts: false", "prompts: true", 1))
 	_, err := Load(path)
@@ -95,6 +111,10 @@ func TestValidateRejectsUnsafeOrUnsupportedSettings(t *testing.T) {
 		{"context waste cached ratio threshold", func(c *Config) { c.Insights.ContextWaste.CachedContextRatioThreshold = 1.1 }, "insights.context_waste.cached_context_ratio_threshold"},
 		{"context waste input growth threshold", func(c *Config) { c.Insights.ContextWaste.InputTokenGrowthThreshold = 0.9 }, "insights.context_waste.input_token_growth_threshold"},
 		{"governance blank allowlist entry", func(c *Config) { c.Governance.MCPAllowlist = []string{"filesystem", "  "} }, "governance.mcp_allowlist[1]"},
+		{"governance blank skill entry", func(c *Config) { c.Governance.SkillsAllowlist = []string{"deploy", "  "} }, "governance.skills_allowlist[1]"},
+		{"governance too many skills", func(c *Config) { c.Governance.SkillsAllowlist = make([]string, 101) }, "governance.skills_allowlist must contain at most 100"},
+		{"governance oversized skill", func(c *Config) { c.Governance.SkillsAllowlist = []string{strings.Repeat("x", 1025)} }, "governance.skills_allowlist[0]"},
+		{"governance oversized Unicode skill", func(c *Config) { c.Governance.SkillsAllowlist = []string{strings.Repeat("界", 1025)} }, "governance.skills_allowlist[0]"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -104,6 +124,14 @@ func TestValidateRejectsUnsafeOrUnsupportedSettings(t *testing.T) {
 				t.Fatalf("expected %q error, got %v", test.want, err)
 			}
 		})
+	}
+}
+
+func TestValidateAcceptsSkillIdentityAtUnicodeCharacterLimit(t *testing.T) {
+	cfg := Default()
+	cfg.Governance.SkillsAllowlist = []string{strings.Repeat("界", 1024)}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("skill identity at Unicode character limit rejected: %v", err)
 	}
 }
 

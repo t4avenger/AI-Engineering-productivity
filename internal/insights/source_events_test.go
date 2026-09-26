@@ -34,3 +34,32 @@ func TestSourceEventsFromSessionKeepsMCPIdentityWithTokenFields(t *testing.T) {
 		t.Fatalf("identity state = %q, want provider_reported", inventory.Servers[0].IdentityState)
 	}
 }
+
+func TestSourceEventsFromSessionRetainsIncompleteSkillPolicyEvidence(t *testing.T) {
+	now := time.Now().UTC()
+	events := []canonical.Event{
+		{
+			EventID: "inferred", EventType: "skill_invocation", SessionID: "s1",
+			OccurredAt: now, ReceivedAt: now, Provider: "anthropic", Tool: "claude-code",
+			ProviderExtensions: map[string]any{"skill_detection": "inferred"},
+		},
+		{
+			EventID: "unnamed-explicit", EventType: "skill_invocation", SessionID: "s1",
+			OccurredAt: now, ReceivedAt: now, Provider: "anthropic", Tool: "claude-code",
+			ProviderExtensions: map[string]any{"skill_detection": "explicit", "skill": map[string]any{"name": ""}},
+		},
+	}
+
+	thin := SourceEventsFromSession(events)
+	if len(thin) != 3 {
+		t.Fatalf("retained events = %#v", thin)
+	}
+	for _, event := range thin[:2] {
+		if event.ProviderExtensions["skill_detection"] == nil {
+			t.Fatalf("incomplete skill signal was dropped: %#v", event)
+		}
+	}
+	if thin[1].ProviderExtensions["skill"].(map[string]any)["name"] != "" {
+		t.Fatalf("explicit skill evidence = %#v", thin[1].ProviderExtensions)
+	}
+}

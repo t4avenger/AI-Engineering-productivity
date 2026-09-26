@@ -139,7 +139,7 @@ These are planned interfaces, not assertions that schemas/detectors exist today.
   Use the current 64 KiB form body cap, atomic persistence and in-process reload.
   Validate the whole submission before writes, preserve unrelated settings,
   and never log rule values or matched content. Limit each new rule list to 100
-  entries and each pattern/identity to 1024 UTF-8 bytes; labels to 120 bytes and
+  entries and each pattern/identity to 1024 Unicode characters; labels to 120 bytes and
   prompt-rule IDs to 64 ASCII letters/digits/underscore/hyphen characters.
   Document these additive limits in the schema and test boundary values.
   POST without HTMX must work; HTMX returns the same validation/result semantics.

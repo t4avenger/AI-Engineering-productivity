@@ -32,6 +32,37 @@ type testAllowlistController struct {
 	saveErr error
 }
 
+type testPolicyController struct {
+	mcp     testAllowlistController
+	mu      sync.RWMutex
+	skills  []string
+	saveErr error
+}
+
+func (c *testPolicyController) MCPAllowlist() []string {
+	return c.mcp.MCPAllowlist()
+}
+
+func (c *testPolicyController) SaveMCPAllowlist(names []string) error {
+	return c.mcp.SaveMCPAllowlist(names)
+}
+
+func (c *testPolicyController) SkillsAllowlist() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return append([]string(nil), c.skills...)
+}
+
+func (c *testPolicyController) SaveSkillsAllowlist(names []string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.saveErr != nil {
+		return c.saveErr
+	}
+	c.skills = append([]string(nil), names...)
+	return nil
+}
+
 func (c *testAllowlistController) MCPAllowlist() []string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -1854,9 +1885,6 @@ func TestGovernanceFindingsPage(t *testing.T) {
 			`data-mcp-policy="not-allowlisted"`,
 			`data-active-checked="true"`,
 		})
-		if strings.Contains(body, "Allowlist not configured") {
-			t.Fatalf("configured allowlist must not show policy_unconfigured: %q", body)
-		}
 	})
 }
 
@@ -2020,14 +2048,144 @@ func TestGovernanceAllowlistWriteFailureKeepsActivePolicy(t *testing.T) {
 	}
 }
 
+func TestGovernanceSkillsAllowlistWriteFailureKeepsActivePolicy(t *testing.T) {
+	repo := governanceFindingsFixture(t)
+	now := time.Now().UTC()
+	repo.events["gov-session-1"] = append(repo.events["gov-session-1"], canonical.Event{
+		EventID: "skill-e1", SessionID: "gov-session-1", EventType: "skill_invocation",
+		OccurredAt: now, ReceivedAt: now, Provider: "openai", Tool: "codex",
+		ProviderExtensions: map[string]any{"skill_detection": "explicit", "skill": map[string]any{"name": "deploy"}},
+	})
+	controller := &testPolicyController{skills: []string{"configured-only"}, saveErr: errors.New("disk full")}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, controller.MCPAllowlist(), controller)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+
+	response := postSkillsAllowlist(t, handler, cookie, url.Values{"skill": {"deploy"}})
+	body := response.Body.String()
+	if response.Code != http.StatusInternalServerError || !strings.Contains(body, "active policy was not changed") {
+		t.Fatalf("write failure response = %d: %q", response.Code, body)
+	}
+	if got := controller.SkillsAllowlist(); !equalStrings(got, []string{"configured-only"}) {
+		t.Fatalf("failed write changed skills allowlist: %#v", got)
+	}
+	assertContainsAll(t, body, []string{
+		`name="skill" value="deploy" data-active-checked="false" checked`,
+		`name="skill" value="configured-only" data-active-checked="true"`,
+		"Finding",
+		"Explicit provider identity",
+	})
+	if strings.Contains(body, `name="skill" value="configured-only" data-active-checked="true" checked`) {
+		t.Fatalf("failed save draft must not keep configured-only checked when omitted from submit: %q", body)
+	}
+}
+
+func TestGovernanceSkillsAllowlistSaveRoundTrip(t *testing.T) {
+	repo := governanceFindingsFixture(t)
+	now := time.Now().UTC()
+	repo.events["gov-session-1"] = append(repo.events["gov-session-1"], canonical.Event{
+		EventID: "skill-e1", SessionID: "gov-session-1", EventType: "skill_invocation",
+		OccurredAt: now, ReceivedAt: now, Provider: "openai", Tool: "codex",
+		ProviderExtensions: map[string]any{"skill_detection": "explicit", "skill": map[string]any{"name": "deploy"}},
+	})
+	controller := &testPolicyController{skills: []string{"configured-only"}}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, controller.MCPAllowlist(), controller)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+
+	initial := getAuthed(t, handler, cookie, "/governance?rules=skills").Body.String()
+	assertContainsAll(t, initial, []string{
+		`id="skills-allowlist-form"`,
+		`name="skill" value="deploy"`,
+		"Explicit provider identity",
+		"configured-only",
+	})
+
+	response := postSkillsAllowlist(t, handler, cookie, url.Values{"skill": {"deploy"}})
+	if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/governance?rules=skills&saved=1" {
+		t.Fatalf("save response = %d location %q", response.Code, response.Header().Get("Location"))
+	}
+	if got := controller.SkillsAllowlist(); !equalStrings(got, []string{"deploy"}) {
+		t.Fatalf("saved skills allowlist = %#v", got)
+	}
+	saved := getAuthed(t, handler, cookie, "/governance?rules=skills&saved=1").Body.String()
+	assertContainsAll(t, saved, []string{"Skills allowlist saved", "Explicit provider identity"})
+}
+
 func postAllowlist(t *testing.T, handler http.Handler, cookie *http.Cookie, values url.Values) *httptest.ResponseRecorder {
 	t.Helper()
-	request := httptest.NewRequest(http.MethodPost, "/governance/mcp-allowlist", strings.NewReader(values.Encode()))
+	return postGovernanceAllowlist(t, handler, cookie, "/governance/mcp-allowlist", values, "http://example.com", "")
+}
+
+func postSkillsAllowlist(t *testing.T, handler http.Handler, cookie *http.Cookie, values url.Values) *httptest.ResponseRecorder {
+	t.Helper()
+	return postGovernanceAllowlist(t, handler, cookie, "/governance/skills-allowlist", values, "http://example.com", "")
+}
+
+func postGovernanceAllowlist(t *testing.T, handler http.Handler, cookie *http.Cookie, path string, values url.Values, origin, bearer string) *httptest.ResponseRecorder {
+	t.Helper()
+	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(values.Encode()))
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	request.AddCookie(cookie)
+	if origin != "" {
+		request.Header.Set("Origin", origin)
+	}
+	if bearer != "" {
+		request.Header.Set("Authorization", "Bearer "+bearer)
+	}
+	if cookie != nil {
+		request.AddCookie(cookie)
+	}
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	return response
+}
+
+func TestGovernanceAllowlistRejectsCrossOriginCookieMutation(t *testing.T) {
+	repo := governanceFindingsFixture(t)
+	now := time.Now().UTC()
+	repo.events["gov-session-1"] = append(repo.events["gov-session-1"], canonical.Event{
+		EventID: "skill-e1", SessionID: "gov-session-1", EventType: "skill_invocation",
+		OccurredAt: now, ReceivedAt: now, Provider: "openai", Tool: "codex",
+		ProviderExtensions: map[string]any{"skill_detection": "explicit", "skill": map[string]any{"name": "deploy"}},
+	})
+	controller := &testPolicyController{mcp: testAllowlistController{names: []string{"configured-only"}}, skills: []string{"configured-only"}}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, controller.MCPAllowlist(), controller)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+
+	tests := []struct {
+		name      string
+		path      string
+		values    url.Values
+		unchanged func() []string
+	}{
+		{"MCP", "/governance/mcp-allowlist", url.Values{"mcp_server": {"rogue-tool"}}, controller.MCPAllowlist},
+		{"Skills", "/governance/skills-allowlist", url.Values{"skill": {"deploy"}}, controller.SkillsAllowlist},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			response := postGovernanceAllowlist(t, handler, cookie, test.path, test.values, "https://attacker.invalid", "")
+			if response.Code != http.StatusForbidden || !strings.Contains(response.Body.String(), "Cross-origin") {
+				t.Fatalf("cross-origin response = %d: %q", response.Code, response.Body.String())
+			}
+			if got := test.unchanged(); !equalStrings(got, []string{"configured-only"}) {
+				t.Fatalf("cross-origin request changed policy: %#v", got)
+			}
+			response = postGovernanceAllowlist(t, handler, nil, test.path, test.values, "", "test-token")
+			if response.Code != http.StatusSeeOther {
+				t.Fatalf("bearer-token response = %d: %q", response.Code, response.Body.String())
+			}
+		})
+	}
 }
 
 func equalStrings(left, right []string) bool {

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
 )
@@ -71,6 +72,11 @@ type Governance struct {
 	// unapproved-MCP policy. When empty, the policy reports indeterminate because
 	// approval cannot be judged without a declared allowlist.
 	MCPAllowlist []string `yaml:"mcp_allowlist"`
+	// SkillsAllowlist is the set of exact provider-reported skill identities
+	// approved by the local detect-and-report policy. It is deliberately
+	// separate from MCP identity handling: provider skill names are compared
+	// exactly, never case-folded or inferred.
+	SkillsAllowlist []string `yaml:"skills_allowlist"`
 }
 
 // ContextWaste configures the §13.10 context-waste insight thresholds.
@@ -252,6 +258,17 @@ func (c Config) validateGovernance() error {
 	for i, name := range c.Governance.MCPAllowlist {
 		if strings.TrimSpace(name) == "" {
 			return fmt.Errorf("governance.mcp_allowlist[%d] must not be blank", i)
+		}
+	}
+	if len(c.Governance.SkillsAllowlist) > 100 {
+		return fmt.Errorf("governance.skills_allowlist must contain at most 100 entries, got %d", len(c.Governance.SkillsAllowlist))
+	}
+	for i, name := range c.Governance.SkillsAllowlist {
+		if strings.TrimSpace(name) == "" {
+			return fmt.Errorf("governance.skills_allowlist[%d] must not be blank", i)
+		}
+		if utf8.RuneCountInString(name) > 1024 {
+			return fmt.Errorf("governance.skills_allowlist[%d] must be at most 1024 Unicode characters", i)
 		}
 	}
 	return nil
