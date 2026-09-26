@@ -85,18 +85,31 @@ func thinInsightEvent(event canonical.Event) (canonical.Event, bool) {
 		keep = true
 		thin.ProviderExtensions["outcome_contract"] = event.ProviderExtensions["outcome_contract"]
 	}
-	if detectionState(event) == "explicit" {
-		if _, _, ok := explicitSkill(event); ok {
-			keep = true
-			thin.ProviderExtensions["skill_detection"] = event.ProviderExtensions["skill_detection"]
-			thin.ProviderExtensions["skill"] = event.ProviderExtensions["skill"]
-		}
+	if copySkillPolicyEvidence(&thin, event) {
+		keep = true
 	}
 	if _, _, ok := tokenSignals(event); ok {
 		keep = true
 		copyTokenAttributes(&thin, event)
 	}
 	return thin, keep
+}
+
+func copySkillPolicyEvidence(thin *canonical.Event, event canonical.Event) bool {
+	detection, present := event.ProviderExtensions["skill_detection"]
+	if !present {
+		return false
+	}
+	// Retain every provider-stamped detection signal. Incomplete evidence must
+	// remain visible to policy evaluation so it cannot report a clean allowlist
+	// decision for inferred, unknown, or unnamed explicit skills.
+	thin.ProviderExtensions["skill_detection"] = detection
+	if detectionState(event) == "explicit" {
+		if skill, ok := event.ProviderExtensions["skill"].(map[string]any); ok {
+			thin.ProviderExtensions["skill"] = cloneStringKeyedMap(skill)
+		}
+	}
+	return true
 }
 
 func copyTokenAttributes(thin *canonical.Event, event canonical.Event) {

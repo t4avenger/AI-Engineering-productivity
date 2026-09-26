@@ -92,7 +92,7 @@ export async function expectUtilityDestinations(
   await expect(utilityNavigation.getByRole('link')).toHaveText(labels);
 }
 
-/** Access Rules tab shells (#160): MCP editable; others honest unavailable. */
+/** Access Rules tabs: MCP and Skills are local editors; later policy areas remain unavailable. */
 export async function expectGovernanceAccessRulesShells(
   page: Page,
 ): Promise<void> {
@@ -113,8 +113,10 @@ export async function expectGovernanceAccessRulesShells(
 
   await page.getByRole('tab', { name: 'Skills' }).click();
   await expect(page).toHaveURL(/\/governance\?rules=skills$/);
-  await expect(page.getByText('No allow or block counts are shown')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Save local changes' })).toHaveCount(0);
+  await expect(page.locator('#skills-allowlist-form')).toBeVisible();
+  await expect(
+    page.getByText(/exact explicit skill identities/i),
+  ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Publish' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Enforce' })).toHaveCount(0);
 }
@@ -164,6 +166,26 @@ export async function expectGovernanceMCPEditorInteractions(
   await expect(checkbox).toBeChecked();
 
   page.once('dialog', (dialog) => dialog.accept());
+  await page
+    .getByLabel('Primary navigation')
+    .getByRole('link', { name: 'Overview', exact: true })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Orchestration overview' })).toBeVisible();
+}
+
+/** Assert the editor names its own policy in the unsaved-navigation prompt. */
+export async function expectAllowlistDiscardConfirmation(
+  page: Page,
+  checkboxName: string,
+  policyName: string,
+): Promise<void> {
+  await page.getByRole('checkbox', { name: checkboxName }).check();
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toBe(
+      `Discard unsaved local ${policyName} allowlist changes?`,
+    );
+    await dialog.accept();
+  });
   await page
     .getByLabel('Primary navigation')
     .getByRole('link', { name: 'Overview', exact: true })

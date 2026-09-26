@@ -45,6 +45,10 @@ type unapprovedMCPResponse struct {
 	Data governance.UnapprovedMCP `json:"data"`
 }
 
+type unapprovedSkillsResponse struct {
+	Data governance.UnapprovedSkills `json:"data"`
+}
+
 func (a sessionAPI) mcpInventory(w http.ResponseWriter, r *http.Request) {
 	events, ok := a.loadInsightEvents(w, r)
 	if !ok {
@@ -104,6 +108,14 @@ func (a sessionAPI) unapprovedMCP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSessionJSON(w, http.StatusOK, unapprovedMCPResponse{Data: governance.UnapprovedMCPFromEvents(events, a.thresholds.currentMCPAllowlist())})
+}
+
+func (a sessionAPI) unapprovedSkills(w http.ResponseWriter, r *http.Request) {
+	events, ok := a.loadInsightEvents(w, r)
+	if !ok {
+		return
+	}
+	writeSessionJSON(w, http.StatusOK, unapprovedSkillsResponse{Data: governance.UnapprovedSkillsFromEvents(events, a.thresholds.currentSkillsAllowlist())})
 }
 
 // loadInsightEvents returns retained events for an insight handler, or writes

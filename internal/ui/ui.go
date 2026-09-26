@@ -21,22 +21,23 @@ const (
 	cookieName       = "telemetryiq_auth"
 	bulkDeletePhrase = "DELETE ALL"
 
-	pathUnlock         = "/unlock"
-	pathLogout         = "/logout"
-	pathHome           = "/"
-	pathSessions       = "/sessions"
-	pathSessionsPrefix = "/sessions/"
-	pathInsights       = "/insights"
-	pathModels         = "/models"
-	pathPullRequests   = "/pull-requests"
-	pathEventsPrefix   = "/events/"
-	pathGovernance     = "/governance"
-	pathMCPAllowlist   = "/governance/mcp-allowlist"
-	pathIntegrations   = "/integrations"
-	pathPrivacy        = "/privacy"
-	pathPrivacyDelete  = "/privacy/delete-all"
-	pathCosts          = "/costs"
-	pathStaticPrefix   = "/static/"
+	pathUnlock          = "/unlock"
+	pathLogout          = "/logout"
+	pathHome            = "/"
+	pathSessions        = "/sessions"
+	pathSessionsPrefix  = "/sessions/"
+	pathInsights        = "/insights"
+	pathModels          = "/models"
+	pathPullRequests    = "/pull-requests"
+	pathEventsPrefix    = "/events/"
+	pathGovernance      = "/governance"
+	pathMCPAllowlist    = "/governance/mcp-allowlist"
+	pathSkillsAllowlist = "/governance/skills-allowlist"
+	pathIntegrations    = "/integrations"
+	pathPrivacy         = "/privacy"
+	pathPrivacyDelete   = "/privacy/delete-all"
+	pathCosts           = "/costs"
+	pathStaticPrefix    = "/static/"
 
 	tmplUnlock           = "unlock.html"
 	tmplHome             = "home.html"
@@ -63,21 +64,29 @@ type MCPAllowlistController interface {
 	SaveMCPAllowlist([]string) error
 }
 
+// SkillsAllowlistController persists exact provider skill identities.
+type SkillsAllowlistController interface {
+	SkillsAllowlist() []string
+	SaveSkillsAllowlist([]string) error
+}
+
 // Server serves the local HTMX dashboard.
 type Server struct {
-	token                  string
-	expected               [32]byte
-	sessions               storage.SessionReader
-	deleter                storage.SessionDeleter
-	events                 storage.EventReader
-	operations             storage.OperationReader
-	costs                  storage.CostReader
-	insightSources         storage.InsightSourceReader
-	contextWasteThresholds insights.ContextWasteThresholds
-	mcpAllowlist           []string
-	mcpAllowlistController MCPAllowlistController
-	templates              *template.Template
-	static                 http.Handler
+	token                     string
+	expected                  [32]byte
+	sessions                  storage.SessionReader
+	deleter                   storage.SessionDeleter
+	events                    storage.EventReader
+	operations                storage.OperationReader
+	costs                     storage.CostReader
+	insightSources            storage.InsightSourceReader
+	contextWasteThresholds    insights.ContextWasteThresholds
+	mcpAllowlist              []string
+	mcpAllowlistController    MCPAllowlistController
+	skillsAllowlist           []string
+	skillsAllowlistController SkillsAllowlistController
+	templates                 *template.Template
+	static                    http.Handler
 }
 
 // New builds a dashboard server. sessions may be a full Repository.
@@ -130,23 +139,26 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 	costs, _ := sessions.(storage.CostReader)
 	insightSources, _ := sessions.(storage.InsightSourceReader)
 	var controller MCPAllowlistController
+	var skillsController SkillsAllowlistController
 	if len(controllers) > 0 {
 		controller = controllers[0]
+		skillsController, _ = controllers[0].(SkillsAllowlistController)
 	}
 	return &Server{
-		token:                  token,
-		expected:               sha256.Sum256([]byte(token)),
-		sessions:               sessions,
-		deleter:                deleter,
-		events:                 events,
-		operations:             operations,
-		costs:                  costs,
-		insightSources:         insightSources,
-		contextWasteThresholds: contextWasteThresholds,
-		mcpAllowlist:           append([]string(nil), mcpAllowlist...),
-		mcpAllowlistController: controller,
-		templates:              tmpl,
-		static:                 http.FileServer(http.FS(staticRoot)),
+		token:                     token,
+		expected:                  sha256.Sum256([]byte(token)),
+		sessions:                  sessions,
+		deleter:                   deleter,
+		events:                    events,
+		operations:                operations,
+		costs:                     costs,
+		insightSources:            insightSources,
+		contextWasteThresholds:    contextWasteThresholds,
+		mcpAllowlist:              append([]string(nil), mcpAllowlist...),
+		mcpAllowlistController:    controller,
+		skillsAllowlistController: skillsController,
+		templates:                 tmpl,
+		static:                    http.FileServer(http.FS(staticRoot)),
 	}, nil
 }
 
@@ -155,6 +167,13 @@ func (s *Server) currentMCPAllowlist() []string {
 		return s.mcpAllowlistController.MCPAllowlist()
 	}
 	return append([]string(nil), s.mcpAllowlist...)
+}
+
+func (s *Server) currentSkillsAllowlist() []string {
+	if s.skillsAllowlistController != nil {
+		return s.skillsAllowlistController.SkillsAllowlist()
+	}
+	return append([]string(nil), s.skillsAllowlist...)
 }
 
 func (s *Server) authenticated(r *http.Request) bool {

@@ -61,6 +61,12 @@ func (m *Manager) MCPAllowlist() []string {
 	return m.Current().Governance.MCPAllowlist
 }
 
+// SkillsAllowlist returns a detached snapshot of the active exact skill
+// identity policy input.
+func (m *Manager) SkillsAllowlist() []string {
+	return m.Current().Governance.SkillsAllowlist
+}
+
 // SaveMCPAllowlist validates and atomically persists the complete configuration
 // before publishing the new allowlist to in-process readers.
 func (m *Manager) SaveMCPAllowlist(names []string) error {
@@ -69,6 +75,21 @@ func (m *Manager) SaveMCPAllowlist(names []string) error {
 
 	next := cloneConfig(m.cfg)
 	next.Governance.MCPAllowlist = normalizedAllowlist(names)
+	return m.saveLocked(next)
+}
+
+// SaveSkillsAllowlist validates and atomically persists the complete
+// configuration before publishing exact provider skill identities to readers.
+func (m *Manager) SaveSkillsAllowlist(names []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	next := cloneConfig(m.cfg)
+	next.Governance.SkillsAllowlist = append([]string(nil), names...)
+	return m.saveLocked(next)
+}
+
+func (m *Manager) saveLocked(next Config) error {
 	if err := next.Validate(); err != nil {
 		return err
 	}
@@ -103,6 +124,7 @@ func normalizedAllowlist(names []string) []string {
 
 func cloneConfig(cfg Config) Config {
 	cfg.Governance.MCPAllowlist = append([]string(nil), cfg.Governance.MCPAllowlist...)
+	cfg.Governance.SkillsAllowlist = append([]string(nil), cfg.Governance.SkillsAllowlist...)
 	return cfg
 }
 

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -199,8 +200,32 @@ func TestUnapprovedMCPInsightAPIReadsUpdatedAllowlistSource(t *testing.T) {
 	}
 }
 
+func TestUnapprovedSkillsInsightAPI(t *testing.T) {
+	repo := sessionTestRepository(t)
+	skill := sessionTestEvent(t, "skill-policy", "skill-policy-session", "codex", "active", "2026-01-04T09:00:00Z", "")
+	skill.Provider = "openai"
+	skill.EventType = "skill_invocation"
+	skill.ProviderExtensions = map[string]any{"skill_detection": "explicit", "skill": map[string]any{"name": "deploy"}}
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{skill}); err != nil {
+		t.Fatal(err)
+	}
+	thresholds := DefaultInsightThresholds()
+	thresholds.SkillsAllowlist = []string{"review"}
+	server := httptest.NewServer(newHandler(slog.Default(), nil, repo, repo, thresholds))
+	t.Cleanup(server.Close)
+
+	body := getInsightJSON[unapprovedSkillsResponse](t, server.URL+"/api/v1/insights/unapproved-skills")
+	if body.Data.Outcome != governance.OutcomeViolation || len(body.Data.Findings) != 1 {
+		t.Fatalf("skill policy result = %#v", body.Data)
+	}
+	finding := body.Data.Findings[0]
+	if finding.SkillName != "deploy" || !reflect.DeepEqual(finding.SourceEventIDs, []string{"skill-policy"}) {
+		t.Fatalf("skill finding = %#v", finding)
+	}
+}
+
 func TestInsightsPathRequiresManagementAuth(t *testing.T) {
-	for _, path := range []string{"/api/v1/insights/mcp-inventory", "/api/v1/insights/skill-usage", "/api/v1/insights/model-performance", "/api/v1/insights/context-waste", "/api/v1/insights/operations", "/api/v1/insights/unapproved-mcp"} {
+	for _, path := range []string{"/api/v1/insights/mcp-inventory", "/api/v1/insights/skill-usage", "/api/v1/insights/model-performance", "/api/v1/insights/context-waste", "/api/v1/insights/operations", "/api/v1/insights/unapproved-mcp", "/api/v1/insights/unapproved-skills"} {
 		if !isManagementPath(path) {
 			t.Fatalf("insight endpoint %q must require local API authentication", path)
 		}

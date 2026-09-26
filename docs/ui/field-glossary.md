@@ -65,7 +65,7 @@ strings.
 | `violation` | Violation | A detect-and-report policy found a matching observation. | None | Not applicable when outcome is indeterminate. |
 | `not_violation` | Not a violation | Observed telemetry supported a verdict and no matching risk was found. | None | Do not use when visibility is absent. |
 | `indeterminate` | Indeterminate | Telemetry or policy configuration is insufficient for a verdict. | None | Prefer this over a fabricated clean result. |
-| `policy_unconfigured` | Allowlist not configured | `governance.mcp_allowlist` is empty so MCP approval cannot be decided. | None | Keep outcome indeterminate. |
+| `policy_unconfigured` | Allowlist not configured | The relevant local allowlist (`governance.mcp_allowlist` or `governance.skills_allowlist`) is empty so the policy cannot be decided. | None | Keep outcome indeterminate. |
 | `high` | High | High-confidence classification for a governance finding. | None | Show with evidence; colour is never the sole cue. |
 | `medium` | Medium | Medium-confidence classification for a governance finding. | None | Show with evidence. |
 | `low` | Low | Low-confidence classification for a governance finding. | None | Show with evidence. |
@@ -108,6 +108,7 @@ strings.
 | `detection_state` | Detection | Skill-detection state for a row or provider/tool surface. | Enum | Render the enum label. |
 | `outcomes` | Skill outcomes | Outcome counts reported by the skill payload itself. | Count by outcome | Do not borrow session or task outcome. |
 | `outcome_state` | Skill outcome evidence | Whether skill-specific outcome data was observed. | Enum | Show `Not available from this provider` when no skill outcome field exists. |
+| `source_event_ids` | Source events | Retained event IDs that prove an unapproved explicit-skill finding. | IDs | Inferred or unnamed skill signals never create named findings. |
 
 ## Model Performance Fields
 

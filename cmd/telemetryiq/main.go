@@ -69,8 +69,10 @@ func main() {
 			CachedContextRatioThreshold: cfg.Insights.ContextWaste.CachedContextRatioThreshold,
 			InputTokenGrowthThreshold:   cfg.Insights.ContextWaste.InputTokenGrowthThreshold,
 		},
-		MCPAllowlist:       cfg.Governance.MCPAllowlist,
-		MCPAllowlistSource: configManager,
+		MCPAllowlist:          cfg.Governance.MCPAllowlist,
+		MCPAllowlistSource:    configManager,
+		SkillsAllowlist:       cfg.Governance.SkillsAllowlist,
+		SkillsAllowlistSource: configManager,
 	}
 
 	handler := api.NewAuthenticatedPersistentHandler(logger, repository, token, thresholds, configManager)

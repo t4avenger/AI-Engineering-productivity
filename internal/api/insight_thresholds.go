@@ -8,6 +8,12 @@ type MCPAllowlister interface {
 	MCPAllowlist() []string
 }
 
+// SkillsAllowlister exposes the current exact skill identity policy input.
+// Implementations must be safe for concurrent API and dashboard reads.
+type SkillsAllowlister interface {
+	SkillsAllowlist() []string
+}
+
 // InsightThresholds carries configurable thresholds for insight handlers.
 // It is passed to both the JSON API and the HTMX dashboard so they render
 // consistent results from the same retained telemetry.
@@ -20,6 +26,12 @@ type InsightThresholds struct {
 	// MCPAllowlistSource, when set, supersedes the startup snapshot above so a
 	// successful local configuration save takes effect without daemon restart.
 	MCPAllowlistSource MCPAllowlister
+	// SkillsAllowlist is the set of exact provider skill identities approved by
+	// the local detect-and-report policy. Empty is intentionally indeterminate.
+	SkillsAllowlist []string
+	// SkillsAllowlistSource supersedes the startup snapshot after a successful
+	// local configuration save.
+	SkillsAllowlistSource SkillsAllowlister
 }
 
 func (t InsightThresholds) currentMCPAllowlist() []string {
@@ -27,6 +39,13 @@ func (t InsightThresholds) currentMCPAllowlist() []string {
 		return t.MCPAllowlistSource.MCPAllowlist()
 	}
 	return append([]string(nil), t.MCPAllowlist...)
+}
+
+func (t InsightThresholds) currentSkillsAllowlist() []string {
+	if t.SkillsAllowlistSource != nil {
+		return t.SkillsAllowlistSource.SkillsAllowlist()
+	}
+	return append([]string(nil), t.SkillsAllowlist...)
 }
 
 func DefaultInsightThresholds() InsightThresholds {

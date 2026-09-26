@@ -2,8 +2,10 @@ import { expect, test } from '@playwright/test';
 
 import {
   authToken,
+  expectAllowlistDiscardConfirmation,
   claudeMCPConnectionOTLPLogs,
   claudeRiskyAccessOTLPLogs,
+  claudeSkillOTLPLogs,
   expectFiveDestinationPrimaryNav,
   expectGovernanceAccessRulesShells,
   expectGovernanceMCPEditorInteractions,
@@ -124,4 +126,41 @@ test('filters, resets, and discards MCP edits without mocks', async ({ page }) =
   await unlockDashboard(page, authToken);
   await page.goto('/governance');
   await expectGovernanceMCPEditorInteractions(page, serverName);
+});
+
+test('saves an explicit skill policy and reloads its finding without mocks', async ({
+  page,
+}) => {
+  await ingestOTLPLogs(claudeSkillOTLPLogs());
+
+  const before = await fetch(
+    'http://localhost:18080/api/v1/insights/unapproved-skills',
+    { headers: { Authorization: `Bearer ${authToken}` } },
+  );
+  expect(before.status).toBe(200);
+  expect((await before.json()) as unknown).toMatchObject({
+    data: { outcome: 'indeterminate', visibility: 'policy_unconfigured' },
+  });
+
+  await unlockDashboard(page, authToken);
+  await page.goto('/governance?rules=skills');
+  const checkbox = page.getByRole('checkbox', { name: 'tiq-probe' });
+  await expect(checkbox).toBeVisible();
+  await checkbox.check();
+  await page.getByRole('button', { name: 'Save local changes' }).first().click();
+
+  await expect(page).toHaveURL(/\/governance\?rules=skills&saved=1$/);
+  await expect(page.getByRole('status')).toContainText('Skills allowlist saved');
+  await expect(page.getByText('All explicitly identified observed skills')).toBeVisible();
+  await expect(checkbox).toBeChecked();
+
+  const after = await fetch(
+    'http://localhost:18080/api/v1/insights/unapproved-skills',
+    { headers: { Authorization: `Bearer ${authToken}` } },
+  );
+  expect(after.status).toBe(200);
+  expect((await after.json()) as unknown).toMatchObject({
+    data: { outcome: 'not_violation', visibility: 'observed' },
+  });
+  await expectAllowlistDiscardConfirmation(page, 'tiq-probe', 'Skills');
 });
