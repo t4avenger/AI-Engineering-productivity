@@ -24,6 +24,8 @@ var codexTraceTokenFields = map[string]string{
 	"codex.turn.token_usage.total_tokens":             "total_token_count",
 }
 
+const codexSessionPrefix = "codex:"
+
 // NormalizeTraces maps the Codex CLI 0.154.0 OTLP trace surface into canonical
 // events. The adapter accepts only the observed codex_exec and codex_cli_rs
 // resource identities. Foreign resources return ErrUnsupportedTraces; malformed
@@ -143,12 +145,12 @@ func normalizeLiveTraceSpan(resource, scope, span, resourceAttributes map[string
 // the log surface. All other traces remain trace-scoped observations.
 func codexTraceSessionIdentity(resourceAttributes, spanAttributes map[string]any, traceID string) (string, string) {
 	if conversationID, ok := normalize.ObservedString(resourceAttributes[codexConversationIDKey]); ok {
-		return normalize.ProviderNativeSessionID("codex:", conversationID), codexConversationIDKey
+		return normalize.ProviderNativeSessionID(codexSessionPrefix, conversationID), codexConversationIDKey
 	}
 	if threadID, ok := normalize.ObservedString(spanAttributes[codexThreadIDKey]); ok {
-		return normalize.ProviderNativeSessionID("codex:", threadID), codexThreadIDKey
+		return normalize.ProviderNativeSessionID(codexSessionPrefix, threadID), codexThreadIDKey
 	}
-	return "codex:trace:" + traceID, "trace.id"
+	return codexSessionPrefix + "trace:" + traceID, "trace.id"
 }
 
 func codexTraceAttributes(fields map[string]any) map[string]any {
@@ -191,7 +193,7 @@ func liveTraceCorrelation(fields traceSpanFields, sessionID, sessionIDSource str
 	correlation := traceCorrelation(fields.eventID, fields.traceID, fields.spanID, fields.parentSpanID, fields.occurredAt)
 	correlation["session_id_source"] = sessionIDSource
 	if sessionIDSource == codexConversationIDKey || sessionIDSource == codexThreadIDKey {
-		correlation["provider_session_id"] = strings.TrimPrefix(sessionID, "codex:")
+		correlation["provider_session_id"] = strings.TrimPrefix(sessionID, codexSessionPrefix)
 	}
 	return correlation
 }

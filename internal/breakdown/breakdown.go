@@ -237,7 +237,7 @@ func classify(event canonical.Event, events []canonical.Event) (string, bool) {
 // reports a model. Span names, timestamps, token values, and thread.id are not
 // category evidence.
 func codexTurnHasObservedModelResponse(span canonical.Event, events []canonical.Event) bool {
-	if span.Provider != "openai" || span.Tool != "codex" || span.EventType != "session_task.turn" {
+	if span.Provider != "openai" || span.Tool != "codex" || span.SourceVersion != "0.155.1" || span.EventType != "session_task.turn" {
 		return false
 	}
 	turnID := codexExtensionValue(span, "span_attributes", "turn.id")

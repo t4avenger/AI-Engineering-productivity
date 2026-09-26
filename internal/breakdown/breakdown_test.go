@@ -256,13 +256,14 @@ func TestCalculateKeepsFirstCategoryForDuplicateIdentity(t *testing.T) {
 func TestCalculateCodexTurnRequiresExactObservedModelResponse(t *testing.T) {
 	base := time.Date(2026, 9, 26, 10, 0, 0, 0, time.UTC)
 	for _, test := range []struct {
-		name, logTurnID, availability string
+		name, logTurnID, sourceVersion, availability string
 	}{
-		{name: "exact turn id is model generation", logTurnID: "turn-218", availability: AvailabilityAvailable},
-		{name: "mismatched turn id stays unavailable", logTurnID: "other-turn", availability: AvailabilityUnavailable},
+		{name: "exact turn id is model generation", logTurnID: "turn-218", sourceVersion: "0.155.1", availability: AvailabilityAvailable},
+		{name: "mismatched turn id stays unavailable", logTurnID: "other-turn", sourceVersion: "0.155.1", availability: AvailabilityUnavailable},
+		{name: "older version stays unavailable", logTurnID: "turn-218", sourceVersion: "0.154.0", availability: AvailabilityUnavailable},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			result := Calculate(codexTurnEvents(base, test.logTurnID), nil)
+			result := Calculate(codexTurnEvents(base, test.logTurnID, test.sourceVersion), nil)
 			if result.Availability != test.availability {
 				t.Fatalf("availability = %#v", result)
 			}
@@ -277,17 +278,18 @@ func TestCalculateCodexTurnRequiresExactObservedModelResponse(t *testing.T) {
 	}
 }
 
-func codexTurnEvents(base time.Time, logTurnID string) []canonical.Event {
+func codexTurnEvents(base time.Time, logTurnID, sourceVersion string) []canonical.Event {
 	span := typedSpan("codex-turn", "codex-trace", "span", "", "interaction", base, base.Add(2*time.Second))
 	span.Provider = "openai"
 	span.Tool = "codex"
+	span.SourceVersion = sourceVersion
 	span.EventType = "session_task.turn"
 	span.SessionID = "codex:thread-218"
 	span.ProviderExtensions["span_attributes"] = map[string]any{"thread.id": "thread-218", "turn.id": "turn-218"}
 	log := canonical.Event{
 		SchemaVersion: "0.1.0", EventID: "codex-log", EventType: "codex.sse_event",
 		OccurredAt: base, ReceivedAt: base, Provider: "openai", Tool: "codex",
-		SessionID: "codex:thread-218", Attributes: map[string]any{"model": "gpt-synthetic"},
+		SessionID: "codex:thread-218", SourceVersion: sourceVersion, Attributes: map[string]any{"model": "gpt-synthetic"},
 		ProviderExtensions: map[string]any{"log_attributes": map[string]any{"turn.id": logTurnID}},
 	}
 	return []canonical.Event{span, log}

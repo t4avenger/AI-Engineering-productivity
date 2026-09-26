@@ -33,7 +33,7 @@ for (const scenario of [
   },
 ]) {
   test(scenario.name, async ({ page }) => {
-    if (scenario.logs) {
+	if ('logs' in scenario && scenario.logs) {
       await ingestOTLPLogs(scenario.logs());
     }
     await ingestOTLPTraces(scenario.traces());
