@@ -22,8 +22,28 @@ func TestNormalizeTracesGoldenObservedFixtures(t *testing.T) {
 	for _, fixture := range []traceGoldenFixture{
 		{"trace-only", "codex-0.154.0-trace-spans-otlp.json", "codex-0.154.0-trace-spans.events.json", time.Date(2026, 9, 17, 19, 6, 0, 0, time.UTC)},
 		{"resource-conversation", "codex-0.155.1-trace-conversation-otlp.json", "codex-0.155.1-trace-conversation.events.json", time.Date(2026, 9, 20, 15, 26, 22, 0, time.UTC)},
+		{"thread-turn", "codex-0.155.1-trace-thread-turn-otlp.json", "codex-0.155.1-trace-thread-turn.events.json", time.Date(2026, 9, 26, 10, 0, 0, 0, time.UTC)},
 	} {
 		t.Run(fixture.name, func(t *testing.T) { assertTraceGolden(t, fixture) })
+	}
+}
+
+func TestNormalizeTracesUsesObservedThreadIdentity(t *testing.T) {
+	events, err := NormalizeTraces(observedTracePayloadForFixture(t, "codex-0.155.1-trace-thread-turn-otlp.json"), time.Date(2026, 9, 26, 10, 0, 0, 0, time.UTC))
+	if err != nil || len(events) != 1 {
+		t.Fatalf("events = %#v, %v", events, err)
+	}
+	event := events[0]
+	if event.SessionID != "codex:tiq-thread-218" {
+		t.Fatalf("session id = %q", event.SessionID)
+	}
+	correlation := event.ProviderExtensions["correlation"].(map[string]any)
+	if correlation["session_id_source"] != codexThreadIDKey || correlation["provider_session_id"] != "tiq-thread-218" {
+		t.Fatalf("correlation = %#v", correlation)
+	}
+	spanAttributes := event.ProviderExtensions["span_attributes"].(map[string]any)
+	if spanAttributes[codexThreadIDKey] != "tiq-thread-218" || spanAttributes[codexTurnIDKey] != "tiq-turn-218" {
+		t.Fatalf("span attributes = %#v", spanAttributes)
 	}
 }
 

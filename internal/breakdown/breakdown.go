@@ -180,7 +180,7 @@ func categoryIndex(events []canonical.Event) map[string]string {
 		if _, found := index[identity]; found {
 			continue
 		}
-		if category, ok := classify(event); ok {
+		if category, ok := classify(event, events); ok {
 			index[identity] = category
 		}
 	}
@@ -213,7 +213,10 @@ func spanIdentity(event canonical.Event) string {
 	return traceID + "\x00" + spanID
 }
 
-func classify(event canonical.Event) (string, bool) {
+func classify(event canonical.Event, events []canonical.Event) (string, bool) {
+	if codexTurnHasObservedModelResponse(event, events) {
+		return CategoryModelGeneration, true
+	}
 	if spanType := textValue(event.Attributes["span_type"]); spanType != "" {
 		if category, ok := categoryFromType(spanType); ok {
 			return category, true
@@ -226,6 +229,38 @@ func classify(event canonical.Event) (string, bool) {
 		}
 	}
 	return categoryFromType(stripProviderPrefix(name))
+}
+
+// codexTurnHasObservedModelResponse is the bounded Codex duration-category
+// mapping from #218. session_task.turn is classified only when its retained
+// provider turn.id exactly equals a same-session codex.sse_event turn.id that
+// reports a model. Span names, timestamps, token values, and thread.id are not
+// category evidence.
+func codexTurnHasObservedModelResponse(span canonical.Event, events []canonical.Event) bool {
+	if span.Provider != "openai" || span.Tool != "codex" || span.SourceVersion != "0.155.1" || span.EventType != "session_task.turn" {
+		return false
+	}
+	turnID := codexExtensionValue(span, "span_attributes", "turn.id")
+	if turnID == "" {
+		return false
+	}
+	for _, event := range events {
+		if event.Provider != "openai" || event.Tool != "codex" || event.SessionID != span.SessionID || event.EventType != "codex.sse_event" {
+			continue
+		}
+		if textValue(event.Attributes["model"]) == "" {
+			continue
+		}
+		if codexExtensionValue(event, "log_attributes", "turn.id") == turnID {
+			return true
+		}
+	}
+	return false
+}
+
+func codexExtensionValue(event canonical.Event, extension, key string) string {
+	values, _ := event.ProviderExtensions[extension].(map[string]any)
+	return textValue(values[key])
 }
 
 func stripProviderPrefix(name string) string {

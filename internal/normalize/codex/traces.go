@@ -24,6 +24,8 @@ var codexTraceTokenFields = map[string]string{
 	"codex.turn.token_usage.total_tokens":             "total_token_count",
 }
 
+const codexSessionPrefix = "codex:"
+
 // NormalizeTraces maps the Codex CLI 0.154.0 OTLP trace surface into canonical
 // events. The adapter accepts only the observed codex_exec and codex_cli_rs
 // resource identities. Foreign resources return ErrUnsupportedTraces; malformed
@@ -109,7 +111,7 @@ func normalizeLiveTraceSpan(resource, scope, span, resourceAttributes map[string
 	}
 	spanAttributes := traceAttributeValues(span["attributes"])
 	attributes := codexTraceAttributes(spanAttributes)
-	sessionID, sessionIDSource := codexTraceSessionIdentity(resourceAttributes, fields.traceID)
+	sessionID, sessionIDSource := codexTraceSessionIdentity(resourceAttributes, spanAttributes, fields.traceID)
 
 	return canonical.Event{
 		SchemaVersion: canonicalSchemaVersion,
@@ -137,16 +139,18 @@ func normalizeLiveTraceSpan(resource, scope, span, resourceAttributes map[string
 	}, nil
 }
 
-// codexTraceSessionIdentity promotes only the provider-emitted resource-level
-// conversation.id observed alongside Codex logs in CLI 0.155.1. It is the same
-// raw provider value used by log normalisation, so both surfaces share a
-// session only when the provider supplied the exact identifier. All other
-// traces remain trace-scoped observations.
-func codexTraceSessionIdentity(resourceAttributes map[string]any, traceID string) (string, string) {
+// codexTraceSessionIdentity promotes only reviewed provider-emitted identity
+// keys. CLI 0.155.1 supplies conversation.id at the resource level and a
+// session_task.turn can instead carry thread.id, whose raw value is observed on
+// the log surface. All other traces remain trace-scoped observations.
+func codexTraceSessionIdentity(resourceAttributes, spanAttributes map[string]any, traceID string) (string, string) {
 	if conversationID, ok := normalize.ObservedString(resourceAttributes[codexConversationIDKey]); ok {
-		return normalize.ProviderNativeSessionID("codex:", conversationID), codexConversationIDKey
+		return normalize.ProviderNativeSessionID(codexSessionPrefix, conversationID), codexConversationIDKey
 	}
-	return "codex:trace:" + traceID, "trace.id"
+	if threadID, ok := normalize.ObservedString(spanAttributes[codexThreadIDKey]); ok {
+		return normalize.ProviderNativeSessionID(codexSessionPrefix, threadID), codexThreadIDKey
+	}
+	return codexSessionPrefix + "trace:" + traceID, "trace.id"
 }
 
 func codexTraceAttributes(fields map[string]any) map[string]any {
@@ -188,8 +192,8 @@ func removeTraceUnavailable(values []string, target string) []string {
 func liveTraceCorrelation(fields traceSpanFields, sessionID, sessionIDSource string) map[string]any {
 	correlation := traceCorrelation(fields.eventID, fields.traceID, fields.spanID, fields.parentSpanID, fields.occurredAt)
 	correlation["session_id_source"] = sessionIDSource
-	if sessionIDSource == codexConversationIDKey {
-		correlation["provider_session_id"] = strings.TrimPrefix(sessionID, "codex:")
+	if sessionIDSource == codexConversationIDKey || sessionIDSource == codexThreadIDKey {
+		correlation["provider_session_id"] = strings.TrimPrefix(sessionID, codexSessionPrefix)
 	}
 	return correlation
 }

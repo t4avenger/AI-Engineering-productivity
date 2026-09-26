@@ -606,6 +606,7 @@ const (
 	whereSessionIDClause      = " WHERE session_id=?"
 	codexSessionPrefix        = "codex:"
 	codexConversationIDSource = "conversation.id"
+	codexThreadIDSource       = "thread.id"
 	identityScopeKey          = "identity_scope"
 	identitySourceKey         = "identity_source"
 	identityProvider          = "provider"
@@ -757,8 +758,10 @@ func sessionIdentity(events []canonical.Event) (string, string) {
 		return scope, source
 	}
 	switch {
-	case first.Tool == "codex" && hasCodexLogSessionID(first):
-		return identityProvider, codexConversationIDSource
+	case first.Tool == "codex":
+		if source, ok := codexSessionIDSource(first); ok {
+			return identityProvider, source
+		}
 	case first.Tool == "claude-code" && strings.HasPrefix(id, "claude-code:"):
 		return identityProvider, "session.id"
 	case first.Tool == "cursor-agent" && strings.HasPrefix(id, "cursor-agent:"):
@@ -768,6 +771,7 @@ func sessionIdentity(events []canonical.Event) (string, string) {
 	default:
 		return identityUnknown, "unproven"
 	}
+	return identityUnknown, "unproven"
 }
 
 func observationIdentity(id string) (string, string, bool) {
@@ -832,9 +836,9 @@ func attachSessionEnvironment(session *canonical.Session, event canonical.Event)
 			observeSessionAttribute(session, "git_branch", branch)
 		}
 	}
-	if hasCodexLogSessionID(event) {
+	if source, ok := codexSessionIDSource(event); ok {
 		observeSessionCorrelation(session, map[string]any{
-			"session_id_source":   codexConversationIDSource,
+			"session_id_source":   source,
 			"provider_prefix":     codexSessionPrefix,
 			"provider_session_id": strings.TrimPrefix(event.SessionID, codexSessionPrefix),
 		})
@@ -859,15 +863,24 @@ func sessionResourceAttributes(event canonical.Event) map[string]any {
 	return nil
 }
 
-func hasCodexLogSessionID(event canonical.Event) bool {
+func codexSessionIDSource(event canonical.Event) (string, bool) {
 	if event.Tool != "codex" || !strings.HasPrefix(event.SessionID, codexSessionPrefix) {
-		return false
+		return "", false
 	}
-	if _, ok := event.ProviderExtensions["log_attributes"].(map[string]any); ok {
-		return true
+	if attributes, ok := event.ProviderExtensions["log_attributes"].(map[string]any); ok {
+		for _, source := range []string{codexConversationIDSource, codexThreadIDSource} {
+			if sessionString(attributes[source]) != "" {
+				return source, true
+			}
+		}
+		return codexConversationIDSource, true
 	}
 	correlation, ok := event.ProviderExtensions["correlation"].(map[string]any)
-	return ok && correlation["session_id_source"] == codexConversationIDSource
+	if !ok {
+		return "", false
+	}
+	source, _ := correlation["session_id_source"].(string)
+	return source, source == codexConversationIDSource || source == codexThreadIDSource
 }
 
 func observeSessionAttribute(session *canonical.Session, key, value string) {

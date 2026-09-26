@@ -64,6 +64,11 @@ explains the state. Clients must not render a donut for unavailable results.
    Category + overlap + unclassified durations partition the window.
 
 Interaction and hook spans are not duration categories. Codex spans without a
-reviewed category mapping do not create classified intervals.
+reviewed category mapping do not create classified intervals. The sole reviewed
+Codex mapping is CLI 0.155.1 `session_task.turn` → Model generation: its
+retained `turn.id` must exactly equal a same-session `codex.sse_event` log's
+retained `turn.id`, and that log must report a model. `thread.id` joins the
+session only; neither it, the span name, timestamps, tokens, nor model presence
+alone is duration-category evidence.
 
 Session detail HTML shares `breakdown.Calculate` for the right rail.

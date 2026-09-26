@@ -7,7 +7,7 @@ a malformed supported span returns `422` for the whole batch instead of being
 accepted and silently dropped. The CLI 0.153.4 no-trace result remains valid
 for that version (#112); trace export is therefore version-dependent.
 
-For live traces, the event ID is `codex:<traceId>:<spanId>`. CLI 0.155.1 proves a resource-level `conversation.id` shared exactly with the log surface from one isolated synthetic run, so those spans use `codex:<conversation.id>` and `identity_source=conversation.id`. The older 0.154.0 fixture has no such attribute and remains the trace-only `codex:trace:<traceId>` observation with `identity_source=trace.id`. No timestamp, model, ordering, tool, or content-based join is permitted. The
+For live traces, the event ID is `codex:<traceId>:<spanId>`. CLI 0.155.1 proves a resource-level `conversation.id` shared exactly with the log surface from one isolated synthetic run, so those spans use `codex:<conversation.id>` and `identity_source=conversation.id`. A separate 0.155.1 fixture proves a `session_task.turn` span `thread.id` exactly equals the paired log's `conversation.id`; that span uses `codex:<thread.id>` with `identity_source=thread.id`. The older 0.154.0 fixture has neither attribute and remains the trace-only `codex:trace:<traceId>` observation with `identity_source=trace.id`. No timestamp, model, ordering, tool, or content-based join is permitted. The
 adapter uses OTLP `startTimeUnixNano` plus receipt time and sorts spans by
 observed time plus stable identifiers, collapses duplicate trace/span IDs, and
 stores dedup, ordering, trace/span, parent-span, and task-boundary confidence
@@ -20,12 +20,18 @@ Other span attributes remain provider-specific evidence; model, tool, file,
 command, approval, content, repository, task-outcome, and provider-cost
 semantics are not inferred from internal span names.
 
+For the Session Breakdown only, the paired 0.155.1 fixture additionally proves
+an exact `turn.id` shared by `session_task.turn` and a same-session
+model-reporting `codex.sse_event`. That exact equality permits the span interval
+to be labelled Model generation. A thread match, span name, timestamps, tokens,
+or model presence alone remains insufficient.
+
 Resource, scope, span, and unknown attribute fields are preserved under
 `provider_extensions`; the adapter does not log them. Committed fixtures remain
 sanitized synthetic-only evidence even though the local ingest path retains the
 raw values it receives under epic #87.
 
-`fixtures/codex/expected/codex-0.154.0-trace-spans.events.json` remains the golden output for the trace-only fixture. `fixtures/codex/observed-sanitised/codex-0.155.1-trace-conversation-otlp.json` and its same-run log companion record the reviewed exact join evidence.
+`fixtures/codex/expected/codex-0.154.0-trace-spans.events.json` remains the golden output for the trace-only fixture. `fixtures/codex/observed-sanitised/codex-0.155.1-trace-conversation-otlp.json` and its same-run log companion record the resource conversation join; `codex-0.155.1-trace-thread-turn-otlp.json`, `codex-0.155.1-log-thread-turn-otlp.json`, and `fixtures/codex/expected/codex-0.155.1-trace-thread-turn.events.json` record the reviewed thread/turn evidence.
 
 ## Observed log support
 
@@ -74,14 +80,17 @@ metadata; the server name is promoted out of generic log attributes to avoid
 duplicate evidence but retained in the MCP-specific record for display. Empty
 `mcp_server` means the provider did not report that tool result as an MCP server
 call, so it remains an internal Codex/tool invocation rather than MCP inventory
-evidence. When a `conversation.id` is present, logs use the raw provider-native
-session identity `codex:<conversation.id>`. Records without that field fall back
+evidence. When a `conversation.id` or `thread.id` is present, logs use the raw
+provider-native session identity with the stable `codex:` prefix. Records
+without either field fall back
 to a non-keyed content ID for uniqueness only (epic #87 — no ingest-time
 hiding). SQLite session reconstruction carries that identity forward under
 `provider_extensions.correlation` with `session_id_source=conversation.id` and
 keeps the raw provider session ID separate from the stable `codex:` prefix.
 Reconstructed conversation-backed rows are labelled
-`identity_scope=provider`, `identity_source=conversation.id`. Content-derived
+`identity_scope=provider`, `identity_source=conversation.id`. Logs with an
+observed `thread.id` but no `conversation.id` are labelled
+`identity_source=thread.id`. Content-derived
 `codex-log:*`, token, and skill rows are labelled `identity_scope=observation`
 and remain available in the observation/all list scopes. The normaliser and
 storage layer do not use time, model, or intake order to attach those rows to a
@@ -93,7 +102,7 @@ from both log `provider_extensions.resource_attributes` and metric
 under session `provider_extensions.resource_attributes`, while session attributes expose
 `service_name`, `service_version`, and the normalized entrypoint
 (`codex_cli_rs` -> `interactive`, `codex_exec` -> `codex exec`) for the sessions
-evidence browser. Log-derived sessions and Codex CLI 0.155.1 traces carrying the observed resource-level `conversation.id` get `session_id_source=conversation.id`; content-derived metrics and traces without that exact provider key do not.
+evidence browser. Log-derived sessions and Codex CLI 0.155.1 traces carrying the observed resource-level `conversation.id` get `session_id_source=conversation.id`; reviewed `session_task.turn` spans carrying `thread.id` retain `session_id_source=thread.id`. Content-derived metrics and traces without an exact provider key do not.
 Prompt/response/source-code content is not captured by
 default; its configurable capture is tracked in #94.
 
@@ -122,9 +131,9 @@ Codex log shape into stable-primitive `canonical.ModelInteraction` records
   to canonical `session.active` and keeps safe startup/websocket governance
   metadata on the timeline. Session end is still `unknown` pending fixture-backed
   evidence.
-- **Session/request identity** uses the raw `codex:<conversation.id>` for the
-  session when a conversation ID is present. Request IDs and records without a
-  conversation ID use a non-keyed content ID for deterministic correlation and
+- **Session/request identity** uses the raw `codex:<conversation.id>` or
+  `codex:<thread.id>` when the corresponding provider key is present. Request
+  IDs and records without either key use a non-keyed content ID for deterministic correlation and
   uniqueness only — never an HMAC fingerprint (epic #87).
 - **Correlation evidence** records the dedup key, ordering key, and explicit
   unknown task-boundary confidence under `provider_extensions.correlation`; log
