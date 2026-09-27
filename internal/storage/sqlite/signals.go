@@ -75,6 +75,33 @@ CREATE INDEX IF NOT EXISTS events_session_type_occurred ON events(session_id, ev
 	return nil
 }
 
+// ensurePromptInsightSignals is migration 8: rebuild thin dashboard signals so
+// retained Claude user-prompt bodies are available to local prompt findings.
+func (r *Repository) ensurePromptInsightSignals(ctx context.Context) error {
+	applied, err := r.migrationApplied(ctx, 8)
+	if err != nil {
+		return err
+	}
+	if applied {
+		return nil
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin migration 8: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := r.backfillInsightSignals(ctx, tx); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO schema_migrations(version) VALUES (8)"); err != nil {
+		return fmt.Errorf("record migration 8: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit migration 8: %w", err)
+	}
+	return nil
+}
+
 func (r *Repository) backfillInsightSignals(ctx context.Context, tx *sql.Tx) error {
 	rows, err := tx.QueryContext(ctx, "SELECT DISTINCT session_id FROM events ORDER BY session_id")
 	if err != nil {

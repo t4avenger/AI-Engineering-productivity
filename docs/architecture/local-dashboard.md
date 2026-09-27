@@ -88,8 +88,11 @@ Files & Paths is an editable local detect-and-report policy: `governance.path_ru
 matches raw retained filesystem paths with case-sensitive exact or documented
 segment-aware glob rules. Blocked rules win, and absent filesystem-path evidence
 is indeterminate. It never expands paths, reads the filesystem, resolves symlinks,
-or blocks actions. Prompt Keywords remains an honest unavailable shell until its
-schema key and detector exist. The page makes no enforcement claim; the local
+or blocks actions. Prompt Keywords is an editable local detect-and-report policy:
+`governance.prompt_keywords` matches retained user-prompt text after capture and
+records a finding. Literal rules are case-sensitive; RE2 rules fold case only with
+an explicit flag. Missing or provider-redacted prompt bodies stay indeterminate,
+and the page shows only rules the operator configured. The page makes no enforcement claim; the local
 edition remains detect-and-report only.
 
 The preceding Access Rules shell description reflects #160, whose PR #185

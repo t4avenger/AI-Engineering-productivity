@@ -215,6 +215,31 @@ func TestManagerPersistsPathRulesAndRejectsMalformedGlob(t *testing.T) {
 	}
 }
 
+func TestManagerPersistsPromptKeywordsAndKeepsPreviousOnReject(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	manager, err := NewManager(path, Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	rules := []PromptKeyword{{ID: "customer-id", Label: "Customer id", Group: "customer_data", Enabled: false, Kind: "literal", Value: "customer-000"}}
+	if err := manager.SavePromptKeywords(rules); err != nil {
+		t.Fatalf("save prompt keywords: %v", err)
+	}
+	if got := manager.PromptKeywords(); !reflect.DeepEqual(got, rules) {
+		t.Fatalf("prompt keywords = %#v", got)
+	}
+	loaded, err := Load(path)
+	if err != nil || !reflect.DeepEqual(loaded.Governance.PromptKeywords, rules) {
+		t.Fatalf("persisted prompt keywords = %#v, %v", loaded.Governance.PromptKeywords, err)
+	}
+	if err := manager.SavePromptKeywords([]PromptKeyword{{ID: "dup", Label: "One", Group: "custom", Enabled: true, Kind: "literal", Value: "a"}, {ID: "dup", Label: "Two", Group: "custom", Enabled: true, Kind: "literal", Value: "b"}}); err == nil {
+		t.Fatal("expected duplicate id rejection")
+	}
+	if got := manager.PromptKeywords(); !reflect.DeepEqual(got, rules) {
+		t.Fatalf("rejected save changed active prompt keywords: %#v", got)
+	}
+}
+
 func TestManagerPersistsUnicodeWindowsGlobPathRule(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	manager, err := NewManager(path, Default())

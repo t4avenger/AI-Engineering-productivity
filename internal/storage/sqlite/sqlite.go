@@ -130,6 +130,9 @@ CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, session_json B
 	if err := r.ensureInsightSignals(ctx); err != nil {
 		return err
 	}
+	if err := r.ensurePromptInsightSignals(ctx); err != nil {
+		return err
+	}
 	return nil
 }
 

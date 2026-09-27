@@ -108,7 +108,7 @@ mock's internally inconsistent percentages as actual data.
 
 ### Local policy implementation decisions
 
-These are planned interfaces, not assertions that schemas/detectors exist today.
+MCP allowlist, skills allowlist, path rules, and prompt keyword rules are local detect-and-report editors. The shapes below are their contract.
 
 - Reuse `governance.mcp_allowlist` and `POST /governance/mcp-allowlist`.
   Preserve today's semantics and config-only entries.

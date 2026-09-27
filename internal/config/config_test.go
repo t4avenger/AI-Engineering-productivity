@@ -50,6 +50,45 @@ func TestLoadAcceptsGovernanceMCPAllowlist(t *testing.T) {
 	}
 }
 
+func samplePromptKeyword(id string) PromptKeyword {
+	return PromptKeyword{ID: id, Label: "Synthetic label", Group: "custom", Enabled: true, Kind: "literal", Value: "synthetic"}
+}
+
+func TestLoadAcceptsPromptKeywords(t *testing.T) {
+	path := writeConfig(t, validConfiguration+`governance:
+  prompt_keywords:
+    - id: aws-key
+      label: AWS access key
+      group: credentials
+      enabled: true
+      kind: regex
+      value: AKIA[0-9A-Z]{16}
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("load configuration: %v", err)
+	}
+	want := []PromptKeyword{{ID: "aws-key", Label: "AWS access key", Group: "credentials", Enabled: true, Kind: "regex", Value: "AKIA[0-9A-Z]{16}"}}
+	if !reflect.DeepEqual(cfg.Governance.PromptKeywords, want) {
+		t.Fatalf("prompt keywords = %#v", cfg.Governance.PromptKeywords)
+	}
+}
+
+func TestLoadRejectsNonBooleanPromptEnabled(t *testing.T) {
+	path := writeConfig(t, validConfiguration+`governance:
+  prompt_keywords:
+    - id: aws-key
+      label: AWS access key
+      group: credentials
+      enabled: maybe
+      kind: literal
+      value: AKIA
+`)
+	if _, err := Load(path); err == nil {
+		t.Fatal("expected non-boolean enabled state to fail")
+	}
+}
+
 func TestLoadAcceptsExactSkillsAllowlist(t *testing.T) {
 	path := writeConfig(t, validConfiguration+`governance:
   skills_allowlist:
@@ -115,6 +154,35 @@ func TestValidateRejectsUnsafeOrUnsupportedSettings(t *testing.T) {
 		{"governance too many skills", func(c *Config) { c.Governance.SkillsAllowlist = make([]string, 101) }, "governance.skills_allowlist must contain at most 100"},
 		{"governance oversized skill", func(c *Config) { c.Governance.SkillsAllowlist = []string{strings.Repeat("x", 1025)} }, "governance.skills_allowlist[0]"},
 		{"governance oversized Unicode skill", func(c *Config) { c.Governance.SkillsAllowlist = []string{strings.Repeat("界", 1025)} }, "governance.skills_allowlist[0]"},
+		{"prompt keywords over limit", func(c *Config) { c.Governance.PromptKeywords = make([]PromptKeyword, 101) }, "governance.prompt_keywords must contain at most 100"},
+		{"prompt keyword duplicate id", func(c *Config) {
+			c.Governance.PromptKeywords = []PromptKeyword{samplePromptKeyword("same"), samplePromptKeyword("same")}
+		}, "governance.prompt_keywords[1]: duplicate id"},
+		{"prompt keyword blank value", func(c *Config) {
+			rule := samplePromptKeyword("blank")
+			rule.Value = "  "
+			c.Governance.PromptKeywords = []PromptKeyword{rule}
+		}, "governance.prompt_keywords[0]: value must not be blank"},
+		{"prompt keyword invalid regex", func(c *Config) {
+			rule := samplePromptKeyword("bad-re")
+			rule.Kind = "regex"
+			rule.Value = "("
+			c.Governance.PromptKeywords = []PromptKeyword{rule}
+		}, "governance.prompt_keywords[0]: value is not a valid RE2 pattern"},
+		{"prompt keyword oversized value", func(c *Config) {
+			rule := samplePromptKeyword("long")
+			rule.Value = strings.Repeat("界", 1025)
+			c.Governance.PromptKeywords = []PromptKeyword{rule}
+		}, "governance.prompt_keywords[0]: value must be at most 1024"},
+		{"prompt keyword oversized label", func(c *Config) {
+			rule := samplePromptKeyword("label")
+			rule.Label = strings.Repeat("x", 121)
+			c.Governance.PromptKeywords = []PromptKeyword{rule}
+		}, "governance.prompt_keywords[0]: label must be at most 120 bytes"},
+		{"prompt keyword bad id", func(c *Config) {
+			rule := samplePromptKeyword("bad id")
+			c.Governance.PromptKeywords = []PromptKeyword{rule}
+		}, "governance.prompt_keywords[0]: id must be 1-64"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -182,6 +182,80 @@ func TestAuthenticatedPathRulesSavePersistsAndReloadsJSONPolicy(t *testing.T) {
 	}
 }
 
+func TestAuthenticatedPromptKeywordsSavePersistsAndReloadsJSONPolicy(t *testing.T) {
+	repository := sessionTestRepository(t)
+	event := sessionTestEvent(t, "prompt-save", "prompt-save-session", "claude-code", "active", "2026-01-04T09:00:00Z", "")
+	event.Provider = "anthropic"
+	event.EventType = "user_prompt"
+	event.ProviderExtensions = map[string]any{"event": map[string]any{"prompt": "synthetic retained user phrase"}}
+	if err := repository.SaveEvents(context.Background(), []canonical.Event{event}); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(t.TempDir(), "config.yaml")
+	manager, err := config.NewManager(configPath, config.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	thresholds := DefaultInsightThresholds()
+	thresholds.PromptKeywordsSource = manager
+	server := httptest.NewServer(NewAuthenticatedPersistentHandler(slog.Default(), repository, "test-token", thresholds, manager))
+	t.Cleanup(server.Close)
+
+	response := authenticatedManagementForm(t, server.URL+"/governance/prompt-keywords", url.Values{
+		"rule_id": {"retained-user"}, "rule_label": {"Retained user phrase"}, "rule_group": {"credentials"},
+		"rule_enabled": {"true"}, "rule_kind": {"literal"}, "rule_value": {"retained user"},
+	})
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusSeeOther || response.Header.Get("Location") != "/governance?rules=prompts&saved=1" {
+		t.Fatalf("save response = %d location %q", response.StatusCode, response.Header.Get("Location"))
+	}
+	loaded, err := config.Load(configPath)
+	if err != nil || len(loaded.Governance.PromptKeywords) != 1 {
+		t.Fatalf("persisted prompt keywords = %#v, %v", loaded.Governance.PromptKeywords, err)
+	}
+
+	response = authenticatedManagementGet(t, server.URL+"/api/v1/insights/prompt-keywords")
+	defer func() { _ = response.Body.Close() }()
+	var body promptKeywordsResponse
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Data.Outcome != governance.OutcomeViolation || len(body.Data.Findings) != 1 || body.Data.Findings[0].RuleID != "retained-user" {
+		t.Fatalf("updated prompt policy = %#v", body.Data)
+	}
+}
+
+func TestPromptKeywordsAPIContract(t *testing.T) {
+	repository := sessionTestRepository(t)
+	server := httptest.NewServer(NewAuthenticatedPersistentHandler(slog.Default(), repository, "test-token", DefaultInsightThresholds()))
+	t.Cleanup(server.Close)
+
+	unauthenticated, err := http.Get(server.URL + "/api/v1/insights/prompt-keywords")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = unauthenticated.Body.Close() }()
+	if unauthenticated.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated status = %d", unauthenticated.StatusCode)
+	}
+
+	response := authenticatedManagementGet(t, server.URL+"/api/v1/insights/prompt-keywords")
+	defer func() { _ = response.Body.Close() }()
+	var body struct {
+		Data struct {
+			Findings   []governance.PromptKeywordFinding `json:"findings"`
+			Outcome    string                            `json:"outcome"`
+			Visibility string                            `json:"visibility"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Data.Outcome != "indeterminate" || body.Data.Visibility != "policy_unconfigured" || body.Data.Findings == nil {
+		t.Fatalf("empty prompt policy = %#v", body.Data)
+	}
+}
+
 func authenticatedManagementForm(t *testing.T, target string, form url.Values) *http.Response {
 	t.Helper()
 	request, err := http.NewRequest(http.MethodPost, target, strings.NewReader(form.Encode()))

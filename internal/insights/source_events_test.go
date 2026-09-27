@@ -63,3 +63,39 @@ func TestSourceEventsFromSessionRetainsIncompleteSkillPolicyEvidence(t *testing.
 		t.Fatalf("explicit skill evidence = %#v", thin[1].ProviderExtensions)
 	}
 }
+
+func TestSourceEventsFromSessionRetainsUserPromptAndDropsAssistantText(t *testing.T) {
+	now := time.Now().UTC()
+	events := []canonical.Event{
+		{
+			EventID: "prompt", EventType: "user_prompt", SessionID: "s1",
+			OccurredAt: now, ReceivedAt: now, Provider: "anthropic", Tool: "claude-code",
+			ProviderExtensions: map[string]any{"event": map[string]any{"prompt": "synthetic retained user", "unrelated": "drop-me"}},
+		},
+		{
+			EventID: "reply", EventType: "assistant_response", SessionID: "s1",
+			OccurredAt: now, ReceivedAt: now, Provider: "anthropic", Tool: "claude-code",
+			ProviderExtensions: map[string]any{"event": map[string]any{"response": "synthetic assistant"}},
+		},
+	}
+	thin := SourceEventsFromSession(events)
+	var prompt *canonical.Event
+	for i := range thin {
+		if thin[i].EventType == "user_prompt" {
+			prompt = &thin[i]
+		}
+		if thin[i].EventType == "assistant_response" {
+			t.Fatalf("assistant text was copied into insight signals: %#v", thin[i])
+		}
+	}
+	if prompt == nil {
+		t.Fatal("user prompt signal missing")
+	}
+	echo := prompt.ProviderExtensions["event"].(map[string]any)
+	if echo["prompt"] != "synthetic retained user" {
+		t.Fatalf("prompt signal = %#v", echo)
+	}
+	if _, present := echo["unrelated"]; present {
+		t.Fatalf("unrelated prompt field retained: %#v", echo)
+	}
+}

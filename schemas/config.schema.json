@@ -81,6 +81,11 @@
             "allowed": {"$ref": "#/$defs/pathPatterns"},
             "blocked": {"$ref": "#/$defs/pathPatterns"}
           }
+        },
+        "prompt_keywords": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {"$ref": "#/$defs/promptKeyword"}
         }
       }
     }
@@ -97,6 +102,19 @@
           "kind": {"enum": ["exact", "glob"]},
           "value": {"type": "string", "minLength": 1, "maxLength": 1024, "pattern": "\\S"}
         }
+      }
+    },
+    "promptKeyword": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "group", "enabled", "kind", "value"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9_-]+$"},
+        "label": {"type": "string", "minLength": 1, "maxLength": 120},
+        "group": {"enum": ["credentials", "customer_data", "custom"]},
+        "enabled": {"type": "boolean"},
+        "kind": {"enum": ["literal", "regex"]},
+        "value": {"type": "string", "minLength": 1, "maxLength": 1024}
       }
     }
   }

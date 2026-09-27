@@ -59,6 +59,7 @@ func newHandler(logger *slog.Logger, inspector *ingestInspector, repository stor
 	mux.HandleFunc("GET /api/v1/insights/unapproved-mcp", sessionAPI.unapprovedMCP)
 	mux.HandleFunc("GET /api/v1/insights/unapproved-skills", sessionAPI.unapprovedSkills)
 	mux.HandleFunc("GET /api/v1/insights/path-rules", sessionAPI.pathRules)
+	mux.HandleFunc("GET /api/v1/insights/prompt-keywords", sessionAPI.promptKeywords)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/costs", sessionAPI.costs)
 	mux.HandleFunc("GET /api/v1/sessions/{id}", sessionAPI.detail)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/events", sessionAPI.events)

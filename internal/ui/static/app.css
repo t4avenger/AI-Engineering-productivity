@@ -752,6 +752,13 @@ button.secondary { background: transparent; border: 1px solid var(--color-border
 .path-rule-groups { display: grid; gap: var(--space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .path-rule-groups section { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3); }
 .path-rule-row { align-items: center; display: grid; gap: var(--space-2); grid-template-columns: minmax(6rem, auto) minmax(0, 1fr) auto; margin: var(--space-2) 0; }
+.prompt-keyword-groups { display: grid; gap: var(--space-4); }
+.prompt-keyword-groups section, .prompt-keyword-chips li { border: 1px solid var(--color-border); border-radius: var(--radius); }
+.prompt-keyword-groups section { padding: var(--space-3); }
+.prompt-keyword-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); list-style: none; margin: 0 0 var(--space-2); padding: 0; }
+.prompt-keyword-chips li { border-radius: 999px; padding: 0.15rem 0.6rem; }
+.prompt-rule-row { align-items: end; display: grid; gap: var(--space-2); grid-template-columns: repeat(5, minmax(0, 1fr)) auto; margin: var(--space-2) 0; }
+.prompt-rule-row label { display: grid; gap: 0.2rem; }
 .sr-only { height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute; width: 1px; clip: rect(0, 0, 0, 0); white-space: nowrap; }
-@media (max-width: 1024px) { .governance-workspace { grid-template-columns: 1fr; } .governance-preview-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 767px) { .governance-header, .mcp-rule-toolbar { align-items: stretch; flex-direction: column; } .governance-main-tabs, .governance-summary, .governance-preview-rail, .path-rule-groups { grid-template-columns: 1fr; } .path-rule-row { grid-template-columns: 1fr; } .governance-main-tabs a { min-height: var(--target-min); } }
+@media (max-width: 1024px) { .governance-workspace { grid-template-columns: 1fr; } .governance-preview-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); } .prompt-rule-row { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 767px) { .governance-header, .mcp-rule-toolbar { align-items: stretch; flex-direction: column; } .governance-main-tabs, .governance-summary, .governance-preview-rail, .path-rule-groups { grid-template-columns: 1fr; } .path-rule-row, .prompt-rule-row { grid-template-columns: 1fr; } .governance-main-tabs a { min-height: var(--target-min); } }

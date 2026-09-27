@@ -22,6 +22,11 @@ type PathRulesProvider interface {
 	PathRules() config.PathRules
 }
 
+// PromptKeywordsProvider exposes the live prompt-findings policy input.
+type PromptKeywordsProvider interface {
+	PromptKeywords() []config.PromptKeyword
+}
+
 // InsightThresholds carries configurable thresholds for insight handlers.
 // It is passed to both the JSON API and the HTMX dashboard so they render
 // consistent results from the same retained telemetry.
@@ -44,6 +49,10 @@ type InsightThresholds struct {
 	PathRules config.PathRules
 	// PathRulesSource supersedes the startup snapshot after a configuration save.
 	PathRulesSource PathRulesProvider
+	// PromptKeywords are optional. No enabled rule yields an indeterminate report.
+	PromptKeywords []config.PromptKeyword
+	// PromptKeywordsSource supersedes the startup snapshot after a configuration save.
+	PromptKeywordsSource PromptKeywordsProvider
 }
 
 func (t InsightThresholds) currentPathRules() config.PathRules {
@@ -51,6 +60,13 @@ func (t InsightThresholds) currentPathRules() config.PathRules {
 		return t.PathRulesSource.PathRules()
 	}
 	return t.PathRules
+}
+
+func (t InsightThresholds) currentPromptKeywords() []config.PromptKeyword {
+	if t.PromptKeywordsSource != nil {
+		return t.PromptKeywordsSource.PromptKeywords()
+	}
+	return append([]config.PromptKeyword(nil), t.PromptKeywords...)
 }
 
 func (t InsightThresholds) currentMCPAllowlist() []string {
