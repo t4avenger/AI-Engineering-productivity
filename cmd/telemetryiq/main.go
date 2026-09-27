@@ -73,6 +73,8 @@ func main() {
 		MCPAllowlistSource:    configManager,
 		SkillsAllowlist:       cfg.Governance.SkillsAllowlist,
 		SkillsAllowlistSource: configManager,
+		PathRules:             cfg.Governance.PathRules,
+		PathRulesSource:       configManager,
 	}
 
 	handler := api.NewAuthenticatedPersistentHandler(logger, repository, token, thresholds, configManager)

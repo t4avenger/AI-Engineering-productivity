@@ -140,6 +140,48 @@ func TestAuthenticatedSkillsAllowlistSavePersistsAndReloadsJSONPolicy(t *testing
 	}
 }
 
+func TestAuthenticatedPathRulesSavePersistsAndReloadsJSONPolicy(t *testing.T) {
+	repository := sessionTestRepository(t)
+	event := sessionTestEvent(t, "path-save", "path-save-session", "codex", "active", "2026-01-04T09:00:00Z", "")
+	event.Attributes = map[string]any{"file_path": ".env"}
+	if err := repository.SaveEvents(context.Background(), []canonical.Event{event}); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(t.TempDir(), "config.yaml")
+	manager, err := config.NewManager(configPath, config.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	thresholds := DefaultInsightThresholds()
+	thresholds.PathRulesSource = manager
+	server := httptest.NewServer(NewAuthenticatedPersistentHandler(slog.Default(), repository, "test-token", thresholds, manager))
+	t.Cleanup(server.Close)
+
+	response := authenticatedManagementForm(t, server.URL+"/governance/path-rules", url.Values{
+		"mode":          {"monitor"},
+		"blocked_kind":  {"exact"},
+		"blocked_value": {".env"},
+	})
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusSeeOther || response.Header.Get("Location") != "/governance?rules=paths&saved=1" {
+		t.Fatalf("save response = %d location %q", response.StatusCode, response.Header.Get("Location"))
+	}
+	loaded, err := config.Load(configPath)
+	if err != nil || loaded.Governance.PathRules.Mode != "monitor" {
+		t.Fatalf("persisted path rules = %#v, %v", loaded.Governance.PathRules, err)
+	}
+
+	response = authenticatedManagementGet(t, server.URL+"/api/v1/insights/path-rules")
+	defer func() { _ = response.Body.Close() }()
+	var body pathRulesResponse
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Data.Outcome != governance.OutcomeViolation || len(body.Data.Findings) != 1 {
+		t.Fatalf("updated path policy = %#v", body.Data)
+	}
+}
+
 func authenticatedManagementForm(t *testing.T, target string, form url.Values) *http.Response {
 	t.Helper()
 	request, err := http.NewRequest(http.MethodPost, target, strings.NewReader(form.Encode()))

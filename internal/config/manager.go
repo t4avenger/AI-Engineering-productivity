@@ -67,6 +67,11 @@ func (m *Manager) SkillsAllowlist() []string {
 	return m.Current().Governance.SkillsAllowlist
 }
 
+// PathRules returns a detached snapshot of the active raw-path policy input.
+func (m *Manager) PathRules() PathRules {
+	return clonePathRules(m.Current().Governance.PathRules)
+}
+
 // SaveMCPAllowlist validates and atomically persists the complete configuration
 // before publishing the new allowlist to in-process readers.
 func (m *Manager) SaveMCPAllowlist(names []string) error {
@@ -86,6 +91,17 @@ func (m *Manager) SaveSkillsAllowlist(names []string) error {
 
 	next := cloneConfig(m.cfg)
 	next.Governance.SkillsAllowlist = append([]string(nil), names...)
+	return m.saveLocked(next)
+}
+
+// SavePathRules validates and atomically persists the complete configuration
+// before publishing the new detect-and-report path policy to readers.
+func (m *Manager) SavePathRules(rules PathRules) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	next := cloneConfig(m.cfg)
+	next.Governance.PathRules = clonePathRules(rules)
 	return m.saveLocked(next)
 }
 
@@ -125,7 +141,14 @@ func normalizedAllowlist(names []string) []string {
 func cloneConfig(cfg Config) Config {
 	cfg.Governance.MCPAllowlist = append([]string(nil), cfg.Governance.MCPAllowlist...)
 	cfg.Governance.SkillsAllowlist = append([]string(nil), cfg.Governance.SkillsAllowlist...)
+	cfg.Governance.PathRules = clonePathRules(cfg.Governance.PathRules)
 	return cfg
+}
+
+func clonePathRules(rules PathRules) PathRules {
+	rules.Allowed = append([]PathRulePattern(nil), rules.Allowed...)
+	rules.Blocked = append([]PathRulePattern(nil), rules.Blocked...)
+	return rules
 }
 
 func atomicWrite(path string, contents []byte) (returnErr error) {

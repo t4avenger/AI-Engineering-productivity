@@ -71,6 +71,31 @@
           "type": "array",
           "maxItems": 100,
           "items": {"type": "string", "minLength": 1, "maxLength": 1024, "pattern": "\\S"}
+        },
+        "path_rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "allowed", "blocked"],
+          "properties": {
+            "mode": {"enum": ["monitor", "approved_only", "flag_all"]},
+            "allowed": {"$ref": "#/$defs/pathPatterns"},
+            "blocked": {"$ref": "#/$defs/pathPatterns"}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "pathPatterns": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "value"],
+        "properties": {
+          "kind": {"enum": ["exact", "glob"]},
+          "value": {"type": "string", "minLength": 1, "maxLength": 1024, "pattern": "\\S"}
         }
       }
     }

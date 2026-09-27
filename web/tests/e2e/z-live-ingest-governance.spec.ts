@@ -164,3 +164,42 @@ test('saves an explicit skill policy and reloads its finding without mocks', asy
   });
   await expectAllowlistDiscardConfirmation(page, 'tiq-probe', 'Skills');
 });
+
+test('saves raw-path rules and renders their detect-only finding without mocks', async ({
+  page,
+}) => {
+  const rawPath = '/home/dev/secret-app/.env';
+  await ingestOTLPLogs(claudeRiskyAccessOTLPLogs());
+  await unlockDashboard(page, authToken);
+  await page.goto('/governance?rules=paths');
+
+  await page.getByLabel('Monitor all').check();
+  await page.getByRole('button', { name: 'Add blocked path' }).click();
+  const blockedRule = page.locator('.path-rule-list[data-group="blocked"] .path-rule-row');
+  await blockedRule.getByRole('textbox', { name: 'Blocked path rule' }).fill(rawPath);
+  await page.getByRole('button', { name: 'Save local changes' }).first().click();
+
+  await expect(page).toHaveURL(/\/governance\?rules=paths&saved=1$/);
+  await expect(page.getByRole('status')).toContainText('Files & Paths rules saved');
+  await expect(page.getByText(rawPath).first()).toBeVisible();
+  await expect(page.getByText('detect only', { exact: false }).first()).toBeVisible();
+
+  await page
+    .getByLabel('Path rule findings')
+    .getByRole('link')
+    .first()
+    .click();
+  await expect(page).toHaveURL(
+    /\/sessions\/claude-code:tiq-live-e2e-governance-session\?event=.+&inspector=details#event-inspector$/,
+  );
+  await expect(page.locator('#event-inspector')).toBeVisible();
+
+  const after = await fetch(
+    'http://localhost:18080/api/v1/insights/path-rules',
+    { headers: { Authorization: `Bearer ${authToken}` } },
+  );
+  expect(after.status).toBe(200);
+  expect((await after.json()) as unknown).toMatchObject({
+    data: { outcome: 'violation', visibility: 'observed' },
+  });
+});

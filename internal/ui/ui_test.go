@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wayne/telemetryiq/internal/config"
 	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/governance"
 	"github.com/wayne/telemetryiq/internal/insights"
@@ -33,10 +34,11 @@ type testAllowlistController struct {
 }
 
 type testPolicyController struct {
-	mcp     testAllowlistController
-	mu      sync.RWMutex
-	skills  []string
-	saveErr error
+	mcp       testAllowlistController
+	mu        sync.RWMutex
+	skills    []string
+	pathRules config.PathRules
+	saveErr   error
 }
 
 func (c *testPolicyController) MCPAllowlist() []string {
@@ -61,6 +63,30 @@ func (c *testPolicyController) SaveSkillsAllowlist(names []string) error {
 	}
 	c.skills = append([]string(nil), names...)
 	return nil
+}
+
+func (c *testPolicyController) PathRules() config.PathRules {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return cloneTestPathRules(c.pathRules)
+}
+
+func (c *testPolicyController) SavePathRules(rules config.PathRules) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.saveErr != nil {
+		return c.saveErr
+	}
+	c.pathRules = cloneTestPathRules(rules)
+	return nil
+}
+
+func cloneTestPathRules(rules config.PathRules) config.PathRules {
+	return config.PathRules{
+		Mode:    rules.Mode,
+		Allowed: append([]config.PathRulePattern(nil), rules.Allowed...),
+		Blocked: append([]config.PathRulePattern(nil), rules.Blocked...),
+	}
 }
 
 func (c *testAllowlistController) MCPAllowlist() []string {
@@ -2081,6 +2107,66 @@ func TestGovernanceSkillsAllowlistWriteFailureKeepsActivePolicy(t *testing.T) {
 	if strings.Contains(body, `name="skill" value="configured-only" data-active-checked="true" checked`) {
 		t.Fatalf("failed save draft must not keep configured-only checked when omitted from submit: %q", body)
 	}
+}
+
+func TestGovernancePathRulesWriteFailureKeepsActivePolicy(t *testing.T) {
+	repo := governanceFindingsFixture(t)
+	activeRules := config.PathRules{Mode: "monitor"}
+	controller := &testPolicyController{pathRules: activeRules, saveErr: errors.New("disk full")}
+	handler, cookie := pathRulesTestHandler(t, repo, controller)
+
+	response := postGovernanceAllowlist(t, handler, cookie, "/governance/path-rules", url.Values{"mode": {"flag_all"}}, "http://example.com", "")
+	body := response.Body.String()
+	if response.Code != http.StatusInternalServerError || !strings.Contains(body, "active policy was not changed") {
+		t.Fatalf("write failure response = %d: %q", response.Code, body)
+	}
+	if got := controller.PathRules(); got.Mode != activeRules.Mode {
+		t.Fatalf("failed write changed active path rules: %#v", got)
+	}
+	if !strings.Contains(body, `value="flag_all" checked`) {
+		t.Fatalf("failed save must retain submitted path-rule draft: %q", body)
+	}
+}
+
+func TestGovernancePathRulesValidationFailureIsUnprocessable(t *testing.T) {
+	repo := governanceFindingsFixture(t)
+	activeRules := config.PathRules{Mode: "monitor"}
+	controller := &testPolicyController{pathRules: activeRules}
+	handler, cookie := pathRulesTestHandler(t, repo, controller)
+
+	response := postGovernanceAllowlist(t, handler, cookie, "/governance/path-rules", url.Values{
+		"mode":          {"monitor"},
+		"blocked_kind":  {"glob"},
+		"blocked_value": {"[secret]"},
+	}, "http://example.com", "")
+	if response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), "unsupported glob metacharacter") {
+		t.Fatalf("validation response = %d: %q", response.Code, response.Body.String())
+	}
+	if got := controller.PathRules(); got.Mode != activeRules.Mode {
+		t.Fatalf("invalid save changed active path rules: %#v", got)
+	}
+}
+
+func TestGovernancePathRuleFindingLinksToRetainedEvidence(t *testing.T) {
+	repo := governanceFindingsFixture(t)
+	controller := &testPolicyController{pathRules: config.PathRules{Mode: "flag_all"}}
+	handler, cookie := pathRulesTestHandler(t, repo, controller)
+
+	body := getAuthed(t, handler, cookie, "/governance?rules=paths").Body.String()
+	assertContainsAll(t, body, []string{
+		`href="/sessions/gov-session-1?event=gov-e1&amp;inspector=details#event-inspector"`,
+		`<code>gov-e1</code>`,
+	})
+}
+
+func pathRulesTestHandler(t *testing.T, repo *fullStub, controller *testPolicyController) (http.Handler, *http.Cookie) {
+	t.Helper()
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, controller.MCPAllowlist(), controller)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	return handler, unlock(t, handler)
 }
 
 func TestGovernanceSkillsAllowlistSaveRoundTrip(t *testing.T) {
