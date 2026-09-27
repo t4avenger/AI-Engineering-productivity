@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/capabilities"
+	"github.com/wayne/telemetryiq/internal/config"
 	"github.com/wayne/telemetryiq/internal/conversation"
 	"github.com/wayne/telemetryiq/internal/governance"
 	"github.com/wayne/telemetryiq/internal/insights"
@@ -234,12 +235,16 @@ type governanceData struct {
 	RiskyAccess            governance.RiskyAccess
 	UnapprovedMCP          governance.UnapprovedMCP
 	UnapprovedSkills       governance.UnapprovedSkills
+	PathRules              governance.PathRules
+	PathRulesConfig        config.PathRules
 	MCPServers             []mcpAllowlistOption
 	Skills                 []skillAllowlistOption
 	MCPConfiguredCount     int
 	MCPPolicyConfigured    bool
 	SkillsConfiguredCount  int
 	SkillsPolicyConfigured bool
+	PathRulesConfigured    bool
+	PathRulesSaveAvailable bool
 	MCPPreview             governancePreview
 	SaveAvailable          bool
 	SkillsSaveAvailable    bool
@@ -858,6 +863,80 @@ func (s *Server) governanceSkillsAllowlistSave(w http.ResponseWriter, r *http.Re
 	http.Redirect(w, r, pathGovernance+"?rules=skills&saved=1", http.StatusSeeOther)
 }
 
+func (s *Server) governancePathRulesSave(w http.ResponseWriter, r *http.Request) {
+	if s.pathRulesController == nil {
+		data := s.governancePageData(r, nil, nil)
+		data.Error = "Files & Paths saving is unavailable."
+		s.renderGovernanceError(w, r, http.StatusServiceUnavailable, data, rulesTabPaths)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	if err := r.ParseForm(); err != nil {
+		data := s.governancePageData(r, nil, nil)
+		data.Error = "Unable to read Files & Paths rules."
+		s.renderGovernanceError(w, r, http.StatusUnprocessableEntity, data, rulesTabPaths)
+		return
+	}
+	rules, err := pathRulesFromForm(r.Form)
+	if err != nil {
+		data := s.governancePageData(r, nil, nil)
+		data.Error = err.Error()
+		s.renderGovernanceError(w, r, http.StatusUnprocessableEntity, data, rulesTabPaths)
+		return
+	}
+	if err := config.ValidatePathRules(rules); err != nil {
+		data := s.governancePageData(r, nil, nil, rules)
+		data.Error = err.Error()
+		s.renderGovernanceError(w, r, http.StatusUnprocessableEntity, data, rulesTabPaths)
+		return
+	}
+	data := s.governancePageData(r, nil, nil, rules)
+	if data.Error != "" {
+		s.renderGovernanceError(w, r, http.StatusServiceUnavailable, data, rulesTabPaths)
+		return
+	}
+	if err := s.pathRulesController.SavePathRules(rules); err != nil {
+		data.Error = "Unable to save Files & Paths rules. The active policy was not changed."
+		s.renderGovernanceError(w, r, http.StatusInternalServerError, data, rulesTabPaths)
+		return
+	}
+	http.Redirect(w, r, pathGovernance+"?rules=paths&saved=1", http.StatusSeeOther)
+}
+
+func pathRulesFromForm(form map[string][]string) (config.PathRules, error) {
+	rules := config.PathRules{Mode: firstFormValue(form["mode"])}
+	var err error
+	if rules.Allowed, err = pathPatternsFromForm(form, "allowed"); err != nil {
+		return config.PathRules{}, err
+	}
+	if rules.Blocked, err = pathPatternsFromForm(form, "blocked"); err != nil {
+		return config.PathRules{}, err
+	}
+	return rules, nil
+}
+
+func firstFormValue(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
+}
+
+func pathPatternsFromForm(form map[string][]string, group string) ([]config.PathRulePattern, error) {
+	kinds, values := form[group+"_kind"], form[group+"_value"]
+	if len(kinds) != len(values) {
+		return nil, fmt.Errorf("each %s path rule needs both a kind and a value", group)
+	}
+	patterns := make([]config.PathRulePattern, 0, len(kinds))
+	for i := range kinds {
+		if strings.TrimSpace(kinds[i]) == "" && strings.TrimSpace(values[i]) == "" {
+			continue
+		}
+		patterns = append(patterns, config.PathRulePattern{Kind: kinds[i], Value: values[i]})
+	}
+	return patterns, nil
+}
+
 func (s *Server) renderGovernanceError(w http.ResponseWriter, r *http.Request, status int, data governanceData, tab string) {
 	data.ActiveRulesTab = tab
 	w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
@@ -865,7 +944,7 @@ func (s *Server) renderGovernanceError(w http.ResponseWriter, r *http.Request, s
 	s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
 }
 
-func (s *Server) governancePageData(r *http.Request, mcpSelected, skillsSelected []string) governanceData {
+func (s *Server) governancePageData(r *http.Request, mcpSelected, skillsSelected []string, pathDraft ...config.PathRules) governanceData {
 	activeAllowlist := s.currentMCPAllowlist()
 	draftAllowlist := activeAllowlist
 	if mcpSelected != nil {
@@ -876,6 +955,11 @@ func (s *Server) governancePageData(r *http.Request, mcpSelected, skillsSelected
 	if skillsSelected != nil {
 		draftSkills = skillsSelected
 	}
+	activePathRules := s.currentPathRules()
+	draftPathRules := activePathRules
+	if len(pathDraft) > 0 {
+		draftPathRules = pathDraft[0]
+	}
 	data := governanceData{
 		SaveAvailable:          s.mcpAllowlistController != nil,
 		SkillsSaveAvailable:    s.skillsAllowlistController != nil,
@@ -884,6 +968,9 @@ func (s *Server) governancePageData(r *http.Request, mcpSelected, skillsSelected
 		MCPPolicyConfigured:    len(activeAllowlist) > 0,
 		SkillsConfiguredCount:  len(activeSkills),
 		SkillsPolicyConfigured: len(activeSkills) > 0,
+		PathRulesConfigured:    activePathRules.Mode != "",
+		PathRulesSaveAvailable: s.pathRulesController != nil,
+		PathRulesConfig:        draftPathRules,
 	}
 	events, err := s.insightSourceEvents(r)
 	if err != nil {
@@ -891,6 +978,7 @@ func (s *Server) governancePageData(r *http.Request, mcpSelected, skillsSelected
 		data.RiskyAccess = governance.RiskyAccess{Findings: []governance.Finding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable"}
 		data.UnapprovedMCP = governance.UnapprovedMCP{Findings: []governance.MCPServerFinding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable"}
 		data.UnapprovedSkills = governance.UnapprovedSkills{Findings: []governance.SkillFinding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable"}
+		data.PathRules = governance.PathRules{Findings: []governance.PathFinding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable"}
 		data.MCPServers = mcpAllowlistOptions(insights.MCPInventory{}, draftAllowlist, activeAllowlist)
 		data.Skills = skillAllowlistOptions(nil, draftSkills, activeSkills)
 	} else {
@@ -899,6 +987,7 @@ func (s *Server) governancePageData(r *http.Request, mcpSelected, skillsSelected
 		// is only a draft for checkbox rendering until save succeeds.
 		data.UnapprovedMCP = governance.UnapprovedMCPFromEvents(events, activeAllowlist)
 		data.UnapprovedSkills = governance.UnapprovedSkillsFromEvents(events, activeSkills)
+		data.PathRules = governance.PathRulesFromEvents(events, activePathRules)
 		data.MCPServers = mcpAllowlistOptions(insights.MCPInventoryFromEvents(events), draftAllowlist, activeAllowlist)
 		data.Skills = skillAllowlistOptions(events, draftSkills, activeSkills)
 	}

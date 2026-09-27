@@ -84,10 +84,13 @@ checkboxes, and an authenticated Save atomically writes the validated local YAML
 and reloads both HTML and JSON findings in-process. Skills match only exact,
 provider-stamped explicit identities; inferred, anonymous, unavailable, and
 unknown skill signals remain indeterminate and never become named violations.
-Files & Paths and Prompt Keywords remain honest unavailable shells until their
-schema keys and detectors exist — no fake allow/block counts and no
-Publish/Enforce controls. The page makes no enforcement claim; the local edition
-remains detect-and-report only.
+Files & Paths is an editable local detect-and-report policy: `governance.path_rules`
+matches raw retained filesystem paths with case-sensitive exact or documented
+segment-aware glob rules. Blocked rules win, and absent filesystem-path evidence
+is indeterminate. It never expands paths, reads the filesystem, resolves symlinks,
+or blocks actions. Prompt Keywords remains an honest unavailable shell until its
+schema key and detector exist. The page makes no enforcement claim; the local
+edition remains detect-and-report only.
 
 The preceding Access Rules shell description reflects #160, whose PR #185
 merged on 2026-09-19 at 13:54:38 UTC (rechecked during this audit).

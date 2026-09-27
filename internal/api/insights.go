@@ -49,6 +49,10 @@ type unapprovedSkillsResponse struct {
 	Data governance.UnapprovedSkills `json:"data"`
 }
 
+type pathRulesResponse struct {
+	Data governance.PathRules `json:"data"`
+}
+
 func (a sessionAPI) mcpInventory(w http.ResponseWriter, r *http.Request) {
 	events, ok := a.loadInsightEvents(w, r)
 	if !ok {
@@ -116,6 +120,14 @@ func (a sessionAPI) unapprovedSkills(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSessionJSON(w, http.StatusOK, unapprovedSkillsResponse{Data: governance.UnapprovedSkillsFromEvents(events, a.thresholds.currentSkillsAllowlist())})
+}
+
+func (a sessionAPI) pathRules(w http.ResponseWriter, r *http.Request) {
+	events, ok := a.loadInsightEvents(w, r)
+	if !ok {
+		return
+	}
+	writeSessionJSON(w, http.StatusOK, pathRulesResponse{Data: governance.PathRulesFromEvents(events, a.thresholds.currentPathRules())})
 }
 
 // loadInsightEvents returns retained events for an insight handler, or writes

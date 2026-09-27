@@ -192,3 +192,40 @@ func TestManagerConcurrentReadsAndSaves(t *testing.T) {
 		t.Fatalf("concurrent save produced invalid config: %v", err)
 	}
 }
+
+func TestManagerPersistsPathRulesAndRejectsMalformedGlob(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	manager, err := NewManager(path, Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	rules := PathRules{Mode: "approved_only", Allowed: []PathRulePattern{{Kind: "glob", Value: "src/**"}}, Blocked: []PathRulePattern{{Kind: "exact", Value: ".env"}}}
+	if err := manager.SavePathRules(rules); err != nil {
+		t.Fatalf("save path rules: %v", err)
+	}
+	if got := manager.PathRules(); !reflect.DeepEqual(got, rules) {
+		t.Fatalf("path rules = %#v, want %#v", got, rules)
+	}
+	before := manager.PathRules()
+	if err := manager.SavePathRules(PathRules{Mode: "monitor", Blocked: []PathRulePattern{{Kind: "glob", Value: "[secret]"}}}); err == nil {
+		t.Fatal("expected unsupported glob syntax rejection")
+	}
+	if got := manager.PathRules(); !reflect.DeepEqual(got, before) {
+		t.Fatalf("failed path save changed active policy: %#v", got)
+	}
+}
+
+func TestManagerPersistsUnicodeWindowsGlobPathRule(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	manager, err := NewManager(path, Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	rules := PathRules{Mode: "approved_only", Allowed: []PathRulePattern{{Kind: "glob", Value: "C:/work/équipe/*.go"}}}
+	if err := manager.SavePathRules(rules); err != nil {
+		t.Fatalf("save Unicode Windows glob: %v", err)
+	}
+	if got := manager.PathRules(); !reflect.DeepEqual(got, rules) {
+		t.Fatalf("path rules = %#v, want %#v", got, rules)
+	}
+}

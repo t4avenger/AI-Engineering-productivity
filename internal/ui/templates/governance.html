@@ -9,10 +9,10 @@
       <h1>Governance Policies</h1>
       <p>Detect and report only. This local edition does not enforce or publish policies or block provider actions.</p>
     </div>
-    {{if or (and .SaveAvailable (eq .ActiveRulesTab "mcp")) (and .SkillsSaveAvailable (eq .ActiveRulesTab "skills"))}}<button type="submit" form="{{if eq .ActiveRulesTab "mcp"}}mcp-allowlist-form{{else}}skills-allowlist-form{{end}}" id="save-local-changes" disabled>Save local changes</button>{{else}}<p class="muted">Local configuration saving is unavailable.</p>{{end}}
+    {{if or (and .SaveAvailable (eq .ActiveRulesTab "mcp")) (and .SkillsSaveAvailable (eq .ActiveRulesTab "skills")) (and .PathRulesSaveAvailable (eq .ActiveRulesTab "paths"))}}<button type="submit" form="{{if eq .ActiveRulesTab "mcp"}}mcp-allowlist-form{{else if eq .ActiveRulesTab "skills"}}skills-allowlist-form{{else}}path-rules-form{{end}}" id="save-local-changes" disabled>Save local changes</button>{{else}}<p class="muted">Local configuration saving is unavailable.</p>{{end}}
   </header>
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
-  {{if .Saved}}<output class="success">{{if eq .ActiveRulesTab "skills"}}Skills{{else}}MCP{{end}} allowlist saved. Findings now use the updated local policy.</output>{{end}}
+  {{if .Saved}}<output class="success">{{if eq .ActiveRulesTab "skills"}}Skills allowlist{{else if eq .ActiveRulesTab "paths"}}Files &amp; Paths rules{{else}}MCP allowlist{{end}} saved. Findings now use the updated local policy.</output>{{end}}
 
   <nav class="governance-main-tabs" aria-label="Governance policy areas">
     <a href="#access-rules" aria-current="page">Access Rules</a>
@@ -24,7 +24,7 @@
   <section class="governance-summary" aria-label="Local policy summary">
     <article class="governance-summary-card"><h2>MCP servers</h2>{{if .MCPPolicyConfigured}}<p class="summary-value">{{.MCPConfiguredCount}} configured</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Configured rule identities</p></article>
     <article class="governance-summary-card"><h2>Skills</h2>{{if .SkillsPolicyConfigured}}<p class="summary-value">{{.SkillsConfiguredCount}} configured</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Exact explicit skill identities</p></article>
-    <article class="governance-summary-card"><h2>File rules</h2><p>{{template "status-badge" "unavailable"}}</p><p class="muted">Policy editor follows in #193.</p></article>
+    <article class="governance-summary-card"><h2>File rules</h2>{{if .PathRulesConfigured}}<p class="summary-value">{{len .PathRulesConfig.Allowed}} allowed · {{len .PathRulesConfig.Blocked}} blocked</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Raw retained paths; detect only</p></article>
     <article class="governance-summary-card"><h2>Prompt rules</h2><p>{{template "status-badge" "unavailable"}}</p><p class="muted">Policy editor follows in #194.</p></article>
   </section>
 
@@ -125,7 +125,7 @@
   <div class="governance-workspace">
   <section id="access-rules" aria-labelledby="access-rules-heading">
     <h2 id="access-rules-heading">Access Rules</h2>
-    <p>Manage explicit MCP server identities for this local daemon. Skills, path, and prompt policies remain deliberately unavailable until their schema and detectors land.</p>
+    <p>Manage local detect-and-report policies over retained evidence. Path rules inspect raw retained paths only; they never read the filesystem or block provider actions.</p>
     <div class="rules-tabs" role="tablist" aria-label="Access Rules categories">
       <a class="rules-tab{{if eq .ActiveRulesTab "mcp"}} active{{end}}" role="tab" id="rules-tab-mcp" href="{{governanceRulesPath "mcp"}}" aria-controls="rules-panel-mcp" aria-selected="{{if eq .ActiveRulesTab "mcp"}}true{{else}}false{{end}}"{{if eq .ActiveRulesTab "mcp"}} aria-current="page"{{end}}>MCP servers</a>
       <a class="rules-tab{{if eq .ActiveRulesTab "skills"}} active{{end}}" role="tab" id="rules-tab-skills" href="{{governanceRulesPath "skills"}}" aria-controls="rules-panel-skills" aria-selected="{{if eq .ActiveRulesTab "skills"}}true{{else}}false{{end}}"{{if eq .ActiveRulesTab "skills"}} aria-current="page"{{end}}>Skills</a>
@@ -226,6 +226,25 @@
         </div>
       </form>
     </div>
+    {{else if and (eq .ActiveRulesTab "paths") .PathRulesSaveAvailable}}
+    <div class="rules-panel" role="tabpanel" id="rules-panel-paths" aria-labelledby="rules-tab-paths">
+      <p>Evaluate retained raw filesystem paths after capture. Matching is case-sensitive; <code>*</code> stays within a segment, <code>**</code> crosses segments, and <code>?</code> matches one non-separator character. Paths are never expanded, resolved, or used to intercept access.</p>
+      <p>Status {{template "status-badge" (printf "%s" .PathRules.Outcome)}} · Visibility {{template "status-badge" .PathRules.Visibility}}</p>
+      {{if .PathRules.Findings}}<section class="table-wrap" aria-label="Path rule findings"><table><thead><tr><th scope="col">Path</th><th scope="col">Reason</th><th scope="col">Source event</th></tr></thead><tbody>{{range .PathRules.Findings}}<tr><td><code>{{.Path}}</code></td><td>{{.Reason}} · detect only</td><td>{{if and .SessionID .SourceEventID}}<a href="{{pathFindingEvidencePath .SessionID .SourceEventID}}"><code>{{.SourceEventID}}</code></a>{{else}}<code>{{.SourceEventID}}</code>{{end}}</td></tr>{{end}}</tbody></table></section>{{else if eq .PathRules.Visibility "policy_unconfigured"}}<p class="muted">No path policy is configured, so retained path evidence is indeterminate.</p>{{else if eq .PathRules.Visibility "unavailable"}}<p class="muted">No filesystem-path evidence is available from retained events, so this check is indeterminate.</p>{{else}}<p class="muted">No retained paths match the active local policy.</p>{{end}}
+      <!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token -- Go/HTMX form is protected by sameOriginCookieMutation; bearer clients are non-ambient. Owner: TelemetryIQ. Expiry: 2026-12-31. -->
+      <form method="post" action="/governance/path-rules" id="path-rules-form" class="path-rules-form" data-policy-name="Files &amp; Paths">
+        <fieldset><legend>Mode</legend>
+          <label><input type="radio" name="mode" value="monitor"{{if eq .PathRulesConfig.Mode "monitor"}} checked{{end}}> Monitor all</label>
+          <label><input type="radio" name="mode" value="approved_only"{{if eq .PathRulesConfig.Mode "approved_only"}} checked{{end}}> Approved paths only</label>
+          <label><input type="radio" name="mode" value="flag_all"{{if eq .PathRulesConfig.Mode "flag_all"}} checked{{end}}> Flag all</label>
+        </fieldset>
+        <div class="path-rule-groups">
+          <section><h3>Allowed paths</h3><p class="muted">Used only by Approved paths only.</p><div class="path-rule-list" data-group="allowed">{{range $index, $rule := .PathRulesConfig.Allowed}}<div class="path-rule-row"><label for="allowed-kind-{{$index}}" class="sr-only">Allowed path rule kind</label><select id="allowed-kind-{{$index}}" name="allowed_kind"><option value="exact"{{if eq $rule.Kind "exact"}} selected{{end}}>Exact</option><option value="glob"{{if eq $rule.Kind "glob"}} selected{{end}}>Glob</option></select><label for="allowed-value-{{$index}}" class="sr-only">Allowed path rule</label><input id="allowed-value-{{$index}}" name="allowed_value" value="{{$rule.Value}}"><button type="button" class="secondary remove-path-rule">Remove</button></div>{{end}}</div><button type="button" class="secondary add-path-rule" data-group="allowed">Add allowed path</button></section>
+          <section><h3>Blocked paths <span class="muted">detect only</span></h3><div class="path-rule-list" data-group="blocked">{{range $index, $rule := .PathRulesConfig.Blocked}}<div class="path-rule-row"><label for="blocked-kind-{{$index}}" class="sr-only">Blocked path rule kind</label><select id="blocked-kind-{{$index}}" name="blocked_kind"><option value="exact"{{if eq $rule.Kind "exact"}} selected{{end}}>Exact</option><option value="glob"{{if eq $rule.Kind "glob"}} selected{{end}}>Glob</option></select><label for="blocked-value-{{$index}}" class="sr-only">Blocked path rule</label><input id="blocked-value-{{$index}}" name="blocked_value" value="{{$rule.Value}}"><button type="button" class="secondary remove-path-rule">Remove</button></div>{{end}}</div><button type="button" class="secondary add-path-rule" data-group="blocked">Add blocked path</button></section>
+        </div>
+        <div class="governance-save-bar"><p class="muted allowlist-dirty-summary" hidden></p><div><button type="reset" class="secondary">Reset changes</button><button type="submit" class="allowlist-save-inline" disabled>Save local changes</button></div></div>
+      </form>
+    </div>
     {{else}}{{with .RulesShell}}
     <div class="rules-panel" role="tabpanel" id="{{.PanelID}}" aria-labelledby="{{.TabID}}">
       <p>Status {{template "status-badge" "unavailable"}}</p>
@@ -251,6 +270,45 @@
   {{end}}
   <script>
   (function () {
+    var pathForm = document.getElementById("path-rules-form");
+    if (pathForm) {
+      var initialPathState = new FormData(pathForm);
+      var pathSummary = pathForm.querySelector(".allowlist-dirty-summary");
+      var pathSaveButtons = [document.getElementById("save-local-changes"), pathForm.querySelector(".allowlist-save-inline")].filter(Boolean);
+      function addPathRow(group, kind, value) {
+        var row = document.createElement("div");
+        row.className = "path-rule-row";
+        var select = document.createElement("select");
+        select.name = group + "_kind"; select.id = group + "-kind-draft-" + pathForm.querySelectorAll('.path-rule-list[data-group="' + group + '"] .path-rule-row').length;
+        var kindLabel = document.createElement("label"); kindLabel.htmlFor = select.id; kindLabel.className = "sr-only"; kindLabel.textContent = group === "allowed" ? "Allowed path rule kind" : "Blocked path rule kind";
+        [["exact", "Exact"], ["glob", "Glob"]].forEach(function (option) { var node = document.createElement("option"); node.value = option[0]; node.textContent = option[1]; node.selected = option[0] === (kind || "exact"); select.appendChild(node); });
+        var input = document.createElement("input"); input.name = group + "_value"; input.value = value || ""; input.id = group + "-value-draft-" + pathForm.querySelectorAll('.path-rule-list[data-group="' + group + '"] .path-rule-row').length;
+        var label = document.createElement("label"); label.htmlFor = input.id; label.className = "sr-only"; label.textContent = group === "allowed" ? "Allowed path rule" : "Blocked path rule";
+        var remove = document.createElement("button"); remove.type = "button"; remove.className = "secondary remove-path-rule"; remove.textContent = "Remove";
+        row.append(kindLabel, select, label, input, remove);
+        pathForm.querySelector('.path-rule-list[data-group="' + group + '"]').appendChild(row);
+      }
+      function serialised(formData) { return Array.from(formData.entries()).map(function (entry) { return entry[0] + "=" + entry[1]; }).join("&"); }
+      function refreshPathDirty() {
+        var changed = serialised(new FormData(pathForm)) !== serialised(initialPathState);
+        pathSummary.hidden = !changed;
+        pathSummary.textContent = changed ? "Unsaved local Files & Paths changes." : "";
+        pathSaveButtons.forEach(function (button) { button.disabled = !changed; });
+      }
+      pathForm.addEventListener("click", function (event) {
+        var add = event.target.closest(".add-path-rule");
+        if (add) { addPathRow(add.dataset.group); refreshPathDirty(); return; }
+        var remove = event.target.closest(".remove-path-rule");
+        if (remove) { remove.closest(".path-rule-row").remove(); refreshPathDirty(); }
+      });
+      pathForm.addEventListener("input", refreshPathDirty);
+      pathForm.addEventListener("change", refreshPathDirty);
+      pathForm.addEventListener("reset", function () { window.setTimeout(function () { location.reload(); }, 0); });
+      document.querySelectorAll("a[href]").forEach(function (link) { link.addEventListener("click", function (event) { if (!pathSummary.hidden && !window.confirm("Discard unsaved local Files & Paths changes?")) event.preventDefault(); }); });
+      window.addEventListener("beforeunload", function (event) { if (!pathSummary.hidden) { event.preventDefault(); event.returnValue = ""; } });
+      refreshPathDirty();
+      return;
+    }
     var form = document.querySelector(".allowlist-form");
     if (!form) return;
     var inputName = form.dataset.inputName;

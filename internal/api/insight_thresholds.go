@@ -1,6 +1,9 @@
 package api
 
-import "github.com/wayne/telemetryiq/internal/insights"
+import (
+	"github.com/wayne/telemetryiq/internal/config"
+	"github.com/wayne/telemetryiq/internal/insights"
+)
 
 // MCPAllowlister exposes the current policy input. Implementations must be
 // safe for concurrent API and dashboard reads.
@@ -12,6 +15,11 @@ type MCPAllowlister interface {
 // Implementations must be safe for concurrent API and dashboard reads.
 type SkillsAllowlister interface {
 	SkillsAllowlist() []string
+}
+
+// PathRulesProvider exposes the live raw-path policy input.
+type PathRulesProvider interface {
+	PathRules() config.PathRules
 }
 
 // InsightThresholds carries configurable thresholds for insight handlers.
@@ -32,6 +40,17 @@ type InsightThresholds struct {
 	// SkillsAllowlistSource supersedes the startup snapshot after a successful
 	// local configuration save.
 	SkillsAllowlistSource SkillsAllowlister
+	// PathRules are optional. An unset mode yields an indeterminate report.
+	PathRules config.PathRules
+	// PathRulesSource supersedes the startup snapshot after a configuration save.
+	PathRulesSource PathRulesProvider
+}
+
+func (t InsightThresholds) currentPathRules() config.PathRules {
+	if t.PathRulesSource != nil {
+		return t.PathRulesSource.PathRules()
+	}
+	return t.PathRules
 }
 
 func (t InsightThresholds) currentMCPAllowlist() []string {

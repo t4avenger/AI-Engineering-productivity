@@ -215,6 +215,7 @@ func AccessObservations(event canonical.Event) []AccessObservation {
 // without the original nested provider payload.
 func ThinAccessEvent(event canonical.Event, observation AccessObservation, index int) canonical.Event {
 	attrs := map[string]any{}
+	attrs["source_event_id"] = event.EventID
 	switch observation.Method {
 	case AccessFilesystemRead:
 		attrs["file_path"] = observation.Value

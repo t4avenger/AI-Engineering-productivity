@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/capabilities"
+	"github.com/wayne/telemetryiq/internal/config"
 	"github.com/wayne/telemetryiq/internal/insights"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
@@ -33,6 +34,7 @@ const (
 	pathGovernance      = "/governance"
 	pathMCPAllowlist    = "/governance/mcp-allowlist"
 	pathSkillsAllowlist = "/governance/skills-allowlist"
+	pathPathRules       = "/governance/path-rules"
 	pathIntegrations    = "/integrations"
 	pathPrivacy         = "/privacy"
 	pathPrivacyDelete   = "/privacy/delete-all"
@@ -70,6 +72,12 @@ type SkillsAllowlistController interface {
 	SaveSkillsAllowlist([]string) error
 }
 
+// PathRulesController persists raw-path detect-and-report rules.
+type PathRulesController interface {
+	PathRules() config.PathRules
+	SavePathRules(config.PathRules) error
+}
+
 // Server serves the local HTMX dashboard.
 type Server struct {
 	token                     string
@@ -85,6 +93,7 @@ type Server struct {
 	mcpAllowlistController    MCPAllowlistController
 	skillsAllowlist           []string
 	skillsAllowlistController SkillsAllowlistController
+	pathRulesController       PathRulesController
 	templates                 *template.Template
 	static                    http.Handler
 }
@@ -118,13 +127,14 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 			}
 			return *v
 		},
-		"formatPercent":       formatPercent,
-		"formatMultiplier":    formatMultiplier,
-		"formatMillis":        formatMillis,
-		"formatOptionalInt":   formatOptionalInt64,
-		"sessionPath":         sessionPath,
-		"governanceRulesPath": governanceRulesPath,
-		"microusd":            formatMicroUSD,
+		"formatPercent":           formatPercent,
+		"formatMultiplier":        formatMultiplier,
+		"formatMillis":            formatMillis,
+		"formatOptionalInt":       formatOptionalInt64,
+		"sessionPath":             sessionPath,
+		"pathFindingEvidencePath": pathFindingEvidencePath,
+		"governanceRulesPath":     governanceRulesPath,
+		"microusd":                formatMicroUSD,
 	}).ParseFS(embedded, "templates/*.html")
 	if err != nil {
 		return nil, err
@@ -140,9 +150,11 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 	insightSources, _ := sessions.(storage.InsightSourceReader)
 	var controller MCPAllowlistController
 	var skillsController SkillsAllowlistController
+	var pathController PathRulesController
 	if len(controllers) > 0 {
 		controller = controllers[0]
 		skillsController, _ = controllers[0].(SkillsAllowlistController)
+		pathController, _ = controllers[0].(PathRulesController)
 	}
 	return &Server{
 		token:                     token,
@@ -157,9 +169,17 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 		mcpAllowlist:              append([]string(nil), mcpAllowlist...),
 		mcpAllowlistController:    controller,
 		skillsAllowlistController: skillsController,
+		pathRulesController:       pathController,
 		templates:                 tmpl,
 		static:                    http.FileServer(http.FS(staticRoot)),
 	}, nil
+}
+
+func (s *Server) currentPathRules() config.PathRules {
+	if s.pathRulesController != nil {
+		return s.pathRulesController.PathRules()
+	}
+	return config.PathRules{}
 }
 
 func (s *Server) currentMCPAllowlist() []string {
@@ -370,4 +390,8 @@ func formatOptionalInt64(value *int64, unit string) string {
 
 func sessionPath(id string) string {
 	return pathSessions + "/" + url.PathEscape(id)
+}
+
+func pathFindingEvidencePath(sessionID, eventID string) string {
+	return sessionPath(sessionID) + "?event=" + url.QueryEscape(eventID) + "&inspector=details#event-inspector"
 }

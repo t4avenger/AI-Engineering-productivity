@@ -77,6 +77,25 @@ type Governance struct {
 	// separate from MCP identity handling: provider skill names are compared
 	// exactly, never case-folded or inferred.
 	SkillsAllowlist []string `yaml:"skills_allowlist"`
+	// PathRules configures raw retained-path evaluation. It is an observation
+	// policy only: it never expands a path or mediates a provider action.
+	PathRules PathRules `yaml:"path_rules,omitempty"`
+}
+
+type PathRules struct {
+	Mode    string            `yaml:"mode"`
+	Allowed []PathRulePattern `yaml:"allowed"`
+	Blocked []PathRulePattern `yaml:"blocked"`
+}
+
+type PathRulePattern struct {
+	Kind  string `yaml:"kind"`
+	Value string `yaml:"value"`
+}
+
+// IsZero keeps this additive field absent from YAML written for legacy configs.
+func (r PathRules) IsZero() bool {
+	return r.Mode == "" && len(r.Allowed) == 0 && len(r.Blocked) == 0
 }
 
 // ContextWaste configures the §13.10 context-waste insight thresholds.
@@ -271,7 +290,54 @@ func (c Config) validateGovernance() error {
 			return fmt.Errorf("governance.skills_allowlist[%d] must be at most 1024 Unicode characters", i)
 		}
 	}
+	return ValidatePathRules(c.Governance.PathRules)
+}
+
+// ValidatePathRules verifies the local raw-path observation policy without
+// inspecting or resolving any paths.
+func ValidatePathRules(rules PathRules) error {
+	if rules.Mode == "" && len(rules.Allowed) == 0 && len(rules.Blocked) == 0 {
+		return nil
+	}
+	if rules.Mode != "monitor" && rules.Mode != "approved_only" && rules.Mode != "flag_all" {
+		return fmt.Errorf("governance.path_rules.mode must be monitor, approved_only, or flag_all, got %q", rules.Mode)
+	}
+	if len(rules.Allowed) > 100 || len(rules.Blocked) > 100 {
+		return errors.New("governance.path_rules.allowed and governance.path_rules.blocked must each contain at most 100 entries")
+	}
+	if err := validatePathRuleList("allowed", rules.Allowed); err != nil {
+		return err
+	}
+	return validatePathRuleList("blocked", rules.Blocked)
+}
+
+func validatePathRuleList(list string, patterns []PathRulePattern) error {
+	for i, pattern := range patterns {
+		if err := validatePathRulePattern(pattern); err != nil {
+			return fmt.Errorf("governance.path_rules.%s[%d]: %w", list, i, err)
+		}
+	}
 	return nil
+}
+
+func validatePathRulePattern(pattern PathRulePattern) error {
+	if pattern.Kind != "exact" && pattern.Kind != "glob" {
+		return fmt.Errorf("kind must be exact or glob, got %q", pattern.Kind)
+	}
+	if strings.TrimSpace(pattern.Value) == "" {
+		return errors.New("value must not be blank")
+	}
+	if utf8.RuneCountInString(pattern.Value) > 1024 {
+		return errors.New("value must be at most 1024 Unicode characters")
+	}
+	if pattern.Kind == "glob" && hasUnsupportedGlobCharacter(pattern.Value) {
+		return errors.New("value contains unsupported glob metacharacter")
+	}
+	return nil
+}
+
+func hasUnsupportedGlobCharacter(value string) bool {
+	return strings.ContainsAny(value, "[]{}")
 }
 
 func (c Config) validatePricing() error {
