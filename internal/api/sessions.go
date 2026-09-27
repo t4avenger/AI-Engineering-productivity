@@ -300,6 +300,7 @@ func sessionAvailability(session canonical.Session) map[string]string {
 		"tool_version":    observedIf(sessionStringAttribute(session, "service_version") != ""),
 		"observed_events": observedIf(numericAttribute(session.Attributes, "event_count")),
 		"token_usage":     tokenUsageAvailability(session),
+		"conversation":    observedIf(numericAttribute(session.Attributes, "conversation_event_count")),
 	}
 }
 

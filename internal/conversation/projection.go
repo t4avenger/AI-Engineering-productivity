@@ -87,6 +87,15 @@ func projectEvent(event canonical.Event) (Record, bool) {
 	}, true
 }
 
+// IsContentEventType reports whether an event type projects into a conversation
+// record. It is the single source of truth shared with session-availability
+// reporting so the "conversation coverage" signal can never drift from what
+// Project actually emits.
+func IsContentEventType(eventType string) bool {
+	_, _, _, ok := contentShape(eventType)
+	return ok
+}
+
 func contentShape(eventType string) (key, role string, lengthKeys []string, ok bool) {
 	switch eventType {
 	case "user_prompt":

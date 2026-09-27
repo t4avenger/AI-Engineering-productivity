@@ -1,0 +1,387 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.283",
+  "captured_at": "2026-09-27T09:35:29Z",
+  "sanitisation_reviewed": true,
+  "capture_note": "Single synthetic Claude Code run (v2.1.283) captured via a loopback OTLP/HTTP sink. The trace spans, the OTLP log records (claude-code-2.1.283-log-conversation-otlp.json), and the on-disk session JSONL all carried the SAME session.id in this one run; the shared value is scrubbed to the synthetic 'tiq-corr-210'. All identifiers, prompt, and response content are synthetic (git hygiene).",
+  "payload": {
+    "resourceSpans": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "host.arch",
+              "value": {
+                "stringValue": "amd64"
+              }
+            },
+            {
+              "key": "os.type",
+              "value": {
+                "stringValue": "linux"
+              }
+            },
+            {
+              "key": "os.version",
+              "value": {
+                "stringValue": "7.0.0-31-generic"
+              }
+            },
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "claude-code"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "2.1.283"
+              }
+            }
+          ],
+          "droppedAttributesCount": 0
+        },
+        "scopeSpans": [
+          {
+            "scope": {
+              "name": "com.anthropic.claude_code.tracing",
+              "version": "1.0.0"
+            },
+            "spans": [
+              {
+                "traceId": "00000000000000000000000000000210",
+                "spanId": "0000000000000211",
+                "parentSpanId": "0000000000000210",
+                "name": "claude_code.llm_request",
+                "kind": 1,
+                "startTimeUnixNano": "1790501729814000000",
+                "endTimeUnixNano": "1790501731073341125",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "0000000000000000000000000000000000000000000000000000000000000001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "tiq-corr-210"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000a1"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic-user@example.test"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000a2"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_00000000000000000000000001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "llm_request"
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "claude-opus-4-8"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.system",
+                    "value": {
+                      "stringValue": "anthropic"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.request.model",
+                    "value": {
+                      "stringValue": "claude-opus-4-8"
+                    }
+                  },
+                  {
+                    "key": "llm_request.context",
+                    "value": {
+                      "stringValue": "interaction"
+                    }
+                  },
+                  {
+                    "key": "speed",
+                    "value": {
+                      "stringValue": "normal"
+                    }
+                  },
+                  {
+                    "key": "query_source_safe",
+                    "value": {
+                      "stringValue": "sdk"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 1259
+                    }
+                  },
+                  {
+                    "key": "input_tokens",
+                    "value": {
+                      "intValue": 2
+                    }
+                  },
+                  {
+                    "key": "output_tokens",
+                    "value": {
+                      "intValue": 4
+                    }
+                  },
+                  {
+                    "key": "cache_read_tokens",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "cache_creation_tokens",
+                    "value": {
+                      "intValue": 8532
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  },
+                  {
+                    "key": "attempt",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "request_id",
+                    "value": {
+                      "stringValue": "req_synthetic00000000000000000001"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.id",
+                    "value": {
+                      "stringValue": "req_synthetic00000000000000000001"
+                    }
+                  },
+                  {
+                    "key": "ttft_ms",
+                    "value": {
+                      "intValue": 1209
+                    }
+                  },
+                  {
+                    "key": "first_content_ms",
+                    "value": {
+                      "intValue": 1210
+                    }
+                  },
+                  {
+                    "key": "effort",
+                    "value": {
+                      "stringValue": "high"
+                    }
+                  },
+                  {
+                    "key": "stop_reason",
+                    "value": {
+                      "stringValue": "end_turn"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.finish_reasons",
+                    "value": {
+                      "arrayValue": {
+                        "values": [
+                          {
+                            "stringValue": "end_turn"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "attempt",
+                        "value": {
+                          "intValue": 1
+                        }
+                      }
+                    ],
+                    "name": "gen_ai.request.attempt",
+                    "timeUnixNano": "1790501729819798362",
+                    "droppedAttributesCount": 0
+                  }
+                ],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "link.type",
+                        "value": {
+                          "stringValue": "parent_of"
+                        }
+                      }
+                    ],
+                    "spanId": "0000000000000299",
+                    "traceId": "00000000000000000000000000000299",
+                    "droppedAttributesCount": 0,
+                    "flags": 769
+                  }
+                ],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000210",
+                "spanId": "0000000000000210",
+                "name": "claude_code.interaction",
+                "kind": 1,
+                "startTimeUnixNano": "1790501729743000000",
+                "endTimeUnixNano": "1790501731117935312",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "0000000000000000000000000000000000000000000000000000000000000001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "tiq-corr-210"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000a1"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic-user@example.test"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000a2"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_00000000000000000000000001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "interaction"
+                    }
+                  },
+                  {
+                    "key": "user_prompt",
+                    "value": {
+                      "stringValue": "synthetic correlation prompt for issue 210"
+                    }
+                  },
+                  {
+                    "key": "user_prompt_length",
+                    "value": {
+                      "intValue": 42
+                    }
+                  },
+                  {
+                    "key": "interaction.sequence",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "parent.source",
+                    "value": {
+                      "stringValue": "none"
+                    }
+                  },
+                  {
+                    "key": "queued_sends",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "interaction.duration_ms",
+                    "value": {
+                      "intValue": 1375
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

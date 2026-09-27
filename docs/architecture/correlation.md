@@ -18,6 +18,20 @@ The same value is used as the canonical `event_id` and is copied to `provider_ex
 
 Codex OTLP log records observed in 0.145.0 can carry `conversation.id`. CLI 0.155.1 traces can carry the same provider-emitted value as a resource attribute; only that exact field maps their spans to `codex:<conversation.id>`. Log-derived events and `canonical.ModelInteraction` records use the same raw session ID. Records without a conversation ID fall back to a non-keyed content ID (epic #87 removed ingest-time hiding — no HMAC fingerprint). Their deduplication key remains the `request_id`, which is copied to `provider_extensions.correlation.dedup_key`.
 
+For Claude Code, the single join key across all three surfaces is the raw
+`session.id`: OTLP trace spans, OTLP content logs, and the on-disk session JSONL
+transcript each normalise to `claude-code:<session.id>` via
+`normalize.ProviderNativeSessionID`. This is proven from one version-pinned
+synthetic run (v2.1.283) whose trace, log, and transcript carried the same
+`session.id` before sanitisation — the paired fixtures
+`claude-code-2.1.283-trace-conversation-otlp.json` and
+`claude-code-2.1.283-log-conversation-otlp.json` replay it, and
+`TestClaudeTraceLogShareSessionJoinAndConversation` reconstructs one provider
+session exposing both the trace spans and the projected conversation. A span with
+no `session.id` falls back to `claude-code:trace:<traceId>` and stays a separate
+observation row (`identity_source: trace.id`); it is never merged into a provider
+session. Claude correlation never joins by time, model, or prompt content.
+
 ## Session identity scope
 
 SQLite reconstructs one retained row for every distinct event `session_id`; it

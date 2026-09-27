@@ -302,6 +302,58 @@ func TestNormalizeTracesSessionFallbackIsTraceScoped(t *testing.T) {
 	}
 }
 
+// TestNormalizeClaudeSharedSessionCorrelation proves, from one version-pinned
+// synthetic run, that the OTLP trace spans and the OTLP conversation logs both
+// normalise to the SAME provider-native session id. This is the fixture-backed
+// evidence for the #210 correlation contract: the join key is the raw
+// session.id, and nothing heuristic (time/model/prompt) participates. The paired
+// fixtures (…-trace-conversation-otlp.json / …-log-conversation-otlp.json) were
+// captured from one run whose session.id matched across trace, log, and the
+// on-disk transcript before sanitisation.
+func TestNormalizeClaudeSharedSessionCorrelation(t *testing.T) {
+	receivedAt := time.Date(2026, 9, 27, 9, 35, 30, 0, time.UTC)
+	const wantSession = "claude-code:tiq-corr-210"
+
+	tracePayload := tracesFixturePayload(t, "claude-code-2.1.283-trace-conversation-otlp.json")
+	logPayload := tracesFixturePayload(t, "claude-code-2.1.283-log-conversation-otlp.json")
+
+	traceEvents, err := NormalizeTraces(tracePayload, receivedAt)
+	if err != nil {
+		t.Fatalf("NormalizeTraces: %v", err)
+	}
+	traceRepeat, err := NormalizeTraces(tracePayload, receivedAt)
+	if err != nil {
+		t.Fatalf("NormalizeTraces repeat: %v", err)
+	}
+	logEvents, err := NormalizeLogs(logPayload, receivedAt)
+	if err != nil {
+		t.Fatalf("NormalizeLogs: %v", err)
+	}
+	logRepeat, err := NormalizeLogs(logPayload, receivedAt)
+	if err != nil {
+		t.Fatalf("NormalizeLogs repeat: %v", err)
+	}
+	if !reflect.DeepEqual(traceEvents, traceRepeat) || !reflect.DeepEqual(logEvents, logRepeat) {
+		t.Fatal("normalisation must be deterministic across surfaces")
+	}
+	if len(traceEvents) == 0 || len(logEvents) == 0 {
+		t.Fatalf("empty events: %d trace, %d log", len(traceEvents), len(logEvents))
+	}
+	assertAllEventsShareSession(t, "trace", traceEvents, wantSession)
+	assertAllEventsShareSession(t, "log", logEvents, wantSession)
+}
+
+// assertAllEventsShareSession fails unless every event carries the expected raw
+// provider-native session id, proving the join key is uniform across a surface.
+func assertAllEventsShareSession(t *testing.T, surface string, events []canonical.Event, want string) {
+	t.Helper()
+	for _, event := range events {
+		if event.SessionID != want {
+			t.Fatalf("%s event %q session id = %q, want %q", surface, event.EventType, event.SessionID, want)
+		}
+	}
+}
+
 // TestNormalizeTracesFiltersSensitiveAttributes proves the allow-list drops
 // identity/secret-bearing span attributes (the adapter is the sole guard after
 // #88 removed storage-side sanitising) while keeping safe behaviour metadata.

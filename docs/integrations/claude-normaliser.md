@@ -413,7 +413,17 @@ a live capture (tool 2.1.268,
 Each span becomes one `canonical.Event`. The raw `session.id` is promoted to the
 canonical `session_id` (`claude-code:<session.id>`); when a span carries no
 `session.id` the identity falls back to the trace id (`claude-code:trace:<traceId>`)
-so spans from different traces are not merged into one synthetic session. The raw
+so spans from different traces are not merged into one synthetic session. That
+`session.id` is the single cross-surface join key: the paired v2.1.283 fixtures
+`claude-code-2.1.283-trace-conversation-otlp.json` and
+`claude-code-2.1.283-log-conversation-otlp.json` were captured from one run whose
+trace, log, and transcript carried the same `session.id`, so `NormalizeTraces` and
+`NormalizeLogs` both key `claude-code:tiq-corr-210`
+(`TestNormalizeClaudeSharedSessionCorrelation`), and ingest→read reconstructs one
+provider session exposing both the spans and the projected conversation
+(`TestClaudeTraceLogShareSessionJoinAndConversation`). The trace-scoped fallback
+stays a separate observation (`TestClaudeTraceOnlyStaysSeparateObservation`);
+correlation never uses time, model, or prompt content. The raw
 span identity (`traceId`/`spanId`/`parentSpanId`), span `name`, `kind`, start/end
 nanos, status, and scope are retained verbatim under
 `provider_extensions.span`/`correlation` (epic #87); a root span's absent parent

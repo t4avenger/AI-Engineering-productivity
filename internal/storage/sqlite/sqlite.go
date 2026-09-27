@@ -16,6 +16,7 @@ import (
 	// Register the pure-Go SQLite driver with database/sql.
 	_ "modernc.org/sqlite"
 
+	"github.com/wayne/telemetryiq/internal/conversation"
 	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/normalize/claude"
@@ -708,11 +709,28 @@ func reconstructSession(id string, events []canonical.Event) canonical.Session {
 			}
 		}
 	}
+	if count := countConversationEvents(events); count > 0 {
+		session.Attributes["conversation_event_count"] = count
+	}
 	attachSessionPRLink(&session, events)
 	scope, source := sessionIdentity(events)
 	session.Attributes[identityScopeKey] = scope
 	session.Attributes[identitySourceKey] = source
 	return session
+}
+
+// countConversationEvents reports how many of a session's events project into
+// conversation records, using the conversation package as the single source of
+// truth so the session-level coverage signal cannot drift from what the
+// conversation endpoint emits.
+func countConversationEvents(events []canonical.Event) int {
+	count := 0
+	for _, event := range events {
+		if conversation.IsContentEventType(event.EventType) {
+			count++
+		}
+	}
+	return count
 }
 
 func attachSessionPRLink(session *canonical.Session, events []canonical.Event) {

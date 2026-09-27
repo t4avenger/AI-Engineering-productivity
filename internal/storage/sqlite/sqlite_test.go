@@ -66,6 +66,33 @@ func TestSessionIdentityUsesCodexThreadID(t *testing.T) {
 	}
 }
 
+// TestSessionIdentityClaudeTraceScopePrecedesProvider pins the load-bearing
+// ordering in identity classification: a claude-code:trace:<id> key must resolve
+// to an observation (trace.id), while a plain claude-code:<session.id> key
+// resolves to a provider session (session.id). This only holds because
+// observationIdentity is consulted before the generic claude-code: provider case;
+// reordering them would silently merge trace-only observations into provider
+// sessions (regression guard for #210).
+func TestSessionIdentityClaudeTraceScopePrecedesProvider(t *testing.T) {
+	tests := []struct {
+		name       string
+		sessionID  string
+		wantScope  string
+		wantSource string
+	}{
+		{name: "trace-only observation", sessionID: "claude-code:trace:00000000000000000000000000000210", wantScope: identityObservation, wantSource: "trace.id"},
+		{name: "provider session", sessionID: "claude-code:tiq-corr-210", wantScope: identityProvider, wantSource: "session.id"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			scope, source := sessionIdentity([]canonical.Event{{Tool: "claude-code", SessionID: test.sessionID}})
+			if scope != test.wantScope || source != test.wantSource {
+				t.Fatalf("identity = %q, %q; want %q, %q", scope, source, test.wantScope, test.wantSource)
+			}
+		})
+	}
+}
+
 func TestReconstructedSessionPromotesOnlyUnambiguousPRLink(t *testing.T) {
 	tests := []struct {
 		name       string
