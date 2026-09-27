@@ -18,6 +18,7 @@
         }
       },
       "event": {
+        "parent_uuid": "a5000000-0000-4000-8000-000000000005",
         "tool_name": "Bash",
         "tool_use_id": "toolu_bash"
       },
@@ -53,6 +54,7 @@
         }
       },
       "event": {
+        "parent_uuid": "a3000000-0000-4000-8000-000000000003",
         "tool_name": "Edit",
         "tool_use_id": "toolu_edit"
       },
@@ -90,6 +92,8 @@
         }
       },
       "event": {
+        "is_sidechain": true,
+        "parent_uuid": "a8000000-0000-4000-8000-000000000008",
         "tool_name": "Grep",
         "tool_use_id": "toolu_grep"
       },
@@ -126,6 +130,7 @@
         }
       },
       "event": {
+        "parent_uuid": "a1000000-0000-4000-8000-000000000001",
         "tool_name": "Read",
         "tool_use_id": "toolu_read"
       },
@@ -161,6 +166,7 @@
         }
       },
       "event": {
+        "parent_uuid": "a7000000-0000-4000-8000-000000000007",
         "tool_name": "Task",
         "tool_use_id": "toolu_task"
       },
@@ -198,6 +204,7 @@
         }
       },
       "event": {
+        "parent_uuid": "a5000000-0000-4000-8000-000000000005",
         "tool_name": "TodoWrite",
         "tool_use_id": "toolu_todo"
       },
@@ -244,6 +251,7 @@
         }
       },
       "event": {
+        "parent_uuid": "a3000000-0000-4000-8000-000000000003",
         "tool_name": "Write",
         "tool_use_id": "toolu_write"
       },

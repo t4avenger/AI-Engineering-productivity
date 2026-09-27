@@ -696,17 +696,21 @@ it to canonical events and is served live at `POST /v1/claude/transcript`
   `unknown` but is **still promoted**, never dropped). The full `input` (Edit/Write
   diffs `old_string`/`new_string`/`content`, and TodoWrite `todos` snapshots) and the
   paired `tool_result` body are captured raw under `provider_extensions.tool_call`
-  (`{input, result}`); a TodoWrite snapshot is additionally aliased under
-  `provider_extensions.todo_snapshot`. `NormalizeTranscript` emits one **content-free**
+  (`{input, result}`) — a single raw copy, so a TodoWrite snapshot is read from
+  `tool_call.input.todos` rather than duplicated under a second key.
+  `NormalizeTranscript` emits one **content-free**
   `tool_call` correlation event per invocation carrying
   `attributes.tool = {tool_name, tool_use_id, file_path?, full_command?, subagent_type?}`
   — deliberately the **same key names** the OTLP tool-span path (`traces.go:toolAttributes`)
   uses, so `insights.SessionFilesFromEvidence` (Files-lane) and
   `governance.risky_access` surface transcript-sourced paths/commands with **zero
   changes** to those consumers. Sub-agent (Task) work needs no separate walker: a
-  sidechain record's `tool_use` flows through the same unconditional pass, and its
-  `is_sidechain`/`parent_uuid` linkage (already on every event via
-  `transcriptCorrelation`) attributes it to the sub-agent. The flat, id-keyed collector
+  sidechain record's `tool_use` flows through the same unconditional pass and
+  self-identifies as sub-agent work — the tool_call event carries the same
+  `provider_extensions.transcript.is_sidechain` marker the assistant_message event
+  uses, and the generic Operation's `event` block carries `is_sidechain` plus
+  `parent_uuid`, so a consumer can attribute it directly without a multi-hop join
+  (the event's `correlation.parent_uuid` still carries the DAG linkage too). The flat, id-keyed collector
   is last-seen-wins for a duplicate `tool_use_id` (documented and tested), so a call
   echoed on both a main-line and a sidechain record yields exactly one deterministic
   Operation. Evidence: `fixtures/claude/synthetic/claude-code-2.1.269-tool-io-diffs-subagent-transcript.json`

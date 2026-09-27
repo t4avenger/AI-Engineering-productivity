@@ -138,8 +138,8 @@ func TestNormalizeTranscriptCapturesThinkingAndSlash(t *testing.T) {
 }
 
 // TestNormalizeTranscriptCapturesDiffAndTodoRaw proves Edit/Write diffs and a
-// TodoWrite snapshot are captured raw under tool_call.input on the Operation (no
-// second copy under another key), satisfying the diff/todo DoD.
+// TodoWrite task-list snapshot are captured raw under tool_call.input on the
+// Operation as a single copy, satisfying the diff and task-list capture requirement.
 func TestNormalizeTranscriptCapturesDiffAndTodoRaw(t *testing.T) {
 	data := transcriptFixtureNDJSONFrom(t, "synthetic", toolIOTranscriptFixture)
 	operations, err := ExtractTranscriptOperations(data, time.Unix(0, 0).UTC())
@@ -183,10 +183,12 @@ func toolCallInput(t *testing.T, byID map[string]canonical.Operation, id string)
 }
 
 // TestToolCallSidechainCaptured proves a sub-agent (sidechain) tool_use flows
-// through the same collector and carries its DAG linkage: the Grep call's operation
-// exists and its correlation parent_uuid points at the sidechain assistant record,
-// so the conversation tree can attribute it to the sub-agent without a separate
-// sidechain walker.
+// through the same collector and self-identifies as sub-agent work on both the
+// operation and the event: the Grep operation's event block carries is_sidechain
+// plus the parent_uuid pointing at the sidechain assistant record, and the tool_call
+// event carries the same is_sidechain marker the assistant_message event uses — so
+// the conversation tree can attribute it to the sub-agent without a separate
+// sidechain walker or a multi-hop join.
 func TestToolCallSidechainCaptured(t *testing.T) {
 	data := transcriptFixtureNDJSONFrom(t, "synthetic", toolIOTranscriptFixture)
 	operations, err := ExtractTranscriptOperations(data, time.Unix(0, 0).UTC())
@@ -201,13 +203,28 @@ func TestToolCallSidechainCaptured(t *testing.T) {
 	if grep.Category != canonical.OperationCategoryFilesystemRead {
 		t.Errorf("Grep category = %q, want filesystem read", grep.Category)
 	}
-	correlation := grep.ProviderExtensions["correlation"].(map[string]any)
-	// The Grep tool_use lives on the sidechain assistant record a9, so its own
-	// correlation identity is that record; the operation ordering key still sorts it
-	// deterministically. The sub-agent linkage is carried by the sidechain
-	// assistant/user events (is_sidechain + parent_uuid), not re-derived here.
-	if _, ok := correlation["ordering_key"].(string); !ok {
-		t.Fatalf("Grep operation missing ordering key: %#v", correlation)
+	event, ok := grep.ProviderExtensions["event"].(map[string]any)
+	if !ok {
+		t.Fatalf("Grep operation missing event block: %#v", grep.ProviderExtensions)
+	}
+	if event["is_sidechain"] != true {
+		t.Errorf("Grep operation event.is_sidechain = %#v, want true", event["is_sidechain"])
+	}
+	if event["parent_uuid"] != "a8000000-0000-4000-8000-000000000008" {
+		t.Errorf("Grep operation event.parent_uuid = %#v, want the sidechain parent", event["parent_uuid"])
+	}
+
+	events, err := NormalizeTranscript(data, time.Unix(0, 0).UTC())
+	if err != nil {
+		t.Fatalf("normalise: %v", err)
+	}
+	grepEvent, ok := eventByID(events, "claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_grep")
+	if !ok {
+		t.Fatal("sidechain Grep tool_use must become a tool_call event")
+	}
+	transcript, ok := grepEvent.ProviderExtensions["transcript"].(map[string]any)
+	if !ok || transcript["is_sidechain"] != true {
+		t.Fatalf("Grep tool_call event missing is_sidechain marker: %#v", grepEvent.ProviderExtensions)
 	}
 }
 

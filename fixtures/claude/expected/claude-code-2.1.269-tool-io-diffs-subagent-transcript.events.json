@@ -647,6 +647,9 @@
           "reason": "Claude Code transcript records have no reviewed task-boundary signal"
         },
         "uuid": "a9000000-0000-4000-8000-000000000009"
+      },
+      "transcript": {
+        "is_sidechain": true
       }
     }
   }

@@ -141,6 +141,16 @@ func firstEventOfType(t *testing.T, events []canonical.Event, eventType string) 
 	return matched[0]
 }
 
+// eventByID returns the event with the given EventID, if present.
+func eventByID(events []canonical.Event, eventID string) (canonical.Event, bool) {
+	for _, event := range events {
+		if event.EventID == eventID {
+			return event, true
+		}
+	}
+	return canonical.Event{}, false
+}
+
 func assertTranscriptEventShape(t *testing.T, event canonical.Event) {
 	t.Helper()
 	if event.EventType != eventTypeAssistantMessage {

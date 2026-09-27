@@ -399,7 +399,12 @@ func transcriptUserContent(line []byte) string {
 	}
 	var text string
 	if err := json.Unmarshal(raw, &text); err == nil {
-		return strings.TrimSpace(text)
+		// Trim only to decide whether the prompt is empty; the stored value is the
+		// original string so leading/trailing whitespace survives verbatim (#87).
+		if strings.TrimSpace(text) == "" {
+			return ""
+		}
+		return text
 	}
 	var blocks []transcriptContentBlock
 	if err := json.Unmarshal(raw, &blocks); err != nil {

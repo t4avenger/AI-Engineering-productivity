@@ -32,12 +32,13 @@ const transcriptTaskBoundaryReason = "Claude Code transcript tool_use records ha
 // content array needed to reconstruct a tool call from a transcript line. Every
 // other transcript field is left undeclared, so no unrelated body is read here.
 type transcriptContentEnvelope struct {
-	UUID       string                 `json:"uuid"`
-	ParentUUID *string                `json:"parentUuid"`
-	SessionID  string                 `json:"sessionId"`
-	Timestamp  string                 `json:"timestamp"`
-	Version    string                 `json:"version"`
-	Message    *transcriptContentBody `json:"message"`
+	UUID        string                 `json:"uuid"`
+	ParentUUID  *string                `json:"parentUuid"`
+	SessionID   string                 `json:"sessionId"`
+	Timestamp   string                 `json:"timestamp"`
+	Version     string                 `json:"version"`
+	IsSidechain *bool                  `json:"isSidechain"`
+	Message     *transcriptContentBody `json:"message"`
 }
 
 // transcriptContentBody holds the raw content payload. It is decoded as
@@ -73,19 +74,20 @@ type transcriptContentBlock struct {
 // well-formed MCP name. A call whose result is absent (still in flight when the
 // transcript shipped) keeps outcome "unknown" rather than a fabricated value.
 type transcriptToolCall struct {
-	sessionID  string
-	uuid       string
-	parentUUID *string
-	occurredAt time.Time
-	version    string
-	category   canonical.OperationCategory
-	fullName   string
-	server     string // MCP only
-	toolName   string // MCP only
-	toolUseID  string
-	input      any
-	result     any
-	outcome    string
+	sessionID   string
+	uuid        string
+	parentUUID  *string
+	isSidechain bool
+	occurredAt  time.Time
+	version     string
+	category    canonical.OperationCategory
+	fullName    string
+	server      string // MCP only
+	toolName    string // MCP only
+	toolUseID   string
+	input       any
+	result      any
+	outcome     string
 }
 
 // toolCallCollector accumulates tool_use invocations across a transcript walk and
@@ -136,18 +138,19 @@ func (c *toolCallCollector) collectToolUses(line []byte) {
 			c.order = append(c.order, block.ID)
 		}
 		c.calls[block.ID] = &transcriptToolCall{
-			sessionID:  sessionID,
-			uuid:       strings.TrimSpace(envelope.UUID),
-			parentUUID: trimmedParentUUID(envelope.ParentUUID),
-			occurredAt: occurredAt.UTC(),
-			version:    envelope.Version,
-			category:   category,
-			fullName:   block.Name,
-			server:     server,
-			toolName:   toolName,
-			toolUseID:  block.ID,
-			input:      decodeRawContent(block.Input),
-			outcome:    "unknown",
+			sessionID:   sessionID,
+			uuid:        strings.TrimSpace(envelope.UUID),
+			parentUUID:  trimmedParentUUID(envelope.ParentUUID),
+			isSidechain: envelope.IsSidechain != nil && *envelope.IsSidechain,
+			occurredAt:  occurredAt.UTC(),
+			version:     envelope.Version,
+			category:    category,
+			fullName:    block.Name,
+			server:      server,
+			toolName:    toolName,
+			toolUseID:   block.ID,
+			input:       decodeRawContent(block.Input),
+			outcome:     "unknown",
 		}
 	}
 }
@@ -261,6 +264,17 @@ func (c transcriptToolCall) operation() canonical.Operation {
 // with no change. The raw input and result body ride on toolOperation instead.
 func (c transcriptToolCall) toolCorrelationEvent(receivedAt time.Time) canonical.Event {
 	eventID := c.sessionID + ":toolcall:" + c.toolUseID
+	extensions := map[string]any{
+		"correlation": transcriptCorrelation(eventID, c.occurredAt, c.uuid, c.parentUUID),
+	}
+	// A sub-agent (sidechain) tool_use self-identifies via the same
+	// provider_extensions.transcript.is_sidechain marker the assistant_message event
+	// carries, so a consumer can attribute the call to sub-agent work directly rather
+	// than joining back through the assistant record (correlation.parent_uuid still
+	// carries the DAG linkage regardless).
+	if c.isSidechain {
+		extensions["transcript"] = map[string]any{"is_sidechain": true}
+	}
 	return canonical.Event{
 		SchemaVersion: canonicalSchemaVersion,
 		EventID:       eventID,
@@ -280,9 +294,7 @@ func (c transcriptToolCall) toolCorrelationEvent(receivedAt time.Time) canonical
 			"tool":               c.toolEventAttributes(),
 			"unavailable_fields": toolCallUnavailableFields(),
 		},
-		ProviderExtensions: map[string]any{
-			"correlation": transcriptCorrelation(eventID, c.occurredAt, c.uuid, c.parentUUID),
-		},
+		ProviderExtensions: extensions,
 	}
 }
 
@@ -324,9 +336,19 @@ func (c transcriptToolCall) toolEventAttributes() map[string]any {
 // Files-lane matcher (insights.operationToolUseID) pairs the operation to its event.
 func (c transcriptToolCall) toolOperation() canonical.Operation {
 	operationID := c.sessionID + ":tool:" + c.toolUseID
+	event := map[string]any{"tool_name": c.fullName, "tool_use_id": c.toolUseID}
+	// Carry the sub-agent linkage onto the operation itself so a sidechain tool call
+	// self-identifies without a multi-hop join through the events (the MCP operation
+	// shape stays byte-stable — this is the generic path only).
+	if c.parentUUID != nil {
+		event["parent_uuid"] = *c.parentUUID
+	}
+	if c.isSidechain {
+		event["is_sidechain"] = true
+	}
 	extensions := map[string]any{
 		"correlation": operationCorrelation(operationID, c.occurredAt, transcriptTaskBoundaryReason),
-		"event":       map[string]any{"tool_name": c.fullName, "tool_use_id": c.toolUseID},
+		"event":       event,
 	}
 	call := map[string]any{}
 	if c.input != nil {
