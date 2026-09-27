@@ -71,13 +71,10 @@ func Page(records []Record, limit int, cursorOccurredAt, cursorEventID string) (
 }
 
 func projectEvent(event canonical.Event) (Record, bool) {
-	if event.Provider != "anthropic" || event.Tool != "claude-code" {
+	if !IsConversationEvent(event) {
 		return Record{}, false
 	}
-	key, role, lengthKeys, ok := contentShape(event.EventType)
-	if !ok {
-		return Record{}, false
-	}
+	key, role, lengthKeys, _ := contentShape(event.EventType)
 	echo, _ := event.ProviderExtensions["event"].(map[string]any)
 	text, availability := contentValue(echo, key, lengthKeys...)
 	return Record{
@@ -87,12 +84,17 @@ func projectEvent(event canonical.Event) (Record, bool) {
 	}, true
 }
 
-// IsContentEventType reports whether an event type projects into a conversation
-// record. It is the single source of truth shared with session-availability
-// reporting so the "conversation coverage" signal can never drift from what
-// Project actually emits.
-func IsContentEventType(eventType string) bool {
-	_, _, _, ok := contentShape(eventType)
+// IsConversationEvent reports whether an event projects into a conversation
+// record. It is the single source of truth used by both Project and
+// session-availability reporting, so the "conversation coverage" signal can
+// never drift from what Project actually emits: it applies the same provider/tool
+// guard (only Claude Code content events are conversation records) as the
+// projection, not just the event-type shape.
+func IsConversationEvent(event canonical.Event) bool {
+	if event.Provider != "anthropic" || event.Tool != "claude-code" {
+		return false
+	}
+	_, _, _, ok := contentShape(event.EventType)
 	return ok
 }
 

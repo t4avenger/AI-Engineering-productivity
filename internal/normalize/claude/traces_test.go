@@ -303,19 +303,22 @@ func TestNormalizeTracesSessionFallbackIsTraceScoped(t *testing.T) {
 }
 
 // TestNormalizeClaudeSharedSessionCorrelation proves, from one version-pinned
-// synthetic run, that the OTLP trace spans and the OTLP conversation logs both
-// normalise to the SAME provider-native session id. This is the fixture-backed
-// evidence for the #210 correlation contract: the join key is the raw
-// session.id, and nothing heuristic (time/model/prompt) participates. The paired
-// fixtures (…-trace-conversation-otlp.json / …-log-conversation-otlp.json) were
-// captured from one run whose session.id matched across trace, log, and the
-// on-disk transcript before sanitisation.
+// synthetic run, that all THREE Claude surfaces — OTLP trace spans, OTLP
+// conversation logs, and the on-disk session JSONL transcript — normalise to the
+// SAME provider-native session id. This is the fixture-backed evidence for the
+// #210 correlation contract: the join key is the raw session.id, and nothing
+// heuristic (time/model/prompt) participates. The three fixtures
+// (…-trace-conversation-otlp.json / …-log-conversation-otlp.json /
+// …-transcript-conversation.json) were captured from one run whose transcript
+// file was named by, and whose records carried, the same session UUID as the
+// OTLP session.id before sanitisation.
 func TestNormalizeClaudeSharedSessionCorrelation(t *testing.T) {
 	receivedAt := time.Date(2026, 9, 27, 9, 35, 30, 0, time.UTC)
 	const wantSession = "claude-code:tiq-corr-210"
 
 	tracePayload := tracesFixturePayload(t, "claude-code-2.1.283-trace-conversation-otlp.json")
 	logPayload := tracesFixturePayload(t, "claude-code-2.1.283-log-conversation-otlp.json")
+	transcriptPayload := transcriptFixtureNDJSON(t, "claude-code-2.1.283-transcript-conversation.json")
 
 	traceEvents, err := NormalizeTraces(tracePayload, receivedAt)
 	if err != nil {
@@ -333,14 +336,25 @@ func TestNormalizeClaudeSharedSessionCorrelation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NormalizeLogs repeat: %v", err)
 	}
-	if !reflect.DeepEqual(traceEvents, traceRepeat) || !reflect.DeepEqual(logEvents, logRepeat) {
+	transcriptEvents, err := NormalizeTranscript(transcriptPayload, receivedAt)
+	if err != nil {
+		t.Fatalf("NormalizeTranscript: %v", err)
+	}
+	transcriptRepeat, err := NormalizeTranscript(transcriptPayload, receivedAt)
+	if err != nil {
+		t.Fatalf("NormalizeTranscript repeat: %v", err)
+	}
+	if !reflect.DeepEqual(traceEvents, traceRepeat) ||
+		!reflect.DeepEqual(logEvents, logRepeat) ||
+		!reflect.DeepEqual(transcriptEvents, transcriptRepeat) {
 		t.Fatal("normalisation must be deterministic across surfaces")
 	}
-	if len(traceEvents) == 0 || len(logEvents) == 0 {
-		t.Fatalf("empty events: %d trace, %d log", len(traceEvents), len(logEvents))
+	if len(traceEvents) == 0 || len(logEvents) == 0 || len(transcriptEvents) == 0 {
+		t.Fatalf("empty events: %d trace, %d log, %d transcript", len(traceEvents), len(logEvents), len(transcriptEvents))
 	}
 	assertAllEventsShareSession(t, "trace", traceEvents, wantSession)
 	assertAllEventsShareSession(t, "log", logEvents, wantSession)
+	assertAllEventsShareSession(t, "transcript", transcriptEvents, wantSession)
 }
 
 // assertAllEventsShareSession fails unless every event carries the expected raw

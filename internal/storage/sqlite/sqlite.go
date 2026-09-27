@@ -726,7 +726,7 @@ func reconstructSession(id string, events []canonical.Event) canonical.Session {
 func countConversationEvents(events []canonical.Event) int {
 	count := 0
 	for _, event := range events {
-		if conversation.IsContentEventType(event.EventType) {
+		if conversation.IsConversationEvent(event) {
 			count++
 		}
 	}

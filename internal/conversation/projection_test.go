@@ -31,6 +31,30 @@ func TestProjectPreservesContentAvailabilityWithoutInventingMessages(t *testing.
 	assertRecord(t, records[5], RoleAssistant, AvailabilityUnavailable, "")
 }
 
+// TestIsConversationEventGuardsProviderAndTool proves the shared eligibility
+// predicate applies the same provider/tool guard as Project, so a non-Claude
+// event carrying a generic user_prompt/assistant_response type is NOT treated as
+// a conversation event. This keeps the session-availability conversation signal
+// aligned with what the conversation endpoint actually emits.
+func TestIsConversationEventGuardsProviderAndTool(t *testing.T) {
+	tests := []struct {
+		name  string
+		event canonical.Event
+		want  bool
+	}{
+		{name: "claude content event", event: canonical.Event{Provider: "anthropic", Tool: "claude-code", EventType: "user_prompt"}, want: true},
+		{name: "non-claude content event", event: canonical.Event{Provider: "openai", Tool: "codex", EventType: "user_prompt"}, want: false},
+		{name: "claude non-content event", event: canonical.Event{Provider: "anthropic", Tool: "claude-code", EventType: "api_request"}, want: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := IsConversationEvent(test.event); got != test.want {
+				t.Fatalf("IsConversationEvent = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
 func TestPageUsesSourceEventCursorAfterProjection(t *testing.T) {
 	at := time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC)
 	records := []Record{{EventID: "a", OccurredAt: at}, {EventID: "b", OccurredAt: at.Add(time.Second)}, {EventID: "c", OccurredAt: at.Add(2 * time.Second)}}

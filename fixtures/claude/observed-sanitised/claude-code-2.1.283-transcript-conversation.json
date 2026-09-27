@@ -1,0 +1,100 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.283",
+  "captured_at": "2026-09-27T09:35:31Z",
+  "sanitisation_reviewed": true,
+  "capture_note": "On-disk session JSONL transcript from the SAME synthetic Claude Code run (v2.1.283) as claude-code-2.1.283-trace-conversation-otlp.json and claude-code-2.1.283-log-conversation-otlp.json. The real transcript file was named by, and every record carried, the same session UUID as the OTLP session.id, proving the transcript is the third surface joined on session.id (scrubbed to 'tiq-corr-210'). Content is synthetic.",
+  "payload": {
+    "source_type": "session_jsonl_transcript",
+    "transcript_lines": [
+      {
+        "parentUuid": null,
+        "isSidechain": false,
+        "promptId": "00000000-0000-4000-8000-0000000000b1",
+        "type": "user",
+        "message": {
+          "role": "user",
+          "content": "synthetic correlation prompt for issue 210"
+        },
+        "uuid": "00000000-0000-4000-8000-0000000000c1",
+        "timestamp": "2026-09-27T09:35:29.776Z",
+        "permissionMode": "default",
+        "promptSource": "sdk",
+        "turnOrigin": "sdk",
+        "userType": "external",
+        "entrypoint": "sdk-cli",
+        "cwd": "/home/synthetic/project",
+        "sessionId": "tiq-corr-210",
+        "version": "2.1.283",
+        "gitBranch": "main"
+      },
+      {
+        "parentUuid": "00000000-0000-4000-8000-0000000000c1",
+        "isSidechain": false,
+        "message": {
+          "id": "msg_synthetic00000000000000000001",
+          "type": "message",
+          "role": "assistant",
+          "model": "claude-opus-4-8",
+          "content": [
+            {
+              "type": "text",
+              "text": "synthetic correlation response for issue 210"
+            }
+          ],
+          "stop_reason": "end_turn",
+          "usage": {
+            "input_tokens": 2,
+            "cache_creation_input_tokens": 8532,
+            "cache_read_input_tokens": 0,
+            "output_tokens": 4,
+            "output_tokens_details": {
+              "thinking_tokens": 0
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 2592,
+              "ephemeral_5m_input_tokens": 5940
+            },
+            "inference_geo": "not_available",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 4,
+                "cache_read_input_tokens": 0,
+                "cache_creation_input_tokens": 8532,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 5940,
+                  "ephemeral_1h_input_tokens": 2592
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard"
+          },
+          "stop_details": null
+        },
+        "apiBlockIndex": 0,
+        "requestId": "req_synthetic00000000000000000001",
+        "type": "assistant",
+        "uuid": "00000000-0000-4000-8000-0000000000c2",
+        "timestamp": "2026-09-27T09:35:31.029Z",
+        "effort": "high",
+        "perTurnEffort": null,
+        "userType": "external",
+        "entrypoint": "sdk-cli",
+        "cwd": "/home/synthetic/project",
+        "sessionId": "tiq-corr-210",
+        "version": "2.1.283",
+        "gitBranch": "main"
+      }
+    ]
+  }
+}
