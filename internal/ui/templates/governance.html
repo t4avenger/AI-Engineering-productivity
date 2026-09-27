@@ -329,7 +329,7 @@
       categoryTablist.addEventListener("keydown", function (event) {
         var current = categoryTabs.indexOf(document.activeElement);
         if (current < 0) return;
-        var next = current;
+        var next;
         if (event.key === "ArrowRight") next = (current + 1) % categoryTabs.length;
         else if (event.key === "ArrowLeft") next = (current + categoryTabs.length - 1) % categoryTabs.length;
         else if (event.key === "Home") next = 0;

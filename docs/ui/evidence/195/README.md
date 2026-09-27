@@ -16,6 +16,12 @@ The browser scenario selects a retained conversation event to show the Session
 Trace inspector and opens the Files & Paths editor on Governance. It uses
 synthetic fixture values only. Screenshot text is evidence, not product data.
 
+Playwright pins Chromium for the screenshot baseline. Its `system-ui` font still
+varies slightly between supported Linux image versions, so the regression
+assertion permits at most a 5% pixel difference. That bound is calibrated above
+the observed 4% glyph-rasterisation difference on Ubuntu 24.04; layout, colour
+and larger visual regressions remain test failures.
+
 ## Intentional deviations checklist
 
 | Requirement IDs | Deliberate difference from source images | Reason |
