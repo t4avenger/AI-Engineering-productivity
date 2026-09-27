@@ -32,6 +32,12 @@ jobs:
       - run: npm ci --prefix web
       - run: npm exec --prefix web -- playwright install --with-deps chromium
       - run: make verify-ci
+      - if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: playwright-test-results
+          path: web/test-results
+          if-no-files-found: ignore
 
   static-security:
     name: Static analysis and security
