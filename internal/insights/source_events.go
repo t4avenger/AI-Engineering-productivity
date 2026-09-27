@@ -88,11 +88,36 @@ func thinInsightEvent(event canonical.Event) (canonical.Event, bool) {
 	if copySkillPolicyEvidence(&thin, event) {
 		keep = true
 	}
+	if copyUserPromptEvidence(&thin, event) {
+		keep = true
+	}
 	if _, _, ok := tokenSignals(event); ok {
 		keep = true
 		copyTokenAttributes(&thin, event)
 	}
 	return thin, keep
+}
+
+// copyUserPromptEvidence keeps the retained Claude user-prompt body, or its
+// length-only signal, so later policy checks can tell a real match from
+// missing coverage. Assistant and raw API bodies are not copied.
+func copyUserPromptEvidence(thin *canonical.Event, event canonical.Event) bool {
+	if event.EventType != "user_prompt" || event.Provider != "anthropic" || event.Tool != "claude-code" {
+		return false
+	}
+	raw, _ := event.ProviderExtensions["event"].(map[string]any)
+	echo := map[string]any{}
+	if raw != nil {
+		for _, key := range []string{"prompt", "prompt_length"} {
+			if value, ok := raw[key]; ok {
+				echo[key] = value
+			}
+		}
+	}
+	if len(echo) > 0 {
+		thin.ProviderExtensions["event"] = echo
+	}
+	return true
 }
 
 func copySkillPolicyEvidence(thin *canonical.Event, event canonical.Event) bool {

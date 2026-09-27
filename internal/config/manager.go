@@ -72,6 +72,11 @@ func (m *Manager) PathRules() PathRules {
 	return clonePathRules(m.Current().Governance.PathRules)
 }
 
+// PromptKeywords returns a detached snapshot of the active prompt-findings rules.
+func (m *Manager) PromptKeywords() []PromptKeyword {
+	return clonePromptKeywords(m.Current().Governance.PromptKeywords)
+}
+
 // SaveMCPAllowlist validates and atomically persists the complete configuration
 // before publishing the new allowlist to in-process readers.
 func (m *Manager) SaveMCPAllowlist(names []string) error {
@@ -102,6 +107,17 @@ func (m *Manager) SavePathRules(rules PathRules) error {
 
 	next := cloneConfig(m.cfg)
 	next.Governance.PathRules = clonePathRules(rules)
+	return m.saveLocked(next)
+}
+
+// SavePromptKeywords validates and atomically persists the complete
+// configuration before publishing prompt-findings rules to readers.
+func (m *Manager) SavePromptKeywords(rules []PromptKeyword) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	next := cloneConfig(m.cfg)
+	next.Governance.PromptKeywords = clonePromptKeywords(rules)
 	return m.saveLocked(next)
 }
 
@@ -142,6 +158,7 @@ func cloneConfig(cfg Config) Config {
 	cfg.Governance.MCPAllowlist = append([]string(nil), cfg.Governance.MCPAllowlist...)
 	cfg.Governance.SkillsAllowlist = append([]string(nil), cfg.Governance.SkillsAllowlist...)
 	cfg.Governance.PathRules = clonePathRules(cfg.Governance.PathRules)
+	cfg.Governance.PromptKeywords = clonePromptKeywords(cfg.Governance.PromptKeywords)
 	return cfg
 }
 
@@ -149,6 +166,10 @@ func clonePathRules(rules PathRules) PathRules {
 	rules.Allowed = append([]PathRulePattern(nil), rules.Allowed...)
 	rules.Blocked = append([]PathRulePattern(nil), rules.Blocked...)
 	return rules
+}
+
+func clonePromptKeywords(rules []PromptKeyword) []PromptKeyword {
+	return append([]PromptKeyword(nil), rules...)
 }
 
 func atomicWrite(path string, contents []byte) (returnErr error) {

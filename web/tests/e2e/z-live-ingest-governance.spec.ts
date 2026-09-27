@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import {
   authToken,
   expectAllowlistDiscardConfirmation,
+  claudeContentOTLPLogs,
   claudeMCPConnectionOTLPLogs,
   claudeRiskyAccessOTLPLogs,
   claudeSkillOTLPLogs,
@@ -201,5 +202,50 @@ test('saves raw-path rules and renders their detect-only finding without mocks',
   expect(after.status).toBe(200);
   expect((await after.json()) as unknown).toMatchObject({
     data: { outcome: 'violation', visibility: 'observed' },
+  });
+});
+
+test('saves a prompt finding rule and records the retained match', async ({
+  page,
+}) => {
+  await ingestOTLPLogs(claudeContentOTLPLogs());
+  await unlockDashboard(page, authToken);
+  await page.goto('/governance?rules=prompts');
+
+  await page.getByRole('button', { name: 'Add credentials rule' }).click();
+  const draft = page.locator('.prompt-rule-list[data-group="credentials"] .prompt-rule-row');
+  await draft.getByRole('textbox', { name: 'Rule ID' }).fill('draft-rule');
+  await page.getByRole('button', { name: 'Reset changes' }).click();
+  await expect(draft).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Add credentials rule' }).click();
+  const row = page.locator('.prompt-rule-list[data-group="credentials"] .prompt-rule-row');
+  await row.getByRole('textbox', { name: 'Rule ID' }).fill('retained-user');
+  await row.getByRole('textbox', { name: 'Rule label' }).fill('Retained user phrase');
+  await row.getByRole('textbox', { name: 'Pattern' }).fill('retained user');
+  await page.getByRole('button', { name: 'Save local changes' }).first().click();
+
+  await expect(page).toHaveURL(/\/governance\?rules=prompts&saved=1$/);
+  await expect(page.getByRole('status')).toContainText('Prompt findings saved');
+  await expect(page.getByText('Retained user phrase').first()).toBeVisible();
+  await expect(page.getByText('Record finding').first()).toBeVisible();
+
+  await page.getByLabel('Prompt keyword findings').getByRole('link').first().click();
+  await expect(page).toHaveURL(
+    /\/sessions\/claude-code:tiq-live-e2e-conversation-content\?event=.+&inspector=details#event-inspector$/,
+  );
+  await expect(page.locator('#event-inspector')).toBeVisible();
+
+  const after = await fetch(
+    'http://localhost:18080/api/v1/insights/prompt-keywords',
+    { headers: { Authorization: `Bearer ${authToken}` } },
+  );
+  expect(after.status).toBe(200);
+  expect((await after.json()) as unknown).toMatchObject({
+    data: {
+      outcome: 'violation',
+      visibility: 'observed',
+      findings: [{ rule_id: 'retained-user', group: 'credentials' }],
+    },
   });
 });

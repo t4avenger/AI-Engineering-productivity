@@ -53,6 +53,10 @@ type pathRulesResponse struct {
 	Data governance.PathRules `json:"data"`
 }
 
+type promptKeywordsResponse struct {
+	Data governance.PromptKeywordReport `json:"data"`
+}
+
 func (a sessionAPI) mcpInventory(w http.ResponseWriter, r *http.Request) {
 	events, ok := a.loadInsightEvents(w, r)
 	if !ok {
@@ -128,6 +132,14 @@ func (a sessionAPI) pathRules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSessionJSON(w, http.StatusOK, pathRulesResponse{Data: governance.PathRulesFromEvents(events, a.thresholds.currentPathRules())})
+}
+
+func (a sessionAPI) promptKeywords(w http.ResponseWriter, r *http.Request) {
+	events, ok := a.loadInsightEvents(w, r)
+	if !ok {
+		return
+	}
+	writeSessionJSON(w, http.StatusOK, promptKeywordsResponse{Data: governance.PromptKeywordsFromEvents(events, a.thresholds.currentPromptKeywords())})
 }
 
 // loadInsightEvents returns retained events for an insight handler, or writes

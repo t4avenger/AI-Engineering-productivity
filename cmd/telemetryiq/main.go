@@ -75,6 +75,8 @@ func main() {
 		SkillsAllowlistSource: configManager,
 		PathRules:             cfg.Governance.PathRules,
 		PathRulesSource:       configManager,
+		PromptKeywords:        cfg.Governance.PromptKeywords,
+		PromptKeywordsSource:  configManager,
 	}
 
 	handler := api.NewAuthenticatedPersistentHandler(logger, repository, token, thresholds, configManager)

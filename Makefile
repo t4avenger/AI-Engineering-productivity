@@ -35,7 +35,7 @@ test-integration:
 	go test ./internal/api
 
 test-contract:
-	go test ./internal/api -run '^TestSession(API|FilesAPI|ConversationAPI|EventAPI)Contract$$'
+	go test ./internal/api -run '^Test(Session(API|FilesAPI|ConversationAPI|EventAPI)|PromptKeywordsAPI)Contract$$'
 
 test-e2e:
 	npm run test:e2e --prefix $(WEB_DIR)
@@ -53,6 +53,7 @@ test-fuzz-smoke:
 	go test ./internal/normalize/claude -run='^$$' -fuzz=FuzzNormalizeLogs -fuzztime=3s
 	go test ./internal/normalize/cursor -run='^$$' -fuzz=FuzzNormalizeMetrics -fuzztime=3s
 	go test ./internal/normalize/cursor -run='^$$' -fuzz=FuzzNormalizeLogs -fuzztime=3s
+	go test ./internal/governance -run='^$$' -fuzz=FuzzPromptKeywordMatch -fuzztime=3s
 
 test-performance-smoke:
 	bash scripts/performance-smoke.sh

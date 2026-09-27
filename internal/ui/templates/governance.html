@@ -9,10 +9,10 @@
       <h1>Governance Policies</h1>
       <p>Detect and report only. This local edition does not enforce or publish policies or block provider actions.</p>
     </div>
-    {{if or (and .SaveAvailable (eq .ActiveRulesTab "mcp")) (and .SkillsSaveAvailable (eq .ActiveRulesTab "skills")) (and .PathRulesSaveAvailable (eq .ActiveRulesTab "paths"))}}<button type="submit" form="{{if eq .ActiveRulesTab "mcp"}}mcp-allowlist-form{{else if eq .ActiveRulesTab "skills"}}skills-allowlist-form{{else}}path-rules-form{{end}}" id="save-local-changes" disabled>Save local changes</button>{{else}}<p class="muted">Local configuration saving is unavailable.</p>{{end}}
+    {{if or (and .SaveAvailable (eq .ActiveRulesTab "mcp")) (and .SkillsSaveAvailable (eq .ActiveRulesTab "skills")) (and .PathRulesSaveAvailable (eq .ActiveRulesTab "paths")) (and .PromptKeywordsSaveAvailable (eq .ActiveRulesTab "prompts"))}}<button type="submit" form="{{if eq .ActiveRulesTab "mcp"}}mcp-allowlist-form{{else if eq .ActiveRulesTab "skills"}}skills-allowlist-form{{else if eq .ActiveRulesTab "paths"}}path-rules-form{{else}}prompt-keywords-form{{end}}" id="save-local-changes" disabled>Save local changes</button>{{else}}<p class="muted">Local configuration saving is unavailable.</p>{{end}}
   </header>
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
-  {{if .Saved}}<output class="success">{{if eq .ActiveRulesTab "skills"}}Skills allowlist{{else if eq .ActiveRulesTab "paths"}}Files &amp; Paths rules{{else}}MCP allowlist{{end}} saved. Findings now use the updated local policy.</output>{{end}}
+  {{if .Saved}}<output class="success">{{if eq .ActiveRulesTab "skills"}}Skills allowlist{{else if eq .ActiveRulesTab "paths"}}Files &amp; Paths rules{{else if eq .ActiveRulesTab "prompts"}}Prompt findings{{else}}MCP allowlist{{end}} saved. Findings now use the updated local policy.</output>{{end}}
 
   <nav class="governance-main-tabs" aria-label="Governance policy areas">
     <a href="#access-rules" aria-current="page">Access Rules</a>
@@ -25,7 +25,7 @@
     <article class="governance-summary-card"><h2>MCP servers</h2>{{if .MCPPolicyConfigured}}<p class="summary-value">{{.MCPConfiguredCount}} configured</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Configured rule identities</p></article>
     <article class="governance-summary-card"><h2>Skills</h2>{{if .SkillsPolicyConfigured}}<p class="summary-value">{{.SkillsConfiguredCount}} configured</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Exact explicit skill identities</p></article>
     <article class="governance-summary-card"><h2>File rules</h2>{{if .PathRulesConfigured}}<p class="summary-value">{{len .PathRulesConfig.Allowed}} allowed · {{len .PathRulesConfig.Blocked}} blocked</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Raw retained paths; detect only</p></article>
-    <article class="governance-summary-card"><h2>Prompt rules</h2><p>{{template "status-badge" "unavailable"}}</p><p class="muted">Policy editor follows in #194.</p></article>
+    <article class="governance-summary-card"><h2>Prompt rules</h2>{{if .PromptKeywordsConfigured}}<p class="summary-value">{{.PromptKeywordCount}} configured</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Prompt findings — after capture</p></article>
   </section>
 
   <section aria-labelledby="findings-heading">
@@ -245,6 +245,44 @@
         <div class="governance-save-bar"><p class="muted allowlist-dirty-summary" hidden></p><div><button type="reset" class="secondary">Reset changes</button><button type="submit" class="allowlist-save-inline" disabled>Save local changes</button></div></div>
       </form>
     </div>
+    {{else if and (eq .ActiveRulesTab "prompts") .PromptKeywordsSaveAvailable}}
+    <div class="rules-panel" role="tabpanel" id="rules-panel-prompts" aria-labelledby="rules-tab-prompts">
+      <h3>Prompt findings — after capture</h3>
+      <p>Action: Record finding. Match retained user-prompt text only. Literal matching is case-sensitive. Regular expressions use RE2, and case folding happens only with an explicit flag such as <code>(?i)</code>. Missing bodies and provider-redacted text stay indeterminate. This does not filter prompts before they leave the device and does not promise comprehensive secret detection.</p>
+      <p>Status {{template "status-badge" (printf "%s" .PromptKeywordReport.Outcome)}} · Visibility {{template "status-badge" .PromptKeywordReport.Visibility}}</p>
+      {{if .PromptKeywordReport.Findings}}
+      <section class="table-wrap" aria-label="Prompt keyword findings"><table><thead><tr><th scope="col">Label</th><th scope="col">Group</th><th scope="col">Kind</th><th scope="col">Source event</th></tr></thead><tbody>{{range .PromptKeywordReport.Findings}}<tr><td>{{.Label}}</td><td>{{.Group}}</td><td>{{.Kind}}</td><td>{{if and .SessionID .SourceEventID}}<a href="{{pathFindingEvidencePath .SessionID .SourceEventID}}"><code>{{.SourceEventID}}</code></a>{{else}}<code>{{.SourceEventID}}</code>{{end}}</td></tr>{{end}}</tbody></table></section>
+      {{else if eq .PromptKeywordReport.Visibility "policy_unconfigured"}}<p class="muted">No enabled prompt rule is configured, so retained prompts are indeterminate.</p>
+      {{else if eq .PromptKeywordReport.Visibility "partial"}}<p class="muted">Some retained prompts are missing or provider-redacted, so this check cannot claim complete coverage.</p>
+      {{else if eq .PromptKeywordReport.Visibility "unavailable"}}<p class="muted">No retained user-prompt body is available, so this check is indeterminate.</p>
+      {{else}}<p class="muted">Enabled rules did not match the available retained user prompts.</p>{{end}}
+      <!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token -- Go/HTMX form is protected by sameOriginCookieMutation; bearer clients are non-ambient. Owner: TelemetryIQ. Expiry: 2026-12-31. -->
+      <form method="post" action="/governance/prompt-keywords" id="prompt-keywords-form" class="prompt-keywords-form" data-policy-name="Prompt findings">
+        <div class="prompt-keyword-groups">
+          {{range $group := .PromptKeywordGroups}}
+          <section>
+            <h3>{{$group.Label}}</h3>
+            {{if $group.Rules}}<ul class="prompt-keyword-chips" aria-label="{{$group.Label}} rules">{{range $group.Rules}}<li>{{.Label}}</li>{{end}}</ul>{{else}}<p class="muted">No {{$group.Label}} rules are configured.</p>{{end}}
+            <div class="prompt-rule-list" data-group="{{$group.ID}}">
+              {{range $index, $rule := $group.Rules}}
+              <div class="prompt-rule-row">
+                <label>Rule ID <input name="rule_id" value="{{$rule.ID}}" id="{{$group.ID}}-id-{{$index}}"></label>
+                <label>Rule label <input name="rule_label" value="{{$rule.Label}}" id="{{$group.ID}}-label-{{$index}}"></label>
+                <input type="hidden" name="rule_group" value="{{$group.ID}}">
+                <label>Enabled <select name="rule_enabled" id="{{$group.ID}}-enabled-{{$index}}"><option value="true"{{if $rule.Enabled}} selected{{end}}>Enabled</option><option value="false"{{if not $rule.Enabled}} selected{{end}}>Disabled</option></select></label>
+                <label>Match kind <select name="rule_kind" id="{{$group.ID}}-kind-{{$index}}"><option value="literal"{{if eq $rule.Kind "literal"}} selected{{end}}>Literal</option><option value="regex"{{if eq $rule.Kind "regex"}} selected{{end}}>RE2</option></select></label>
+                <label>Pattern <input name="rule_value" value="{{$rule.Value}}" id="{{$group.ID}}-value-{{$index}}"></label>
+                <button type="button" class="secondary remove-prompt-rule">Remove</button>
+              </div>
+              {{end}}
+            </div>
+            <button type="button" class="secondary add-prompt-rule" data-group="{{$group.ID}}">{{$group.AddLabel}}</button>
+          </section>
+          {{end}}
+        </div>
+        <div class="governance-save-bar"><p class="muted allowlist-dirty-summary" hidden></p><div><button type="reset" class="secondary">Reset changes</button><button type="submit" class="allowlist-save-inline" disabled>Save local changes</button></div></div>
+      </form>
+    </div>
     {{else}}{{with .RulesShell}}
     <div class="rules-panel" role="tabpanel" id="{{.PanelID}}" aria-labelledby="{{.TabID}}">
       <p>Status {{template "status-badge" "unavailable"}}</p>
@@ -260,55 +298,104 @@
       <p>{{.MCPPreview.Description}}</p>
       <p class="muted">Preview evaluates retained evidence after capture. It does not intercept or approve provider actions.</p>
     </section>
+    <section aria-labelledby="prompt-findings-heading">
+      <h2 id="prompt-findings-heading">Prompt findings — after capture</h2>
+      <p>Action: Record finding</p>
+      {{range .PromptKeywordGroups}}
+      <h3>{{.Label}}</h3>
+      {{if .Rules}}<ul class="prompt-keyword-chips" aria-label="{{.Label}} configured rules">{{range .Rules}}<li>{{.Label}}</li>{{end}}</ul>{{else}}<p class="muted">No {{.Label}} rules are configured.</p>{{end}}
+      {{end}}
+      <p class="muted">Chips are the rules saved in local configuration. They are not a built-in secret or customer-data catalogue.</p>
+    </section>
     <section id="future-policy-controls">
       <h2>Future policy controls</h2>
       <p>{{template "status-badge" "unavailable"}}</p>
-      <p class="muted">Prompt protection, enforcement, and exceptions require their separately tracked local or architecture gates; no team, publish, or runtime-blocking state is available here.</p>
+      <p class="muted">Enforcement and exceptions require their architecture gates; no team, publish, or runtime-blocking state is available here.</p>
     </section>
   </aside>
   </div>
   {{end}}
   <script>
   (function () {
-    var pathForm = document.getElementById("path-rules-form");
-    if (pathForm) {
-      var initialPathState = new FormData(pathForm);
-      var pathSummary = pathForm.querySelector(".allowlist-dirty-summary");
-      var pathSaveButtons = [document.getElementById("save-local-changes"), pathForm.querySelector(".allowlist-save-inline")].filter(Boolean);
-      function addPathRow(group, kind, value) {
-        var row = document.createElement("div");
-        row.className = "path-rule-row";
-        var select = document.createElement("select");
-        select.name = group + "_kind"; select.id = group + "-kind-draft-" + pathForm.querySelectorAll('.path-rule-list[data-group="' + group + '"] .path-rule-row').length;
-        var kindLabel = document.createElement("label"); kindLabel.htmlFor = select.id; kindLabel.className = "sr-only"; kindLabel.textContent = group === "allowed" ? "Allowed path rule kind" : "Blocked path rule kind";
-        [["exact", "Exact"], ["glob", "Glob"]].forEach(function (option) { var node = document.createElement("option"); node.value = option[0]; node.textContent = option[1]; node.selected = option[0] === (kind || "exact"); select.appendChild(node); });
-        var input = document.createElement("input"); input.name = group + "_value"; input.value = value || ""; input.id = group + "-value-draft-" + pathForm.querySelectorAll('.path-rule-list[data-group="' + group + '"] .path-rule-row').length;
-        var label = document.createElement("label"); label.htmlFor = input.id; label.className = "sr-only"; label.textContent = group === "allowed" ? "Allowed path rule" : "Blocked path rule";
-        var remove = document.createElement("button"); remove.type = "button"; remove.className = "secondary remove-path-rule"; remove.textContent = "Remove";
-        row.append(kindLabel, select, label, input, remove);
-        pathForm.querySelector('.path-rule-list[data-group="' + group + '"]').appendChild(row);
+    function serialised(formData) { return Array.from(formData.entries()).map(function (entry) { return entry[0] + "=" + entry[1]; }).join("&"); }
+    function bindDirtyRuleForm(form, policyName, onClick) {
+      if (!form) return false;
+      var initialState = serialised(new FormData(form));
+      var summary = form.querySelector(".allowlist-dirty-summary");
+      var saveButtons = [document.getElementById("save-local-changes"), form.querySelector(".allowlist-save-inline")].filter(Boolean);
+      function refresh() {
+        var changed = serialised(new FormData(form)) !== initialState;
+        summary.hidden = !changed;
+        summary.textContent = changed ? "Unsaved local " + policyName + " changes." : "";
+        saveButtons.forEach(function (button) { button.disabled = !changed; });
       }
-      function serialised(formData) { return Array.from(formData.entries()).map(function (entry) { return entry[0] + "=" + entry[1]; }).join("&"); }
-      function refreshPathDirty() {
-        var changed = serialised(new FormData(pathForm)) !== serialised(initialPathState);
-        pathSummary.hidden = !changed;
-        pathSummary.textContent = changed ? "Unsaved local Files & Paths changes." : "";
-        pathSaveButtons.forEach(function (button) { button.disabled = !changed; });
-      }
-      pathForm.addEventListener("click", function (event) {
-        var add = event.target.closest(".add-path-rule");
-        if (add) { addPathRow(add.dataset.group); refreshPathDirty(); return; }
-        var remove = event.target.closest(".remove-path-rule");
-        if (remove) { remove.closest(".path-rule-row").remove(); refreshPathDirty(); }
-      });
-      pathForm.addEventListener("input", refreshPathDirty);
-      pathForm.addEventListener("change", refreshPathDirty);
-      pathForm.addEventListener("reset", function () { window.setTimeout(function () { location.reload(); }, 0); });
-      document.querySelectorAll("a[href]").forEach(function (link) { link.addEventListener("click", function (event) { if (!pathSummary.hidden && !window.confirm("Discard unsaved local Files & Paths changes?")) event.preventDefault(); }); });
-      window.addEventListener("beforeunload", function (event) { if (!pathSummary.hidden) { event.preventDefault(); event.returnValue = ""; } });
-      refreshPathDirty();
-      return;
+      form.addEventListener("click", function (event) { onClick(event, refresh); });
+      var reloading = false;
+      form.addEventListener("input", refresh);
+      form.addEventListener("change", refresh);
+      form.addEventListener("reset", function () { reloading = true; window.setTimeout(function () { location.reload(); }, 0); });
+      document.querySelectorAll("a[href]").forEach(function (link) { link.addEventListener("click", function (event) { if (!summary.hidden && !window.confirm("Discard unsaved local " + policyName + " changes?")) event.preventDefault(); }); });
+      window.addEventListener("beforeunload", function (event) { if (!reloading && !summary.hidden) { event.preventDefault(); event.returnValue = ""; } });
+      refresh();
+      return true;
     }
+    function addPathRow(form, group) {
+      var list = form.querySelector('.path-rule-list[data-group="' + group + '"]');
+      var index = list.querySelectorAll(".path-rule-row").length;
+      var row = document.createElement("div");
+      row.className = "path-rule-row";
+      var select = document.createElement("select");
+      select.name = group + "_kind"; select.id = group + "-kind-draft-" + index;
+      var kindLabel = document.createElement("label"); kindLabel.htmlFor = select.id; kindLabel.className = "sr-only"; kindLabel.textContent = group === "allowed" ? "Allowed path rule kind" : "Blocked path rule kind";
+      [["exact", "Exact"], ["glob", "Glob"]].forEach(function (option) { var node = document.createElement("option"); node.value = option[0]; node.textContent = option[1]; node.selected = option[0] === "exact"; select.appendChild(node); });
+      var input = document.createElement("input"); input.name = group + "_value"; input.id = group + "-value-draft-" + index;
+      var label = document.createElement("label"); label.htmlFor = input.id; label.className = "sr-only"; label.textContent = group === "allowed" ? "Allowed path rule" : "Blocked path rule";
+      var remove = document.createElement("button"); remove.type = "button"; remove.className = "secondary remove-path-rule"; remove.textContent = "Remove";
+      row.append(kindLabel, select, label, input, remove);
+      list.appendChild(row);
+    }
+    function appendPromptField(row, tag, name, text, group, index) {
+      var id = group + "-" + name + "-draft-" + index;
+      var label = document.createElement("label");
+      label.textContent = text + " ";
+      var control = document.createElement(tag);
+      control.name = name; control.id = id;
+      label.appendChild(control);
+      row.appendChild(label);
+      return control;
+    }
+    function addPromptRow(form, group) {
+      var list = form.querySelector('.prompt-rule-list[data-group="' + group + '"]');
+      var index = list.querySelectorAll(".prompt-rule-row").length;
+      var row = document.createElement("div");
+      row.className = "prompt-rule-row";
+      appendPromptField(row, "input", "rule_id", "Rule ID", group, index);
+      appendPromptField(row, "input", "rule_label", "Rule label", group, index);
+      var hidden = document.createElement("input"); hidden.type = "hidden"; hidden.name = "rule_group"; hidden.value = group;
+      row.appendChild(hidden);
+      var enabled = appendPromptField(row, "select", "rule_enabled", "Enabled", group, index);
+      [["true", "Enabled"], ["false", "Disabled"]].forEach(function (option) { var node = document.createElement("option"); node.value = option[0]; node.textContent = option[1]; node.selected = option[0] === "true"; enabled.appendChild(node); });
+      var kind = appendPromptField(row, "select", "rule_kind", "Match kind", group, index);
+      [["literal", "Literal"], ["regex", "RE2"]].forEach(function (option) { var node = document.createElement("option"); node.value = option[0]; node.textContent = option[1]; node.selected = option[0] === "literal"; kind.appendChild(node); });
+      appendPromptField(row, "input", "rule_value", "Pattern", group, index);
+      var remove = document.createElement("button"); remove.type = "button"; remove.className = "secondary remove-prompt-rule"; remove.textContent = "Remove";
+      row.appendChild(remove);
+      list.appendChild(row);
+    }
+    if (bindDirtyRuleForm(document.getElementById("path-rules-form"), "Files & Paths", function (event, refresh) {
+      var form = document.getElementById("path-rules-form");
+      var add = event.target.closest(".add-path-rule");
+      if (add) { addPathRow(form, add.dataset.group); refresh(); return; }
+      var remove = event.target.closest(".remove-path-rule");
+      if (remove) { remove.closest(".path-rule-row").remove(); refresh(); }
+    })) return;
+    if (bindDirtyRuleForm(document.getElementById("prompt-keywords-form"), "Prompt findings", function (event, refresh) {
+      var form = document.getElementById("prompt-keywords-form");
+      var add = event.target.closest(".add-prompt-rule");
+      if (add) { addPromptRow(form, add.dataset.group); refresh(); return; }
+      var remove = event.target.closest(".remove-prompt-rule");
+      if (remove) { remove.closest(".prompt-rule-row").remove(); refresh(); }
+    })) return;
     var form = document.querySelector(".allowlist-form");
     if (!form) return;
     var inputName = form.dataset.inputName;

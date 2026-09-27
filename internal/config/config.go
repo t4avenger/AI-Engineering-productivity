@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -80,6 +81,21 @@ type Governance struct {
 	// PathRules configures raw retained-path evaluation. It is an observation
 	// policy only: it never expands a path or mediates a provider action.
 	PathRules PathRules `yaml:"path_rules,omitempty"`
+	// PromptKeywords are optional local detect-and-report patterns matched
+	// against retained prompt text after capture. An empty list, and a list
+	// with no enabled rule, leaves the policy unconfigured.
+	PromptKeywords []PromptKeyword `yaml:"prompt_keywords,omitempty"`
+}
+
+// PromptKeyword is one local prompt-findings rule. It records a match; it
+// does not hide, drop, or block prompt text at ingest.
+type PromptKeyword struct {
+	ID      string `yaml:"id"`
+	Label   string `yaml:"label"`
+	Group   string `yaml:"group"`
+	Enabled bool   `yaml:"enabled"`
+	Kind    string `yaml:"kind"`
+	Value   string `yaml:"value"`
 }
 
 type PathRules struct {
@@ -290,7 +306,10 @@ func (c Config) validateGovernance() error {
 			return fmt.Errorf("governance.skills_allowlist[%d] must be at most 1024 Unicode characters", i)
 		}
 	}
-	return ValidatePathRules(c.Governance.PathRules)
+	if err := ValidatePathRules(c.Governance.PathRules); err != nil {
+		return err
+	}
+	return ValidatePromptKeywords(c.Governance.PromptKeywords)
 }
 
 // ValidatePathRules verifies the local raw-path observation policy without
@@ -338,6 +357,60 @@ func validatePathRulePattern(pattern PathRulePattern) error {
 
 func hasUnsupportedGlobCharacter(value string) bool {
 	return strings.ContainsAny(value, "[]{}")
+}
+
+var promptKeywordIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+// ValidatePromptKeywords checks the local prompt-findings rule list. Error
+// text names the failing index and constraint, never the pattern or label.
+func ValidatePromptKeywords(rules []PromptKeyword) error {
+	if len(rules) == 0 {
+		return nil
+	}
+	if len(rules) > 100 {
+		return fmt.Errorf("governance.prompt_keywords must contain at most 100 entries, got %d", len(rules))
+	}
+	seen := make(map[string]struct{}, len(rules))
+	for i, rule := range rules {
+		if err := validatePromptKeyword(rule); err != nil {
+			return fmt.Errorf("governance.prompt_keywords[%d]: %w", i, err)
+		}
+		if _, exists := seen[rule.ID]; exists {
+			return fmt.Errorf("governance.prompt_keywords[%d]: duplicate id", i)
+		}
+		seen[rule.ID] = struct{}{}
+	}
+	return nil
+}
+
+func validatePromptKeyword(rule PromptKeyword) error {
+	if !promptKeywordIDPattern.MatchString(rule.ID) {
+		return errors.New("id must be 1-64 ASCII letters, digits, underscores, or hyphens")
+	}
+	if strings.TrimSpace(rule.Label) == "" {
+		return errors.New("label must not be blank")
+	}
+	if len(rule.Label) > 120 {
+		return errors.New("label must be at most 120 bytes")
+	}
+	if rule.Group != "credentials" && rule.Group != "customer_data" && rule.Group != "custom" {
+		return fmt.Errorf("group must be credentials, customer_data, or custom, got %q", rule.Group)
+	}
+	if rule.Kind != "literal" && rule.Kind != "regex" {
+		return fmt.Errorf("kind must be literal or regex, got %q", rule.Kind)
+	}
+	if strings.TrimSpace(rule.Value) == "" {
+		return errors.New("value must not be blank")
+	}
+	if utf8.RuneCountInString(rule.Value) > 1024 {
+		return errors.New("value must be at most 1024 Unicode characters")
+	}
+	if rule.Kind == "regex" {
+		if _, err := regexp.Compile(rule.Value); err != nil {
+			return errors.New("value is not a valid RE2 pattern")
+		}
+	}
+	return nil
 }
 
 func (c Config) validatePricing() error {

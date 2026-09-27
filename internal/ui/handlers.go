@@ -232,26 +232,32 @@ type pullRequestsData struct {
 // governanceData is the server-rendered Governance findings view (#151)
 // plus Access Rules tab shells (#160).
 type governanceData struct {
-	RiskyAccess            governance.RiskyAccess
-	UnapprovedMCP          governance.UnapprovedMCP
-	UnapprovedSkills       governance.UnapprovedSkills
-	PathRules              governance.PathRules
-	PathRulesConfig        config.PathRules
-	MCPServers             []mcpAllowlistOption
-	Skills                 []skillAllowlistOption
-	MCPConfiguredCount     int
-	MCPPolicyConfigured    bool
-	SkillsConfiguredCount  int
-	SkillsPolicyConfigured bool
-	PathRulesConfigured    bool
-	PathRulesSaveAvailable bool
-	MCPPreview             governancePreview
-	SaveAvailable          bool
-	SkillsSaveAvailable    bool
-	Saved                  bool
-	Error                  string
-	ActiveRulesTab         string
-	RulesShell             *accessRulesShell // set for unavailable Access Rules tabs
+	RiskyAccess                 governance.RiskyAccess
+	UnapprovedMCP               governance.UnapprovedMCP
+	UnapprovedSkills            governance.UnapprovedSkills
+	PathRules                   governance.PathRules
+	PathRulesConfig             config.PathRules
+	PromptKeywordReport         governance.PromptKeywordReport
+	PromptKeywordRules          []config.PromptKeyword
+	PromptKeywordGroups         []promptKeywordGroupView
+	MCPServers                  []mcpAllowlistOption
+	Skills                      []skillAllowlistOption
+	MCPConfiguredCount          int
+	MCPPolicyConfigured         bool
+	SkillsConfiguredCount       int
+	SkillsPolicyConfigured      bool
+	PathRulesConfigured         bool
+	PathRulesSaveAvailable      bool
+	PromptKeywordsConfigured    bool
+	PromptKeywordCount          int
+	PromptKeywordsSaveAvailable bool
+	MCPPreview                  governancePreview
+	SaveAvailable               bool
+	SkillsSaveAvailable         bool
+	Saved                       bool
+	Error                       string
+	ActiveRulesTab              string
+	RulesShell                  *accessRulesShell // set for unavailable Access Rules tabs
 }
 
 // governancePreview explains the current local MCP policy evaluation. It is
@@ -270,7 +276,14 @@ type accessRulesShell struct {
 	SchemaKey string
 }
 
-// Access Rules tab ids for ?rules= (issue #160). MCP is the only editable tab.
+// Access Rules tab ids for ?rules= (issue #160).
+type promptKeywordGroupView struct {
+	ID       string
+	Label    string
+	AddLabel string
+	Rules    []config.PromptKeyword
+}
+
 const (
 	rulesTabMCP     = "mcp"
 	rulesTabSkills  = "skills"
@@ -903,6 +916,49 @@ func (s *Server) governancePathRulesSave(w http.ResponseWriter, r *http.Request)
 	http.Redirect(w, r, pathGovernance+"?rules=paths&saved=1", http.StatusSeeOther)
 }
 
+func (s *Server) governancePromptKeywordsSave(w http.ResponseWriter, r *http.Request) {
+	if s.promptKeywordsController == nil {
+		data := s.governancePageData(r, nil, nil)
+		data.Error = "Prompt findings saving is unavailable."
+		s.renderGovernanceError(w, r, http.StatusServiceUnavailable, data, rulesTabPrompts)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	if err := r.ParseForm(); err != nil {
+		data := s.governancePageData(r, nil, nil)
+		data.Error = "Unable to read prompt findings rules."
+		s.renderGovernanceError(w, r, http.StatusUnprocessableEntity, data, rulesTabPrompts)
+		return
+	}
+	rules, err := promptKeywordsFromForm(r.Form)
+	if err != nil {
+		data := s.governancePageData(r, nil, nil)
+		data.Error = err.Error()
+		s.renderGovernanceError(w, r, http.StatusUnprocessableEntity, data, rulesTabPrompts)
+		return
+	}
+	if err := config.ValidatePromptKeywords(rules); err != nil {
+		data := s.governancePageData(r, nil, nil)
+		applyPromptKeywordDraft(&data, rules)
+		data.Error = err.Error()
+		s.renderGovernanceError(w, r, http.StatusUnprocessableEntity, data, rulesTabPrompts)
+		return
+	}
+	data := s.governancePageData(r, nil, nil)
+	if data.Error != "" {
+		applyPromptKeywordDraft(&data, rules)
+		s.renderGovernanceError(w, r, http.StatusServiceUnavailable, data, rulesTabPrompts)
+		return
+	}
+	if err := s.promptKeywordsController.SavePromptKeywords(rules); err != nil {
+		applyPromptKeywordDraft(&data, rules)
+		data.Error = "Unable to save prompt findings rules. The active policy was not changed."
+		s.renderGovernanceError(w, r, http.StatusInternalServerError, data, rulesTabPrompts)
+		return
+	}
+	http.Redirect(w, r, pathGovernance+"?rules=prompts&saved=1", http.StatusSeeOther)
+}
+
 func pathRulesFromForm(form map[string][]string) (config.PathRules, error) {
 	rules := config.PathRules{Mode: firstFormValue(form["mode"])}
 	var err error
@@ -937,6 +993,70 @@ func pathPatternsFromForm(form map[string][]string, group string) ([]config.Path
 	return patterns, nil
 }
 
+func promptKeywordsFromForm(form map[string][]string) ([]config.PromptKeyword, error) {
+	ids, labels := form["rule_id"], form["rule_label"]
+	groups, enabled := form["rule_group"], form["rule_enabled"]
+	kinds, values := form["rule_kind"], form["rule_value"]
+	if len(ids) != len(labels) || len(ids) != len(groups) || len(ids) != len(enabled) || len(ids) != len(kinds) || len(ids) != len(values) {
+		return nil, errors.New("each prompt rule needs an id, label, group, enabled state, kind, and value")
+	}
+	rules := make([]config.PromptKeyword, 0, len(ids))
+	for i := range ids {
+		if promptKeywordRowBlank(ids[i], labels[i], groups[i], enabled[i], kinds[i], values[i]) {
+			continue
+		}
+		on, err := parsePromptKeywordEnabled(enabled[i])
+		if err != nil {
+			return nil, err
+		}
+		rules = append(rules, config.PromptKeyword{
+			ID: ids[i], Label: labels[i], Group: groups[i], Enabled: on, Kind: kinds[i], Value: values[i],
+		})
+	}
+	return rules, nil
+}
+
+func promptKeywordRowBlank(fields ...string) bool {
+	for _, field := range fields {
+		if strings.TrimSpace(field) != "" {
+			return false
+		}
+	}
+	return true
+}
+
+func parsePromptKeywordEnabled(value string) (bool, error) {
+	switch value {
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	default:
+		return false, errors.New("prompt rule enabled state must be true or false")
+	}
+}
+
+func applyPromptKeywordDraft(data *governanceData, rules []config.PromptKeyword) {
+	data.PromptKeywordRules = rules
+	data.PromptKeywordGroups = promptKeywordGroups(rules)
+}
+
+func promptKeywordGroups(rules []config.PromptKeyword) []promptKeywordGroupView {
+	groups := []promptKeywordGroupView{
+		{ID: "credentials", Label: "Credentials", AddLabel: "Add credentials rule"},
+		{ID: "customer_data", Label: "Customer data", AddLabel: "Add customer data rule"},
+		{ID: "custom", Label: "Custom", AddLabel: "Add custom rule"},
+	}
+	for i := range groups {
+		for _, rule := range rules {
+			if rule.Group == groups[i].ID {
+				groups[i].Rules = append(groups[i].Rules, rule)
+			}
+		}
+	}
+	return groups
+}
+
 func (s *Server) renderGovernanceError(w http.ResponseWriter, r *http.Request, status int, data governanceData, tab string) {
 	data.ActiveRulesTab = tab
 	w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
@@ -960,18 +1080,23 @@ func (s *Server) governancePageData(r *http.Request, mcpSelected, skillsSelected
 	if len(pathDraft) > 0 {
 		draftPathRules = pathDraft[0]
 	}
+	activePromptKeywords := s.currentPromptKeywords()
 	data := governanceData{
-		SaveAvailable:          s.mcpAllowlistController != nil,
-		SkillsSaveAvailable:    s.skillsAllowlistController != nil,
-		ActiveRulesTab:         rulesTabMCP,
-		MCPConfiguredCount:     len(activeAllowlist),
-		MCPPolicyConfigured:    len(activeAllowlist) > 0,
-		SkillsConfiguredCount:  len(activeSkills),
-		SkillsPolicyConfigured: len(activeSkills) > 0,
-		PathRulesConfigured:    activePathRules.Mode != "",
-		PathRulesSaveAvailable: s.pathRulesController != nil,
-		PathRulesConfig:        draftPathRules,
+		SaveAvailable:               s.mcpAllowlistController != nil,
+		SkillsSaveAvailable:         s.skillsAllowlistController != nil,
+		ActiveRulesTab:              rulesTabMCP,
+		MCPConfiguredCount:          len(activeAllowlist),
+		MCPPolicyConfigured:         len(activeAllowlist) > 0,
+		SkillsConfiguredCount:       len(activeSkills),
+		SkillsPolicyConfigured:      len(activeSkills) > 0,
+		PathRulesConfigured:         activePathRules.Mode != "",
+		PathRulesSaveAvailable:      s.pathRulesController != nil,
+		PathRulesConfig:             draftPathRules,
+		PromptKeywordsConfigured:    len(activePromptKeywords) > 0,
+		PromptKeywordCount:          len(activePromptKeywords),
+		PromptKeywordsSaveAvailable: s.promptKeywordsController != nil,
 	}
+	applyPromptKeywordDraft(&data, activePromptKeywords)
 	events, err := s.insightSourceEvents(r)
 	if err != nil {
 		data.Error = "Unable to load governance findings."
@@ -979,6 +1104,7 @@ func (s *Server) governancePageData(r *http.Request, mcpSelected, skillsSelected
 		data.UnapprovedMCP = governance.UnapprovedMCP{Findings: []governance.MCPServerFinding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable"}
 		data.UnapprovedSkills = governance.UnapprovedSkills{Findings: []governance.SkillFinding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable"}
 		data.PathRules = governance.PathRules{Findings: []governance.PathFinding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable"}
+		data.PromptKeywordReport = governance.PromptKeywordReport{Findings: []governance.PromptKeywordFinding{}, Outcome: governance.OutcomeIndeterminate, Visibility: "unavailable"}
 		data.MCPServers = mcpAllowlistOptions(insights.MCPInventory{}, draftAllowlist, activeAllowlist)
 		data.Skills = skillAllowlistOptions(nil, draftSkills, activeSkills)
 	} else {
@@ -988,6 +1114,7 @@ func (s *Server) governancePageData(r *http.Request, mcpSelected, skillsSelected
 		data.UnapprovedMCP = governance.UnapprovedMCPFromEvents(events, activeAllowlist)
 		data.UnapprovedSkills = governance.UnapprovedSkillsFromEvents(events, activeSkills)
 		data.PathRules = governance.PathRulesFromEvents(events, activePathRules)
+		data.PromptKeywordReport = governance.PromptKeywordsFromEvents(events, activePromptKeywords)
 		data.MCPServers = mcpAllowlistOptions(insights.MCPInventoryFromEvents(events), draftAllowlist, activeAllowlist)
 		data.Skills = skillAllowlistOptions(events, draftSkills, activeSkills)
 	}

@@ -35,6 +35,7 @@ const (
 	pathMCPAllowlist    = "/governance/mcp-allowlist"
 	pathSkillsAllowlist = "/governance/skills-allowlist"
 	pathPathRules       = "/governance/path-rules"
+	pathPromptKeywords  = "/governance/prompt-keywords"
 	pathIntegrations    = "/integrations"
 	pathPrivacy         = "/privacy"
 	pathPrivacyDelete   = "/privacy/delete-all"
@@ -78,6 +79,12 @@ type PathRulesController interface {
 	SavePathRules(config.PathRules) error
 }
 
+// PromptKeywordsController persists local prompt-findings rules.
+type PromptKeywordsController interface {
+	PromptKeywords() []config.PromptKeyword
+	SavePromptKeywords([]config.PromptKeyword) error
+}
+
 // Server serves the local HTMX dashboard.
 type Server struct {
 	token                     string
@@ -94,6 +101,7 @@ type Server struct {
 	skillsAllowlist           []string
 	skillsAllowlistController SkillsAllowlistController
 	pathRulesController       PathRulesController
+	promptKeywordsController  PromptKeywordsController
 	templates                 *template.Template
 	static                    http.Handler
 }
@@ -151,10 +159,12 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 	var controller MCPAllowlistController
 	var skillsController SkillsAllowlistController
 	var pathController PathRulesController
+	var promptController PromptKeywordsController
 	if len(controllers) > 0 {
 		controller = controllers[0]
 		skillsController, _ = controllers[0].(SkillsAllowlistController)
 		pathController, _ = controllers[0].(PathRulesController)
+		promptController, _ = controllers[0].(PromptKeywordsController)
 	}
 	return &Server{
 		token:                     token,
@@ -170,6 +180,7 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 		mcpAllowlistController:    controller,
 		skillsAllowlistController: skillsController,
 		pathRulesController:       pathController,
+		promptKeywordsController:  promptController,
 		templates:                 tmpl,
 		static:                    http.FileServer(http.FS(staticRoot)),
 	}, nil
@@ -180,6 +191,13 @@ func (s *Server) currentPathRules() config.PathRules {
 		return s.pathRulesController.PathRules()
 	}
 	return config.PathRules{}
+}
+
+func (s *Server) currentPromptKeywords() []config.PromptKeyword {
+	if s.promptKeywordsController != nil {
+		return s.promptKeywordsController.PromptKeywords()
+	}
+	return nil
 }
 
 func (s *Server) currentMCPAllowlist() []string {

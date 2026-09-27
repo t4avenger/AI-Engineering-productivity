@@ -162,8 +162,9 @@ governance:
     mode: monitor # monitor | approved_only | flag_all
     allowed: [] # [{kind: exact|glob, value: "src/**"}]
     blocked: [] # [{kind: exact|glob, value: ".env"}]
+  prompt_keywords: [] # [{id, label, group: credentials|customer_data|custom, enabled, kind: literal|regex, value}]
 ```
 
-The authenticated Governance page can update `governance.mcp_allowlist` and `governance.path_rules`. Path rules operate only on raw retained filesystem-path evidence: `*` stays within a segment, `**` crosses segments, `?` matches a non-separator, matching is case-sensitive, and blocked rules take precedence. TelemetryIQ never expands paths, reads the filesystem, resolves symlinks, or blocks actions. Saves validate and atomically replace the complete local YAML before the in-process HTML and JSON findings adopt the change; a failed write leaves both disk and active policy unchanged.
+The authenticated Governance page can update `governance.mcp_allowlist`, `governance.path_rules`, and `governance.prompt_keywords`. Path rules operate only on raw retained filesystem-path evidence: `*` stays within a segment, `**` crosses segments, `?` matches a non-separator, matching is case-sensitive, and blocked rules take precedence. TelemetryIQ never expands paths, reads the filesystem, resolves symlinks, or blocks actions. Prompt findings match retained user-prompt text after capture. Literal rules are case-sensitive; regular expressions use RE2 and fold case only when the pattern includes an explicit flag. There are no built-in secret or customer-data rules. Saves validate and atomically replace the complete local YAML before the in-process HTML and JSON findings adopt the change; a failed write leaves both disk and active policy unchanged.
 
 The daemon rejects unknown fields, unsupported schema versions, content capture, non-local storage, unsafe sharing, non-loopback hosts, and invalid ports with actionable startup errors. `TELEMETRYIQ_HOST` (default `localhost`) and `TELEMETRYIQ_PORT` (default `8080`) override the loopback server address.

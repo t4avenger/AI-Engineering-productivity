@@ -34,11 +34,12 @@ type testAllowlistController struct {
 }
 
 type testPolicyController struct {
-	mcp       testAllowlistController
-	mu        sync.RWMutex
-	skills    []string
-	pathRules config.PathRules
-	saveErr   error
+	mcp            testAllowlistController
+	mu             sync.RWMutex
+	skills         []string
+	pathRules      config.PathRules
+	promptKeywords []config.PromptKeyword
+	saveErr        error
 }
 
 func (c *testPolicyController) MCPAllowlist() []string {
@@ -78,6 +79,22 @@ func (c *testPolicyController) SavePathRules(rules config.PathRules) error {
 		return c.saveErr
 	}
 	c.pathRules = cloneTestPathRules(rules)
+	return nil
+}
+
+func (c *testPolicyController) PromptKeywords() []config.PromptKeyword {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return append([]config.PromptKeyword(nil), c.promptKeywords...)
+}
+
+func (c *testPolicyController) SavePromptKeywords(rules []config.PromptKeyword) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.saveErr != nil {
+		return c.saveErr
+	}
+	c.promptKeywords = append([]config.PromptKeyword(nil), rules...)
 	return nil
 }
 
@@ -2157,6 +2174,107 @@ func TestGovernancePathRuleFindingLinksToRetainedEvidence(t *testing.T) {
 		`href="/sessions/gov-session-1?event=gov-e1&amp;inspector=details#event-inspector"`,
 		`<code>gov-e1</code>`,
 	})
+}
+
+func TestGovernancePromptKeywordsSaveRoundTrip(t *testing.T) {
+	repo := governanceFindingsFixture(t)
+	now := time.Now().UTC()
+	repo.events["gov-session-1"] = append(repo.events["gov-session-1"], canonical.Event{
+		EventID: "prompt-e1", SessionID: "gov-session-1", EventType: "user_prompt",
+		OccurredAt: now, ReceivedAt: now, Provider: "anthropic", Tool: "claude-code",
+		ProviderExtensions: map[string]any{"event": map[string]any{"prompt": "contains retained user phrase"}},
+	})
+	controller := &testPolicyController{}
+	handler, cookie := pathRulesTestHandler(t, repo, controller)
+
+	initial := getAuthed(t, handler, cookie, "/governance?rules=prompts").Body.String()
+	assertContainsAll(t, initial, []string{
+		"Prompt findings — after capture",
+		"Record finding",
+		"Add credentials rule",
+		"No enabled prompt rule is configured",
+		`id="prompt-keywords-form"`,
+	})
+
+	response := postGovernanceAllowlist(t, handler, cookie, "/governance/prompt-keywords", url.Values{
+		"rule_id": {"retained-user"}, "rule_label": {"Retained user phrase"}, "rule_group": {"credentials"},
+		"rule_enabled": {"true"}, "rule_kind": {"literal"}, "rule_value": {"retained user"},
+	}, "http://example.com", "")
+	if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/governance?rules=prompts&saved=1" {
+		t.Fatalf("save response = %d location %q", response.Code, response.Header().Get("Location"))
+	}
+	saved := getAuthed(t, handler, cookie, "/governance?rules=prompts&saved=1").Body.String()
+	assertContainsAll(t, saved, []string{
+		"Prompt findings saved",
+		"Retained user phrase",
+		"prompt-e1",
+		`aria-label="Credentials rules"`,
+	})
+	if strings.Contains(saved, "contains retained user phrase") {
+		t.Fatalf("governance page echoed matched prompt text: %q", saved)
+	}
+}
+
+func TestGovernancePromptKeywordsValidationFailureIsUnprocessable(t *testing.T) {
+	controller := &testPolicyController{promptKeywords: []config.PromptKeyword{{
+		ID: "keep", Label: "Keep", Group: "custom", Enabled: true, Kind: "literal", Value: "keep",
+	}}}
+	handler, cookie := pathRulesTestHandler(t, governanceFindingsFixture(t), controller)
+	response := postGovernanceAllowlist(t, handler, cookie, "/governance/prompt-keywords", url.Values{
+		"rule_id": {"keep"}, "rule_label": {"Keep"}, "rule_group": {"custom"},
+		"rule_enabled": {"true"}, "rule_kind": {"regex"}, "rule_value": {"("},
+	}, "http://example.com", "")
+	if response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), "not a valid RE2 pattern") {
+		t.Fatalf("validation response = %d: %q", response.Code, response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), "value \"(\"") {
+		t.Fatalf("validation error echoed the pattern: %q", response.Body.String())
+	}
+	if got := controller.PromptKeywords(); len(got) != 1 || got[0].Value != "keep" {
+		t.Fatalf("rejected save changed active rules: %#v", got)
+	}
+}
+
+func TestGovernancePromptKeywordsWriteFailureKeepsActivePolicy(t *testing.T) {
+	active := []config.PromptKeyword{{ID: "keep", Label: "Keep", Group: "custom", Enabled: false, Kind: "literal", Value: "keep"}}
+	controller := &testPolicyController{promptKeywords: active, saveErr: errors.New("disk full")}
+	handler, cookie := pathRulesTestHandler(t, governanceFindingsFixture(t), controller)
+	response := postGovernanceAllowlist(t, handler, cookie, "/governance/prompt-keywords", url.Values{
+		"rule_id": {"new-rule"}, "rule_label": {"New"}, "rule_group": {"custom"},
+		"rule_enabled": {"true"}, "rule_kind": {"literal"}, "rule_value": {"new"},
+	}, "http://example.com", "")
+	body := response.Body.String()
+	if response.Code != http.StatusInternalServerError || !strings.Contains(body, "active policy was not changed") {
+		t.Fatalf("write failure response = %d: %q", response.Code, body)
+	}
+	if got := controller.PromptKeywords(); len(got) != 1 || got[0].ID != "keep" {
+		t.Fatalf("failed write changed active rules: %#v", got)
+	}
+	if !strings.Contains(body, `value="new-rule"`) {
+		t.Fatalf("failed save must retain submitted draft: %q", body)
+	}
+}
+
+func TestGovernancePromptKeywordsRejectsCrossOriginCookieMutation(t *testing.T) {
+	controller := &testPolicyController{promptKeywords: []config.PromptKeyword{{
+		ID: "keep", Label: "Keep", Group: "custom", Enabled: true, Kind: "literal", Value: "keep",
+	}}}
+	handler, cookie := pathRulesTestHandler(t, governanceFindingsFixture(t), controller)
+	values := url.Values{
+		"rule_id": {"other"}, "rule_label": {"Other"}, "rule_group": {"custom"},
+		"rule_enabled": {"true"}, "rule_kind": {"literal"}, "rule_value": {"other"},
+	}
+	response := postGovernanceAllowlist(t, handler, cookie, "/governance/prompt-keywords", values, "https://attacker.invalid", "")
+	if response.Code != http.StatusForbidden || !strings.Contains(response.Body.String(), "Cross-origin") {
+		t.Fatalf("cross-origin response = %d: %q", response.Code, response.Body.String())
+	}
+	if got := controller.PromptKeywords(); len(got) != 1 || got[0].ID != "keep" {
+		t.Fatalf("cross-origin request changed policy: %#v", got)
+	}
+	response = postGovernanceAllowlist(t, handler, nil, "/governance/prompt-keywords", values, "", "test-token")
+	if response.Code != http.StatusSeeOther {
+		t.Fatalf("bearer-token response = %d: %q", response.Code, response.Body.String())
+	}
 }
 
 func pathRulesTestHandler(t *testing.T, repo *fullStub, controller *testPolicyController) (http.Handler, *http.Cookie) {
