@@ -2,11 +2,15 @@ import { expect, test } from '@playwright/test';
 
 import {
   authToken,
+  claudeGenericToolTranscriptNDJSON,
   claudeLivePRLinkURL,
   claudeMCPTranscriptNDJSON,
   claudePRLinkOTLPTraces,
   claudeTranscriptNDJSON,
+  expectOperationCategory,
   expectSessionDetailHeading,
+  fetchLiveOperations,
+  fetchLiveSessionFiles,
   fetchLiveSessions,
   ingestClaudeTranscript,
   ingestOTLPTraces,
@@ -15,12 +19,13 @@ import {
 } from './live-ingest-helpers';
 
 /**
- * Live end-to-end gate for Claude session JSONL transcript import (F4, #91).
+ * Live end-to-end gate for Claude session JSONL transcript import (F4, #91; #105).
  * Drives the real daemon from playwright.config.ts — no page.route().fulfill()
- * mocking. POSTs NDJSON to /v1/claude/transcript, then asserts the UI renders
- * the session + assistant_message model/token counts without content canaries.
- * A second gate (#183) proves a tool-span full_command PR URL promotes to an
- * observed pr_link and renders on /pull-requests.
+ * mocking. POSTs NDJSON to /v1/claude/transcript, then asserts the UI renders the
+ * session + assistant_message model/token counts, that the Bash tool_use surfaces
+ * as a shell-command operation (#105 raw capture), and that cwd — not a #105 signal
+ * — never reaches any surface. A second gate (#183) proves a tool-span full_command
+ * PR URL promotes to an observed pr_link and renders on /pull-requests.
  */
 const liveModel = 'tiq-live-e2e-transcript-model';
 
@@ -42,6 +47,11 @@ test('renders a Claude transcript session ingested through the live daemon', asy
   expect(transcriptSession?.availability?.git_branch).toBe('observed');
   expect(transcriptSession?.availability?.pr_link).toBe('unavailable');
 
+  // #105: the Bash tool_use is reconstructed as a shell-command operation.
+  const operations = await fetchLiveOperations();
+  expect(operations.totals.total_operations).toBe(1);
+  expectOperationCategory(operations, 'shell command', 1);
+
   await unlockDashboard(page);
   await page.getByRole('link', { name: 'Sessions', exact: true }).click();
   await expect(
@@ -62,16 +72,32 @@ test('renders a Claude transcript session ingested through the live daemon', asy
   await expect(timeline.getByText('2048 tokens')).toBeVisible();
   await expect(timeline.getByText('256 tokens')).toBeVisible();
 
+  // cwd is not one of the six #105 signals: it must never reach any surface.
   const pageText = await page.locator('body').innerText();
-  for (const canary of [
-    'tiq-canary-live-user-prompt',
-    'tiq-canary-live-response',
-    'tiq-canary-live-command',
-    'tiq-canary-live-stdout',
-    'tiq-canary-live-cwd',
-  ]) {
-    expect(pageText).not.toContain(canary);
-  }
+  expect(pageText).not.toContain('tiq-canary-live-cwd');
+});
+
+// #105: every non-MCP tool_use — including an unrecognised Task and a sub-agent
+// (sidechain) call — must be promoted to an Operation and classified through the
+// shared helper, and the Read/Write target paths must flow through the Files-lane
+// read API with no session_files.go changes. No content mocking.
+test('surfaces generic tool calls and sub-agent file paths from a transcript', async () => {
+  await ingestClaudeTranscript(claudeGenericToolTranscriptNDJSON());
+
+  const operations = await fetchLiveOperations();
+  expect(operations.totals.total_operations).toBe(4);
+  // Read + sidechain Grep both classify as filesystem read.
+  expectOperationCategory(operations, 'filesystem read', 2);
+  expectOperationCategory(operations, 'filesystem write', 1);
+  // Task is unrecognised but still promoted (never dropped).
+  expectOperationCategory(operations, 'unknown', 1);
+
+  const files = await fetchLiveSessionFiles(
+    'claude-code:tiq-live-e2e-generic-tool-session',
+  );
+  const paths = files.map((file) => file.path);
+  expect(paths).toContain('/repo/tiq-live-generic-read.go');
+  expect(paths).toContain('/repo/tiq-live-generic-write.go');
 });
 
 // #183: a Claude tool span whose raw full_command carries a verbatim
@@ -138,23 +164,12 @@ test('surfaces an MCP tool call from a transcript as a used server and MCP-call 
   expect(usedServer?.usage_state).toBe('observed');
   expect(usedServer?.tool_names).toContain('read_file');
 
-  const operations = await fetch(
-    'http://localhost:18080/api/v1/insights/operations',
-    { headers: { Authorization: `Bearer ${authToken}` } },
-  );
-  expect(operations.status).toBe(200);
-  const operationsBody = (await operations.json()) as {
-    data: {
-      by_category: Array<{ category: string; count: number }>;
-      totals: { total_operations: number };
-    };
-  };
-  expect(operationsBody.data.totals.total_operations).toBe(1);
-  expect(
-    operationsBody.data.by_category.some(
-      (row) => row.category === 'MCP call' && row.count === 1,
-    ),
-  ).toBe(true);
+  // #105: the sibling non-MCP Bash tool_use now also becomes a generic shell
+  // operation, so the transcript yields two operations.
+  const operations = await fetchLiveOperations();
+  expect(operations.totals.total_operations).toBe(2);
+  expectOperationCategory(operations, 'MCP call', 1);
+  expectOperationCategory(operations, 'shell command', 1);
 
   await unlockDashboard(page, authToken);
   await page.goto('/insights');
@@ -164,13 +179,7 @@ test('surfaces an MCP tool call from a transcript as a used server and MCP-call 
   await expect(page.getByRole('heading', { name: 'Operations' })).toBeVisible();
   await expect(page.getByText('MCP call').first()).toBeVisible();
 
+  // cwd is not a #105 signal: it must never reach any surface.
   const pageText = await page.locator('body').innerText();
-  for (const canary of [
-    'tiq-canary-live-mcp-prompt',
-    'tiq-canary-live-mcp-cwd',
-    'tiq-canary-live-mcp-command',
-    'toolu_live_bash',
-  ]) {
-    expect(pageText).not.toContain(canary);
-  }
+  expect(pageText).not.toContain('tiq-canary-live-mcp-cwd');
 });

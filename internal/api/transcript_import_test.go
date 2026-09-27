@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/wayne/telemetryiq/internal/insights"
@@ -20,20 +21,32 @@ import (
 const transcriptE2ESessionID = "transcript-e2e-session"
 
 // e2eTranscriptNDJSON is a synthetic session JSONL transcript in the real
-// on-disk newline-delimited format: a skipped user record and one assistant
-// record carrying the model + full token usage. Its content bodies
-// (message.content[], tool input.command/file_path, toolUseResult, cwd) hold
-// canaries that must never reach storage or the read API.
+// on-disk newline-delimited format: a user prompt, an assistant record carrying
+// the model + full token usage plus response/thinking text and a Bash + Edit
+// tool_use, and a paired tool_result. Under epic #87 the content bodies
+// (message.content[] text/thinking, tool input command/file_path/diff, tool_result
+// stdout) are captured raw and must reach storage; only cwd — not one of the six
+// #105 signals — stays excluded.
 const e2eTranscriptNDJSON = `{"type":"user","uuid":"e2e-user-1","sessionId":"transcript-e2e-session","timestamp":"2026-09-12T10:00:00.000Z","version":"2.1.269","message":{"role":"user","content":"tiq-canary-user-prompt"}}
-{"type":"assistant","uuid":"e2e-assistant-1","parentUuid":"e2e-user-1","sessionId":"transcript-e2e-session","timestamp":"2026-09-12T10:00:02.500Z","version":"2.1.269","cwd":"/home/tiq-canary-cwd/project","gitBranch":"main","entrypoint":"cli","requestId":"req_e2e_1","message":{"role":"assistant","model":"claude-opus-4-8","stop_reason":"end_turn","content":[{"type":"text","text":"tiq-canary-response"},{"type":"thinking","thinking":"tiq-canary-thinking"},{"type":"tool_use","name":"Bash","input":{"command":"tiq-canary-command"}},{"type":"tool_use","name":"Edit","input":{"file_path":"/tiq-canary-file-path"}}],"usage":{"input_tokens":4096,"output_tokens":512,"cache_read_input_tokens":8192,"cache_creation_input_tokens":128,"output_tokens_details":{"thinking_tokens":64}}},"toolUseResult":{"stdout":"tiq-canary-stdout"}}`
+{"type":"assistant","uuid":"e2e-assistant-1","parentUuid":"e2e-user-1","sessionId":"transcript-e2e-session","timestamp":"2026-09-12T10:00:02.500Z","version":"2.1.269","cwd":"/home/tiq-canary-cwd/project","gitBranch":"main","entrypoint":"cli","requestId":"req_e2e_1","message":{"role":"assistant","model":"claude-opus-4-8","stop_reason":"end_turn","content":[{"type":"text","text":"tiq-canary-response"},{"type":"thinking","thinking":"tiq-canary-thinking"},{"type":"tool_use","id":"toolu_bash_e2e_1","name":"Bash","input":{"command":"tiq-canary-command"}},{"type":"tool_use","id":"toolu_edit_e2e_1","name":"Edit","input":{"file_path":"/tiq-canary-file-path","old_string":"before","new_string":"after"}}],"usage":{"input_tokens":4096,"output_tokens":512,"cache_read_input_tokens":8192,"cache_creation_input_tokens":128,"output_tokens_details":{"thinking_tokens":64}}}}
+{"type":"user","uuid":"e2e-user-2","parentUuid":"e2e-assistant-1","sessionId":"transcript-e2e-session","timestamp":"2026-09-12T10:00:03.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_bash_e2e_1","is_error":false,"content":[{"type":"text","text":"tiq-canary-stdout"}]}]}}`
 
-var transcriptContentCanaries = []string{
+// transcriptCapturedContent are the raw content bodies epic #87 now retains and
+// surfaces through storage: the user prompt, assistant response + thinking, and the
+// tool IO (command, edit target path, command result).
+var transcriptCapturedContent = []string{
 	"tiq-canary-user-prompt",
 	"tiq-canary-response",
 	"tiq-canary-thinking",
 	"tiq-canary-command",
 	"tiq-canary-file-path",
 	"tiq-canary-stdout",
+}
+
+// transcriptExcludedContent are the values that stay off every surface: cwd is not
+// one of the six #105 signals (out of scope, flagged follow-up), so it must never
+// reach storage, the read API, or the dev inspector.
+var transcriptExcludedContent = []string{
 	"tiq-canary-cwd",
 }
 
@@ -41,8 +54,9 @@ var transcriptContentCanaries = []string{
 // ingests a Claude OTLP log for a session, then POSTs a JSONL transcript for the
 // SAME session to /v1/claude/transcript, and proves both merge into one
 // anthropic/claude-code session whose transcript model + token counts surface
-// through the read API, while none of the transcript content bodies (nor the raw
-// transcript payload via the dev inspector) are ever exposed.
+// through the read API. Per epic #87 it also proves the raw content bodies (prompt,
+// response, thinking, tool command/path/result) are captured to storage, while cwd
+// stays off every surface including the dev inspector.
 func TestTranscriptImportMergesWithOTLPSession(t *testing.T) {
 	repository, server := transcriptTestServer(t, true)
 	postAcceptedOTLP(t, server.URL, "/v1/logs", claudeOTLPLogPayload(t, []any{
@@ -60,7 +74,7 @@ func TestTranscriptImportMergesWithOTLPSession(t *testing.T) {
 	assertSessionHeaderAvailability(t, detail.Data.Availability, "observed", "unavailable")
 	timeline := getInsightJSON[eventListResponse](t, server.URL+"/api/v1/sessions/"+wantSessionID+"/events")
 	assertTranscriptAssistantTokens(t, requireTranscriptAssistantEvent(t, timeline))
-	assertTranscriptContentAbsent(t, repository, wantSessionID, timeline, sessions, server.URL)
+	assertTranscriptContentCapture(t, repository, wantSessionID, timeline, sessions, server.URL)
 	if sessions[0].State == "" {
 		t.Fatalf("session state must not be empty: %#v", sessions[0])
 	}
@@ -68,36 +82,37 @@ func TestTranscriptImportMergesWithOTLPSession(t *testing.T) {
 
 // mcpTranscriptE2ENDJSON is a synthetic MCP-bearing transcript: an assistant
 // record invoking one MCP tool (mcp__canary-fs__read_file) alongside a non-MCP
-// Bash tool_use, paired with a later user tool_result. The cwd, prompt, and the
-// non-MCP Bash command carry canaries that must never reach the read API; the MCP
-// arguments/result are synthetic, ordinary data (captured raw per #104).
+// Bash tool_use, paired with a later user tool_result. Under epic #87 the prompt
+// and the Bash command are captured raw (the Bash call becomes a generic shell
+// operation); only cwd — not a #105 signal — stays off the read API.
 const mcpTranscriptE2ENDJSON = `{"type":"user","uuid":"mcp-e2e-user-1","sessionId":"mcp-transcript-e2e-session","timestamp":"2026-09-12T10:00:00.000Z","version":"2.1.269","message":{"role":"user","content":"tiq-canary-mcp-prompt"}}
 {"type":"assistant","uuid":"mcp-e2e-assistant-1","parentUuid":"mcp-e2e-user-1","sessionId":"mcp-transcript-e2e-session","timestamp":"2026-09-12T10:00:02.000Z","version":"2.1.269","cwd":"/home/tiq-canary-mcp-cwd/project","gitBranch":"main","entrypoint":"cli","requestId":"req_mcp_e2e_1","message":{"role":"assistant","model":"claude-opus-4-8","stop_reason":"tool_use","content":[{"type":"tool_use","id":"toolu_mcp_e2e","name":"mcp__canary-fs__read_file","input":{"path":"docs/overview.md"}},{"type":"tool_use","id":"toolu_bash_e2e","name":"Bash","input":{"command":"tiq-canary-mcp-command"}}],"usage":{"input_tokens":64,"output_tokens":8}}}
 {"type":"user","uuid":"mcp-e2e-user-2","parentUuid":"mcp-e2e-assistant-1","sessionId":"mcp-transcript-e2e-session","timestamp":"2026-09-12T10:00:03.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_mcp_e2e","is_error":false,"content":[{"type":"text","text":"# Overview"}]}]}}`
 
-var mcpTranscriptContentCanaries = []string{
-	"tiq-canary-mcp-prompt",
+var mcpTranscriptExcludedContent = []string{
 	"tiq-canary-mcp-cwd",
-	"tiq-canary-mcp-command",
-	"toolu_bash_e2e",
 }
 
 // TestTranscriptImportSurfacesMCPCallsThroughReadAPI is the live ingest→read gate
 // for #104: it POSTs an MCP-bearing JSONL transcript to /v1/claude/transcript,
 // then proves the reconstructed MCP call surfaces through both the operations
 // insight (an MCP-call operation) and the MCP-inventory insight (the connected-but-
-// unused vs used state now reports the server as used with its invocation count),
-// while the non-MCP tool body and envelope canaries never reach the read API.
+// unused vs used state now reports the server as used with its invocation count).
+// Under #105 the sibling non-MCP Bash tool_use now also becomes a generic shell
+// operation, so the transcript yields two operations; only cwd stays off the read API.
 func TestTranscriptImportSurfacesMCPCallsThroughReadAPI(t *testing.T) {
 	repository, server := transcriptTestServer(t, true)
 	postAcceptedTranscript(t, server.URL, mcpTranscriptE2ENDJSON)
 
 	stats := getInsightJSON[operationStatsResponse](t, server.URL+"/api/v1/insights/operations")
-	if stats.Data.Totals.TotalOperations != 1 {
-		t.Fatalf("operation totals = %#v, want 1 MCP-call operation", stats.Data.Totals)
+	if stats.Data.Totals.TotalOperations != 2 {
+		t.Fatalf("operation totals = %#v, want 2 (one MCP-call + one generic shell operation)", stats.Data.Totals)
 	}
 	if count := operationCategoryCount(stats.Data.ByCategory, string(canonical.OperationCategoryMCPCall)); count != 1 {
 		t.Fatalf("MCP-call category count = %d, want 1: %#v", count, stats.Data.ByCategory)
+	}
+	if count := operationCategoryCount(stats.Data.ByCategory, string(canonical.OperationCategoryShellCommand)); count != 1 {
+		t.Fatalf("shell-command category count = %d, want 1 (Bash tool_use is now a generic operation): %#v", count, stats.Data.ByCategory)
 	}
 
 	inventory := fetchMCPInventory(t, server.URL)
@@ -123,10 +138,65 @@ func TestTranscriptImportSurfacesMCPCallsThroughReadAPI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list operations: %v", err)
 	}
-	assertNoRawIdentifiers(t, mcpTranscriptContentCanaries,
+	assertNoRawIdentifiers(t, mcpTranscriptExcludedContent,
 		marshalJSON(t, stats), marshalJSON(t, inventory), marshalJSON(t, storedEvents), marshalJSON(t, storedOperations))
 	lastIngest := getInsightJSON[map[string]any](t, server.URL+"/api/v1/development/last-ingest")
-	assertNoRawIdentifiers(t, mcpTranscriptContentCanaries, marshalJSON(t, lastIngest))
+	assertNoRawIdentifiers(t, mcpTranscriptExcludedContent, marshalJSON(t, lastIngest))
+}
+
+// genericToolTranscriptNDJSON is a synthetic transcript exercising the full generic
+// tool-call surface (#105): a Read, a Write, a Bash, and an unrecognised Task
+// tool_use on one assistant record. It proves every built-in tool_use is promoted to
+// an Operation (never dropped) and classified through the shared operationCategory
+// helper, and that the Read/Write file paths reach the Files-lane read API.
+const genericToolTranscriptNDJSON = `{"type":"user","uuid":"gen-e2e-user-1","sessionId":"generic-tool-e2e-session","timestamp":"2026-09-12T10:00:00.000Z","version":"2.1.269","message":{"role":"user","content":"list the tool calls"}}
+{"type":"assistant","uuid":"gen-e2e-assistant-1","parentUuid":"gen-e2e-user-1","sessionId":"generic-tool-e2e-session","timestamp":"2026-09-12T10:00:02.000Z","version":"2.1.269","cwd":"/repo","gitBranch":"main","entrypoint":"cli","requestId":"req_gen_e2e_1","message":{"role":"assistant","model":"claude-opus-4-8","stop_reason":"tool_use","content":[{"type":"tool_use","id":"tu_read","name":"Read","input":{"file_path":"/repo/read_target.go"}},{"type":"tool_use","id":"tu_write","name":"Write","input":{"file_path":"/repo/write_target.go","content":"package main"}},{"type":"tool_use","id":"tu_bash","name":"Bash","input":{"command":"go build ./..."}},{"type":"tool_use","id":"tu_task","name":"Task","input":{"description":"investigate","subagent_type":"Explore","prompt":"look"}}],"usage":{"input_tokens":32,"output_tokens":8}}}`
+
+// TestTranscriptImportSurfacesGenericToolCallsThroughReadAPI is the live ingest→read
+// gate for #105: it POSTs a transcript carrying Read/Write/Bash/Task tool_use blocks
+// and proves each surfaces as an Operation in the correct by_category bucket (a
+// generic Operation is promoted even for the unrecognised Task), and that the
+// Read/Write target paths flow through the Files-lane read API with zero changes to
+// session_files.go — the direct evidence the JSONL path now feeds the File
+// operations capability.
+func TestTranscriptImportSurfacesGenericToolCallsThroughReadAPI(t *testing.T) {
+	_, server := transcriptTestServer(t, false)
+	postAcceptedTranscript(t, server.URL, genericToolTranscriptNDJSON)
+
+	stats := getInsightJSON[operationStatsResponse](t, server.URL+"/api/v1/insights/operations")
+	if stats.Data.Totals.TotalOperations != 4 {
+		t.Fatalf("operation totals = %#v, want 4 (Read, Write, Bash, Task)", stats.Data.Totals)
+	}
+	for _, tc := range []struct {
+		category string
+		want     int
+	}{
+		{string(canonical.OperationCategoryFilesystemRead), 1},
+		{string(canonical.OperationCategoryFilesystemWrite), 1},
+		{string(canonical.OperationCategoryShellCommand), 1},
+		{string(canonical.OperationCategoryUnknown), 1},
+	} {
+		if count := operationCategoryCount(stats.Data.ByCategory, tc.category); count != tc.want {
+			t.Fatalf("%s category count = %d, want %d: %#v", tc.category, count, tc.want, stats.Data.ByCategory)
+		}
+	}
+
+	files := getFileList(t, server.URL+"/api/v1/sessions/claude-code:generic-tool-e2e-session/files")
+	for _, wantPath := range []string{"/repo/read_target.go", "/repo/write_target.go"} {
+		if !fileListHasPath(files, wantPath) {
+			t.Fatalf("Files-lane read API missing transcript-sourced path %q: %#v", wantPath, files.Data)
+		}
+	}
+}
+
+// fileListHasPath reports whether any Files-lane row carries the given path.
+func fileListHasPath(files fileListResponse, want string) bool {
+	for _, entry := range files.Data {
+		if entry.Path != nil && *entry.Path == want {
+			return true
+		}
+	}
+	return false
 }
 
 func operationCategoryCount(categories []insights.OperationCategoryStat, category string) int {
@@ -281,15 +351,41 @@ func assertTranscriptAssistantTokens(t *testing.T, assistant timelineEvent) {
 	}
 }
 
-func assertTranscriptContentAbsent(t *testing.T, repository storage.Repository, sessionID string, timeline eventListResponse, sessions []canonical.Session, baseURL string) {
+func assertTranscriptContentCapture(t *testing.T, repository storage.Repository, sessionID string, timeline eventListResponse, sessions []canonical.Session, baseURL string) {
 	t.Helper()
 	events, err := repository.ListEvents(context.Background(), storage.EventFilter{SessionID: sessionID, Limit: 20})
 	if err != nil {
 		t.Fatalf("list events: %v", err)
 	}
-	assertNoRawIdentifiers(t, transcriptContentCanaries, marshalJSON(t, timeline), marshalJSON(t, sessions), marshalJSON(t, events))
+	operations, err := repository.ListOperations(context.Background(), storage.OperationFilter{SessionID: sessionID})
+	if err != nil {
+		t.Fatalf("list operations: %v", err)
+	}
+	// Epic #87: the raw content bodies must be retained on the stored events and
+	// operations.
+	assertContainsAll(t, transcriptCapturedContent, marshalJSON(t, events), marshalJSON(t, operations))
+	// cwd stays excluded from every read surface and the dev inspector.
 	lastIngest := getInsightJSON[map[string]any](t, baseURL+"/api/v1/development/last-ingest")
-	assertNoRawIdentifiers(t, transcriptContentCanaries, marshalJSON(t, lastIngest))
+	assertNoRawIdentifiers(t, transcriptExcludedContent,
+		marshalJSON(t, timeline), marshalJSON(t, sessions), marshalJSON(t, events), marshalJSON(t, operations), marshalJSON(t, lastIngest))
+}
+
+// assertContainsAll fails unless every required value appears verbatim in at least
+// one document — the raw-capture mirror of assertNoRawIdentifiers.
+func assertContainsAll(t *testing.T, required []string, documents ...[]byte) {
+	t.Helper()
+	for _, want := range required {
+		found := false
+		for _, document := range documents {
+			if strings.Contains(string(document), want) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("raw-capture gap: %q not present in stored read output", want)
+		}
+	}
 }
 
 func requireTranscriptAssistantEvent(t *testing.T, timeline eventListResponse) timelineEvent {

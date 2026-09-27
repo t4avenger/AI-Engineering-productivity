@@ -64,8 +64,8 @@ func TestExtractTranscriptOperationsGolden(t *testing.T) {
 // TestExtractTranscriptOperationsPairsAndClassifies proves the tool_use↔tool_result
 // pairing: a paired success, a paired failure, and an unpaired call (outcome
 // unknown, never fabricated), all classified as MCP calls with their server/tool
-// split out. The non-MCP Bash tool_use must not become an Operation (J18/#105 owns
-// generic tool IO).
+// split out. The non-MCP Bash tool_use now also becomes a generic shell-command
+// Operation (J18/#105), paired with its own tool_result.
 func TestExtractTranscriptOperationsPairsAndClassifies(t *testing.T) {
 	data := transcriptFixtureNDJSON(t, mcpTranscriptFixture)
 	operations, err := ExtractTranscriptOperations(data, time.Unix(0, 0).UTC())
@@ -73,15 +73,32 @@ func TestExtractTranscriptOperationsPairsAndClassifies(t *testing.T) {
 		t.Fatalf("extract: %v", err)
 	}
 	byID := operationsByID(operations)
-	if len(operations) != 3 {
-		t.Fatalf("operation count = %d, want 3 MCP calls (Bash tool_use is not an MCP operation)", len(operations))
+	if len(operations) != 4 {
+		t.Fatalf("operation count = %d, want 4 (3 MCP calls + 1 generic Bash)", len(operations))
 	}
 	const prefix = "claude-code:22222222-2222-4222-8222-222222222222:tool:"
 	assertMCPOperation(t, byID, prefix+"toolu_mcp_read", "success", "synthetic-fs", "read_file")
 	assertMCPOperation(t, byID, prefix+"toolu_mcp_write", "failed", "synthetic-fs", "write_file")
 	assertMCPOperation(t, byID, prefix+"toolu_mcp_pending", "unknown", "synthetic-github", "list_issues")
-	if _, present := byID[prefix+"toolu_bash_ls"]; present {
-		t.Fatal("Bash tool_use must not become an MCP operation")
+	bash, ok := byID[prefix+"toolu_bash_ls"]
+	if !ok {
+		t.Fatal("Bash tool_use must become a generic Operation (J18/#105)")
+	}
+	if bash.Category != canonical.OperationCategoryShellCommand {
+		t.Errorf("Bash category = %q, want shell command", bash.Category)
+	}
+	if bash.Outcome != "success" {
+		t.Errorf("Bash outcome = %q, want success (paired tool_result)", bash.Outcome)
+	}
+	if _, isMCP := bash.ProviderExtensions["mcp_call"]; isMCP {
+		t.Error("generic Bash Operation must not carry an mcp_call block")
+	}
+	call, ok := bash.ProviderExtensions["tool_call"].(map[string]any)
+	if !ok {
+		t.Fatalf("Bash Operation must carry tool_call: %#v", bash.ProviderExtensions)
+	}
+	if input, ok := call["input"].(map[string]any); !ok || input["command"] != "ls docs" {
+		t.Errorf("Bash tool_call.input = %#v, want the raw command", call["input"])
 	}
 }
 
@@ -179,38 +196,53 @@ func TestNormalizeTranscriptEmitsMCPCorrelationEvents(t *testing.T) {
 	}
 }
 
-// TestExtractTranscriptOperationsDoesNotEmitNonMCPContent is the operation-path
-// canary guard: a non-MCP tool_use body (a Bash command) must never surface in an
-// MCP operation, so J18/#105's generic tool IO is not smuggled in through #104.
-func TestExtractTranscriptOperationsDoesNotEmitNonMCPContent(t *testing.T) {
+// TestExtractTranscriptOperationsKeepsMCPBlocksMCPOnly is the operation-path
+// separation guard: a non-MCP tool_use body (a Bash command) is captured as a
+// generic tool_call Operation (J18/#105), but must never be smuggled into an
+// mcp_call block — only MCP invocations shape an mcp_call, so the MCP-inventory
+// insight never lights a server from a generic tool.
+func TestExtractTranscriptOperationsKeepsMCPBlocksMCPOnly(t *testing.T) {
 	data := transcriptFixtureNDJSON(t, mcpTranscriptFixture)
 	operations, err := ExtractTranscriptOperations(data, time.Unix(0, 0).UTC())
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
-	encoded, err := json.Marshal(operations)
-	if err != nil {
-		t.Fatalf("marshal operations: %v", err)
-	}
-	for _, leaked := range []string{"ls docs", "toolu_bash_ls", "\"Bash\""} {
-		if strings.Contains(string(encoded), leaked) {
-			t.Fatalf("non-MCP content %q leaked into MCP operations: %s", leaked, encoded)
+	for _, operation := range operations {
+		call, ok := operation.ProviderExtensions["mcp_call"].(map[string]any)
+		if !ok {
+			continue
+		}
+		encoded, err := json.Marshal(call)
+		if err != nil {
+			t.Fatalf("marshal mcp_call: %v", err)
+		}
+		for _, leaked := range []string{"ls docs", "toolu_bash_ls", "\"Bash\""} {
+			if strings.Contains(string(encoded), leaked) {
+				t.Fatalf("non-MCP content %q leaked into an mcp_call block: %s", leaked, encoded)
+			}
 		}
 	}
 }
 
-// TestExtractTranscriptOperationsNoMCPYieldsEmpty proves a transcript with only
-// non-MCP tool calls produces no MCP operations and no error — the extractor never
-// fabricates an operation for a tool it does not own.
-func TestExtractTranscriptOperationsNoMCPYieldsEmpty(t *testing.T) {
+// TestExtractTranscriptOperationsNonMCPYieldsGeneric proves a transcript with only
+// non-MCP tool calls now produces a generic tool_call Operation per tool (J18/#105,
+// which dropped J17's MCP-only filter): the Bash call is a shell-command Operation
+// carrying its raw command, with no mcp_call block.
+func TestExtractTranscriptOperationsNonMCPYieldsGeneric(t *testing.T) {
 	line := `{"type":"assistant","uuid":"a1","sessionId":"s1","timestamp":"2026-09-12T09:00:00Z","version":"2.1.269",` +
 		`"message":{"model":"claude-opus-4-8","content":[{"type":"tool_use","id":"toolu_b","name":"Bash","input":{"command":"echo hi"}}],"usage":{"input_tokens":1,"output_tokens":1}}}`
 	operations, err := ExtractTranscriptOperations([]byte(line), time.Unix(0, 0).UTC())
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
-	if len(operations) != 0 {
-		t.Fatalf("operation count = %d, want 0 (no MCP calls)", len(operations))
+	if len(operations) != 1 {
+		t.Fatalf("operation count = %d, want 1 generic Bash operation", len(operations))
+	}
+	if operations[0].Category != canonical.OperationCategoryShellCommand {
+		t.Errorf("category = %q, want shell command", operations[0].Category)
+	}
+	if _, isMCP := operations[0].ProviderExtensions["mcp_call"]; isMCP {
+		t.Error("generic operation must not carry an mcp_call block")
 	}
 }
 

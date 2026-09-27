@@ -28,6 +28,11 @@ const sourceSchemaTranscript = "session_jsonl"
 // OTLP api_request/ModelInteraction slice.
 const eventTypeAssistantMessage = "assistant_message"
 
+// eventTypeUserMessage is the correlation event emitted for a content-bearing user
+// record (J18/#105): it carries the raw prompt / slash-command-expanded content so
+// the prompt surface is captured from the transcript, not only from OTLP (#94).
+const eventTypeUserMessage = "user_message"
+
 // transcriptRecord decodes the envelope shared by conversation records. Only the
 // scalar fields F4 promotes or allow-lists are declared; content-bearing nested
 // shapes (message.content[], toolUseResult, …) are deliberately absent so they
@@ -76,10 +81,12 @@ type assistantUsage struct {
 	} `json:"cache_creation"`
 }
 
-// transcriptContentFields are the content/body signals F4 deliberately does not
-// emit; they are listed as unavailable so an absent signal is explicit rather
-// than silently missing. Ownership: prompts/responses → E7 (#94); MCP calls →
-// J17 (#104); tool IO / diffs / sub-agents → J18 (#105).
+// transcriptContentFields are the content/body signals a transcript event may not
+// carry; they are listed as unavailable so an absent signal is explicit rather
+// than silently missing. Per-event shapers prune an entry when that event does
+// carry the signal: the assistant event drops response_content when it carries the
+// response text (J18/#105), the user event drops prompt_content when it carries the
+// prompt (J18/#105), and the tool_call/mcp_call events carry their own lists.
 var transcriptContentFields = []string{
 	"prompt_content",
 	"response_content",
@@ -117,9 +124,11 @@ func NormalizeTranscript(data []byte, receivedAt time.Time) ([]canonical.Event, 
 	if err != nil {
 		return nil, err
 	}
-	// Each reconstructed MCP tool call also emits a correlation event so the
-	// MCP-inventory insight can mark a connected server as actually used (#104);
-	// the invocation detail (arguments/result) rides on the Operation instead.
+	// Each reconstructed tool call also emits a content-free correlation event: an
+	// mcp_call event so the MCP-inventory insight can mark a connected server as
+	// actually used (#104), or a generic tool_call event carrying the raw
+	// file_path/full_command for the Files-lane and risky-access consumers (#105).
+	// The invocation detail (arguments/result) rides on the Operation instead.
 	for _, call := range calls {
 		events = append(events, call.correlationEvent(receivedAt))
 	}
@@ -129,24 +138,19 @@ func NormalizeTranscript(data []byte, receivedAt time.Time) ([]canonical.Event, 
 // walkTranscript is the single-pass reader shared by the transcript event path
 // (NormalizeTranscript) and the operation path (ExtractTranscriptOperations). It
 // walks the NDJSON one line at a time (no bytes.Split, so a newline-dense 32 MiB
-// body cannot amplify into slice headers), emits an event per assistant record,
-// and reconstructs every MCP tool call by pairing an assistant tool_use with its
-// later user tool_result by tool_use_id. A malformed line or a malformed supported
-// (assistant) record aborts the whole walk rather than being silently dropped.
-func walkTranscript(data []byte, receivedAt time.Time) ([]canonical.Event, []mcpTranscriptCall, error) {
+// body cannot amplify into slice headers), emits an event per assistant record and
+// per content-bearing user record, and reconstructs every tool call by pairing an
+// assistant tool_use with its later user tool_result by tool_use_id. A malformed
+// line or a malformed supported (assistant) record aborts the whole walk rather
+// than being silently dropped.
+func walkTranscript(data []byte, receivedAt time.Time) ([]canonical.Event, []transcriptToolCall, error) {
 	var events []canonical.Event
-	collector := newMCPCallCollector()
+	collector := newToolCallCollector()
 	lineNum := 0
 	for remaining := data; len(remaining) > 0; {
 		lineNum++
 		var line []byte
-		if i := bytes.IndexByte(remaining, '\n'); i >= 0 {
-			line = remaining[:i]
-			remaining = remaining[i+1:]
-		} else {
-			line = remaining
-			remaining = nil
-		}
+		line, remaining = nextTranscriptLine(remaining)
 		trimmed := bytes.TrimSpace(line)
 		if len(trimmed) == 0 {
 			continue
@@ -159,19 +163,47 @@ func walkTranscript(data []byte, receivedAt time.Time) ([]canonical.Event, []mcp
 		if err := json.Unmarshal(trimmed, &discriminator); err != nil {
 			return nil, nil, fmt.Errorf("%w: line %d is not valid JSON", ErrMalformedTranscript, lineNum)
 		}
-		switch discriminator.Type {
-		case "assistant":
-			event, err := assistantEvent(trimmed, receivedAt)
-			if err != nil {
-				return nil, nil, err
-			}
+		event, ok, err := collector.dispatchTranscriptRecord(discriminator.Type, trimmed, receivedAt)
+		if err != nil {
+			return nil, nil, err
+		}
+		if ok {
 			events = append(events, event)
-			collector.collectToolUses(trimmed)
-		case "user":
-			collector.collectToolResults(trimmed)
 		}
 	}
 	return events, collector.reconstructed(), nil
+}
+
+// nextTranscriptLine splits off the next newline-delimited line from remaining,
+// returning the line and the bytes that follow it (nil once the last line is
+// consumed). Kept separate so walkTranscript stays within the cognitive-complexity
+// budget without a bytes.Split allocation over a newline-dense body.
+func nextTranscriptLine(remaining []byte) (line, rest []byte) {
+	if i := bytes.IndexByte(remaining, '\n'); i >= 0 {
+		return remaining[:i], remaining[i+1:]
+	}
+	return remaining, nil
+}
+
+// dispatchTranscriptRecord routes one already-discriminated transcript line: an
+// assistant record yields an event and collects its tool_uses; a content-bearing
+// user record yields an event, and every user record collects its tool_results. The
+// bool reports whether an event was produced; auxiliary record types produce none.
+func (c *toolCallCollector) dispatchTranscriptRecord(recordType string, trimmed []byte, receivedAt time.Time) (canonical.Event, bool, error) {
+	switch recordType {
+	case "assistant":
+		event, err := assistantEvent(trimmed, receivedAt)
+		if err != nil {
+			return canonical.Event{}, false, err
+		}
+		c.collectToolUses(trimmed)
+		return event, true, nil
+	case "user":
+		c.collectToolResults(trimmed)
+		event, ok := userEvent(trimmed, receivedAt)
+		return event, ok, nil
+	}
+	return canonical.Event{}, false, nil
 }
 
 // assistantEvent maps one assistant transcript record into a canonical event.
@@ -198,8 +230,9 @@ func assistantEvent(line []byte, receivedAt time.Time) (canonical.Event, error) 
 	// via INSERT OR IGNORE rather than duplicating events.
 	eventID := sessionID + ":" + uuid
 
+	thinking, responseText := assistantMessageContent(line)
 	attributes := map[string]any{
-		"unavailable_fields": append([]string(nil), transcriptContentFields...),
+		"unavailable_fields": assistantUnavailableFields(responseText != ""),
 	}
 	var model string
 	var modelObserved bool
@@ -213,9 +246,19 @@ func assistantEvent(line []byte, receivedAt time.Time) (canonical.Event, error) 
 		}
 	}
 
+	// The assistant record's reasoning (thinking) and response text are captured
+	// raw on the event (epic #87 — nothing dropped); the response supersedes the
+	// former "response_content → E7" deferral now that the transcript carries it.
+	envelope := transcriptEnvelope(record)
+	if thinking != "" {
+		envelope["thinking"] = thinking
+	}
+	if responseText != "" {
+		envelope["response_content"] = responseText
+	}
 	extensions := map[string]any{
 		"correlation": transcriptCorrelation(eventID, occurredAt, uuid, trimmedParentUUID(record.ParentUUID)),
-		"transcript":  transcriptEnvelope(record),
+		"transcript":  envelope,
 	}
 	if extra := cacheExtraTokens(record.Message); len(extra) > 0 {
 		extensions["cache_usage_extra"] = extra
@@ -238,6 +281,142 @@ func assistantEvent(line []byte, receivedAt time.Time) (canonical.Event, error) 
 		Attributes:         attributes,
 		ProviderExtensions: extensions,
 	}, nil
+}
+
+// assistantMessageContent decodes an assistant record's message.content array and
+// returns its reasoning (thinking) blocks and response (text) blocks, each joined
+// with a newline when a record carries several. A record with no decodable content
+// array (or none of these block types) yields empty strings, so a content-free
+// assistant record adds nothing.
+func assistantMessageContent(line []byte) (thinking, response string) {
+	_, blocks, ok := decodeContentBlocks(line)
+	if !ok {
+		return "", ""
+	}
+	var thinkingParts, responseParts []string
+	for _, block := range blocks {
+		switch block.Type {
+		case "thinking":
+			if strings.TrimSpace(block.Thinking) != "" {
+				thinkingParts = append(thinkingParts, block.Thinking)
+			}
+		case "text":
+			if strings.TrimSpace(block.Text) != "" {
+				responseParts = append(responseParts, block.Text)
+			}
+		}
+	}
+	return strings.Join(thinkingParts, "\n"), strings.Join(responseParts, "\n")
+}
+
+// assistantUnavailableFields lists the content signals an assistant event does not
+// carry. response_content is pruned when the event carries the response text, so an
+// absent signal is explicit while a present one is not falsely reported missing.
+func assistantUnavailableFields(hasResponse bool) []string {
+	if !hasResponse {
+		return append([]string(nil), transcriptContentFields...)
+	}
+	return removeUnavailableField(transcriptContentFields, "response_content")
+}
+
+// userEvent maps one content-bearing user transcript record into a canonical
+// user_message event carrying the raw prompt / slash-command-expanded content
+// (J18/#105). ok is false — the record is skipped without error — when the record
+// is unparseable, lacks a structural field, or carries no text content (a pure
+// tool_result turn, whose body rides on the paired tool Operation instead). User
+// records are auxiliary, so a malformed one never aborts the import (unlike a
+// malformed assistant record); a real user record always carries these fields.
+func userEvent(line []byte, receivedAt time.Time) (canonical.Event, bool) {
+	var record transcriptRecord
+	if err := json.Unmarshal(line, &record); err != nil {
+		return canonical.Event{}, false
+	}
+	uuid := strings.TrimSpace(record.UUID)
+	sessionIDRaw := strings.TrimSpace(record.SessionID)
+	timestamp := strings.TrimSpace(record.Timestamp)
+	if uuid == "" || sessionIDRaw == "" || timestamp == "" {
+		return canonical.Event{}, false
+	}
+	content := transcriptUserContent(line)
+	if content == "" {
+		return canonical.Event{}, false
+	}
+	occurredAt, err := time.Parse(time.RFC3339, timestamp)
+	if err != nil {
+		return canonical.Event{}, false
+	}
+	occurredAt = occurredAt.UTC()
+
+	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, sessionIDRaw)
+	eventID := sessionID + ":" + uuid
+
+	envelope := transcriptEnvelope(record)
+	envelope["prompt_content"] = content
+
+	return canonical.Event{
+		SchemaVersion: canonicalSchemaVersion,
+		EventID:       eventID,
+		EventType:     eventTypeUserMessage,
+		OccurredAt:    occurredAt,
+		ReceivedAt:    receivedAt.UTC(),
+		Provider:      provider,
+		Tool:          tool,
+		SourceSchema:  sourceSchemaTranscript,
+		SourceVersion: fallbackString(record.Version, unavailable),
+		ActorID:       unavailable,
+		DeviceID:      unavailable,
+		SessionID:     sessionID,
+		PrivacyLevel:  "operational",
+		Attributes: map[string]any{
+			"unavailable_fields": userMessageUnavailableFields(),
+		},
+		ProviderExtensions: map[string]any{
+			"correlation": transcriptCorrelation(eventID, occurredAt, uuid, trimmedParentUUID(record.ParentUUID)),
+			"transcript":  envelope,
+		},
+	}, true
+}
+
+// userMessageUnavailableFields lists the content signals a user event does not
+// carry. prompt_content is pruned because the user event carries the raw prompt.
+func userMessageUnavailableFields() []string {
+	return removeUnavailableField(transcriptContentFields, "prompt_content")
+}
+
+// transcriptUserContent extracts the raw text content of a user record. content is
+// a bare string for an ordinary or slash-command-expanded prompt, or an array of
+// blocks for a tool turn — only text blocks are prompt content (a tool_result body
+// rides on the paired tool Operation, not here). Several text blocks are joined
+// with a newline. An empty or non-text-bearing record yields "".
+func transcriptUserContent(line []byte) string {
+	var envelope transcriptContentEnvelope
+	if err := json.Unmarshal(line, &envelope); err != nil || envelope.Message == nil {
+		return ""
+	}
+	raw := envelope.Message.Content
+	if len(raw) == 0 {
+		return ""
+	}
+	var text string
+	if err := json.Unmarshal(raw, &text); err == nil {
+		// Trim only to decide whether the prompt is empty; the stored value is the
+		// original string so leading/trailing whitespace survives verbatim (#87).
+		if strings.TrimSpace(text) == "" {
+			return ""
+		}
+		return text
+	}
+	var blocks []transcriptContentBlock
+	if err := json.Unmarshal(raw, &blocks); err != nil {
+		return ""
+	}
+	var texts []string
+	for _, block := range blocks {
+		if block.Type == "text" && strings.TrimSpace(block.Text) != "" {
+			texts = append(texts, block.Text)
+		}
+	}
+	return strings.Join(texts, "\n")
 }
 
 // addTokenCounts stamps the numeric token signals under the same canonical
@@ -333,7 +512,7 @@ func transcriptCorrelation(eventID string, occurredAt time.Time, uuid string, pa
 		"parent_uuid":  parent,
 		"task_boundary": map[string]any{
 			"confidence": "unknown",
-			"reason":     "Claude Code transcript assistant records have no reviewed task-boundary signal",
+			"reason":     "Claude Code transcript records have no reviewed task-boundary signal",
 		},
 	}
 }

@@ -1,0 +1,272 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "operation_id": "claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_bash",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "category": "shell command",
+    "outcome": "success",
+    "provenance": "observed",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_bash",
+        "ordering_key": "01789210805000000000:claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_bash",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript tool_use records have no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "parent_uuid": "a5000000-0000-4000-8000-000000000005",
+        "tool_name": "Bash",
+        "tool_use_id": "toolu_bash"
+      },
+      "tool_call": {
+        "input": {
+          "command": "go test ./internal/app/"
+        },
+        "result": [
+          {
+            "text": "ok  internal/app  0.2s",
+            "type": "text"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "operation_id": "claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_edit",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "category": "filesystem write",
+    "outcome": "success",
+    "provenance": "observed",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_edit",
+        "ordering_key": "01789210803000000000:claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_edit",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript tool_use records have no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "parent_uuid": "a3000000-0000-4000-8000-000000000003",
+        "tool_name": "Edit",
+        "tool_use_id": "toolu_edit"
+      },
+      "tool_call": {
+        "input": {
+          "file_path": "internal/app/module.go",
+          "new_string": "// module: reviewed",
+          "old_string": "// module"
+        },
+        "result": [
+          {
+            "text": "Applied 1 edit.",
+            "type": "text"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "operation_id": "claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_grep",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "category": "filesystem read",
+    "outcome": "success",
+    "provenance": "observed",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_grep",
+        "ordering_key": "01789210808000000000:claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_grep",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript tool_use records have no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "is_sidechain": true,
+        "parent_uuid": "a8000000-0000-4000-8000-000000000008",
+        "tool_name": "Grep",
+        "tool_use_id": "toolu_grep"
+      },
+      "tool_call": {
+        "input": {
+          "path": "internal",
+          "pattern": "TODO"
+        },
+        "result": [
+          {
+            "text": "internal/app/module.go:1:// TODO",
+            "type": "text"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "operation_id": "claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_read",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "category": "filesystem read",
+    "outcome": "success",
+    "provenance": "observed",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_read",
+        "ordering_key": "01789210801000000000:claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_read",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript tool_use records have no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "parent_uuid": "a1000000-0000-4000-8000-000000000001",
+        "tool_name": "Read",
+        "tool_use_id": "toolu_read"
+      },
+      "tool_call": {
+        "input": {
+          "file_path": "internal/app/module.go"
+        },
+        "result": [
+          {
+            "text": "package app\n// module",
+            "type": "text"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "operation_id": "claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_task",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "category": "unknown",
+    "outcome": "success",
+    "provenance": "observed",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_task",
+        "ordering_key": "01789210807000000000:claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_task",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript tool_use records have no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "parent_uuid": "a7000000-0000-4000-8000-000000000007",
+        "tool_name": "Task",
+        "tool_use_id": "toolu_task"
+      },
+      "tool_call": {
+        "input": {
+          "description": "Find TODOs",
+          "prompt": "Search the repo for TODO comments.",
+          "subagent_type": "Explore"
+        },
+        "result": [
+          {
+            "text": "Found 1 TODO.",
+            "type": "text"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "operation_id": "claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_todo",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "category": "unknown",
+    "outcome": "success",
+    "provenance": "observed",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_todo",
+        "ordering_key": "01789210805000000000:claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_todo",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript tool_use records have no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "parent_uuid": "a5000000-0000-4000-8000-000000000005",
+        "tool_name": "TodoWrite",
+        "tool_use_id": "toolu_todo"
+      },
+      "tool_call": {
+        "input": {
+          "todos": [
+            {
+              "activeForm": "Reviewing module",
+              "content": "Review module",
+              "status": "completed"
+            },
+            {
+              "activeForm": "Recording notes",
+              "content": "Record notes",
+              "status": "in_progress"
+            }
+          ]
+        },
+        "result": [
+          {
+            "text": "Todos updated",
+            "type": "text"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "operation_id": "claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_write",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "category": "filesystem write",
+    "outcome": "success",
+    "provenance": "observed",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_write",
+        "ordering_key": "01789210803000000000:claude-code:33333333-3333-4333-8333-333333333333:tool:toolu_write",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript tool_use records have no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "parent_uuid": "a3000000-0000-4000-8000-000000000003",
+        "tool_name": "Write",
+        "tool_use_id": "toolu_write"
+      },
+      "tool_call": {
+        "input": {
+          "content": "# Notes\nReviewed the module.",
+          "file_path": "internal/app/notes.md"
+        },
+        "result": [
+          {
+            "text": "Wrote 2 lines.",
+            "type": "text"
+          }
+        ]
+      }
+    }
+  }
+]

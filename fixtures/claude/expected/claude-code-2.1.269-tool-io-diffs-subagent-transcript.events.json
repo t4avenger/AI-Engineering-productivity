@@ -1,0 +1,656 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:33333333-3333-4333-8333-333333333333:a1000000-0000-4000-8000-000000000001",
+    "event_type": "user_message",
+    "occurred_at": "2026-09-12T11:00:00Z",
+    "received_at": "2026-09-12T11:00:11Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "response_content",
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:a1000000-0000-4000-8000-000000000001",
+        "ordering_key": "01789210800000000000:claude-code:33333333-3333-4333-8333-333333333333:a1000000-0000-4000-8000-000000000001",
+        "parent_uuid": null,
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "a1000000-0000-4000-8000-000000000001"
+      },
+      "transcript": {
+        "entrypoint": "cli",
+        "git_branch": "main",
+        "is_sidechain": false,
+        "prompt_content": "\u003ccommand-name\u003e/review\u003c/command-name\u003e\n\u003ccommand-message\u003ereview\u003c/command-message\u003e\n\u003ccommand-args\u003e\u003c/command-args\u003e\nReview the recent changes and record a todo.",
+        "user_type": "external"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:33333333-3333-4333-8333-333333333333:a2000000-0000-4000-8000-000000000002",
+    "event_type": "assistant_message",
+    "occurred_at": "2026-09-12T11:00:01Z",
+    "received_at": "2026-09-12T11:00:11Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cache_write_input_token_count": 40,
+      "cached_input_token_count": 900,
+      "input_token_count": 1200,
+      "model": "claude-opus-4-8",
+      "output_token_count": 80,
+      "unavailable_fields": [
+        "prompt_content",
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:a2000000-0000-4000-8000-000000000002",
+        "ordering_key": "01789210801000000000:claude-code:33333333-3333-4333-8333-333333333333:a2000000-0000-4000-8000-000000000002",
+        "parent_uuid": "a1000000-0000-4000-8000-000000000001",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "a2000000-0000-4000-8000-000000000002"
+      },
+      "transcript": {
+        "entrypoint": "cli",
+        "git_branch": "main",
+        "is_sidechain": false,
+        "response_content": "I'll review and update the module.",
+        "thinking": "Plan: read the module, edit it, write notes, run tests.",
+        "user_type": "external"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_read",
+    "event_type": "tool_call",
+    "occurred_at": "2026-09-12T11:00:01Z",
+    "received_at": "2026-09-12T11:00:11Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "category": "filesystem read",
+      "tool": {
+        "file_path": "internal/app/module.go",
+        "tool_name": "Read",
+        "tool_use_id": "toolu_read"
+      },
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_read",
+        "ordering_key": "01789210801000000000:claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_read",
+        "parent_uuid": "a1000000-0000-4000-8000-000000000001",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "a2000000-0000-4000-8000-000000000002"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:33333333-3333-4333-8333-333333333333:a4000000-0000-4000-8000-000000000004",
+    "event_type": "assistant_message",
+    "occurred_at": "2026-09-12T11:00:03Z",
+    "received_at": "2026-09-12T11:00:11Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cache_write_input_token_count": 40,
+      "cached_input_token_count": 900,
+      "input_token_count": 1200,
+      "model": "claude-opus-4-8",
+      "output_token_count": 80,
+      "unavailable_fields": [
+        "prompt_content",
+        "response_content",
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:a4000000-0000-4000-8000-000000000004",
+        "ordering_key": "01789210803000000000:claude-code:33333333-3333-4333-8333-333333333333:a4000000-0000-4000-8000-000000000004",
+        "parent_uuid": "a3000000-0000-4000-8000-000000000003",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "a4000000-0000-4000-8000-000000000004"
+      },
+      "transcript": {
+        "entrypoint": "cli",
+        "git_branch": "main",
+        "is_sidechain": false,
+        "user_type": "external"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_edit",
+    "event_type": "tool_call",
+    "occurred_at": "2026-09-12T11:00:03Z",
+    "received_at": "2026-09-12T11:00:11Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "category": "filesystem write",
+      "tool": {
+        "file_path": "internal/app/module.go",
+        "tool_name": "Edit",
+        "tool_use_id": "toolu_edit"
+      },
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_edit",
+        "ordering_key": "01789210803000000000:claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_edit",
+        "parent_uuid": "a3000000-0000-4000-8000-000000000003",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "a4000000-0000-4000-8000-000000000004"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_write",
+    "event_type": "tool_call",
+    "occurred_at": "2026-09-12T11:00:03Z",
+    "received_at": "2026-09-12T11:00:11Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "category": "filesystem write",
+      "tool": {
+        "file_path": "internal/app/notes.md",
+        "tool_name": "Write",
+        "tool_use_id": "toolu_write"
+      },
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_write",
+        "ordering_key": "01789210803000000000:claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_write",
+        "parent_uuid": "a3000000-0000-4000-8000-000000000003",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "a4000000-0000-4000-8000-000000000004"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:33333333-3333-4333-8333-333333333333:a6000000-0000-4000-8000-000000000006",
+    "event_type": "assistant_message",
+    "occurred_at": "2026-09-12T11:00:05Z",
+    "received_at": "2026-09-12T11:00:11Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cache_write_input_token_count": 40,
+      "cached_input_token_count": 900,
+      "input_token_count": 1200,
+      "model": "claude-opus-4-8",
+      "output_token_count": 80,
+      "unavailable_fields": [
+        "prompt_content",
+        "response_content",
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:a6000000-0000-4000-8000-000000000006",
+        "ordering_key": "01789210805000000000:claude-code:33333333-3333-4333-8333-333333333333:a6000000-0000-4000-8000-000000000006",
+        "parent_uuid": "a5000000-0000-4000-8000-000000000005",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "a6000000-0000-4000-8000-000000000006"
+      },
+      "transcript": {
+        "entrypoint": "cli",
+        "git_branch": "main",
+        "is_sidechain": false,
+        "user_type": "external"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_bash",
+    "event_type": "tool_call",
+    "occurred_at": "2026-09-12T11:00:05Z",
+    "received_at": "2026-09-12T11:00:11Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "category": "shell command",
+      "tool": {
+        "full_command": "go test ./internal/app/",
+        "tool_name": "Bash",
+        "tool_use_id": "toolu_bash"
+      },
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_bash",
+        "ordering_key": "01789210805000000000:claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_bash",
+        "parent_uuid": "a5000000-0000-4000-8000-000000000005",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "a6000000-0000-4000-8000-000000000006"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_todo",
+    "event_type": "tool_call",
+    "occurred_at": "2026-09-12T11:00:05Z",
+    "received_at": "2026-09-12T11:00:11Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "category": "unknown",
+      "tool": {
+        "tool_name": "TodoWrite",
+        "tool_use_id": "toolu_todo"
+      },
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_todo",
+        "ordering_key": "01789210805000000000:claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_todo",
+        "parent_uuid": "a5000000-0000-4000-8000-000000000005",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "a6000000-0000-4000-8000-000000000006"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:33333333-3333-4333-8333-333333333333:a8000000-0000-4000-8000-000000000008",
+    "event_type": "assistant_message",
+    "occurred_at": "2026-09-12T11:00:07Z",
+    "received_at": "2026-09-12T11:00:11Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cache_write_input_token_count": 40,
+      "cached_input_token_count": 900,
+      "input_token_count": 1200,
+      "model": "claude-opus-4-8",
+      "output_token_count": 80,
+      "unavailable_fields": [
+        "prompt_content",
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:a8000000-0000-4000-8000-000000000008",
+        "ordering_key": "01789210807000000000:claude-code:33333333-3333-4333-8333-333333333333:a8000000-0000-4000-8000-000000000008",
+        "parent_uuid": "a7000000-0000-4000-8000-000000000007",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "a8000000-0000-4000-8000-000000000008"
+      },
+      "transcript": {
+        "entrypoint": "cli",
+        "git_branch": "main",
+        "is_sidechain": false,
+        "response_content": "Delegating a search to a sub-agent.",
+        "user_type": "external"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_task",
+    "event_type": "tool_call",
+    "occurred_at": "2026-09-12T11:00:07Z",
+    "received_at": "2026-09-12T11:00:11Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "category": "unknown",
+      "tool": {
+        "subagent_type": "Explore",
+        "tool_name": "Task",
+        "tool_use_id": "toolu_task"
+      },
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_task",
+        "ordering_key": "01789210807000000000:claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_task",
+        "parent_uuid": "a7000000-0000-4000-8000-000000000007",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "a8000000-0000-4000-8000-000000000008"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:33333333-3333-4333-8333-333333333333:a9000000-0000-4000-8000-000000000009",
+    "event_type": "assistant_message",
+    "occurred_at": "2026-09-12T11:00:08Z",
+    "received_at": "2026-09-12T11:00:11Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cache_write_input_token_count": 40,
+      "cached_input_token_count": 900,
+      "input_token_count": 1200,
+      "model": "claude-opus-4-8",
+      "output_token_count": 80,
+      "unavailable_fields": [
+        "prompt_content",
+        "response_content",
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:a9000000-0000-4000-8000-000000000009",
+        "ordering_key": "01789210808000000000:claude-code:33333333-3333-4333-8333-333333333333:a9000000-0000-4000-8000-000000000009",
+        "parent_uuid": "a8000000-0000-4000-8000-000000000008",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "a9000000-0000-4000-8000-000000000009"
+      },
+      "transcript": {
+        "entrypoint": "cli",
+        "git_branch": "main",
+        "is_sidechain": true,
+        "thinking": "Searching for TODO markers in internal.",
+        "user_type": "external"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_grep",
+    "event_type": "tool_call",
+    "occurred_at": "2026-09-12T11:00:08Z",
+    "received_at": "2026-09-12T11:00:11Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:33333333-3333-4333-8333-333333333333",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "category": "filesystem read",
+      "tool": {
+        "tool_name": "Grep",
+        "tool_use_id": "toolu_grep"
+      },
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_grep",
+        "ordering_key": "01789210808000000000:claude-code:33333333-3333-4333-8333-333333333333:toolcall:toolu_grep",
+        "parent_uuid": "a8000000-0000-4000-8000-000000000008",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "a9000000-0000-4000-8000-000000000009"
+      },
+      "transcript": {
+        "is_sidechain": true
+      }
+    }
+  }
+]
