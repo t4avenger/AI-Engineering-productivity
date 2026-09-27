@@ -35,7 +35,11 @@ event access remain available for every retained row.
 Session list and detail responses include an `availability` object for the
 shared cross-tool fields rendered by the dashboard: `provider`, `tool`,
 `outcome`, `started_at`, `completed_at`, `model`, `entrypoint`,
-`git_branch`, `pr_link`, `tool_version`, `observed_events`, and `token_usage`.
+`git_branch`, `pr_link`, `tool_version`, `observed_events`, `token_usage`, and
+`conversation`. `conversation` is `observed` when the session retains at least one
+projected conversation content event (`user_prompt`, `assistant_response`,
+`api_request_body`, or `api_response_body`) and `unavailable` otherwise, so a
+trace-only session reports `conversation: unavailable` without any heuristic join.
 Values are `observed`, `partial`, `unavailable`, `unsupported`, or `unknown`.
 The UI must render non-observed states as labelled cells, never as blanks or
 numeric zeroes.

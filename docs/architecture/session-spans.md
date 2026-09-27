@@ -57,4 +57,10 @@ IDs return `404 session_not_found`; unavailable session/event storage returns
 
 The reviewed Claude Code surface is OTLP enhanced-telemetry 2.1.268 traces;
 Claude uses provider `session.id` when observed and otherwise keeps a
-trace-scoped session. The reviewed Codex trace surfaces are CLI 0.154.0, which remains trace-only, and CLI 0.155.1, whose resource-level `conversation.id` exactly matched same-run logs in the committed fixture. Other versions and traces without that key remain `codex:trace:<trace-id>` observations; consumers must display unavailable rather than infer a join.
+trace-scoped session. That join is fixture-backed across surfaces from one
+version-pinned run (v2.1.283): the trace spans, the content logs, and the on-disk
+transcript share one raw `session.id`, so a provider session exposes both the
+trace spans and the projected conversation, while a span with no `session.id`
+stays a `claude-code:trace:<trace-id>` observation and is never merged by
+timestamp, model, or prompt (`TestClaudeTraceLogShareSessionJoinAndConversation`,
+`TestClaudeTraceOnlyStaysSeparateObservation`). The reviewed Codex trace surfaces are CLI 0.154.0, which remains trace-only, and CLI 0.155.1, whose resource-level `conversation.id` exactly matched same-run logs in the committed fixture. Other versions and traces without that key remain `codex:trace:<trace-id>` observations; consumers must display unavailable rather than infer a join.

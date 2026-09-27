@@ -651,6 +651,64 @@ export function claudeToolSpanFilePathOTLPTraces(): string {
   });
 }
 
+// claudeInteractionOTLPTraces builds a single claude_code.interaction root span.
+// When sessionId is provided the span carries session.id (so it joins the
+// matching content logs into one provider session); when it is omitted the span
+// has no session.id and the normaliser keeps a trace-scoped observation
+// (claude-code:trace:<traceId>). Used by the #210 correlation e2e for both the
+// joined and trace-only-unavailable states.
+export function claudeInteractionOTLPTraces(opts: {
+  traceId: string;
+  spanId: string;
+  sessionId?: string;
+}): string {
+  const attributes: OTLPAttribute[] = [
+    { key: 'span.type', value: { stringValue: 'interaction' } },
+    { key: 'interaction.sequence', value: { intValue: '1' } },
+    { key: 'interaction.duration_ms', value: { intValue: '1375' } },
+  ];
+  if (opts.sessionId) {
+    attributes.unshift({
+      key: 'session.id',
+      value: { stringValue: opts.sessionId },
+    });
+  }
+  return JSON.stringify({
+    resourceSpans: [
+      {
+        resource: {
+          attributes: [
+            { key: 'service.name', value: { stringValue: 'claude-code' } },
+            { key: 'service.version', value: { stringValue: '2.1.283' } },
+            { key: 'host.arch', value: { stringValue: 'amd64' } },
+            { key: 'os.type', value: { stringValue: 'linux' } },
+          ],
+        },
+        scopeSpans: [
+          {
+            scope: {
+              name: 'com.anthropic.claude_code.tracing',
+              version: '1.0.0',
+            },
+            spans: [
+              {
+                traceId: opts.traceId,
+                spanId: opts.spanId,
+                name: 'claude_code.interaction',
+                kind: 1,
+                startTimeUnixNano: '1790501729743000000',
+                endTimeUnixNano: '1790501731117935312',
+                attributes,
+                status: { code: 0 },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
+
 // Claude enhanced-telemetry Bash tool span whose raw full_command carries a
 // verbatim pull-request URL (#183). Proves the shared provider-agnostic
 // extractor (normalize.AttachPRLinkEvidence) promotes availability.pr_link to
@@ -1084,8 +1142,9 @@ function claudeOTLPLogs(logRecords: Array<{ attributes: OTLPAttribute[] }>): str
 // claudeContentOTLPLogs uses the reviewed content-bearing Claude log shape.
 // Its values are synthetic and intentionally asserted as retained local content
 // by the #188 daemon-to-UI gate.
-export function claudeContentOTLPLogs(): string {
-  const sessionId = 'tiq-live-e2e-conversation-content';
+export function claudeContentOTLPLogs(
+  sessionId = 'tiq-live-e2e-conversation-content',
+): string {
   const contentEvents = [
     ['user_prompt', '2026-09-19T12:00:00Z', '1', 'prompt', 'tiq-live-e2e retained user\nsecond line'],
     ['assistant_response', '2026-09-19T12:00:01Z', '2', 'response', '<REDACTED>'],
