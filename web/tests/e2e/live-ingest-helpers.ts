@@ -635,11 +635,13 @@ function claudeToolSpanOTLPTraces(opts: {
 
 // Claude enhanced-telemetry tool span with a retained file_path (#156 / T06).
 // Session id is live-e2e-specific so file evidence assertions stay isolated.
-export function claudeToolSpanFilePathOTLPTraces(): string {
+export function claudeToolSpanFilePathOTLPTraces(
+  sessionId = 'tiq-live-e2e-session-files',
+): string {
   return claudeToolSpanOTLPTraces({
     traceId: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
     spanId: 'aaaaaaaaaaaaaaaa',
-    sessionId: 'tiq-live-e2e-session-files',
+    sessionId,
     toolName: 'Read',
     toolUseId: 'toolu_live_session_files_read',
     extraAttributes: [
@@ -1144,11 +1146,16 @@ function claudeOTLPLogs(logRecords: Array<{ attributes: OTLPAttribute[] }>): str
 // by the #188 daemon-to-UI gate.
 export function claudeContentOTLPLogs(
   sessionId = 'tiq-live-e2e-conversation-content',
+  timestamps = [
+    '2026-09-19T12:00:00Z',
+    '2026-09-19T12:00:01Z',
+    '2026-09-19T12:00:02Z',
+  ],
 ): string {
   const contentEvents = [
-    ['user_prompt', '2026-09-19T12:00:00Z', '1', 'prompt', 'tiq-live-e2e retained user\nsecond line'],
-    ['assistant_response', '2026-09-19T12:00:01Z', '2', 'response', '<REDACTED>'],
-    ['api_response_body', '2026-09-19T12:00:02Z', '3', 'body', 'tiq-live-e2e raw API evidence'],
+    ['user_prompt', timestamps[0], '1', 'prompt', 'tiq-live-e2e retained user\nsecond line'],
+    ['assistant_response', timestamps[1], '2', 'response', '<REDACTED>'],
+    ['api_response_body', timestamps[2], '3', 'body', 'tiq-live-e2e raw API evidence'],
   ];
   return claudeOTLPLogs(
     contentEvents.map(([eventName, timestamp, sequence, contentKey, content]) =>

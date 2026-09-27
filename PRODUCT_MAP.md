@@ -1422,7 +1422,7 @@ From a clean machine or clean environment, install and complete the core session
 Independently verify cost examples. Confirm unknown costs never become zero and every insight links to evidence. Run boundary, property-based where useful, and regression tests.
 
 #### Phase 4 checkpoint: safe governance reporting
-Run all synthetic policy scenarios. Confirm `indeterminate` handling, no false certainty, no raw secret persistence, and no blocking action is performed.
+Run all synthetic policy scenarios. Confirm `indeterminate` handling, no false certainty, retained raw synthetic capture under §11.3, no diagnostic or export leakage, and no blocking action is performed.
 
 #### Phase 5 checkpoint: private-alpha readiness
 Complete installation, uninstall, upgrade, rollback, support-bundle, threat-model, compatibility, performance, and exploratory usability testing. Resolve all release-blocking defects.
