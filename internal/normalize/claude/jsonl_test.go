@@ -24,6 +24,14 @@ func FuzzNormalizeTranscript(f *testing.F) {
 	f.Add([]byte(`{"type":"assistant","uuid":"a1","sessionId":"s1","timestamp":"2026-09-12T09:00:00Z","version":"2.1.269","message":{"model":"claude-opus-4-8","content":[{"type":"tool_use","id":"t1","name":"mcp__srv__do","input":{"k":"v"}}]}}` +
 		"\n" +
 		`{"type":"user","uuid":"u1","sessionId":"s1","timestamp":"2026-09-12T09:00:01Z","message":{"content":[{"type":"tool_result","tool_use_id":"t1","is_error":true,"content":[{"type":"text","text":"x"}]}]}}`))
+	// Generic tool IO added by J18 (#105): a thinking block, an Edit diff, a
+	// TodoWrite snapshot, and a sidechain (sub-agent) Task tool_use — exercises the
+	// generalized collector, content decode, and the user_message/thinking paths.
+	f.Add([]byte(`{"type":"assistant","uuid":"a1","sessionId":"s1","timestamp":"2026-09-12T09:00:00Z","version":"2.1.269","message":{"model":"claude-opus-4-8","content":[{"type":"thinking","thinking":"reason"},{"type":"tool_use","id":"e1","name":"Edit","input":{"file_path":"a.go","old_string":"x","new_string":"y"}},{"type":"tool_use","id":"w1","name":"TodoWrite","input":{"todos":[{"content":"do it","status":"pending"}]}}]}}` +
+		"\n" +
+		`{"type":"user","uuid":"u1","sessionId":"s1","timestamp":"2026-09-12T09:00:01Z","message":{"content":"/review the diff"}}` +
+		"\n" +
+		`{"type":"assistant","uuid":"a2","sessionId":"s1","timestamp":"2026-09-12T09:00:02Z","version":"2.1.269","isSidechain":true,"parentUuid":"a1","message":{"model":"claude-opus-4-8","content":[{"type":"tool_use","id":"g1","name":"Grep","input":{"pattern":"TODO"}}]}}`))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		_, _ = NormalizeTranscript(data, time.Unix(0, 0).UTC())
 		_, _ = ExtractTranscriptOperations(data, time.Unix(0, 0).UTC())
@@ -38,7 +46,15 @@ func FuzzNormalizeTranscript(f *testing.F) {
 // through float64 before reaching NormalizeTranscript.
 func transcriptFixtureNDJSON(t *testing.T, name string) []byte {
 	t.Helper()
-	decoder := json.NewDecoder(strings.NewReader(string(readFixture(t, name))))
+	return transcriptFixtureNDJSONFrom(t, "observed-sanitised", name)
+}
+
+// transcriptFixtureNDJSONFrom is transcriptFixtureNDJSON reading from an explicit
+// fixture subdir (observed-sanitised or synthetic), so a hand-constructed synthetic
+// transcript can be replayed the same way as a captured one.
+func transcriptFixtureNDJSONFrom(t *testing.T, subdir, name string) []byte {
+	t.Helper()
+	decoder := json.NewDecoder(strings.NewReader(string(readFixtureFrom(t, subdir, name))))
 	decoder.UseNumber()
 	var document map[string]any
 	if err := decoder.Decode(&document); err != nil {
@@ -85,19 +101,44 @@ func TestNormalizeTranscriptGolden(t *testing.T) {
 	assertMatchesGolden(t, "claude-code-2.1.269-session-transcript.events.json", first)
 }
 
-// assertTranscriptAssistantEvents proves F4's core contract: only the assistant
-// records become events (user/system/auxiliary are parsed-and-skipped), they
+// assertTranscriptAssistantEvents proves F4's core contract: the assistant records
+// become assistant_message events (system/auxiliary are parsed-and-skipped, while a
+// content-bearing user record becomes a user_message event, J18/#105), they
 // correlate by the in-record sessionId, and the model + token usage surface under
 // the shared canonical attribute keys.
 func assertTranscriptAssistantEvents(t *testing.T, events []canonical.Event) {
 	t.Helper()
-	if len(events) != 2 {
-		t.Fatalf("event count = %d, want 2 assistant records", len(events))
+	assistants := eventsOfType(events, eventTypeAssistantMessage)
+	if len(assistants) != 2 {
+		t.Fatalf("assistant event count = %d, want 2 assistant records", len(assistants))
 	}
-	for _, event := range events {
+	for _, event := range assistants {
 		assertTranscriptEventShape(t, event)
 	}
-	assertTranscriptTokenAttributes(t, events[0])
+	assertTranscriptTokenAttributes(t, assistants[0])
+}
+
+// eventsOfType returns the events of a given type in their existing (time-sorted)
+// order, so a case can assert over one record type in a mixed event stream.
+func eventsOfType(events []canonical.Event, eventType string) []canonical.Event {
+	var matched []canonical.Event
+	for _, event := range events {
+		if event.EventType == eventType {
+			matched = append(matched, event)
+		}
+	}
+	return matched
+}
+
+// firstEventOfType returns the first event of a given type, failing the test when
+// none is present.
+func firstEventOfType(t *testing.T, events []canonical.Event, eventType string) canonical.Event {
+	t.Helper()
+	matched := eventsOfType(events, eventType)
+	if len(matched) == 0 {
+		t.Fatalf("no %s event in %d events", eventType, len(events))
+	}
+	return matched[0]
 }
 
 func assertTranscriptEventShape(t *testing.T, event canonical.Event) {
@@ -151,9 +192,10 @@ func TestNormalizeTranscriptCorrelation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NormalizeTranscript: %v", err)
 	}
-	correlation, ok := events[0].ProviderExtensions["correlation"].(map[string]any)
+	event := firstEventOfType(t, events, eventTypeAssistantMessage)
+	correlation, ok := event.ProviderExtensions["correlation"].(map[string]any)
 	if !ok {
-		t.Fatalf("missing correlation: %#v", events[0].ProviderExtensions)
+		t.Fatalf("missing correlation: %#v", event.ProviderExtensions)
 	}
 	if correlation["uuid"] != "bbbbbbbb-0000-4000-8000-000000000002" {
 		t.Fatalf("uuid = %#v", correlation["uuid"])
@@ -161,15 +203,16 @@ func TestNormalizeTranscriptCorrelation(t *testing.T) {
 	if correlation["parent_uuid"] != "aaaaaaaa-0000-4000-8000-000000000001" {
 		t.Fatalf("parent_uuid = %#v", correlation["parent_uuid"])
 	}
-	if events[0].EventID != "claude-code:11111111-1111-4111-8111-111111111111:bbbbbbbb-0000-4000-8000-000000000002" {
-		t.Fatalf("event id = %q", events[0].EventID)
+	if event.EventID != "claude-code:11111111-1111-4111-8111-111111111111:bbbbbbbb-0000-4000-8000-000000000002" {
+		t.Fatalf("event id = %q", event.EventID)
 	}
 }
 
-// TestNormalizeTranscriptSkipsUnknownAndBlank proves the type set is open: user,
-// system, auxiliary, and unrecognised types are skipped (never hard-fail), and
-// blank lines between records are ignored — so a content-heavy out-of-scope
-// record can never fail F4.
+// TestNormalizeTranscriptSkipsUnknownAndBlank proves the type set is open: system,
+// auxiliary, and unrecognised types are skipped (never hard-fail), and blank lines
+// between records are ignored — so a content-heavy out-of-scope record can never
+// fail F4. A content-bearing user record does become a user_message event now
+// (J18/#105), so exactly that one event is emitted here.
 func TestNormalizeTranscriptSkipsUnknownAndBlank(t *testing.T) {
 	data := []byte(strings.Join([]string{
 		`{"type":"user","uuid":"u1","sessionId":"s1","timestamp":"2026-09-12T09:00:00Z","message":{"content":"hi"}}`,
@@ -182,8 +225,14 @@ func TestNormalizeTranscriptSkipsUnknownAndBlank(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NormalizeTranscript: %v", err)
 	}
-	if len(events) != 0 {
-		t.Fatalf("event count = %d, want 0 (no assistant records)", len(events))
+	if len(events) != 1 {
+		t.Fatalf("event count = %d, want 1 (the user prompt; unknown/system/blank skipped)", len(events))
+	}
+	if events[0].EventType != eventTypeUserMessage {
+		t.Fatalf("event type = %q, want user_message", events[0].EventType)
+	}
+	if events[0].ProviderExtensions["transcript"].(map[string]any)["prompt_content"] != "hi" {
+		t.Fatalf("prompt_content = %#v, want the raw prompt", events[0].ProviderExtensions["transcript"])
 	}
 }
 
@@ -238,56 +287,94 @@ func TestNormalizeTranscriptMalformedAssistantAbortsImport(t *testing.T) {
 	}
 }
 
-// TestNormalizeTranscriptDoesNotEmitContent is the canary-leakage guard. It is
-// built from direct in-test NDJSON (NOT the committed fixture, which cannot hold
-// prohibited field names and still pass fixture.Validate): an assistant record
-// whose message.content[], tool input.command/file_path, and toolUseResult carry
-// fake secrets and content. None of it may appear in the marshalled events —
-// F4 reads only the model and numeric usage.
-func TestNormalizeTranscriptDoesNotEmitContent(t *testing.T) {
-	line := `{` +
-		`"type":"assistant","uuid":"a1","sessionId":"s1","timestamp":"2026-09-12T09:00:00Z","version":"2.1.269",` +
-		`"cwd":"/home/tiq-canary-user/secret-project",` +
-		`"message":{"role":"assistant","model":"claude-opus-4-8",` +
-		`"content":[` +
-		`{"type":"text","text":"tiq-canary-response-body"},` +
-		`{"type":"thinking","thinking":"tiq-canary-thinking-body"},` +
-		`{"type":"tool_use","name":"Bash","input":{"command":"tiq-canary-command"}},` +
-		`{"type":"tool_use","name":"Edit","input":{"file_path":"/tiq-canary-path","oldString":"tiq-canary-old","newString":"tiq-canary-new"}}` +
-		`],` +
-		`"usage":{"input_tokens":10,"output_tokens":20}},` +
-		`"toolUseResult":{"stdout":"tiq-canary-stdout"}` +
-		`}`
-	events, err := NormalizeTranscript([]byte(line), time.Now().UTC())
+// TestNormalizeTranscriptCapturesContentRaw is the raw-capture invariant guard
+// (epic #87, superseding the pre-#88 content-free canary this replaces). It is
+// built from direct in-test NDJSON (NOT the committed fixture, which is scanned
+// for likely secret values): an assistant record with response text, thinking,
+// and Bash/Edit tool_use blocks, plus the paired user tool_result. The behaviour
+// content IS now captured — response + thinking on the assistant event, the raw
+// file_path/full_command on the tool_call event, and the full input body (Edit
+// diff strings) + result on the Operation. What stays excluded is cwd (out of the
+// six named signals — flagged as follow-up), never emitted on either surface.
+func TestNormalizeTranscriptCapturesContentRaw(t *testing.T) {
+	data := []byte(strings.Join([]string{
+		`{` +
+			`"type":"assistant","uuid":"a1","sessionId":"s1","timestamp":"2026-09-12T09:00:00Z","version":"2.1.269",` +
+			`"cwd":"/home/tiq-canary-user/secret-project",` +
+			`"message":{"role":"assistant","model":"claude-opus-4-8",` +
+			`"content":[` +
+			`{"type":"text","text":"tiq-canary-response-body"},` +
+			`{"type":"thinking","thinking":"tiq-canary-thinking-body"},` +
+			`{"type":"tool_use","id":"toolu_bash","name":"Bash","input":{"command":"tiq-canary-command"}},` +
+			`{"type":"tool_use","id":"toolu_edit","name":"Edit","input":{"file_path":"/tiq-canary-path","old_string":"tiq-canary-old","new_string":"tiq-canary-new"}}` +
+			`],` +
+			`"usage":{"input_tokens":10,"output_tokens":20}}` +
+			`}`,
+		`{"type":"user","uuid":"u1","sessionId":"s1","timestamp":"2026-09-12T09:00:01Z",` +
+			`"message":{"content":[{"type":"tool_result","tool_use_id":"toolu_bash","is_error":false,` +
+			`"content":[{"type":"text","text":"tiq-canary-stdout"}]}]}}`,
+	}, "\n"))
+
+	events, err := NormalizeTranscript(data, time.Now().UTC())
 	if err != nil {
 		t.Fatalf("NormalizeTranscript: %v", err)
 	}
-	encoded, err := json.Marshal(events)
+	operations, err := ExtractTranscriptOperations(data, time.Now().UTC())
 	if err != nil {
-		t.Fatalf("marshal events: %v", err)
+		t.Fatalf("ExtractTranscriptOperations: %v", err)
 	}
-	for _, leaked := range []string{
+	eventsJSON := marshalForCanary(t, events)
+	opsJSON := marshalForCanary(t, operations)
+
+	// Raw content is captured on the event surface (epic #87): response + thinking
+	// on the assistant event; the raw command/path on the tool_call event.
+	for _, present := range []string{
 		"tiq-canary-response-body",
 		"tiq-canary-thinking-body",
+		"tiq-canary-command",
+		"tiq-canary-path",
+	} {
+		if !strings.Contains(eventsJSON, present) {
+			t.Fatalf("content %q must be captured on events (epic #87): %s", present, eventsJSON)
+		}
+	}
+	// The full input body (Edit diff strings) and the tool result ride on the
+	// Operation, raw and complete.
+	for _, present := range []string{
 		"tiq-canary-command",
 		"tiq-canary-path",
 		"tiq-canary-old",
 		"tiq-canary-new",
 		"tiq-canary-stdout",
-		"tiq-canary-user",
-		"secret-project",
 	} {
-		if strings.Contains(string(encoded), leaked) {
-			t.Fatalf("content %q leaked into events: %s", leaked, encoded)
+		if !strings.Contains(opsJSON, present) {
+			t.Fatalf("content %q must be captured on operations (epic #87): %s", present, opsJSON)
 		}
 	}
-	// The numeric usage and model are still captured — the drop is content-only.
-	if events[0].Attributes["model"] != "claude-opus-4-8" {
-		t.Fatalf("model dropped: %#v", events[0].Attributes["model"])
+	// cwd stays excluded on both surfaces — out of the six named signals.
+	for _, excluded := range []string{"tiq-canary-user", "secret-project"} {
+		if strings.Contains(eventsJSON, excluded) || strings.Contains(opsJSON, excluded) {
+			t.Fatalf("cwd content %q must not be emitted on either surface", excluded)
+		}
 	}
-	if events[0].Attributes["input_token_count"] != int64(10) {
-		t.Fatalf("input tokens dropped: %#v", events[0].Attributes["input_token_count"])
+	// The numeric usage and model are still captured alongside the raw content.
+	assistant := firstEventOfType(t, events, eventTypeAssistantMessage)
+	if assistant.Attributes["model"] != "claude-opus-4-8" {
+		t.Fatalf("model dropped: %#v", assistant.Attributes["model"])
 	}
+	if assistant.Attributes["input_token_count"] != int64(10) {
+		t.Fatalf("input tokens dropped: %#v", assistant.Attributes["input_token_count"])
+	}
+}
+
+// marshalForCanary renders a value to JSON for a substring-based capture assertion.
+func marshalForCanary(t *testing.T, value any) string {
+	t.Helper()
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	return string(encoded)
 }
 
 // TestNormalizeTranscriptPreservesLargeTokenCounts proves json.Number keeps

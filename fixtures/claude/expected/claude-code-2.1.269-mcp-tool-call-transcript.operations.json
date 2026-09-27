@@ -1,6 +1,41 @@
 [
   {
     "schema_version": "0.1.0",
+    "operation_id": "claude-code:22222222-2222-4222-8222-222222222222:tool:toolu_bash_ls",
+    "session_id": "claude-code:22222222-2222-4222-8222-222222222222",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "category": "shell command",
+    "outcome": "success",
+    "provenance": "observed",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:22222222-2222-4222-8222-222222222222:tool:toolu_bash_ls",
+        "ordering_key": "01789207202000000000:claude-code:22222222-2222-4222-8222-222222222222:tool:toolu_bash_ls",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript tool_use records have no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "tool_name": "Bash",
+        "tool_use_id": "toolu_bash_ls"
+      },
+      "tool_call": {
+        "input": {
+          "command": "ls docs"
+        },
+        "result": [
+          {
+            "text": "architecture\ndecisions",
+            "type": "text"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
     "operation_id": "claude-code:22222222-2222-4222-8222-222222222222:tool:toolu_mcp_pending",
     "session_id": "claude-code:22222222-2222-4222-8222-222222222222",
     "provider": "anthropic",

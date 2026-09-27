@@ -1,0 +1,416 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "synthetic",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.269",
+  "captured_at": "2026-09-12T11:00:11Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "source_type": "session_jsonl_transcript",
+    "capture": {
+      "workspace": "isolated_tmp",
+      "note": "Hand-constructed synthetic transcript: Edit/Write diffs, a TodoWrite snapshot, and a Task sub-agent sidechain are not reachable through the read-only capture harness, so this fixture is authored to exercise J18/#105 generic tool IO, thinking blocks, and slash-command expansion end to end."
+    },
+    "transcript_lines": [
+      {
+        "type": "user",
+        "uuid": "a1000000-0000-4000-8000-000000000001",
+        "parentUuid": null,
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:00.000Z",
+        "cwd": "/home/synthetic/project",
+        "gitBranch": "main",
+        "version": "2.1.269",
+        "userType": "external",
+        "isSidechain": false,
+        "entrypoint": "cli",
+        "message": {
+          "role": "user",
+          "content": "<command-name>/review</command-name>\n<command-message>review</command-message>\n<command-args></command-args>\nReview the recent changes and record a todo."
+        }
+      },
+      {
+        "type": "assistant",
+        "uuid": "a2000000-0000-4000-8000-000000000002",
+        "parentUuid": "a1000000-0000-4000-8000-000000000001",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:01.000Z",
+        "cwd": "/home/synthetic/project",
+        "gitBranch": "main",
+        "version": "2.1.269",
+        "userType": "external",
+        "isSidechain": false,
+        "entrypoint": "cli",
+        "message": {
+          "role": "assistant",
+          "model": "claude-opus-4-8",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Plan: read the module, edit it, write notes, run tests."
+            },
+            {
+              "type": "text",
+              "text": "I'll review and update the module."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_read",
+              "name": "Read",
+              "input": {
+                "file_path": "internal/app/module.go"
+              }
+            }
+          ],
+          "usage": {
+            "input_tokens": 1200,
+            "output_tokens": 80,
+            "cache_read_input_tokens": 900,
+            "cache_creation_input_tokens": 40
+          }
+        }
+      },
+      {
+        "type": "user",
+        "uuid": "a3000000-0000-4000-8000-000000000003",
+        "parentUuid": "a2000000-0000-4000-8000-000000000002",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:02.000Z",
+        "cwd": "/home/synthetic/project",
+        "gitBranch": "main",
+        "version": "2.1.269",
+        "userType": "external",
+        "isSidechain": false,
+        "entrypoint": "cli",
+        "message": {
+          "role": "user",
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_read",
+              "is_error": false,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "package app\n// module"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "type": "assistant",
+        "uuid": "a4000000-0000-4000-8000-000000000004",
+        "parentUuid": "a3000000-0000-4000-8000-000000000003",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:03.000Z",
+        "cwd": "/home/synthetic/project",
+        "gitBranch": "main",
+        "version": "2.1.269",
+        "userType": "external",
+        "isSidechain": false,
+        "entrypoint": "cli",
+        "message": {
+          "role": "assistant",
+          "model": "claude-opus-4-8",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_edit",
+              "name": "Edit",
+              "input": {
+                "file_path": "internal/app/module.go",
+                "old_string": "// module",
+                "new_string": "// module: reviewed"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_write",
+              "name": "Write",
+              "input": {
+                "file_path": "internal/app/notes.md",
+                "content": "# Notes\nReviewed the module."
+              }
+            }
+          ],
+          "usage": {
+            "input_tokens": 1200,
+            "output_tokens": 80,
+            "cache_read_input_tokens": 900,
+            "cache_creation_input_tokens": 40
+          }
+        }
+      },
+      {
+        "type": "user",
+        "uuid": "a5000000-0000-4000-8000-000000000005",
+        "parentUuid": "a4000000-0000-4000-8000-000000000004",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:04.000Z",
+        "cwd": "/home/synthetic/project",
+        "gitBranch": "main",
+        "version": "2.1.269",
+        "userType": "external",
+        "isSidechain": false,
+        "entrypoint": "cli",
+        "message": {
+          "role": "user",
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_edit",
+              "is_error": false,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Applied 1 edit."
+                }
+              ]
+            },
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_write",
+              "is_error": false,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Wrote 2 lines."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "type": "assistant",
+        "uuid": "a6000000-0000-4000-8000-000000000006",
+        "parentUuid": "a5000000-0000-4000-8000-000000000005",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:05.000Z",
+        "cwd": "/home/synthetic/project",
+        "gitBranch": "main",
+        "version": "2.1.269",
+        "userType": "external",
+        "isSidechain": false,
+        "entrypoint": "cli",
+        "message": {
+          "role": "assistant",
+          "model": "claude-opus-4-8",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_bash",
+              "name": "Bash",
+              "input": {
+                "command": "go test ./internal/app/"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_todo",
+              "name": "TodoWrite",
+              "input": {
+                "todos": [
+                  {
+                    "content": "Review module",
+                    "status": "completed",
+                    "activeForm": "Reviewing module"
+                  },
+                  {
+                    "content": "Record notes",
+                    "status": "in_progress",
+                    "activeForm": "Recording notes"
+                  }
+                ]
+              }
+            }
+          ],
+          "usage": {
+            "input_tokens": 1200,
+            "output_tokens": 80,
+            "cache_read_input_tokens": 900,
+            "cache_creation_input_tokens": 40
+          }
+        }
+      },
+      {
+        "type": "user",
+        "uuid": "a7000000-0000-4000-8000-000000000007",
+        "parentUuid": "a6000000-0000-4000-8000-000000000006",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:06.000Z",
+        "cwd": "/home/synthetic/project",
+        "gitBranch": "main",
+        "version": "2.1.269",
+        "userType": "external",
+        "isSidechain": false,
+        "entrypoint": "cli",
+        "message": {
+          "role": "user",
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_bash",
+              "is_error": false,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "ok  internal/app  0.2s"
+                }
+              ]
+            },
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_todo",
+              "is_error": false,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Todos updated"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "type": "assistant",
+        "uuid": "a8000000-0000-4000-8000-000000000008",
+        "parentUuid": "a7000000-0000-4000-8000-000000000007",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:07.000Z",
+        "cwd": "/home/synthetic/project",
+        "gitBranch": "main",
+        "version": "2.1.269",
+        "userType": "external",
+        "isSidechain": false,
+        "entrypoint": "cli",
+        "message": {
+          "role": "assistant",
+          "model": "claude-opus-4-8",
+          "content": [
+            {
+              "type": "text",
+              "text": "Delegating a search to a sub-agent."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_task",
+              "name": "Task",
+              "input": {
+                "subagent_type": "Explore",
+                "description": "Find TODOs",
+                "prompt": "Search the repo for TODO comments."
+              }
+            }
+          ],
+          "usage": {
+            "input_tokens": 1200,
+            "output_tokens": 80,
+            "cache_read_input_tokens": 900,
+            "cache_creation_input_tokens": 40
+          }
+        }
+      },
+      {
+        "type": "assistant",
+        "uuid": "a9000000-0000-4000-8000-000000000009",
+        "parentUuid": "a8000000-0000-4000-8000-000000000008",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:08.000Z",
+        "cwd": "/home/synthetic/project",
+        "gitBranch": "main",
+        "version": "2.1.269",
+        "userType": "external",
+        "isSidechain": true,
+        "entrypoint": "cli",
+        "message": {
+          "role": "assistant",
+          "model": "claude-opus-4-8",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Searching for TODO markers in internal."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_grep",
+              "name": "Grep",
+              "input": {
+                "pattern": "TODO",
+                "path": "internal"
+              }
+            }
+          ],
+          "usage": {
+            "input_tokens": 1200,
+            "output_tokens": 80,
+            "cache_read_input_tokens": 900,
+            "cache_creation_input_tokens": 40
+          }
+        }
+      },
+      {
+        "type": "user",
+        "uuid": "aa000000-0000-4000-8000-000000000010",
+        "parentUuid": "a9000000-0000-4000-8000-000000000009",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:09.000Z",
+        "cwd": "/home/synthetic/project",
+        "gitBranch": "main",
+        "version": "2.1.269",
+        "userType": "external",
+        "isSidechain": true,
+        "entrypoint": "cli",
+        "message": {
+          "role": "user",
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_grep",
+              "is_error": false,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "internal/app/module.go:1:// TODO"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "uuid": "ab000000-0000-4000-8000-000000000011",
+        "parentUuid": "a8000000-0000-4000-8000-000000000008",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:10.000Z",
+        "cwd": "/home/synthetic/project",
+        "gitBranch": "main",
+        "version": "2.1.269",
+        "userType": "external",
+        "isSidechain": false,
+        "entrypoint": "cli",
+        "message": {
+          "role": "user",
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_task",
+              "is_error": false,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Found 1 TODO."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

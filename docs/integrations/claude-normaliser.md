@@ -648,14 +648,21 @@ it to canonical events and is served live at `POST /v1/claude/transcript`
   and `reasoning_token_count` (from `output_tokens_details.thinking_tokens`). The
   ephemeral cache-window counts (`cache_creation.ephemeral_*`), which have no
   canonical key, are carried under `provider_extensions.cache_usage_extra`.
-- **Content deferred, not silently dropped.** Prompt/response text, non-MCP tool
-  `input`/results, and file diffs are never read into an event; they are listed in
-  `attributes.unavailable_fields`. Ownership: prompts/responses → E7 (#94);
-  generic (non-MCP) tool IO / diffs / sub-agents → J18 (#105). The
-  per-adapter allow-list is the sole guard (epic #88 removed ingest-time hiding):
-  only safe scalar envelope fields (`git_branch`, `entrypoint`, `user_type`,
-  `request_id`, `effort`, `api_block_index`, `is_sidechain`) reach
-  `provider_extensions.transcript` — `cwd` and every content body are excluded.
+- **Message content captured raw (J18 #105).** Epic #87 makes raw capture the
+  invariant, and #105 brings the transcript event path into line: an assistant
+  record's `thinking` block is captured under `provider_extensions.transcript.thinking`
+  and its response `text` under `provider_extensions.transcript.response_content`
+  (present-only — no placeholder when absent). A `user` record now becomes a
+  `user_message` event carrying the prompt raw under
+  `provider_extensions.transcript.prompt_content`, including the CLI's already-expanded
+  slash command (leading `<command-name>…</command-name>` markup is captured verbatim,
+  not re-parsed). `attributes.unavailable_fields` is computed per-presence, so a field
+  is only listed when the record genuinely does not carry it. The per-adapter
+  allow-list remains the sole guard (epic #88 removed ingest-time hiding): safe scalar
+  envelope fields (`git_branch`, `entrypoint`, `user_type`, `request_id`, `effort`,
+  `api_block_index`, `is_sidechain`) reach `provider_extensions.transcript`; `cwd` is
+  the one deliberately excluded envelope field (not one of the six #105 signals — out
+  of scope, flagged follow-up), and account/email identifiers are never on this surface.
 - **MCP tool calls (J17 #104).** MCP invocations are the one tool body read here.
   Each assistant `message.content[]` `tool_use` block named `mcp__<server>__<tool>`
   is paired with its later `user` `tool_result` (by `tool_use_id`, in a single
@@ -669,16 +676,41 @@ it to canonical events and is served live at `POST /v1/claude/transcript`
   **Outcome** comes from the paired result's `is_error` (`success`/`failed`); an
   unpaired call stays `unknown`, never fabricated. Per epic #87 the raw
   arguments/result are captured verbatim under `provider_extensions.mcp_call`
-  (`{server_name, tool_name, arguments, result}`; `result` omitted when unpaired) —
-  MCP arguments/results are in scope for #104, distinct from the generic tool IO
-  J18/#105 still defers. `NormalizeTranscript` additionally emits one **content-free**
+  (`{server_name, tool_name, arguments, result}`; `result` omitted when unpaired).
+  `NormalizeTranscript` additionally emits one **content-free**
   `mcp_call` correlation event per invocation (`stampMCPCorrelation` sets
   `attributes.category` + `provider_extensions.mcp_call` `{server_name, tool_name}`
   only — no arguments/result), which `insights.mcpUseEvent` consumes to mark the
-  server *used* with an invocation count. Non-MCP `tool_use` blocks (Bash, Read,
-  Write, …) are left unread. The route persists events **and** operations in one
+  server *used* with an invocation count. The MCP path shares one collector with the
+  generic tool-IO path (below): the MCP-specific shaping (event id `:mcp:`, byte-stable
+  correlation event) lives in `jsonl_mcp.go`, the shared collector/decoder/dispatch in
+  `jsonl_toolcalls.go`. The route persists events **and** operations in one
   `SaveEventsAndOperations` batch so the operations and MCP-inventory read paths
   see them atomically.
+- **Generic tool IO, diffs, todos, and sub-agents (J18 #105).** Every non-MCP
+  assistant `tool_use` block is now read by the same collector and reconstructed by
+  `ExtractTranscriptOperations` into one `canonical.Operation` — classified through the
+  shared `operationCategory` helper (Read/Glob/Grep/NotebookRead → filesystem read;
+  Write/Edit/MultiEdit/NotebookEdit → filesystem write; Bash → shell command;
+  WebFetch/WebSearch → network request; an unrecognised tool such as `Task` stays
+  `unknown` but is **still promoted**, never dropped). The full `input` (Edit/Write
+  diffs `old_string`/`new_string`/`content`, and TodoWrite `todos` snapshots) and the
+  paired `tool_result` body are captured raw under `provider_extensions.tool_call`
+  (`{input, result}`); a TodoWrite snapshot is additionally aliased under
+  `provider_extensions.todo_snapshot`. `NormalizeTranscript` emits one **content-free**
+  `tool_call` correlation event per invocation carrying
+  `attributes.tool = {tool_name, tool_use_id, file_path?, full_command?, subagent_type?}`
+  — deliberately the **same key names** the OTLP tool-span path (`traces.go:toolAttributes`)
+  uses, so `insights.SessionFilesFromEvidence` (Files-lane) and
+  `governance.risky_access` surface transcript-sourced paths/commands with **zero
+  changes** to those consumers. Sub-agent (Task) work needs no separate walker: a
+  sidechain record's `tool_use` flows through the same unconditional pass, and its
+  `is_sidechain`/`parent_uuid` linkage (already on every event via
+  `transcriptCorrelation`) attributes it to the sub-agent. The flat, id-keyed collector
+  is last-seen-wins for a duplicate `tool_use_id` (documented and tested), so a call
+  echoed on both a main-line and a sidechain record yields exactly one deterministic
+  Operation. Evidence: `fixtures/claude/synthetic/claude-code-2.1.269-tool-io-diffs-subagent-transcript.json`
+  → `…-tool-io-diffs-subagent-transcript.{events,operations}.json`.
 - **Contract.** An `assistant` record missing a structural field (`uuid`,
   `sessionId`, `timestamp`) — including whitespace-only values — is a hard error
   that aborts the whole import (matching the traces adapter — supported data is
@@ -688,17 +720,25 @@ it to canonical events and is served live at `POST /v1/claude/transcript`
   `assistant` records yields zero events and no error.
 - **Size cap and inspector.** The route caps the body at 32 MiB (real transcripts
   reach a few MB), larger than the 1 MiB OTLP cap. It deliberately does **not**
-  wire the dev ingest inspector: the inspector echoes the raw captured payload, so
-  echoing a raw transcript would re-expose exactly the content this path refuses
-  to persist.   Accepted/rejected counters are shared with the OTLP routes. Org-admin rollout
+  wire the dev ingest inspector: the inspector echoes the raw captured payload
+  verbatim, including the envelope fields (`cwd`) and any account/email identifiers
+  the read surfaces deliberately exclude, so it stays unwired to avoid re-exposing
+  them through an uncontrolled second surface.   Accepted/rejected counters are shared with the OTLP routes. Org-admin rollout
   for SaaS fleets is covered in
   [claude-transcript-deployment.md](claude-transcript-deployment.md).
 
 ## Out of scope
 
-Sub-agent/sidechain transcripts (sibling `<session>/subagents/agent-*.jsonl`
-files) and the non-MCP transcript content bodies above are out of scope here
-(generic tool IO / diffs / sub-agents → J18 #105; prompts/responses → E7 #94).
-MCP tool-call invocations and results are now in scope (J17 #104, above). The
-sample-event fixture shape remains the reviewed golden path for `NormalizeEvents`.
+Sub-agent (Task) transcripts are **same-file sidechain records** (`isSidechain` +
+`parentUuid` on the `assistant`/`user` lines), not sibling `<session>/subagents/agent-*.jsonl`
+files — an earlier draft of this doc claimed the sibling-file layout, which neither the
+code nor the reviewed fixtures bear out; #105 corrects it and captures the sidechain
+tool calls through the shared collector (above). Still out of scope here: `cwd` (not one
+of the six #105 signals — flagged follow-up); account/email identifiers (never on this
+surface — Privacy invariants; #107/#173 remain blocked pending a spec revision);
+`TaskID` promotion into the canonical schema (a cross-adapter change tracked
+separately, not #105). MCP tool-call invocations and results are in scope (J17 #104),
+and generic tool IO / diffs / todos / thinking / slash-command expansion are now in
+scope (J18 #105, above). The sample-event fixture shape remains the reviewed golden
+path for `NormalizeEvents`.
 

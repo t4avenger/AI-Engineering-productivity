@@ -875,6 +875,49 @@ export async function fetchLiveSessions(limit = 100): Promise<LiveSessionRow[]> 
   return body.data;
 }
 
+/** Operations insight totals + by_category, shared across live gates (CPD rule). */
+export type LiveOperationStats = {
+  totals: { total_operations: number; duration_observed_count?: number };
+  by_category: Array<{ category: string; count: number }>;
+};
+
+export async function fetchLiveOperations(): Promise<LiveOperationStats> {
+  const response = await fetch(`${daemonBase}/api/v1/insights/operations`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as { data: LiveOperationStats };
+  return body.data;
+}
+
+/** Assert an operations by_category bucket holds exactly the expected count. */
+export function expectOperationCategory(
+  stats: LiveOperationStats,
+  category: string,
+  count: number,
+): void {
+  expect(
+    stats.by_category.some(
+      (row) => row.category === category && row.count === count,
+    ),
+  ).toBe(true);
+}
+
+/** Files-lane rows for one session, shared across live gates (CPD rule). */
+export type LiveSessionFile = { path: string | null; action: string | null };
+
+export async function fetchLiveSessionFiles(
+  sessionId: string,
+): Promise<LiveSessionFile[]> {
+  const response = await fetch(
+    `${daemonBase}/api/v1/sessions/${encodeURIComponent(sessionId)}/files`,
+    { headers: { Authorization: `Bearer ${authToken}` } },
+  );
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as { data: LiveSessionFile[] };
+  return body.data;
+}
+
 /** Full-session duration breakdown (#190 / T09); never page-scoped. */
 export type LiveBreakdown = {
   availability: string;
@@ -993,9 +1036,11 @@ export async function ingestClaudeTranscript(body: string): Promise<void> {
 }
 
 /**
- * Synthetic Claude Code session JSONL for the live transcript UI gate. Content
- * bodies carry canaries that must never appear in the dashboard; model + token
- * counts must surface.
+ * Synthetic Claude Code session JSONL for the live transcript gate. Under epic #87
+ * the prompt/response/thinking text and the tool command + result are captured raw
+ * and surface through the operations read API; only cwd — not a #105 signal — must
+ * never appear on any surface. The Bash tool_use carries an id and a paired
+ * tool_result so it reconstructs a shell-command operation.
  */
 export function claudeTranscriptNDJSON(model: string): string {
   const session = 'tiq-live-e2e-transcript-session';
@@ -1025,8 +1070,10 @@ export function claudeTranscriptNDJSON(model: string): string {
         stop_reason: 'end_turn',
         content: [
           { type: 'text', text: 'tiq-canary-live-response' },
+          { type: 'thinking', thinking: 'tiq-canary-live-thinking' },
           {
             type: 'tool_use',
+            id: 'toolu_live_transcript_bash',
             name: 'Bash',
             input: { command: 'tiq-canary-live-command' },
           },
@@ -1039,7 +1086,109 @@ export function claudeTranscriptNDJSON(model: string): string {
           output_tokens_details: { thinking_tokens: 32 },
         },
       },
-      toolUseResult: { stdout: 'tiq-canary-live-stdout' },
+    }),
+    JSON.stringify({
+      type: 'user',
+      uuid: 'tiq-live-user-2',
+      parentUuid: 'tiq-live-assistant-1',
+      sessionId: session,
+      timestamp: '2026-09-12T12:00:03.000Z',
+      message: {
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'toolu_live_transcript_bash',
+            is_error: false,
+            content: [{ type: 'text', text: 'tiq-canary-live-stdout' }],
+          },
+        ],
+      },
+    }),
+  ].join('\n');
+}
+
+/**
+ * Synthetic Claude Code session JSONL exercising the generic tool-call surface
+ * (#105): a Read, a Write, and a Task tool_use on a main-line assistant record plus
+ * a sub-agent (sidechain) Grep. Drives the transcript path to reconstruct one
+ * Operation per tool_use (filesystem read/write, unknown for Task, filesystem read
+ * for the sidechain Grep) and to serve the Read/Write paths through the Files-lane.
+ */
+export function claudeGenericToolTranscriptNDJSON(): string {
+  const session = 'tiq-live-e2e-generic-tool-session';
+  return [
+    JSON.stringify({
+      type: 'user',
+      uuid: 'tiq-live-generic-user-1',
+      sessionId: session,
+      timestamp: '2026-09-12T14:00:00.000Z',
+      version: '2.1.269',
+      message: { role: 'user', content: 'tiq-canary-live-generic-prompt' },
+    }),
+    JSON.stringify({
+      type: 'assistant',
+      uuid: 'tiq-live-generic-assistant-1',
+      parentUuid: 'tiq-live-generic-user-1',
+      sessionId: session,
+      timestamp: '2026-09-12T14:00:02.000Z',
+      version: '2.1.269',
+      cwd: '/repo',
+      gitBranch: 'main',
+      entrypoint: 'cli',
+      requestId: 'req_live_generic_1',
+      message: {
+        role: 'assistant',
+        model: 'claude-opus-4-8',
+        stop_reason: 'tool_use',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'toolu_live_generic_read',
+            name: 'Read',
+            input: { file_path: '/repo/tiq-live-generic-read.go' },
+          },
+          {
+            type: 'tool_use',
+            id: 'toolu_live_generic_write',
+            name: 'Write',
+            input: {
+              file_path: '/repo/tiq-live-generic-write.go',
+              content: 'package main',
+            },
+          },
+          {
+            type: 'tool_use',
+            id: 'toolu_live_generic_task',
+            name: 'Task',
+            input: { description: 'investigate', subagent_type: 'Explore' },
+          },
+        ],
+        usage: { input_tokens: 48, output_tokens: 12 },
+      },
+    }),
+    JSON.stringify({
+      type: 'assistant',
+      uuid: 'tiq-live-generic-sidechain-1',
+      parentUuid: 'tiq-live-generic-assistant-1',
+      isSidechain: true,
+      sessionId: session,
+      timestamp: '2026-09-12T14:00:03.000Z',
+      version: '2.1.269',
+      message: {
+        role: 'assistant',
+        model: 'claude-opus-4-8',
+        stop_reason: 'tool_use',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'toolu_live_generic_grep',
+            name: 'Grep',
+            input: { pattern: 'func main', path: '/repo' },
+          },
+        ],
+        usage: { input_tokens: 16, output_tokens: 4 },
+      },
     }),
   ].join('\n');
 }
@@ -1048,9 +1197,9 @@ export function claudeTranscriptNDJSON(model: string): string {
  * Synthetic Claude Code session JSONL bearing one MCP tool call (J17, #104): an
  * assistant `tool_use` named mcp__<server>__read_file alongside a non-MCP Bash
  * tool_use, paired with a later user `tool_result`. Drives the transcript path to
- * reconstruct one MCP-call operation and mark the server used. The prompt, cwd,
- * and the non-MCP Bash command carry canaries that must never reach the UI; the
- * MCP arguments/result are synthetic, ordinary data (captured raw per #104).
+ * reconstruct an MCP-call operation (marking the server used) and, under #105, a
+ * generic shell-command operation for the Bash call whose command is captured raw;
+ * only cwd — not a #105 signal — must never reach any surface.
  */
 export function claudeMCPTranscriptNDJSON(serverName: string): string {
   const session = 'tiq-live-e2e-mcp-transcript-session';

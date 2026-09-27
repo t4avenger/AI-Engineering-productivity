@@ -1,6 +1,52 @@
 [
   {
     "schema_version": "0.1.0",
+    "event_id": "claude-code:22222222-2222-4222-8222-222222222222:10000000-0000-4000-8000-000000000001",
+    "event_type": "user_message",
+    "occurred_at": "2026-09-12T10:00:00Z",
+    "received_at": "2026-09-12T10:00:07Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:22222222-2222-4222-8222-222222222222",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "response_content",
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:22222222-2222-4222-8222-222222222222:10000000-0000-4000-8000-000000000001",
+        "ordering_key": "01789207200000000000:claude-code:22222222-2222-4222-8222-222222222222:10000000-0000-4000-8000-000000000001",
+        "parent_uuid": null,
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "10000000-0000-4000-8000-000000000001"
+      },
+      "transcript": {
+        "entrypoint": "cli",
+        "git_branch": "main",
+        "is_sidechain": false,
+        "prompt_content": "Read the overview doc, list the docs directory, then record notes.",
+        "user_type": "external"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
     "event_id": "claude-code:22222222-2222-4222-8222-222222222222:20000000-0000-4000-8000-000000000002",
     "event_type": "assistant_message",
     "occurred_at": "2026-09-12T10:00:02Z",
@@ -22,7 +68,6 @@
       "output_token_count": 40,
       "unavailable_fields": [
         "prompt_content",
-        "response_content",
         "tool_io",
         "mcp_calls",
         "file_operations",
@@ -37,7 +82,7 @@
         "parent_uuid": "10000000-0000-4000-8000-000000000001",
         "task_boundary": {
           "confidence": "unknown",
-          "reason": "Claude Code transcript assistant records have no reviewed task-boundary signal"
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
         },
         "uuid": "20000000-0000-4000-8000-000000000002"
       },
@@ -47,6 +92,7 @@
         "git_branch": "main",
         "is_sidechain": false,
         "request_id": "claude-code:req_mcp_0001",
+        "response_content": "I'll read the overview and list the directory.",
         "user_type": "external"
       }
     }
@@ -91,7 +137,7 @@
         "parent_uuid": "10000000-0000-4000-8000-000000000001",
         "task_boundary": {
           "confidence": "unknown",
-          "reason": "Claude Code transcript assistant records have no reviewed task-boundary signal"
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
         },
         "uuid": "20000000-0000-4000-8000-000000000002"
       },
@@ -99,6 +145,56 @@
         "server_name": "synthetic-fs",
         "tool_name": "read_file",
         "tool_use_id": "toolu_mcp_read"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:22222222-2222-4222-8222-222222222222:toolcall:toolu_bash_ls",
+    "event_type": "tool_call",
+    "occurred_at": "2026-09-12T10:00:02Z",
+    "received_at": "2026-09-12T10:00:07Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.269",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:22222222-2222-4222-8222-222222222222",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "category": "shell command",
+      "tool": {
+        "full_command": "ls docs",
+        "tool_name": "Bash",
+        "tool_use_id": "toolu_bash_ls"
+      },
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:22222222-2222-4222-8222-222222222222:toolcall:toolu_bash_ls",
+        "ordering_key": "01789207202000000000:claude-code:22222222-2222-4222-8222-222222222222:toolcall:toolu_bash_ls",
+        "parent_uuid": "10000000-0000-4000-8000-000000000001",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "20000000-0000-4000-8000-000000000002"
       }
     }
   },
@@ -139,7 +235,7 @@
         "parent_uuid": "30000000-0000-4000-8000-000000000003",
         "task_boundary": {
           "confidence": "unknown",
-          "reason": "Claude Code transcript assistant records have no reviewed task-boundary signal"
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
         },
         "uuid": "40000000-0000-4000-8000-000000000004"
       },
@@ -193,7 +289,7 @@
         "parent_uuid": "30000000-0000-4000-8000-000000000003",
         "task_boundary": {
           "confidence": "unknown",
-          "reason": "Claude Code transcript assistant records have no reviewed task-boundary signal"
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
         },
         "uuid": "40000000-0000-4000-8000-000000000004"
       },
@@ -244,7 +340,7 @@
         "parent_uuid": "30000000-0000-4000-8000-000000000003",
         "task_boundary": {
           "confidence": "unknown",
-          "reason": "Claude Code transcript assistant records have no reviewed task-boundary signal"
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
         },
         "uuid": "40000000-0000-4000-8000-000000000004"
       },
