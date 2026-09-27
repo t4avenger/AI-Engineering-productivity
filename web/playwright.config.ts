@@ -3,6 +3,8 @@ import { defineConfig, devices } from '@playwright/test';
 const testConfigHome = `/tmp/telemetryiq-playwright-${String(process.pid)}`;
 
 export default defineConfig({
+  updateSnapshots:
+    process.env.TELEMETRYIQ_UPDATE_REFERENCE_SNAPSHOTS === '1' ? 'all' : 'none',
   testDir: './tests/e2e',
   fullyParallel: false,
   workers: 1,

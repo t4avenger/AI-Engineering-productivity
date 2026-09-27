@@ -111,17 +111,17 @@ Historical [#71](https://github.com/t4avenger/AI-Engineering-productivity/issues
 
 - [x] S01–S04: five destinations, dark shell, desktop density and responsive a11y (#161).
 - [x] N01–N03: existing Overview preserved; evidence-backed Models and PR pages (#161/#186/#187).
-- [ ] T01–T10: five aligned trace lanes, conversation text, inspector and right rail;
+- [x] T01–T10: five aligned trace lanes, conversation text, inspector and right rail;
   missing evidence, timestamps, correlations and durations are explicit.
-- [ ] G01–G08: reference Governance composition with real MCP/skill/path/prompt
+- [x] G01–G08: reference Governance composition with real MCP/skill/path/prompt
   saves, findings, safe local previews and dirty-state feedback.
-- [ ] Both originals compared with deterministic implementation screenshots;
+- [x] Both originals compared with deterministic implementation screenshots;
   every deviation recorded by requirement ID.
-- [ ] No green 'clean' status without coverage, no fabricated numbers, no
+- [x] No green 'clean' status without coverage, no fabricated numbers, no
   double-counted breakdown, no claims of active runtime blocking.
-- [ ] Applicable QUALITY_GATES pass; backend coverage >=80%, duplication <=3%;
+- [x] Applicable QUALITY_GATES pass; backend coverage >=80%, duplication <=3%;
   live daemon ingest→read→UI coverage and WCAG 2.2 AA evidence recorded.
-- [ ] #195 checkpoint and `rtk make verify-push` completed before phase closure.
+- [x] #195 checkpoint and `rtk make verify-push` completed before phase closure.
 
 ### Full future reference
 
@@ -132,10 +132,12 @@ Finishing local visual work cannot close these requirements.
 
 ## 6. Next smallest task
 
-Local policy editors through [#194](https://github.com/t4avenger/AI-Engineering-productivity/issues/194)
-are delivered. The next local phase task is reference acceptance
-[#195](https://github.com/t4avenger/AI-Engineering-productivity/issues/195).
+Local reference acceptance [#195](https://github.com/t4avenger/AI-Engineering-productivity/issues/195)
+is complete. The next work is deliberately gated enterprise architecture, starting with
+[#196](https://github.com/t4avenger/AI-Engineering-productivity/issues/196);
+it does not authorise runtime enforcement.
 
 This documentation update changes no runtime APIs or schemas. Planned additive
 interfaces are specified in the implementation specification and owned by the
-issues above. No UI delivery phase is declared complete by writing this roadmap.
+issues above. This roadmap records delivery alongside checkpoint evidence; it
+does not authorise gated enterprise behaviour.

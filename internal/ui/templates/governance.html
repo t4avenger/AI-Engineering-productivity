@@ -317,6 +317,30 @@
   {{end}}
   <script>
   (function () {
+    var categoryTablist = document.querySelector('[role="tablist"][aria-label="Access Rules categories"]');
+    if (categoryTablist) {
+      var categoryTabs = Array.prototype.slice.call(categoryTablist.querySelectorAll('[role="tab"]'));
+      var restoreTabID = window.sessionStorage.getItem("governance-category-tab-focus");
+      if (restoreTabID) {
+        window.sessionStorage.removeItem("governance-category-tab-focus");
+        var restoreTab = document.getElementById(restoreTabID);
+        if (restoreTab) window.requestAnimationFrame(function () { restoreTab.focus(); });
+      }
+      categoryTablist.addEventListener("keydown", function (event) {
+        var current = categoryTabs.indexOf(document.activeElement);
+        if (current < 0) return;
+        var next;
+        if (event.key === "ArrowRight") next = (current + 1) % categoryTabs.length;
+        else if (event.key === "ArrowLeft") next = (current + categoryTabs.length - 1) % categoryTabs.length;
+        else if (event.key === "Home") next = 0;
+        else if (event.key === "End") next = categoryTabs.length - 1;
+        else return;
+        event.preventDefault();
+        categoryTabs[next].focus();
+        window.sessionStorage.setItem("governance-category-tab-focus", categoryTabs[next].id);
+        window.location.assign(categoryTabs[next].href);
+      });
+    }
     function serialised(formData) { return Array.from(formData.entries()).map(function (entry) { return entry[0] + "=" + entry[1]; }).join("&"); }
     function bindDirtyRuleForm(form, policyName, onClick) {
       if (!form) return false;

@@ -46,7 +46,7 @@
   font-size: var(--font-base);
 }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; overflow-x: hidden; }
+body { margin: 0; overflow-x: hidden; }
 a { color: var(--color-accent); }
 button, .button {
   font: inherit;
@@ -408,7 +408,7 @@ input[type="password"], input[type="text"] {
   font-weight: 700;
 }
 .rules-panel { margin-top: var(--space-3); }
-.table-wrap { overflow-x: auto; }
+.table-wrap { contain: inline-size; max-width: 100%; min-width: 0; overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; }
 th, td {
   border-bottom: 1px solid var(--color-border);
@@ -742,6 +742,7 @@ button.secondary { background: transparent; border: 1px solid var(--color-border
 .governance-summary-card p { margin: var(--space-2) 0 0; }
 .summary-value { color: var(--color-accent); font-size: var(--font-lg); font-weight: 700; }
 .governance-workspace { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1fr) minmax(16rem, var(--rail-width)); margin-top: var(--space-5); }
+.governance-workspace > * { min-width: 0; }
 .governance-preview-rail { display: grid; align-content: start; gap: var(--space-3); }
 .mcp-rule-toolbar, .governance-save-bar { align-items: end; display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: space-between; margin-bottom: var(--space-3); }
 .mcp-rule-toolbar label { color: var(--color-muted); display: grid; gap: var(--space-1); min-width: 12rem; }
@@ -760,5 +761,5 @@ button.secondary { background: transparent; border: 1px solid var(--color-border
 .prompt-rule-row { align-items: end; display: grid; gap: var(--space-2); grid-template-columns: repeat(5, minmax(0, 1fr)) auto; margin: var(--space-2) 0; }
 .prompt-rule-row label { display: grid; gap: 0.2rem; }
 .sr-only { height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute; width: 1px; clip: rect(0, 0, 0, 0); white-space: nowrap; }
-@media (max-width: 1024px) { .governance-workspace { grid-template-columns: 1fr; } .governance-preview-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); } .prompt-rule-row { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 767px) { .governance-header, .mcp-rule-toolbar { align-items: stretch; flex-direction: column; } .governance-main-tabs, .governance-summary, .governance-preview-rail, .path-rule-groups { grid-template-columns: 1fr; } .path-rule-row, .prompt-rule-row { grid-template-columns: 1fr; } .governance-main-tabs a { min-height: var(--target-min); } }
+@media (max-width: 1024px) { .governance-workspace { grid-template-columns: minmax(0, 1fr); } .governance-preview-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); } .prompt-rule-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 767px) { .governance-header, .mcp-rule-toolbar { align-items: stretch; flex-direction: column; } .mcp-rule-toolbar label { min-width: 0; } .governance-main-tabs, .governance-summary, .governance-preview-rail, .path-rule-groups { grid-template-columns: minmax(0, 1fr); } .path-rule-row, .prompt-rule-row { grid-template-columns: minmax(0, 1fr); } .governance-main-tabs a { min-height: var(--target-min); } }
