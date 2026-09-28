@@ -1,0 +1,51 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "synthetic",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.283",
+  "captured_at": "2026-09-28T09:00:00Z",
+  "sanitisation_reviewed": true,
+  "note": "Constructed (not a real capture) #107 X20 fixture: one user_prompt log event whose record carries operator/organisation identity and whose resource carries machine/app environment, including array-valued workspace.host_paths and gateway user.groups plus app.entrypoint/app.version and identity.source. Proves actor_id is derived from user.id, repository_id from the first workspace host path, and that array-valued resource metadata is retained raw under provider_extensions.resource/environment. Synthetic values only.",
+  "payload": {
+    "resourceLogs": [
+      {
+        "resource": {
+          "attributes": [
+            {"key": "service.name", "value": {"stringValue": "claude-code"}},
+            {"key": "service.version", "value": {"stringValue": "2.1.283"}},
+            {"key": "os.type", "value": {"stringValue": "linux"}},
+            {"key": "os.version", "value": {"stringValue": "0.0.0-synthetic"}},
+            {"key": "host.arch", "value": {"stringValue": "amd64"}},
+            {"key": "app.entrypoint", "value": {"stringValue": "cli"}},
+            {"key": "app.version", "value": {"stringValue": "2.1.283"}},
+            {"key": "identity.source", "value": {"stringValue": "gateway"}},
+            {"key": "user.groups", "value": {"arrayValue": {"values": [{"stringValue": "team-synthetic"}, {"stringValue": "dept-synthetic"}]}}},
+            {"key": "workspace.host_paths", "value": {"arrayValue": {"values": [{"stringValue": "/home/synthetic/workspace"}, {"stringValue": "/home/synthetic/other"}]}}}
+          ]
+        },
+        "scopeLogs": [
+          {
+            "logRecords": [
+              {
+                "attributes": [
+                  {"key": "event.name", "value": {"stringValue": "user_prompt"}},
+                  {"key": "event.timestamp", "value": {"stringValue": "2026-09-28T09:00:01.000Z"}},
+                  {"key": "event.sequence", "value": {"intValue": "1"}},
+                  {"key": "session.id", "value": {"stringValue": "constructed-env-session"}},
+                  {"key": "user.id", "value": {"stringValue": "synthetic-user"}},
+                  {"key": "user.email", "value": {"stringValue": "synthetic@example.test"}},
+                  {"key": "user.account_uuid", "value": {"stringValue": "00000000-0000-4000-8000-0000000000bb"}},
+                  {"key": "user.account_id", "value": {"stringValue": "user_synthetic"}},
+                  {"key": "organization.id", "value": {"stringValue": "00000000-0000-4000-8000-0000000000aa"}},
+                  {"key": "terminal.type", "value": {"stringValue": "gnome-terminal"}},
+                  {"key": "prompt_length", "value": {"intValue": "18"}}
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

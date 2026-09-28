@@ -731,23 +731,32 @@ func TestNormalizeTracesToolSpanUnavailableFields(t *testing.T) {
 // leaks into span_attributes.
 func TestNormalizeTracesToolSpanRetainsIdentityAndDropsUnknownAttribute(t *testing.T) {
 	event := singleSpanEvent(t, toolSpanPayload("tool", `,{"key":"tool_name","value":{"stringValue":"Bash"}},{"key":"full_command","value":{"stringValue":"cat config/app.yaml"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"api_key","value":{"stringValue":"tiq-canary-tool-key"}}`))
-	// The known identity key is retained raw in its typed home (#107 X20).
-	environment, ok := event.ProviderExtensions["environment"].(map[string]any)
-	if !ok || environment["user_email"] != "synthetic@example.test" {
-		t.Fatalf("user.email must ride raw into provider_extensions.environment: %#v", event.ProviderExtensions["environment"])
-	}
-	// An unforeseen, non-identity attribute on no allow-list is not surfaced at all.
-	encoded, err := json.Marshal(event)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	if strings.Contains(string(encoded), "tiq-canary-tool-key") {
-		t.Fatalf("unknown non-identity attribute must not be surfaced: %s", encoded)
-	}
+	assertRetainsIdentityDropsSecret(t, event, "tiq-canary-tool-key")
 	if block := toolBlock(t, event, "tool"); block["full_command"] != "cat config/app.yaml" {
 		t.Fatalf("raw full_command must be captured in the typed block: %#v", block)
 	}
 	assertAbsentFromSpanAttributes(t, event, "full_command")
+}
+
+// assertRetainsIdentityDropsSecret proves the #107 X20 stance shared by the tool
+// and hook span identity tests: a known identity attribute (user.email) rides raw
+// into its typed home provider_extensions.environment (nothing dropped at the
+// local-only ingest boundary — owner directive / epic #87), while an unforeseen,
+// non-identity attribute on no allow-list (secretCanary) is not surfaced anywhere
+// in the encoded event.
+func assertRetainsIdentityDropsSecret(t *testing.T, event canonical.Event, secretCanary string) {
+	t.Helper()
+	environment, ok := event.ProviderExtensions["environment"].(map[string]any)
+	if !ok || environment["user_email"] != "synthetic@example.test" {
+		t.Fatalf("user.email must ride raw into provider_extensions.environment: %#v", event.ProviderExtensions["environment"])
+	}
+	encoded, err := json.Marshal(event)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(encoded), secretCanary) {
+		t.Fatalf("unknown non-identity attribute must not be surfaced: %s", encoded)
+	}
 }
 
 // TestNormalizeTracesSubAgentWorkflowPresentOnly proves sub-agent workflow
@@ -883,19 +892,7 @@ func TestNormalizeTracesHookSpanUnavailableFields(t *testing.T) {
 // typed block (its canonical home) and never leaks into span_attributes.
 func TestNormalizeTracesHookSpanRetainsIdentityAndDropsUnknownAttribute(t *testing.T) {
 	event := singleSpanEvent(t, toolSpanPayload("hook", `,{"key":"hook_event","value":{"stringValue":"PreToolUse"}},{"key":"hook_definitions","value":{"stringValue":"[{\"type\":\"command\",\"command\":\"./scripts/guard.sh\"}]"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"api_key","value":{"stringValue":"tiq-canary-hook-key"}}`))
-	// The known identity key is retained raw in its typed home (#107 X20).
-	environment, ok := event.ProviderExtensions["environment"].(map[string]any)
-	if !ok || environment["user_email"] != "synthetic@example.test" {
-		t.Fatalf("user.email must ride raw into provider_extensions.environment: %#v", event.ProviderExtensions["environment"])
-	}
-	// An unforeseen, non-identity attribute on no allow-list is not surfaced at all.
-	encoded, err := json.Marshal(event)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	if strings.Contains(string(encoded), "tiq-canary-hook-key") {
-		t.Fatalf("unknown non-identity attribute must not be surfaced: %s", encoded)
-	}
+	assertRetainsIdentityDropsSecret(t, event, "tiq-canary-hook-key")
 	if block := toolBlock(t, event, "hook"); block["hook_definitions"] != "[{\"type\":\"command\",\"command\":\"./scripts/guard.sh\"}]" {
 		t.Fatalf("raw hook_definitions must be captured in the typed block: %#v", block)
 	}

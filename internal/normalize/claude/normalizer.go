@@ -140,14 +140,19 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 	attachGovernanceContext(extensions, raw, name)
 	attachToolDecision(extensions, attributes, raw, name, nativeSessionID, eventID)
 	attachMCPCorrelation(attributes, extensions, raw, name)
-	return canonical.Event{
+	event := canonical.Event{
 		SchemaVersion: canonicalSchemaVersion, EventID: eventID, EventType: name,
 		OccurredAt: occurredAt, ReceivedAt: capturedAt, Provider: provider, Tool: tool,
 		SourceSchema: sourceSchema, SourceVersion: document.ToolVersion, ActorID: unavailable, DeviceID: unavailable,
 		SessionID: nativeSessionID, TaskID: nil, RepositoryID: nil, PrivacyLevel: "operational",
 		Attributes:         attributes,
 		ProviderExtensions: extensions,
-	}, nil
+	}
+	// Derive actor_id/repository_id from the record-level identity (#107 X20). The
+	// logs wire path calls this again after merging resource-level environment, so a
+	// resource-only workspace path still reaches repository_id.
+	applyEnvironmentIdentity(&event)
+	return event, nil
 }
 
 // attachPriceableRequestAttributes promotes observed provider-completion token
@@ -703,6 +708,8 @@ var environmentKeys = map[string]string{
 	"os.version":           "os_version",
 	"host.arch":            "host_arch",
 	"workspace.host_paths": "workspace_host_paths",
+	"user.groups":          "user_groups",
+	"identity.source":      "identity_source",
 }
 
 // claudeEnvironment builds the present-only environment/identity block from the
@@ -765,6 +772,78 @@ func environmentEventFields() []string {
 		keys = append(keys, rawKey)
 	}
 	return keys
+}
+
+// applyEnvironmentIdentity fills the canonical actor_id / repository_id from the
+// event's provider_extensions.environment block (#107 X20) when they are not yet
+// set: the schema requires a non-empty actor_id (it stays the unavailable sentinel
+// when no operator identity is present) and repository_id stays nil when no
+// workspace is present. Both are derived from the retained raw values, never
+// fabricated. It is idempotent — a value already set is left untouched — so the
+// logs wire path can call it again after resource-level environment is merged in.
+func applyEnvironmentIdentity(event *canonical.Event) {
+	environment, ok := event.ProviderExtensions["environment"].(map[string]any)
+	if !ok {
+		return
+	}
+	if event.ActorID == unavailable {
+		event.ActorID = environmentActorID(environment)
+	}
+	if event.RepositoryID == nil {
+		event.RepositoryID = environmentRepositoryID(environment)
+	}
+}
+
+// environmentActorID derives the canonical actor_id from the operator identity in
+// the environment block: the provider user id namespaced with the tool prefix
+// (mirroring session/event/request IDs), falling back to the account uuid then the
+// email. Returns the unavailable sentinel when none is present (device identity has
+// no telemetry source, so device_id is never derived here).
+func environmentActorID(environment map[string]any) string {
+	for _, key := range []string{"user_id", "user_account_uuid", "user_email"} {
+		if text, ok := environment[key].(string); ok && strings.TrimSpace(text) != "" {
+			return nativeSessionPrefix + strings.TrimSpace(text)
+		}
+	}
+	return unavailable
+}
+
+// environmentRepositoryID derives the canonical repository_id from the workspace
+// path(s) in the environment block: the first non-empty host path, retained raw
+// (local-only edition — no hashing, #87/#107). Returns nil when no workspace path
+// is present, so a genuine absence stays an absent repository rather than a
+// fabricated one. workspace.host_paths is decoded as an OTLP array, so the value
+// may be a []string, a []any of strings, or a lone string.
+func environmentRepositoryID(environment map[string]any) *string {
+	for _, path := range environmentStringList(environment["workspace_host_paths"]) {
+		if trimmed := strings.TrimSpace(path); trimmed != "" {
+			return &trimmed
+		}
+	}
+	return nil
+}
+
+// environmentStringList coerces a retained environment value into its string
+// members, accepting the []string the array decoder produces, the []any of strings
+// a JSON round-trip yields, or a lone string. Non-string members and other types
+// contribute nothing, so a scalar/absent value simply yields a short (or empty)
+// list the caller can range over.
+func environmentStringList(value any) []string {
+	switch members := value.(type) {
+	case string:
+		return []string{members}
+	case []string:
+		return members
+	case []any:
+		result := make([]string, 0, len(members))
+		for _, item := range members {
+			if text, ok := item.(string); ok {
+				result = append(result, text)
+			}
+		}
+		return result
+	}
+	return nil
 }
 
 func eventCorrelation(eventID string, occurredAt time.Time) map[string]any {

@@ -210,7 +210,7 @@ func NormalizeTraces(data []byte, receivedAt time.Time) ([]canonical.Event, erro
 // events only when its service.name is claude-code (nil otherwise, so a mixed
 // payload is safe).
 func spanEventsFromResource(resource resourceSpan, receivedAt time.Time) ([]canonical.Event, error) {
-	resourceAttrs := attributeValues(resource.Resource.Attributes)
+	resourceAttrs := resourceAttributeValues(resource.Resource.Attributes)
 	if service, _ := resourceAttrs[attrServiceName].(string); service != claudeLogService {
 		return nil, nil
 	}
@@ -339,7 +339,7 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 	// events carrying pr_link_candidates flow through the provider-agnostic
 	// session aggregation (attachSessionPRLink) into session.Attributes["pr_link"].
 	normalize.AttachPRLinkEvidence(attributes, extensions, fields, claudePRLinkScanFields)
-	return canonical.Event{
+	event := canonical.Event{
 		SchemaVersion:      canonicalSchemaVersion,
 		EventID:            eventID,
 		EventType:          name,
@@ -355,7 +355,10 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 		PrivacyLevel:       "operational",
 		Attributes:         attributes,
 		ProviderExtensions: extensions,
-	}, nil
+	}
+	// Derive actor_id/repository_id from the span + resource identity (#107 X20).
+	applyEnvironmentIdentity(&event)
+	return event, nil
 }
 
 // spanCorrelation carries the span-tree linkage (trace/span/parent) alongside

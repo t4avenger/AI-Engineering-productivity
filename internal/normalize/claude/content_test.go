@@ -225,6 +225,98 @@ func TestNormalizeLogsEventsSharingPromptIDExposeSameCorrelation(t *testing.T) {
 	}
 }
 
+// TestNormalizeLogsRetainsSessionEnvironmentIdentityRaw proves the #107 X20
+// invariant against a committed synthetic fixture + golden: a log event carries
+// its operator/organisation identity (record level) and machine/app environment
+// (resource level, including array-valued workspace.host_paths and user.groups)
+// raw under provider_extensions.environment/resource, and the canonical actor_id
+// and repository_id are derived from that retained raw metadata. Nothing is
+// dropped at the local-only ingest boundary (owner directive / epic #87). The
+// input is a clearly-labelled synthetic fixture (not under observed-sanitised) so
+// it never implies a real capture. Synthetic values only.
+func TestNormalizeLogsRetainsSessionEnvironmentIdentityRaw(t *testing.T) {
+	events := normalizeOTLPLogsFixture(t, "synthetic", "claude-code-synthetic-env-identity-otlp.json")
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+	const golden = "claude-code-synthetic-env-identity.events.json"
+	if updateGolden() {
+		writeGolden(t, golden, events)
+	}
+	assertMatchesGolden(t, golden, events)
+
+	event := events[0]
+	if event.ActorID != "claude-code:synthetic-user" {
+		t.Fatalf("actor_id = %q, want claude-code:synthetic-user (derived from user.id)", event.ActorID)
+	}
+	if event.DeviceID != "unavailable" {
+		t.Fatalf("device_id = %q, want unavailable (no device identity in Claude telemetry)", event.DeviceID)
+	}
+	if event.RepositoryID == nil || *event.RepositoryID != "/home/synthetic/workspace" {
+		t.Fatalf("repository_id = %#v, want first workspace.host_paths entry", event.RepositoryID)
+	}
+
+	environment, ok := event.ProviderExtensions["environment"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing provider_extensions.environment: %#v", event.ProviderExtensions)
+	}
+	if environment["user_email"] != "synthetic@example.test" {
+		t.Fatalf("user.email must ride raw into environment: %#v", environment["user_email"])
+	}
+	for key, want := range map[string]any{
+		"organization_id": "00000000-0000-4000-8000-0000000000aa",
+		"terminal_type":   "gnome-terminal",
+		"app_entrypoint":  "cli",
+		"app_version":     "2.1.283",
+		"os_type":         "linux",
+		"host_arch":       "amd64",
+		"identity_source": "gateway",
+	} {
+		if environment[key] != want {
+			t.Fatalf("environment[%q] = %#v, want %#v", key, environment[key], want)
+		}
+	}
+	assertStringMembers(t, environment["workspace_host_paths"], []string{"/home/synthetic/workspace", "/home/synthetic/other"})
+	assertStringMembers(t, environment["user_groups"], []string{"team-synthetic", "dept-synthetic"})
+
+	resource, ok := event.ProviderExtensions["resource"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing provider_extensions.resource: %#v", event.ProviderExtensions)
+	}
+	assertStringMembers(t, resource["workspace.host_paths"], []string{"/home/synthetic/workspace", "/home/synthetic/other"})
+	assertStringMembers(t, resource["user.groups"], []string{"team-synthetic", "dept-synthetic"})
+}
+
+// assertStringMembers asserts a retained array-valued attribute decoded to the
+// expected ordered string members, accepting either the []string the decoder
+// produces or the []any a JSON round-trip yields.
+func assertStringMembers(t *testing.T, value any, want []string) {
+	t.Helper()
+	var got []string
+	switch members := value.(type) {
+	case []string:
+		got = members
+	case []any:
+		for _, item := range members {
+			text, ok := item.(string)
+			if !ok {
+				t.Fatalf("array member %#v is not a string", item)
+			}
+			got = append(got, text)
+		}
+	default:
+		t.Fatalf("value %#v is not a string array", value)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("array = %#v, want %#v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("array[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
 // TestNormalizeLogsUserPromptLengthOnlyNeverFabricatesContent proves the wire
 // adapter reports prompt_length with no prompt key when content logging is off.
 func TestNormalizeLogsUserPromptLengthOnlyNeverFabricatesContent(t *testing.T) {

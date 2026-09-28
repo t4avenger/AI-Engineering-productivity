@@ -113,7 +113,7 @@ func NormalizeLogs(data []byte, receivedAt time.Time) ([]canonical.Event, error)
 // safe). indexBase is the count of events already produced, keeping event indexing
 // stable and contiguous across resources.
 func normaliseResourceLogs(resource resourceLog, receivedAt time.Time, indexBase int) ([]canonical.Event, error) {
-	resourceAttrs := attributeValues(resource.Resource.Attributes)
+	resourceAttrs := resourceAttributeValues(resource.Resource.Attributes)
 	if service, _ := resourceAttrs["service.name"].(string); service != claudeLogService {
 		return nil, nil
 	}
@@ -131,6 +131,9 @@ func normaliseResourceLogs(resource resourceLog, receivedAt time.Time, indexBase
 				return nil, err
 			}
 			attachResourceEnvironment(event.ProviderExtensions, resourceAttrs)
+			// Resource-level environment (workspace.host_paths) is merged above, so
+			// re-derive repository_id/actor_id now that the block is complete (#107 X20).
+			applyEnvironmentIdentity(&event)
 			events = append(events, event)
 		}
 	}
@@ -223,6 +226,27 @@ func attributeValues(attributes []otlpAttribute) map[string]any {
 	for _, attribute := range attributes {
 		if value, ok := attributeValue(attribute.Value); ok {
 			values[attribute.Key] = value
+		}
+	}
+	return values
+}
+
+// resourceAttributeValues flattens OTLP resource attributes like attributeValues
+// but also decodes arrayValue members (as []string), so the raw
+// provider_extensions.resource block and the environment block retain list-valued
+// resource metadata such as workspace.host_paths and gateway user.groups (nothing
+// dropped — owner directive / epic #87 / #107 X20). The scalar attributeValue
+// decoder is deliberately left untouched so the record-level event echo and the
+// metrics goldens do not shift; only resource-level flattening gains array support.
+func resourceAttributeValues(attributes []otlpAttribute) map[string]any {
+	values := make(map[string]any, len(attributes))
+	for _, attribute := range attributes {
+		if value, ok := attributeValue(attribute.Value); ok {
+			values[attribute.Key] = value
+			continue
+		}
+		if array := decodeStringArray(attribute.Value); array != nil {
+			values[attribute.Key] = array
 		}
 	}
 	return values
