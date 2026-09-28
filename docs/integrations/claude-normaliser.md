@@ -117,6 +117,64 @@ paths. The `prompt.id`/`message.uuid` correlation identifiers **are** retained u
 concern; the only remaining `droppedKeys` entry is `tool_parameters` (gated command /
 MCP argument content, owned by #173).
 
+### Session & environment metadata path
+
+Per #107 (X20, extending the epic #87 owner directive), the `user.`/`organization.`/
+`terminal.` prefixes are **no longer dropped** on the logs path — `logs.go` removed
+the former `droppedKeyPrefixes` guard. `NormalizeLogs` surfaces two environment
+blocks per event:
+
+- `provider_extensions.environment` — a present-only, snake_case block built by
+  `claudeEnvironment` from `environmentKeys`: the record-level identity
+  (`user.id`→`user_id`, `user.email`→`user_email`, `user.account_uuid`,
+  `user.account_id`, `organization.id`→`organization_id`, `terminal.type`,
+  `user.groups`→`user_groups`, `identity.source`→`identity_source`) merged
+  with the resource-level machine/app environment (`os.type`, `os.version`,
+  `host.arch`, `app.entrypoint`, `app.version`, `workspace.host_paths`). Record keys
+  win; resource keys fill only the slots the record did not carry. Blank strings are
+  skipped and a genuinely absent key is omitted (never fabricated), so a minimal
+  record yields no block. The identity keys are excluded from the
+  `provider_extensions.event` echo (`environmentEventFields`) so each has one home.
+- `provider_extensions.resource` — the **full raw** OTLP resource attribute set
+  (`copyAttributes`, `attachResourceEnvironment`), nothing dropped. (This is the raw
+  counterpart to the metrics/traces `resource` block, which is still allow-listed by
+  `safeMetricAttributes` pending #173.)
+
+Resource attributes are flattened by `resourceAttributeValues`, which — unlike the
+scalar record-level `attributeValue` — also decodes OTLP `arrayValue` members via
+`decodeStringArray`, so list-valued resource metadata (`workspace.host_paths`,
+gateway `user.groups`) is retained raw as an ordered string list in both the
+`resource` and `environment` blocks. The scalar record decoder is left untouched so
+the event echo and metrics goldens do not shift.
+
+**Canonical identity derivation (#107 X20).** From the retained environment block
+`applyEnvironmentIdentity` fills, when not already set, the schema's canonical
+identity fields — never fabricated, always derived from raw values:
+
+- `actor_id` — `environmentActorID`: the provider user id namespaced with the tool
+  prefix (`claude-code:` + `user.id`), falling back to `user.account_uuid` then
+  `user.email`; stays the `unavailable` sentinel when no operator identity is present.
+- `repository_id` — `environmentRepositoryID`: the first non-empty
+  `workspace.host_paths` entry, raw (local-only edition, no hashing); stays `nil`
+  when no workspace path is present.
+- `device_id` — stays `unavailable`: Claude Code telemetry carries no device
+  identity, so none is derived (this is `unavailable`, not `unknown` — the reviewed
+  surface has no device-identity attribute to carry the signal).
+
+`applyEnvironmentIdentity` is idempotent, so the logs wire path calls it again after
+the resource-level environment (carrying `workspace.host_paths`) is merged in, and
+the traces path calls it per span.
+
+`app.entrypoint`, `app.version` and `workspace.host_paths` are documented standard
+Claude Code attributes but do not appear on any **observed** fixture for the versions
+captured so far; they are mapped here so a capture carrying them is retained without
+further change. The synthetic fixture
+`fixtures/claude/synthetic/claude-code-synthetic-env-identity-otlp.json` proves the
+normaliser retains them (and the array-valued keys) and derives `actor_id`/
+`repository_id` when present, but — being constructed, not a real capture — it does
+not prove the CLI emits them. Until an observed fixture proves emission they stay
+`unknown` in the capability matrix (not `unavailable`), with a scheduled recapture.
+
 To let synthetic content-present fixtures be committed, the shared fixture
 validator (`internal/fixture/validator.go`) no longer prohibits the field names
 `prompt`/`prompts`/`response`/`responses`. Its value-based `likelySecret` scan
@@ -213,11 +271,25 @@ name** rather than sniffing fields — stamps a stable, queryable contract under
   plugin fields both dotted (`plugin.name`) and underscore (`plugin_name`); the
   helper accepts both so the sample and `/v1/logs` paths agree.
 
-No credential- or account-adjacent field is promoted (the wire boundary already
-drops `user.email`/`user.account_id`), and `promotedEventFields` lists these keys —
-in both dotted and underscore spellings — so they don't double-echo under
-`provider_extensions.event`. Building alerting/rules on the contract is downstream
-(`internal/governance`) and out of scope here.
+Account/operator identity is no longer dropped at the wire boundary: per the #107
+owner directive (extending epic #87), nothing is dropped at the local-only ingest
+boundary. `user.id`, `user.email`, `user.account_uuid`, `user.account_id`,
+`organization.id`, `terminal.type`, `user.groups` and `identity.source` — together
+with the machine/app environment `os.type`, `os.version`, `host.arch`,
+`app.entrypoint`, `app.version`, `workspace.host_paths` — are lifted into a
+present-only `provider_extensions.environment` block (`environmentKeys` /
+`claudeEnvironment`, mapping each dotted wire key to a snake_case canonical name).
+`environmentEventFields` excludes them from the `provider_extensions.event` echo so
+each value has exactly one typed home; an *unforeseen* identity key not on that list
+is not dropped either — it still rides raw under `provider_extensions.event`. Two of
+these are additionally **promoted** to the schema's top-level canonical identity
+fields, derived (never fabricated) from the retained raw block by
+`applyEnvironmentIdentity`: `actor_id` (`claude-code:` + `user.id`, falling back to
+`user.account_uuid` then `user.email`) and `repository_id` (first
+`workspace.host_paths` entry); `device_id` stays `unavailable` (no device identity in
+Claude telemetry). The per-field visibility decision is deferred downstream and
+re-evaluated only at the cloud/cross-device upload boundary. Building alerting/rules
+on the contract is downstream (`internal/governance`) and out of scope here.
 
 ## Model-interaction records — `ExtractModelInteractions`
 
@@ -557,12 +629,26 @@ As with metrics, #88 removed storage-side sanitising, so the adapter is the sole
 guard: span attributes are also reduced to an **allow-list**
 (`safeSpanAttributeKeys`, e.g. `span.type`, `gen_ai.*`, `stop_reason`, token
 counts, `duration_ms`, `error_class`, `tool_name`, `tool_use_id`, `result_tokens`,
-`decision`/`source`, `agent_id`/`workflow.*`), dropping operator/identity and any
-unforeseen or secret-bearing attribute (`user.*`, `session.id`, `authorization`,
-the redacted `user_prompt`) by default. The raw `file_path`/`full_command`/`error`
-are **not** in the allow-list — they live only in their typed block (their
-canonical home, which governance walks), so they are never duplicated into
-`provider_extensions.span_attributes`.
+`decision`/`source`, `agent_id`/`workflow.*`). An unforeseen or secret-bearing
+attribute (`authorization`, `api_key`, the redacted `user_prompt`) not on the
+allow-list is not carried into `provider_extensions.span_attributes`. The raw
+`file_path`/`full_command`/`error` are **not** in the allow-list either — they live
+only in their typed block (their canonical home, which governance walks), so they
+are never duplicated into `provider_extensions.span_attributes`.
+
+Session/environment identity is the exception carved out by #107 (X20): the identity
+keys on the span (`user.*`, `organization.id`, `terminal.type`, `identity.source`)
+and the machine/app environment on the OTLP resource (`os.*`, `host.arch`, `app.*`,
+`user.groups`, `workspace.host_paths`) are lifted into a present-only
+`provider_extensions.environment` block (`claudeEnvironment(fields, resourceAttrs)`)
+— the same block the logs path builds — so identity is retained raw rather than
+dropped (owner directive; nothing dropped at the local-only ingest boundary), while
+staying out of `span_attributes`. As on the logs path, `applyEnvironmentIdentity`
+then derives the span's canonical `actor_id` (from `user.id`) and `repository_id`
+(from `workspace.host_paths`) from that block, with `device_id` staying `unavailable`.
+(The `provider_extensions.resource` block on a span is still reduced by
+`safeMetricAttributes`; reconciling that allow-list to full raw retention, like the
+logs path, is tracked under #173.)
 
 ## Privacy
 

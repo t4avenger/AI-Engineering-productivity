@@ -9,7 +9,7 @@
     "tool": "claude-code",
     "source_schema": "otel",
     "source_version": "2.1.268",
-    "actor_id": "unavailable",
+    "actor_id": "claude-code:synthetic-user",
     "device_id": "unavailable",
     "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
     "task_id": null,
@@ -47,6 +47,17 @@
         },
         "trace_id": "00000000000000000000000000000001"
       },
+      "environment": {
+        "host_arch": "amd64",
+        "organization_id": "00000000-0000-4000-8000-0000000000aa",
+        "os_type": "linux",
+        "os_version": "0.0.0-synthetic",
+        "terminal_type": "gnome-terminal",
+        "user_account_id": "user_synthetic",
+        "user_account_uuid": "00000000-0000-4000-8000-0000000000bb",
+        "user_email": "synthetic@example.test",
+        "user_id": "synthetic-user"
+      },
       "resource": {
         "host.arch": "amd64",
         "os.type": "linux"
@@ -82,7 +93,7 @@
     "tool": "claude-code",
     "source_schema": "otel",
     "source_version": "2.1.268",
-    "actor_id": "unavailable",
+    "actor_id": "claude-code:synthetic-user",
     "device_id": "unavailable",
     "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
     "task_id": null,
@@ -136,6 +147,17 @@
           "reason": "Claude Code trace spans: per-span task-boundary mapping deferred to T-phase"
         },
         "trace_id": "00000000000000000000000000000001"
+      },
+      "environment": {
+        "host_arch": "amd64",
+        "organization_id": "00000000-0000-4000-8000-0000000000aa",
+        "os_type": "linux",
+        "os_version": "0.0.0-synthetic",
+        "terminal_type": "gnome-terminal",
+        "user_account_id": "user_synthetic",
+        "user_account_uuid": "00000000-0000-4000-8000-0000000000bb",
+        "user_email": "synthetic@example.test",
+        "user_id": "synthetic-user"
       },
       "resource": {
         "host.arch": "amd64",

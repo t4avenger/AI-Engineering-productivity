@@ -101,7 +101,7 @@ func TestNormalizeLogsPromotesPriceableRequestAttributes(t *testing.T) {
 	}
 }
 
-func TestNormalizeLogsRetainsCorrelationAndDropsOperatorFields(t *testing.T) {
+func TestNormalizeLogsRetainsCorrelationAndIdentity(t *testing.T) {
 	events, err := NormalizeLogs([]byte(rawClaudeLogs), time.Unix(0, 0).UTC())
 	if err != nil {
 		t.Fatalf("normalise: %v", err)
@@ -125,21 +125,48 @@ func TestNormalizeLogsRetainsCorrelationAndDropsOperatorFields(t *testing.T) {
 		t.Fatalf("server_fingerprint must not be emitted; raw server_name is retained instead: %#v", connection)
 	}
 
-	// No operator or machine identifier reaches canonical output; local provider
-	// session IDs are retained by policy, and the prompt.id correlation id is
-	// retained under provider_extensions.correlation (#106).
+	// Operator and organisation identity ride raw into their typed home
+	// provider_extensions.environment (#107 X20): nothing is dropped at the
+	// local-only ingest boundary (owner directive / epic #87); the per-field
+	// visibility decision is deferred downstream and re-evaluated only at the
+	// cloud/cross-device upload boundary. They are lifted out of the event echo so
+	// each identity value has exactly one typed home.
+	environment := requireEventEnvironment(t, events)
+	for key, want := range map[string]any{"user_id": "synthetic-user-hash", "organization_id": "synthetic-org"} {
+		if environment[key] != want {
+			t.Fatalf("environment[%q] = %#v, want %#v", key, environment[key], want)
+		}
+	}
+	if _, duplicated := connection["user.id"]; duplicated {
+		t.Fatalf("identity must not be duplicated in the event echo; its home is environment: %#v", connection)
+	}
+	// The prompt.id correlation id is retained under provider_extensions.correlation
+	// (#106) and local provider session IDs are retained by policy.
 	serialized, err := json.Marshal(events)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, prohibited := range []string{"synthetic-user-hash", "synthetic-org"} {
-		if strings.Contains(string(serialized), prohibited) {
-			t.Fatalf("identity leaked into canonical events: %q", prohibited)
-		}
-	}
 	if !strings.Contains(string(serialized), `"prompt_id":"synthetic-prompt"`) {
 		t.Fatalf("prompt.id correlation id not retained under correlation: %s", serialized)
 	}
+}
+
+// requireEventEnvironment returns the provider_extensions.environment map of the
+// single mcp_server_connection event, failing the test if it is absent.
+func requireEventEnvironment(t *testing.T, events []canonical.Event) map[string]any {
+	t.Helper()
+	for _, event := range events {
+		if event.EventType != "mcp_server_connection" {
+			continue
+		}
+		environment, _ := event.ProviderExtensions["environment"].(map[string]any)
+		if environment == nil {
+			t.Fatalf("mcp_server_connection event missing environment extension: %#v", event.ProviderExtensions)
+		}
+		return environment
+	}
+	t.Fatal("no mcp_server_connection event")
+	return nil
 }
 
 // requireConnectionExtensions returns the provider_extensions.event map of the

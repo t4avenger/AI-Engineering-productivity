@@ -410,6 +410,38 @@ Committed evidence:
 - `fixtures/claude/expected/claude-code-2.1.270-user-prompt.events.json`,
   `…-assistant-response.events.json`, `…-api-bodies.events.json` (golden events)
 
+## Session & environment metadata capture (X20/#107)
+
+`NormalizeLogs`/`NormalizeTraces` now retain session/environment identity raw under
+`provider_extensions.environment` (nothing dropped at the local-only ingest
+boundary — owner directive extending epic #87). The identity/env attributes ride at
+two OTLP levels, confirmed by a fresh live capture on **tool 2.1.283** against a
+loopback sink (`CLAUDE_CODE_ENABLE_TELEMETRY=1`, all three exporters `otlp`,
+isolated `HOME`, no authentication so no real API call — the exporter still flushes
+startup/session telemetry):
+
+- **Resource level:** `service.name`, `service.version`, `os.type`, `os.version`,
+  `host.arch`.
+- **Log-record / span level:** `session.id`, `user.id`, `terminal.type` (plus
+  `prompt.id`/`message.uuid` correlation ids and the per-event behaviour fields).
+
+`claudeEnvironment` builds the block from both levels (record/span keys win; resource
+keys fill the rest). Account/operator/organisation identity — `user.email`,
+`user.account_uuid`, `user.account_id`, `organization.id` — is emitted only by an
+**authenticated** session and is proven by the existing observed-sanitised trace-span
+fixture (`claude-code-2.1.268-trace-spans-otlp.json`), which carries the full identity
+surface; #107 now retains it raw instead of dropping it.
+
+Navigated-but-absent (the "navigate every path" outcome): `app.entrypoint`,
+`app.version`, and `workspace.host_paths` are documented standard attributes but were
+**not emitted** by the 2.1.283 live capture at any level. They are mapped defensively
+in `environmentKeys` so a future capture carrying them is retained without code
+change, and stay `unknown` (never `unavailable`, per AGENTS.md) pending a scheduled
+recapture on a version that emits them. Committed evidence for the retained surface is
+the trace-span and shared-prompt goldens (`environment`/`resource` blocks); no new raw
+fixture is added because the live capture's only new signal is the negative result on
+the three absent keys.
+
 ## Validation
 
 The validator rejects missing origin or tool-version metadata, prohibited field

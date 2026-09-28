@@ -44,6 +44,10 @@
       },
       "event": {
         "prompt_length": 12
+      },
+      "resource": {
+        "service.name": "claude-code",
+        "service.version": "2.1.270"
       }
     }
   },
@@ -92,6 +96,10 @@
       },
       "event": {
         "prompt_length": 34
+      },
+      "resource": {
+        "service.name": "claude-code",
+        "service.version": "2.1.270"
       }
     }
   }

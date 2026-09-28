@@ -11,8 +11,10 @@ import (
 // TestUnapprovedMCPInsightIngestEndToEnd exercises the live-data DoD: a real
 // wire-shaped Claude OTLP payload is POSTed to the running /v1/logs receiver and
 // the HTTP read API is asserted to serve the expected policy decision, with a
-// configured allowlist threaded end-to-end and operator/machine identifiers
-// absent from the response.
+// configured allowlist threaded end-to-end. Operator/machine identifiers are
+// retained raw at ingest under provider_extensions.environment (#107 X20 — nothing
+// dropped at the local-only boundary); this scoped MCP policy report is asserted to
+// have no reason to echo them, so they stay out of this response's shape.
 func TestUnapprovedMCPInsightIngestEndToEnd(t *testing.T) {
 	repository, err := sqlite.Open(":memory:")
 	if err != nil {
@@ -37,8 +39,9 @@ func TestUnapprovedMCPInsightIngestEndToEnd(t *testing.T) {
 		t.Fatalf("expected one unapproved-rogue-server finding, got %#v", report.Data.Findings)
 	}
 
-	// Operator/machine identifiers from the raw payload must never survive to the
-	// persisted read output.
+	// Operator/organisation identifiers are retained raw at ingest (#107 X20), but a
+	// scoped MCP policy-decision report has no reason to carry them: assert they do
+	// not appear in this report's shape.
 	assertNoRawIdentifiers(t,
 		[]string{"synthetic-user-hash", "synthetic-org", "synthetic-prompt"},
 		marshalJSON(t, report))

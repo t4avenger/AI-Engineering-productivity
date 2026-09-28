@@ -368,20 +368,31 @@ func assertAllEventsShareSession(t *testing.T, surface string, events []canonica
 	}
 }
 
-// TestNormalizeTracesFiltersSensitiveAttributes proves the allow-list drops
-// identity/secret-bearing span attributes (the adapter is the sole guard after
-// #88 removed storage-side sanitising) while keeping safe behaviour metadata.
-func TestNormalizeTracesFiltersSensitiveAttributes(t *testing.T) {
+// TestNormalizeTracesRetainsIdentityAndFiltersSecrets proves the #107 X20 stance
+// on an llm_request span: the known identity attribute (user.email) rides raw into
+// its typed home provider_extensions.environment (nothing dropped at the local-only
+// ingest boundary — owner directive / epic #87), while genuine secrets/credentials
+// and prompt content that are neither mapped identity keys nor on the span
+// allow-list (api_key, authorization, user_prompt) stay out of canonical output —
+// the adapter is the sole guard after #88 removed storage-side sanitising. Safe
+// behaviour metadata is preserved.
+func TestNormalizeTracesRetainsIdentityAndFiltersSecrets(t *testing.T) {
 	payload := []byte(`{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}},{"key":"service.version","value":{"stringValue":"2.1.268"}}]},"scopeSpans":[{"scope":{"name":"com.anthropic.claude_code.tracing"},"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","name":"claude_code.llm_request","startTimeUnixNano":"1789117549650000000","attributes":[{"key":"span.type","value":{"stringValue":"llm_request"}},{"key":"stop_reason","value":{"stringValue":"end_turn"}},{"key":"session.id","value":{"stringValue":"synthetic-session"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"user_prompt","value":{"stringValue":"tiq-canary-prompt"}},{"key":"api_key","value":{"stringValue":"tiq-canary-api-key"}},{"key":"authorization","value":{"stringValue":"Bearer tiq-canary-token"}}]}]}]}]}`)
 	events, err := NormalizeTraces(payload, time.Now().UTC())
 	if err != nil {
 		t.Fatalf("NormalizeTraces: %v", err)
 	}
+	// The known identity key is retained raw in its typed home (#107 X20).
+	environment, ok := events[0].ProviderExtensions["environment"].(map[string]any)
+	if !ok || environment["user_email"] != "synthetic@example.test" {
+		t.Fatalf("user.email must ride raw into provider_extensions.environment: %#v", events[0].ProviderExtensions["environment"])
+	}
+	// Secrets/credentials and prompt content on no allow-list stay out entirely.
 	encoded, err := json.Marshal(events)
 	if err != nil {
 		t.Fatalf("marshal events: %v", err)
 	}
-	for _, leaked := range []string{"tiq-canary-api-key", "Bearer tiq-canary-token", "synthetic@example.test", "tiq-canary-prompt"} {
+	for _, leaked := range []string{"tiq-canary-api-key", "Bearer tiq-canary-token", "tiq-canary-prompt"} {
 		if strings.Contains(string(encoded), leaked) {
 			t.Fatalf("sensitive value %q leaked in %s", leaked, encoded)
 		}
@@ -391,7 +402,7 @@ func TestNormalizeTracesFiltersSensitiveAttributes(t *testing.T) {
 		t.Fatalf("safe span attribute stop_reason not preserved: %#v", spanAttributes)
 	}
 	if _, present := spanAttributes["user.email"]; present {
-		t.Fatalf("identity attribute user.email must be dropped: %#v", spanAttributes)
+		t.Fatalf("identity attribute user.email home is environment, not span_attributes: %#v", spanAttributes)
 	}
 }
 
@@ -711,25 +722,41 @@ func TestNormalizeTracesToolSpanUnavailableFields(t *testing.T) {
 	}
 }
 
-// TestNormalizeTracesToolSpanFiltersSensitiveAttributes proves the allow-list
-// still drops an unforeseen identity/secret attribute on a tool span, while the
-// raw file_path/full_command are captured in the typed block (their canonical
-// home) and never leak into span_attributes.
-func TestNormalizeTracesToolSpanFiltersSensitiveAttributes(t *testing.T) {
+// TestNormalizeTracesToolSpanRetainsIdentityAndDropsUnknownAttribute proves the
+// #107 X20 stance on a tool span: a known identity attribute (user.email) rides raw
+// into its typed home provider_extensions.environment (nothing dropped at the
+// local-only ingest boundary — owner directive / epic #87), while an unforeseen,
+// non-identity attribute on no allow-list (api_key) is not surfaced anywhere. The
+// raw full_command is captured in the typed block (its canonical home) and never
+// leaks into span_attributes.
+func TestNormalizeTracesToolSpanRetainsIdentityAndDropsUnknownAttribute(t *testing.T) {
 	event := singleSpanEvent(t, toolSpanPayload("tool", `,{"key":"tool_name","value":{"stringValue":"Bash"}},{"key":"full_command","value":{"stringValue":"cat config/app.yaml"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"api_key","value":{"stringValue":"tiq-canary-tool-key"}}`))
-	encoded, err := json.Marshal(event)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	for _, leaked := range []string{"synthetic@example.test", "tiq-canary-tool-key"} {
-		if strings.Contains(string(encoded), leaked) {
-			t.Fatalf("sensitive value %q leaked: %s", leaked, encoded)
-		}
-	}
+	assertRetainsIdentityDropsSecret(t, event, "tiq-canary-tool-key")
 	if block := toolBlock(t, event, "tool"); block["full_command"] != "cat config/app.yaml" {
 		t.Fatalf("raw full_command must be captured in the typed block: %#v", block)
 	}
 	assertAbsentFromSpanAttributes(t, event, "full_command")
+}
+
+// assertRetainsIdentityDropsSecret proves the #107 X20 stance shared by the tool
+// and hook span identity tests: a known identity attribute (user.email) rides raw
+// into its typed home provider_extensions.environment (nothing dropped at the
+// local-only ingest boundary — owner directive / epic #87), while an unforeseen,
+// non-identity attribute on no allow-list (secretCanary) is not surfaced anywhere
+// in the encoded event.
+func assertRetainsIdentityDropsSecret(t *testing.T, event canonical.Event, secretCanary string) {
+	t.Helper()
+	environment, ok := event.ProviderExtensions["environment"].(map[string]any)
+	if !ok || environment["user_email"] != "synthetic@example.test" {
+		t.Fatalf("user.email must ride raw into provider_extensions.environment: %#v", event.ProviderExtensions["environment"])
+	}
+	encoded, err := json.Marshal(event)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(encoded), secretCanary) {
+		t.Fatalf("unknown non-identity attribute must not be surfaced: %s", encoded)
+	}
 }
 
 // TestNormalizeTracesSubAgentWorkflowPresentOnly proves sub-agent workflow
@@ -855,21 +882,17 @@ func TestNormalizeTracesHookSpanUnavailableFields(t *testing.T) {
 	}
 }
 
-// TestNormalizeTracesHookSpanFiltersSensitiveAttributes proves the allow-list
-// still drops an unforeseen identity/secret attribute on a hook span, while the
-// gated hook_definitions is captured raw in the typed block (its canonical home)
-// and never leaks into span_attributes.
-func TestNormalizeTracesHookSpanFiltersSensitiveAttributes(t *testing.T) {
+// TestNormalizeTracesHookSpanRetainsIdentityAndDropsUnknownAttribute proves the
+// #107 X20 stance on a hook span: a known identity attribute (user.email) rides
+// raw into its typed home provider_extensions.environment (nothing dropped at the
+// local-only ingest boundary — owner directive / epic #87), while an unforeseen,
+// non-identity attribute that is on no allow-list (api_key) is not surfaced
+// anywhere — it is neither a mapped environment key nor a safe span attribute, so
+// it never reaches a canonical block. The gated hook_definitions stays raw in the
+// typed block (its canonical home) and never leaks into span_attributes.
+func TestNormalizeTracesHookSpanRetainsIdentityAndDropsUnknownAttribute(t *testing.T) {
 	event := singleSpanEvent(t, toolSpanPayload("hook", `,{"key":"hook_event","value":{"stringValue":"PreToolUse"}},{"key":"hook_definitions","value":{"stringValue":"[{\"type\":\"command\",\"command\":\"./scripts/guard.sh\"}]"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"api_key","value":{"stringValue":"tiq-canary-hook-key"}}`))
-	encoded, err := json.Marshal(event)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	for _, leaked := range []string{"synthetic@example.test", "tiq-canary-hook-key"} {
-		if strings.Contains(string(encoded), leaked) {
-			t.Fatalf("sensitive value %q leaked: %s", leaked, encoded)
-		}
-	}
+	assertRetainsIdentityDropsSecret(t, event, "tiq-canary-hook-key")
 	if block := toolBlock(t, event, "hook"); block["hook_definitions"] != "[{\"type\":\"command\",\"command\":\"./scripts/guard.sh\"}]" {
 		t.Fatalf("raw hook_definitions must be captured in the typed block: %#v", block)
 	}

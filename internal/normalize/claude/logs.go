@@ -57,21 +57,20 @@ var wireKeyMapping = map[string]string{
 	"request.id":      "request_id",
 }
 
-// droppedKeyPrefixes are attribute keys that identify the operator or machine
-// rather than behaviour. They are dropped here so they never reach
-// provider_extensions.event, belt-and-braces with the upstream sanitiser (which
-// already removes user.email/user.account_id but retains provider session IDs
-// under the local-only exception).
-var droppedKeyPrefixes = []string{"user.", "organization.", "terminal."}
-
 // droppedKeys are attributes dropped at the wire boundary. tool_parameters is
 // gated content: on tool_decision (and with OTEL_LOG_TOOL_DETAILS=1 more broadly)
 // it carries the full command and MCP server/tool names, so it is not surfaced
 // here. That drop is pre-existing and owned by #173; whether the epic #87
-// raw-capture stance should retain it is #173's decision, not settled here.
-// prompt.id/message.uuid are the per-prompt / per-message correlation ids: they
-// are retained under provider_extensions.correlation (#106), not dropped — the
-// normaliser lifts them there and excludes them from the event echo.
+// raw-capture stance should retain it is #173's decision, not settled here. It is
+// the only remaining wire-boundary drop: operator/machine identity
+// (user.*/organization.*/terminal.*) is no longer dropped — per the owner directive
+// (and epic #87 / PRODUCT_MAP §11.3) nothing is dropped at the local-only ingest
+// boundary; those keys ride raw into provider_extensions.environment (#107 X20),
+// the per-field visibility decision deferred downstream and re-evaluated only at
+// the cloud/cross-device upload boundary. prompt.id/message.uuid are the per-prompt
+// / per-message correlation ids retained under provider_extensions.correlation
+// (#106), not dropped — the normaliser lifts them there and excludes them from the
+// event echo.
 var droppedKeys = map[string]struct{}{"tool_parameters": {}}
 
 // serverIdentityKeys carry a provider-reported MCP server identity. The raw name
@@ -114,7 +113,7 @@ func NormalizeLogs(data []byte, receivedAt time.Time) ([]canonical.Event, error)
 // safe). indexBase is the count of events already produced, keeping event indexing
 // stable and contiguous across resources.
 func normaliseResourceLogs(resource resourceLog, receivedAt time.Time, indexBase int) ([]canonical.Event, error) {
-	resourceAttrs := attributeValues(resource.Resource.Attributes)
+	resourceAttrs := resourceAttributeValues(resource.Resource.Attributes)
 	if service, _ := resourceAttrs["service.name"].(string); service != claudeLogService {
 		return nil, nil
 	}
@@ -131,6 +130,10 @@ func normaliseResourceLogs(resource resourceLog, receivedAt time.Time, indexBase
 			if err != nil {
 				return nil, err
 			}
+			attachResourceEnvironment(event.ProviderExtensions, resourceAttrs)
+			// Resource-level environment (workspace.host_paths) is merged above, so
+			// re-derive repository_id/actor_id now that the block is complete (#107 X20).
+			applyEnvironmentIdentity(&event)
 			events = append(events, event)
 		}
 	}
@@ -139,13 +142,15 @@ func normaliseResourceLogs(resource resourceLog, receivedAt time.Time, indexBase
 
 // sampleEventFromRecord reduces one OTLP log record to the underscore-keyed
 // sample-event map normaliseSampleEvent consumes: it maps the dotted semantic
-// keys, drops operator/machine identifiers, retains provider session and MCP
-// server display identities allowed by local policy, and forwards the remaining
-// behaviour attributes verbatim.
+// keys, retains provider session, operator/machine identity, and MCP server
+// display identities raw (nothing dropped at the local-only ingest boundary —
+// owner directive / epic #87; identity rides into provider_extensions.environment,
+// #107), and forwards the remaining behaviour attributes verbatim. Only the gated
+// droppedKeys (tool_parameters, #173) are withheld.
 func sampleEventFromRecord(record logRecord) map[string]any {
 	sample := make(map[string]any, len(record.Attributes))
 	for _, attribute := range record.Attributes {
-		if _, dropped := droppedKeys[attribute.Key]; dropped || hasDroppedPrefix(attribute.Key) {
+		if _, dropped := droppedKeys[attribute.Key]; dropped {
 			continue
 		}
 		value, ok := attributeValue(attribute.Value)
@@ -167,13 +172,43 @@ func sampleEventFromRecord(record logRecord) map[string]any {
 	return sample
 }
 
-func hasDroppedPrefix(key string) bool {
-	for _, prefix := range droppedKeyPrefixes {
-		if strings.HasPrefix(key, prefix) {
-			return true
+// attachResourceEnvironment retains the OTLP resource attributes on a log event:
+// the full raw attribute set under provider_extensions.resource (nothing dropped —
+// owner directive / epic #87) and the machine/app environment keys merged into the
+// present-only provider_extensions.environment block, so a log event carries the
+// same environment/identity surface a trace span does (#107 X20). The environment
+// block already holds the record-level identity keys (built in normaliseSampleEvent
+// from the log record); resource keys fill only the slots the record did not carry,
+// so record identity is never overwritten by a resource value.
+func attachResourceEnvironment(extensions, resourceAttrs map[string]any) {
+	if len(resourceAttrs) == 0 {
+		return
+	}
+	extensions["resource"] = copyAttributes(resourceAttrs)
+	resourceEnvironment := claudeEnvironment(resourceAttrs)
+	if resourceEnvironment == nil {
+		return
+	}
+	existing, ok := extensions["environment"].(map[string]any)
+	if !ok || existing == nil {
+		extensions["environment"] = resourceEnvironment
+		return
+	}
+	for key, value := range resourceEnvironment {
+		if _, present := existing[key]; !present {
+			existing[key] = value
 		}
 	}
-	return false
+}
+
+// copyAttributes returns a shallow copy so per-event provider_extensions.resource
+// blocks do not alias the shared per-resource attribute map.
+func copyAttributes(attrs map[string]any) map[string]any {
+	out := make(map[string]any, len(attrs))
+	for key, value := range attrs {
+		out[key] = value
+	}
+	return out
 }
 
 func isServerIdentityKey(key string) bool {
@@ -191,6 +226,27 @@ func attributeValues(attributes []otlpAttribute) map[string]any {
 	for _, attribute := range attributes {
 		if value, ok := attributeValue(attribute.Value); ok {
 			values[attribute.Key] = value
+		}
+	}
+	return values
+}
+
+// resourceAttributeValues flattens OTLP resource attributes like attributeValues
+// but also decodes arrayValue members (as []string), so the raw
+// provider_extensions.resource block and the environment block retain list-valued
+// resource metadata such as workspace.host_paths and gateway user.groups (nothing
+// dropped — owner directive / epic #87 / #107 X20). The scalar attributeValue
+// decoder is deliberately left untouched so the record-level event echo and the
+// metrics goldens do not shift; only resource-level flattening gains array support.
+func resourceAttributeValues(attributes []otlpAttribute) map[string]any {
+	values := make(map[string]any, len(attributes))
+	for _, attribute := range attributes {
+		if value, ok := attributeValue(attribute.Value); ok {
+			values[attribute.Key] = value
+			continue
+		}
+		if array := decodeStringArray(attribute.Value); array != nil {
+			values[attribute.Key] = array
 		}
 	}
 	return values

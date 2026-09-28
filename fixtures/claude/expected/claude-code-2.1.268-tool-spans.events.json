@@ -47,6 +47,10 @@
         },
         "trace_id": "00000000000000000000000000000101"
       },
+      "environment": {
+        "host_arch": "amd64",
+        "os_type": "linux"
+      },
       "resource": {
         "host.arch": "amd64",
         "os.type": "linux"
@@ -119,6 +123,10 @@
         },
         "trace_id": "00000000000000000000000000000101"
       },
+      "environment": {
+        "host_arch": "amd64",
+        "os_type": "linux"
+      },
       "resource": {
         "host.arch": "amd64",
         "os.type": "linux"
@@ -188,6 +196,10 @@
           "reason": "Claude Code tool spans are intra-interaction operations, not task boundaries"
         },
         "trace_id": "00000000000000000000000000000101"
+      },
+      "environment": {
+        "host_arch": "amd64",
+        "os_type": "linux"
       },
       "resource": {
         "host.arch": "amd64",
@@ -262,6 +274,10 @@
         },
         "trace_id": "00000000000000000000000000000101"
       },
+      "environment": {
+        "host_arch": "amd64",
+        "os_type": "linux"
+      },
       "resource": {
         "host.arch": "amd64",
         "os.type": "linux"
@@ -333,6 +349,10 @@
         },
         "trace_id": "00000000000000000000000000000101"
       },
+      "environment": {
+        "host_arch": "amd64",
+        "os_type": "linux"
+      },
       "resource": {
         "host.arch": "amd64",
         "os.type": "linux"
@@ -401,6 +421,10 @@
           "reason": "Claude Code tool spans are intra-interaction operations, not task boundaries"
         },
         "trace_id": "00000000000000000000000000000101"
+      },
+      "environment": {
+        "host_arch": "amd64",
+        "os_type": "linux"
       },
       "resource": {
         "host.arch": "amd64",
