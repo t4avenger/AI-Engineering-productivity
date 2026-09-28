@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/htmx.min.js" defer></script>
 </head>
-<body class="{{if .Nav}}has-sidebar{{else}}unlock-shell{{end}}">
+<body class="{{if .Nav}}has-sidebar{{else}}unlock-shell{{end}}{{if .Rail}} has-rail{{end}}">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <div class="app-shell">
 {{end}}
@@ -78,12 +78,14 @@
 {{define "shell-end"}}
     {{if .Nav}}
     </div>
-    {{if .RightRail}}
+    {{if eq .Rail "session"}}
     <aside class="right-rail" aria-label="Session summary">
       {{template "session_right_rail.html" .RightRail}}
     </aside>
-    {{else}}
-    <div class="right-rail" aria-hidden="true"></div>
+    {{else if eq .Rail "governance"}}
+    <aside class="right-rail governance-preview-rail" aria-labelledby="policy-preview-heading">
+      {{template "governance_preview_rail.html" .RightRail}}
+    </aside>
     {{end}}
     {{end}}
   </div>

@@ -291,32 +291,16 @@
     </div>
     {{end}}{{end}}
   </section>
-  <aside class="governance-preview-rail" aria-labelledby="policy-preview-heading">
-    <section>
-      <h2 id="policy-preview-heading">Policy Preview</h2>
-      <p>{{template "status-badge" .MCPPreview.State}} <strong>{{.MCPPreview.Title}}</strong></p>
-      <p>{{.MCPPreview.Description}}</p>
-      <p class="muted">Preview evaluates retained evidence after capture. It does not intercept or approve provider actions.</p>
-    </section>
-    <section aria-labelledby="prompt-findings-heading">
-      <h2 id="prompt-findings-heading">Prompt findings — after capture</h2>
-      <p>Action: Record finding</p>
-      {{range .PromptKeywordGroups}}
-      <h3>{{.Label}}</h3>
-      {{if .Rules}}<ul class="prompt-keyword-chips" aria-label="{{.Label}} configured rules">{{range .Rules}}<li>{{.Label}}</li>{{end}}</ul>{{else}}<p class="muted">No {{.Label}} rules are configured.</p>{{end}}
-      {{end}}
-      <p class="muted">Chips are the rules saved in local configuration. They are not a built-in secret or customer-data catalogue.</p>
-    </section>
-    <section id="future-policy-controls">
-      <h2>Future policy controls</h2>
-      <p>{{template "status-badge" "unavailable"}}</p>
-      <p class="muted">Enforcement and exceptions require their architecture gates; no team, publish, or runtime-blocking state is available here.</p>
-    </section>
-  </aside>
   </div>
   {{end}}
   <script>
   (function () {
+    function setGovernanceUnsaved(text, hidden) {
+      var rail = document.getElementById("governance-unsaved");
+      if (!rail) return;
+      rail.hidden = hidden;
+      rail.textContent = hidden ? "" : text;
+    }
     var categoryTablist = document.querySelector('[role="tablist"][aria-label="Access Rules categories"]');
     if (categoryTablist) {
       var categoryTabs = Array.prototype.slice.call(categoryTablist.querySelectorAll('[role="tab"]'));
@@ -351,6 +335,7 @@
         var changed = serialised(new FormData(form)) !== initialState;
         summary.hidden = !changed;
         summary.textContent = changed ? "Unsaved local " + policyName + " changes." : "";
+        setGovernanceUnsaved(summary.textContent, !changed);
         saveButtons.forEach(function (button) { button.disabled = !changed; });
       }
       form.addEventListener("click", function (event) { onClick(event, refresh); });
@@ -456,6 +441,7 @@
       if (summary) {
         summary.hidden = !changed;
         summary.textContent = changed ? names.length + " unsaved local " + form.dataset.policyName + " allowlist change(s): " + names.join(", ") + "." : "";
+        setGovernanceUnsaved(summary.textContent, !changed);
       }
       saveButtons.forEach(function (button) { button.disabled = !changed; });
       refreshRows();

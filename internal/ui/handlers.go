@@ -21,11 +21,17 @@ import (
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
+const (
+	railSession    = "session"
+	railGovernance = "governance"
+)
+
 type layoutData struct {
 	Title     string
 	Nav       string
 	Health    healthStatus
 	Content   any
+	Rail      string
 	RightRail any
 	Error     string
 }
@@ -559,7 +565,7 @@ func (s *Server) sessionDetail(w http.ResponseWriter, r *http.Request) {
 	attachSelectionPaths(&data, r)
 	s.populateEventInspector(r, id, data.inspectorSessionEvents, &data)
 	data.Legend = eventLegend(data.Events, data.SpanEvidence, data.Conversation, data.Trace)
-	s.render(w, tmplSessionDetail, layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(r), Content: data, RightRail: data})
+	s.render(w, tmplSessionDetail, layoutData{Title: "Session", Nav: "sessions", Health: s.healthLabel(r), Content: data, Rail: railSession, RightRail: data})
 }
 
 func unavailableGovernanceChecklist() (governance.RiskyAccess, governance.UnapprovedMCP) {
@@ -740,7 +746,14 @@ func (s *Server) governancePage(w http.ResponseWriter, r *http.Request) {
 	data.Saved = r.URL.Query().Get("saved") == "1"
 	data.ActiveRulesTab = governanceRulesTab(r.URL.Query().Get("rules"))
 	data.RulesShell = accessRulesShellFor(data.ActiveRulesTab)
-	s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
+	s.render(w, tmplGovernance, s.governanceLayout(r, data))
+}
+
+func (s *Server) governanceLayout(r *http.Request, data governanceData) layoutData {
+	return layoutData{
+		Title: "Governance", Nav: "governance", Health: s.healthLabel(r),
+		Content: data, Rail: railGovernance, RightRail: data,
+	}
 }
 
 // governanceRulesTab clamps ?rules= to a known Access Rules tab; default mcp.
@@ -1061,7 +1074,7 @@ func (s *Server) renderGovernanceError(w http.ResponseWriter, r *http.Request, s
 	data.ActiveRulesTab = tab
 	w.Header().Set(htmlContentTypeHeader, htmlContentTypeValue)
 	w.WriteHeader(status)
-	s.render(w, tmplGovernance, layoutData{Title: "Governance", Nav: "governance", Health: s.healthLabel(r), Content: data})
+	s.render(w, tmplGovernance, s.governanceLayout(r, data))
 }
 
 func (s *Server) governancePageData(r *http.Request, mcpSelected, skillsSelected []string, pathDraft ...config.PathRules) governanceData {

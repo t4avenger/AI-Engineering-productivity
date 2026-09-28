@@ -1885,6 +1885,36 @@ func assertIntegrationsBody(t *testing.T, repo storage.SessionReader, want, want
 	}
 }
 
+func TestShellRailOnlyOnSessionAndGovernance(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fullStub{sessions: []canonical.Session{syntheticSession("rail-session", now)}}
+	handler := wrapUI(t, repo)
+	cookie := unlock(t, handler)
+
+	for _, path := range []string{"/", "/sessions"} {
+		body := getAuthed(t, handler, cookie, path).Body.String()
+		if strings.Contains(body, `class="right-rail`) {
+			t.Fatalf("%s must not reserve an empty right rail: %q", path, body)
+		}
+		if strings.Contains(body, "has-rail") {
+			t.Fatalf("%s must not use the rail shell: %q", path, body)
+		}
+	}
+
+	governance := renderGovernance(t, governanceFindingsFixture(t), nil)
+	assertContainsAll(t, governance, []string{
+		`class="right-rail governance-preview-rail"`,
+		"Policy Preview",
+		"has-rail",
+		"A published policy set, approval flow, and runtime enforcement are unavailable.",
+	})
+	assertOmitsAll(t, governance, []string{"Session Breakdown"})
+
+	detail := getAuthed(t, handler, cookie, "/sessions/rail-session").Body.String()
+	assertContainsAll(t, detail, []string{`class="right-rail"`, "Session Breakdown", "has-rail"})
+	assertOmitsAll(t, detail, []string{"Policy Preview", "governance-preview-rail"})
+}
+
 func TestGovernanceFindingsPage(t *testing.T) {
 	repo := governanceFindingsFixture(t)
 

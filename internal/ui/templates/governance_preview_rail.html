@@ -1,0 +1,24 @@
+{{define "governance_preview_rail.html"}}
+<section>
+  <h2 id="policy-preview-heading">Policy Preview</h2>
+  <p>{{template "status-badge" .MCPPreview.State}} <strong>{{.MCPPreview.Title}}</strong></p>
+  <p>{{.MCPPreview.Description}}</p>
+  <p>Path rules {{template "status-badge" (printf "%s" .PathRules.Outcome)}} {{template "status-badge" .PathRules.Visibility}}</p>
+  <p>Prompt findings {{template "status-badge" (printf "%s" .PromptKeywordReport.Outcome)}} {{template "status-badge" .PromptKeywordReport.Visibility}}</p>
+  <p class="muted">Preview evaluates retained evidence after capture. Branches are no finding, finding, or indeterminate. It does not intercept or approve provider actions.</p>
+</section>
+<section aria-labelledby="prompt-findings-heading">
+  <h2 id="prompt-findings-heading">Prompt findings — after capture</h2>
+  <p>Action: Record finding</p>
+  {{range .PromptKeywordGroups}}
+  <h3>{{.Label}}</h3>
+  {{if .Rules}}<ul class="prompt-keyword-chips" aria-label="{{.Label}} configured rules">{{range .Rules}}<li>{{.Label}}</li>{{end}}</ul>{{else}}<p class="muted">No {{.Label}} rules are configured.</p>{{end}}
+  {{end}}
+  <p class="muted">Chips are the rules saved in local configuration. They are not a built-in secret or customer-data catalogue.</p>
+</section>
+<section id="future-policy-controls">
+  <h2>Unsaved changes</h2>
+  <p id="governance-unsaved" class="muted" hidden></p>
+  <p class="muted">A published policy set, approval flow, and runtime enforcement are unavailable.</p>
+</section>
+{{end}}

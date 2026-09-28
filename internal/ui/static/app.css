@@ -92,8 +92,11 @@ body.unlock-shell .app-shell {
 }
 body.has-sidebar .app-shell {
   display: grid;
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--rail-width);
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   min-height: 100vh;
+}
+body.has-sidebar.has-rail .app-shell {
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--rail-width);
 }
 
 .app-sidebar {
@@ -276,7 +279,8 @@ body.has-sidebar .app-shell {
 
 /* Compact labelled-on-focus navigation at tablet widths (S03). */
 @media (max-width: 1024px) {
-  body.has-sidebar .app-shell {
+  body.has-sidebar .app-shell,
+  body.has-sidebar.has-rail .app-shell {
     grid-template-columns: var(--compact-nav-width) minmax(0, 1fr);
     grid-template-rows: auto auto;
   }
@@ -326,7 +330,8 @@ body.has-sidebar .app-shell {
 
 /* Below 768px: disclosure + single column (S03). */
 @media (max-width: 767px) {
-  body.has-sidebar .app-shell {
+  body.has-sidebar .app-shell,
+  body.has-sidebar.has-rail .app-shell {
     grid-template-columns: 1fr;
   }
   .app-sidebar {
@@ -741,7 +746,7 @@ button.secondary { background: transparent; border: 1px solid var(--color-border
 .governance-summary-card h2, .governance-preview-rail h2 { font-size: var(--font-base); margin: 0 0 var(--space-2); }
 .governance-summary-card p { margin: var(--space-2) 0 0; }
 .summary-value { color: var(--color-accent); font-size: var(--font-lg); font-weight: 700; }
-.governance-workspace { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1fr) minmax(16rem, var(--rail-width)); margin-top: var(--space-5); }
+.governance-workspace { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1fr); margin-top: var(--space-5); }
 .governance-workspace > * { min-width: 0; }
 .governance-preview-rail { display: grid; align-content: start; gap: var(--space-3); }
 .mcp-rule-toolbar, .governance-save-bar { align-items: end; display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: space-between; margin-bottom: var(--space-3); }
