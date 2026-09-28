@@ -8,8 +8,7 @@
   <header class="session-trace-header">
     <div class="session-trace-title-row">
       <div>
-        <p class="eyebrow">Session Trace</p>
-        <h1 id="session-trace-heading">Session {{.Session.SessionID}}</h1>
+        <h1 id="session-trace-heading">Session Trace</h1>
         <p class="session-trace-meta">
           <span>{{template "status-badge" .Session.State}}</span>
           <span>{{.Session.Tool}} · {{.Session.Provider}}</span>
@@ -27,6 +26,8 @@
         </ul>
       </details>
     </div>
+    <details class="trace-evidence-summary">
+      <summary>Session evidence and availability</summary>
     {{if .SessionMetadata}}
     <section aria-labelledby="session-environment-heading">
       <h2 id="session-environment-heading">Environment</h2>
@@ -47,6 +48,7 @@
       </ul>
     </section>
     {{end}}
+    </details>
   </header>
 
   {{if .FilesError}}<p class="error" role="alert">{{.FilesError}}</p>{{end}}

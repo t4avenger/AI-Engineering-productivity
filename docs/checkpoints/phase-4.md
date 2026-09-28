@@ -1,6 +1,7 @@
 # Phase 4 checkpoint: local governance reporting and reference-aligned UI
 
-Status: **GO WITH CONDITIONS** for the #195 local UI acceptance subphase.
+Status: **REOPENED** — the previous #195 visual acceptance was based on
+self-generated regression snapshots rather than a source-image comparison.
 This is not a declaration that the wider PRODUCT_MAP Phase 4 milestone or any
 enterprise capability is complete.
 
@@ -20,9 +21,10 @@ enterprise capability is complete.
 
 ## Acceptance, privacy and accessibility
 
-- S01–S04, N01–N03, T01–T10 and G01–G08 are recorded complete in the UI
-  roadmap. The evidence README records every intentional source-image
-  difference by requirement ID.
+- The reopened #195 remediation uses live rendered evidence plus
+  source-derived geometry checks; self-generated screenshots alone do not
+  establish reference fidelity. The evidence README records deliberate
+  local-only differences by requirement ID.
 - The browser journey performs non-mocked OTLP ingest, reader projection and UI
   rendering using synthetic wire-shaped data. It asserts focus navigation,
   reduced motion, token contrast, no page-wide overflow and all target
@@ -54,5 +56,6 @@ enterprise capability is complete.
   the effective pricing tier and request-level attribution needed for cost
   attribution.
 
-**Decision:** accept the local reference-aligned UI subphase. Do not use this
+**Decision:** do not accept the local reference-aligned UI subphase until the
+remediation PR has completed its full verification and review. Do not use this
 checkpoint to enable gated enterprise behaviour.

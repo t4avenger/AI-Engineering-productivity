@@ -6,7 +6,7 @@ import { expect, type Page, test } from '@playwright/test';
  * daemon address, auth token, Codex OTLP payload shape and daemon-reset hooks
  * live here once instead of being copied per spec.
  */
-const daemonBase = 'http://localhost:18080';
+export const daemonBase = process.env.TELEMETRYIQ_E2E_ORIGIN ?? 'http://localhost:18080';
 export const authToken = 'playwright-token';
 
 export async function unlockDashboard(
@@ -21,12 +21,11 @@ export async function unlockDashboard(
   ).toBeVisible();
 }
 
-/** Session detail h1; level-scoped so "Session Breakdown" rail does not match. */
+/** Session Trace h1; level-scoped so the right-rail heading does not match. */
 export async function expectSessionDetailHeading(page: Page): Promise<void> {
   await expect(
-    page.getByRole('heading', { level: 1, name: /^Session / }),
+    page.getByRole('heading', { level: 1, name: 'Session Trace' }),
   ).toBeVisible();
-  await expect(page.getByText('Session Trace', { exact: true }).first()).toBeVisible();
 }
 
 /** Chronological lists under the Session Trace (T10 accessible alternative). */

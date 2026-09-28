@@ -16,11 +16,12 @@ The browser scenario selects a retained conversation event to show the Session
 Trace inspector and opens the Files & Paths editor on Governance. It uses
 synthetic fixture values only. Screenshot text is evidence, not product data.
 
-Playwright pins Chromium for the screenshot baseline. Its `system-ui` font still
-varies slightly between supported Linux image versions, so the regression
-assertion permits at most a 5% pixel difference. That bound is calibrated above
-the observed 4% glyph-rasterisation difference on Ubuntu 24.04; layout, colour
-and larger visual regressions remain test failures.
+Playwright pins Chromium for the screenshot baseline. The baseline is a
+regression guard only; it is not accepted as source-image proof. The live test
+also asserts source-derived desktop geometry: a 200px sidebar, a dense
+280–360px right rail, five Session Trace lanes, and four Governance summary
+cards. Review the source and 1680×945 captures side by side before accepting a
+new baseline.
 
 ## Intentional deviations checklist
 
@@ -30,3 +31,4 @@ and larger visual regressions remain test failures.
 | T01, T04, T09 | No Share control, generated plan stages, model approval, or clean governance claims. | These require explicit retained evidence or E03; the UI shows availability/indeterminate states instead. |
 | G01, G03–G05, G07 | No environment selector, Publish, Enforced/Blocked/approval claims, users/repositories, or pre-send prompt blocking. | Local detect-and-report is the accepted scope; E01–E03 remain gated. |
 | G02, G06 | Rule counts and rows come only from saved configuration or observed synthetic evidence. | The source image's values are illustrative and must not become defaults. |
+| T01, T04, T09; G01–G07 | The source images supplied the hierarchy, density, navy panel system, three-column desktop composition, and interaction affordances. | The remediation intentionally matches those visual relationships while preserving evidence-backed local content and explicit unavailable states. |

@@ -28,8 +28,8 @@
     <article class="governance-summary-card"><h2>Prompt rules</h2>{{if .PromptKeywordsConfigured}}<p class="summary-value">{{.PromptKeywordCount}} configured</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Prompt findings — after capture</p></article>
   </section>
 
-  <section aria-labelledby="findings-heading">
-    <h2 id="findings-heading">Findings</h2>
+  <details class="governance-findings" id="findings">
+    <summary id="findings-heading">Findings and retained evidence</summary>
 
     <section aria-labelledby="risky-access-heading">
       <h3 id="risky-access-heading">Risky access</h3>
@@ -120,7 +120,7 @@
       <p class="muted">No MCP servers were observed in retained events, so this check is indeterminate.</p>
       {{end}}
     </section>
-  </section>
+  </details>
 
   <div class="governance-workspace">
   <section id="access-rules" aria-labelledby="access-rules-heading">

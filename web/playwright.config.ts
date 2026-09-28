@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const testConfigHome = `/tmp/telemetryiq-playwright-${String(process.pid)}`;
+const testPort = process.env.TELEMETRYIQ_E2E_PORT ?? '18080';
+const testOrigin = `http://localhost:${testPort}`;
 
 export default defineConfig({
   updateSnapshots:
@@ -10,13 +12,13 @@ export default defineConfig({
   workers: 1,
   reporter: [['list']],
   use: {
-    baseURL: 'http://localhost:18080',
+    baseURL: testOrigin,
     trace: 'on-first-retry',
   },
   webServer: [
     {
-      command: `cd .. && XDG_CONFIG_HOME=${testConfigHome} TELEMETRYIQ_AUTH_TOKEN=playwright-token TELEMETRYIQ_HOST=localhost TELEMETRYIQ_PORT=18080 go run ./cmd/telemetryiq`,
-      url: 'http://localhost:18080/api/v1/health',
+      command: `cd .. && XDG_CONFIG_HOME=${testConfigHome} TELEMETRYIQ_AUTH_TOKEN=playwright-token TELEMETRYIQ_HOST=localhost TELEMETRYIQ_PORT=${testPort} go run ./cmd/telemetryiq`,
+      url: `${testOrigin}/api/v1/health`,
       reuseExistingServer: false,
       timeout: 120_000,
     },

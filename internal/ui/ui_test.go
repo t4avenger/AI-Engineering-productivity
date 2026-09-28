@@ -1140,7 +1140,8 @@ func TestSessionGovernanceReadFailureKeepsSessionMetadataVisible(t *testing.T) {
 	}
 	body := renderSessionDetail(t, repo, []string{"filesystem"}, "governance-error-session")
 	assertContainsAll(t, body, []string{
-		"Session governance-error-session",
+		"Session Trace",
+		"governance-error-session",
 		"anthropic",
 		"Session governance checks are unavailable because retained events could not be loaded.",
 		"Unable to load timeline.",

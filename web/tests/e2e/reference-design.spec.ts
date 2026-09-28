@@ -74,7 +74,7 @@ const destinations: Destination[] = [
   },
   {
     name: 'governance',
-    path: '/governance?rules=paths',
+    path: '/governance',
     heading: 'Governance Policies',
   },
 ];
@@ -132,6 +132,25 @@ async function captureDestination(
     path: path.join(evidenceDir, `${destination.name}-${viewport.name}.png`),
     animations: 'disabled',
   });
+
+  if (viewport.name === '1680x945' && ['sessions', 'governance'].includes(destination.name)) {
+    const geometry = await page.evaluate((destinationName) => {
+      const width = (selector: string): number =>
+        Math.round(document.querySelector(selector)?.getBoundingClientRect().width ?? 0);
+      return {
+        sidebar: width('.app-sidebar'),
+        rail: width(destinationName === 'sessions' ? '.right-rail' : '.governance-preview-rail'),
+        lanes: document.querySelectorAll('.trace-lane').length,
+        cards: document.querySelectorAll('.governance-summary-card').length,
+      };
+    }, destination.name);
+    expect(geometry.sidebar, 'reference sidebar is 200px').toBeGreaterThanOrEqual(190);
+    expect(geometry.sidebar, 'reference sidebar is 200px').toBeLessThanOrEqual(210);
+    expect(geometry.rail, 'reference right rail remains a dense desktop column').toBeGreaterThanOrEqual(280);
+    expect(geometry.rail, 'reference right rail remains a dense desktop column').toBeLessThanOrEqual(360);
+    if (destination.name === 'sessions') expect(geometry.lanes).toBe(5);
+    if (destination.name === 'governance') expect(geometry.cards).toBe(4);
+  }
 }
 
 function contrastRatio(first: number[], second: number[]): number {
