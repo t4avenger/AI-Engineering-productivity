@@ -24,6 +24,9 @@
   <div class="rules-panel inspector-columns" role="tabpanel" id="inspector-panel-details" aria-labelledby="inspector-tab-details">
     <section>
       <h3>Identity and timing</h3>
+      {{if .IntervalEvents}}
+      <p>{{len .IntervalEvents}}{{if .IntervalMore}} of the events{{end}} in this mark are listed on <a href="{{.EventsTabURL}}">Events</a>. This panel shows the selected record.</p>
+      {{end}}
       <dl class="timeline-facts">
         <div><dt>Event type</dt><dd>{{.EventType}}</dd></div>
         <div><dt>Occurred at</dt><dd>{{.OccurredAt}}</dd></div>
@@ -35,8 +38,11 @@
     </section>
     <section>
       <h3>Attributes</h3>
-      <p class="muted">Retained attribute values stay on the Attributes tab, including unknown provider extensions.</p>
-      <p><a href="{{.AttributesTabURL}}">Open Attributes</a></p>
+      <pre class="inspector-json">{{.AttributesJSON}}</pre>
+      {{if and .ExtensionsJSON (ne .ExtensionsJSON "{}") (ne .ExtensionsJSON "null")}}
+      <h3>Provider extensions</h3>
+      <pre class="inspector-json">{{.ExtensionsJSON}}</pre>
+      {{end}}
     </section>
     <section>
       <h3>Related files</h3>
@@ -61,6 +67,13 @@
   </div>
   {{else}}
   <div class="rules-panel" role="tabpanel" id="inspector-panel-events" aria-labelledby="inspector-tab-events">
+    {{if .IntervalEvents}}
+    <h3>Events in this mark</h3>
+    <ul class="file-evidence-list">{{range .IntervalEvents}}
+      <li>{{if .Href}}<a href="{{.Href}}">{{.Label}}</a>{{else}}{{.Label}}{{end}}{{if .Meta}} <span class="muted">{{.Meta}}</span>{{end}}</li>
+    {{end}}</ul>
+    {{if .IntervalMore}}<p class="muted">{{.IntervalMore}} more events in this interval stay in the chronological list.</p>{{end}}
+    {{end}}
     <h3>Related files</h3>
     {{if eq .FilesAvailability "none"}}
     <p class="muted">No proven file relationships for this event.</p>

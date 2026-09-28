@@ -121,6 +121,16 @@ export async function expectGovernanceAccessRulesShells(
   await expect(page.getByRole('button', { name: 'Enforce' })).toHaveCount(0);
 }
 
+/** Reference layout keeps detect-and-report findings closed under the policy workspace. */
+export async function openGovernanceFindings(page: Page): Promise<void> {
+  const findings = page.locator('#governance-findings');
+  await expect(findings).toBeVisible();
+  if ((await findings.getAttribute('open')) === null) {
+    await findings.locator('summary').click();
+  }
+  await expect(page.getByRole('heading', { name: 'Risky access' })).toBeVisible();
+}
+
 /**
  * Client-side MCP editor behaviours for #191 / G03+G05: dirty count/diff, filter
  * without dropping hidden selections, reset to the active baseline, and

@@ -31,21 +31,20 @@
         <div class="trace-lane-track" style="--trace-stack-rows: {{.TrackHeight}}">
           {{range .Markers}}
           <a
-            class="trace-marker trace-marker-{{.Kind}}{{if eq .Kind "span"}} is-span{{end}}{{if .Selected}} is-selected{{end}}{{if not .HasDuration}} is-point{{end}}"
+            class="trace-marker trace-marker-{{.Kind}} is-flow{{if .HasDuration}} is-span{{else}} is-point{{end}}{{if .Selected}} is-selected{{end}}"
             href="{{.SelectPath}}"
             id="{{.DOMID}}"
             data-event-id="{{.EventID}}"
             {{if .SpanID}}data-span-id="{{.SpanID}}"{{end}}
             {{if .ParentSpanID}}data-parent-span-id="{{.ParentSpanID}}"{{end}}
-            style="left: {{printf "%.3f" .LeftPercent}}%;{{if .HasDuration}} width: {{printf "%.3f" .WidthPercent}}%;{{end}} --trace-stack-index: {{.StackIndex}}; --trace-nest-depth: {{.NestDepth}}"
+            style="left: {{printf "%.3f" .LeftPercent}}%;{{if .HasDuration}} width: {{printf "%.3f" .WidthPercent}}%;{{end}}"
             title="{{.AccessibleName}}"
             aria-label="{{.AccessibleName}}"
           >
             {{template "event-kind-icon" .Kind}}
             <span class="trace-marker-copy">
               <span class="trace-marker-label">{{.Label}}</span>
-              <span class="muted trace-marker-time">{{.OffsetLabel}}{{if .HasDuration}} · {{.DurationLabel}}{{end}}</span>
-              {{if .Preview}}<span class="trace-marker-preview">{{.Preview}}</span>{{end}}
+              <span class="muted trace-marker-time">{{if gt .Count 1}}{{.Count}} · {{end}}{{.OffsetLabel}}</span>
             </span>
           </a>
           {{else}}

@@ -11,6 +11,7 @@ import {
   expectGovernanceAccessRulesShells,
   expectGovernanceMCPEditorInteractions,
   ingestOTLPLogs,
+  openGovernanceFindings,
   resetDaemonBetweenTests,
   unlockDashboard,
 } from './live-ingest-helpers';
@@ -53,6 +54,7 @@ test('renders risky-access findings after live OTLP ingest', async ({
   await page.goto('/governance');
   await expectFiveDestinationPrimaryNav(page);
   await expect(page.getByRole('heading', { name: 'Governance' })).toBeVisible();
+  await openGovernanceFindings(page);
   await expect(page.getByRole('heading', { name: 'Risky access' })).toBeVisible();
   await expect(page.getByText('Violation').first()).toBeVisible();
   await expect(page.getByText('/home/dev/secret-app/.env').first()).toBeVisible();

@@ -215,3 +215,29 @@ func TestSessionTraceSelectionHighlightsLaneMarker(t *testing.T) {
 		t.Fatalf("selected lane marker missing is-selected: %q", body)
 	}
 }
+
+func TestSessionTraceFoldsDenseLaneIntoFlowMarks(t *testing.T) {
+	now := time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)
+	completed := now.Add(20 * time.Minute)
+	session := syntheticSession("dense-trace", now)
+	session.CompletedAt = &completed
+	events := make([]canonical.Event, 0, 24)
+	for i := 0; i < 24; i++ {
+		events = append(events, canonical.Event{
+			EventID: "model-" + string(rune('a'+i)), EventType: "model_interaction", SessionID: "dense-trace",
+			OccurredAt: now.Add(time.Duration(i) * 40 * time.Second), ReceivedAt: now.Add(time.Duration(i) * 40 * time.Second),
+			Provider: "anthropic", Tool: "claude-code",
+		})
+	}
+	body := renderSessionDetail(t, &fullStub{
+		sessions: []canonical.Session{session},
+		events:   map[string][]canonical.Event{"dense-trace": events},
+	}, nil, "dense-trace")
+	marks := strings.Count(body, "trace-marker-agent")
+	if marks < 1 || marks > 6 {
+		t.Fatalf("agent lane marks = %d, want 1..6 flow nodes", marks)
+	}
+	if !strings.Contains(body, "Model interaction · ") {
+		t.Fatalf("folded agent marks must show a count: %s", body)
+	}
+}

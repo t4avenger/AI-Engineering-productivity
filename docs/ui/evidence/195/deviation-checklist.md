@@ -13,12 +13,12 @@ are visually approved.
 | S03 | 200px sidebar and 300px rail at desktop for Governance and Session Trace. Other pages do not keep an empty gutter. 44px rule rows. Tablet rail drops under the content. Narrow layout uses the menu disclosure. | Horizontal scroll stays inside the trace, not the page. |
 | S04 | Visible text labels, focus, 12px metadata floor, reduced-motion, and rendered contrast checks. | Decorative icons are hidden from the accessibility tree. |
 | T01 | Compact Session Trace title, breadcrumb, state, model, branch, PR, duration, tokens, timestamp, and overflow. | No Share upload and no invented cost. Delete stays in Actions. Extra metadata is behind a closed disclosure. |
-| T02 | Shared ruler with five clock ticks and five fixed lanes. | Tick labels follow the observed window, not a fixed four-minute demo. |
-| T03 | Conversation cards show role text, offset, and retained preview. | Point events use a readable card anchored at the timestamp and say they have no duration. |
+| T02 | Shared ruler with five clock ticks and five lanes joined by a flow line. | A dense session folds each lane into at most about six labeled marks. Tick labels follow the observed window. |
+| T03 | Conversation marks are short labeled nodes on the flow line. Role and retained preview open in the inspector. | The matrix does not print the prompt on every message. Point events stay points and say they have no duration. |
 | T04 | Agent lane shows observed model work only. | No Plan, Inspect, Implement, Test, or Revise stages and no connectors. |
-| T05 | Tools, MCP, and skills use distinct icons and text. | Names come from retained evidence. |
-| T06 | File cards use retained paths. Related files stay in the inspector. | Line-change counts appear only when the record already has them. |
-| T07 | Span lane uses duration bars and nesting depth. | Missing parents stay labelled orphans. |
+| T05 | Tools, MCP, and skills are distinct nodes on the flow line. | Names, duration, and outcome open in the inspector. A crowded interval is one node with a count. |
+| T06 | File events are bars on the clock. Paths and related files stay in the inspector. | Line-change counts appear only when the record already has them. |
+| T07 | Span lane uses duration bars on the flow line. | Child spans in the same interval share one bar. Missing parents stay labelled orphans. |
 | T08 | Inspector is docked under the matrix with Details, Attributes, and Events. Escape, close, and deep links stay. | Attributes remain escaped retained JSON. Temporal neighbours are not linked. |
 | T09 | Breakdown, session governance, and a legend of rendered kinds. | Indeterminate checks stay labelled. There is no green "approved model" or "no secrets" claim without an engine result. |
 | T10 | Chronological lists remain, closed by default. | Loaded pages are not reported as full-session totals. |
@@ -29,5 +29,5 @@ are visually approved.
 | G05 | Policy Preview rail states no finding, finding, or indeterminate for MCP, paths, and prompts. Unsaved text mirrors the editor. | Not the screenshot's Allow, Require approval, Block sequence. |
 | G06 | Skills, paths, and prompt editors remain real forms with validation, reset, and save when their controllers exist. | Missing controllers stay explicitly unavailable. |
 | G07 | Prompt workspace says Prompt findings — after capture and Record finding. | No pre-send protection. |
-| G08 | Risky access and unapproved MCP stay below the workspace with evidence links. | Empty allowlists stay unconfigured. |
+| G08 | Risky access and unapproved MCP stay in a closed Findings disclosure under the workspace, with evidence links. | The reference page stops at the policy editor. The finding tables are not the default bottom of the page. |
 | E01–E04 | Not implemented. | Enforcement, publishing, sharing, and GitHub sync remain gated. |

@@ -193,7 +193,8 @@ async function expectReferenceGeometry(
       };
     });
     expect(pointLayout.inlineWidth.endsWith('%')).toBe(false);
-    expect(pointLayout.width).toBeGreaterThan(120);
+    expect(pointLayout.width).toBeGreaterThan(100);
+    expect(pointLayout.width).toBeLessThan(210);
     expect(pointLayout.width).toBeLessThan(pointLayout.trackWidth);
     const dock = await page.evaluate(() => {
       const inspector = document.getElementById('event-inspector');
