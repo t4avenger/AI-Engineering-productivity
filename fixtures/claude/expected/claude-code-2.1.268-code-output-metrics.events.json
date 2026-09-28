@@ -9,7 +9,7 @@
     "tool": "claude-code",
     "source_schema": "otel",
     "source_version": "2.1.268",
-    "actor_id": "unavailable",
+    "actor_id": "claude-code:synthetic-user",
     "device_id": "unavailable",
     "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
     "task_id": null,
@@ -41,18 +41,33 @@
           "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
         }
       },
+      "environment": {
+        "host_arch": "amd64",
+        "os_type": "linux",
+        "os_version": "0.0.0-synthetic",
+        "user_email": "synthetic@example.test",
+        "user_id": "synthetic-user"
+      },
       "metric": {
         "name": "claude_code.lines_of_code.count",
         "unit": "count"
       },
       "metric_attributes": {
         "agent.name": "general-purpose",
+        "model": "claude-sonnet-5",
         "query_source": "main",
-        "skill.name": "code-reviewer"
+        "session.id": "00000000-0000-4000-8000-000000000001",
+        "skill.name": "code-reviewer",
+        "type": "added",
+        "user.email": "synthetic@example.test",
+        "user.id": "synthetic-user"
       },
       "resource": {
         "host.arch": "amd64",
-        "os.type": "linux"
+        "os.type": "linux",
+        "os.version": "0.0.0-synthetic",
+        "service.name": "claude-code",
+        "service.version": "2.1.268"
       }
     }
   },
@@ -66,7 +81,7 @@
     "tool": "claude-code",
     "source_schema": "otel",
     "source_version": "2.1.268",
-    "actor_id": "unavailable",
+    "actor_id": "claude-code:synthetic-user",
     "device_id": "unavailable",
     "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
     "task_id": null,
@@ -98,18 +113,31 @@
           "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
         }
       },
+      "environment": {
+        "host_arch": "amd64",
+        "os_type": "linux",
+        "os_version": "0.0.0-synthetic",
+        "user_id": "synthetic-user"
+      },
       "metric": {
         "name": "claude_code.lines_of_code.count",
         "unit": "count"
       },
       "metric_attributes": {
         "agent.name": "general-purpose",
+        "model": "claude-sonnet-5",
         "query_source": "main",
-        "skill.name": "code-reviewer"
+        "session.id": "00000000-0000-4000-8000-000000000001",
+        "skill.name": "code-reviewer",
+        "type": "removed",
+        "user.id": "synthetic-user"
       },
       "resource": {
         "host.arch": "amd64",
-        "os.type": "linux"
+        "os.type": "linux",
+        "os.version": "0.0.0-synthetic",
+        "service.name": "claude-code",
+        "service.version": "2.1.268"
       }
     }
   },
@@ -123,7 +151,7 @@
     "tool": "claude-code",
     "source_schema": "otel",
     "source_version": "2.1.268",
-    "actor_id": "unavailable",
+    "actor_id": "claude-code:synthetic-user",
     "device_id": "unavailable",
     "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
     "task_id": null,
@@ -154,16 +182,27 @@
           "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
         }
       },
+      "environment": {
+        "host_arch": "amd64",
+        "os_type": "linux",
+        "os_version": "0.0.0-synthetic",
+        "user_id": "synthetic-user"
+      },
       "metric": {
         "name": "claude_code.commit.count",
         "unit": "count"
       },
       "metric_attributes": {
-        "query_source": "main"
+        "query_source": "main",
+        "session.id": "00000000-0000-4000-8000-000000000001",
+        "user.id": "synthetic-user"
       },
       "resource": {
         "host.arch": "amd64",
-        "os.type": "linux"
+        "os.type": "linux",
+        "os.version": "0.0.0-synthetic",
+        "service.name": "claude-code",
+        "service.version": "2.1.268"
       }
     }
   },
@@ -177,7 +216,7 @@
     "tool": "claude-code",
     "source_schema": "otel",
     "source_version": "2.1.268",
-    "actor_id": "unavailable",
+    "actor_id": "claude-code:synthetic-user",
     "device_id": "unavailable",
     "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
     "task_id": null,
@@ -208,16 +247,27 @@
           "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
         }
       },
+      "environment": {
+        "host_arch": "amd64",
+        "os_type": "linux",
+        "os_version": "0.0.0-synthetic",
+        "user_id": "synthetic-user"
+      },
       "metric": {
         "name": "claude_code.pull_request.count",
         "unit": "count"
       },
       "metric_attributes": {
-        "query_source": "main"
+        "query_source": "main",
+        "session.id": "00000000-0000-4000-8000-000000000001",
+        "user.id": "synthetic-user"
       },
       "resource": {
         "host.arch": "amd64",
-        "os.type": "linux"
+        "os.type": "linux",
+        "os.version": "0.0.0-synthetic",
+        "service.name": "claude-code",
+        "service.version": "2.1.268"
       }
     }
   }
