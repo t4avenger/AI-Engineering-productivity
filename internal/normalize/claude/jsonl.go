@@ -33,12 +33,14 @@ const eventTypeAssistantMessage = "assistant_message"
 // the prompt surface is captured from the transcript, not only from OTLP (#94).
 const eventTypeUserMessage = "user_message"
 
-// transcriptRecord decodes the envelope shared by conversation records. Only the
-// scalar fields F4 promotes or allow-lists are declared; content-bearing nested
-// shapes (message.content[], toolUseResult, …) are deliberately absent so they
-// are never read into a canonical event (owned by E7 #94 / J18 #105). Fields are
-// read from the record body — no filename or path is passed to the normaliser,
-// so correlation is the in-record sessionId, not the on-disk file stem.
+// transcriptRecord decodes the scalar envelope shared by conversation records
+// (the F4-promoted / allow-listed fields, cwd included — #173). The content-bearing
+// nested shapes are decoded by the dedicated content shapers, not here:
+// message.content[] by decodeContentBlocks (assistant/user/tool paths) and the
+// record-scoped toolUseResult by transcriptContentEnvelope (#173, Site 3), so each
+// body is read once through its owning path rather than twice. Fields are read from
+// the record body — no filename or path is passed to the normaliser, so correlation
+// is the in-record sessionId, not the on-disk file stem.
 type transcriptRecord struct {
 	Type          string            `json:"type"`
 	UUID          string            `json:"uuid"`
@@ -46,6 +48,7 @@ type transcriptRecord struct {
 	SessionID     string            `json:"sessionId"`
 	Timestamp     string            `json:"timestamp"`
 	Version       string            `json:"version"`
+	Cwd           string            `json:"cwd"`
 	GitBranch     string            `json:"gitBranch"`
 	Entrypoint    string            `json:"entrypoint"`
 	UserType      string            `json:"userType"`
@@ -468,11 +471,16 @@ func transcriptTokenCount(number json.Number) *int64 {
 	return normalize.OptionalTokenCount(number.String())
 }
 
-// transcriptEnvelope reduces the assistant record to the allow-listed safe scalar
-// envelope. cwd and every content body are deliberately excluded — the allow-list
-// is the sole guard (#88), so only proven-safe behaviour scalars are carried.
+// transcriptEnvelope reduces the assistant or content-bearing user record to its
+// behaviour scalars. cwd (the workspace path a record ran in) is retained raw (#173,
+// epic #87) alongside the other scalars; content bodies are carried by the dedicated
+// content shapers, not here. Per PRODUCT_MAP §11.3 nothing is amputated at ingest —
+// any downstream visibility of the path is layered over the retained value.
 func transcriptEnvelope(record transcriptRecord) map[string]any {
 	envelope := map[string]any{}
+	if record.Cwd != "" {
+		envelope["cwd"] = record.Cwd
+	}
 	if record.GitBranch != "" {
 		envelope["git_branch"] = record.GitBranch
 	}

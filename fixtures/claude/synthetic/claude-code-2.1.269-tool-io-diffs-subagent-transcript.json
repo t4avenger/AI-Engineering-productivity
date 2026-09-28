@@ -83,6 +83,14 @@
         "userType": "external",
         "isSidechain": false,
         "entrypoint": "cli",
+        "toolUseResult": {
+          "type": "text",
+          "file": {
+            "filePath": "internal/app/module.go",
+            "numLines": 2,
+            "totalBytes": 9007199254740993
+          }
+        },
         "message": {
           "role": "user",
           "content": [
@@ -156,6 +164,10 @@
         "userType": "external",
         "isSidechain": false,
         "entrypoint": "cli",
+        "toolUseResult": {
+          "type": "text",
+          "summary": "batched edit and write results"
+        },
         "message": {
           "role": "user",
           "content": [

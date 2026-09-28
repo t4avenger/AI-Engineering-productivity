@@ -37,6 +37,7 @@
         "uuid": "10000000-0000-4000-8000-000000000001"
       },
       "transcript": {
+        "cwd": "/home/synthetic/project",
         "entrypoint": "cli",
         "git_branch": "main",
         "is_sidechain": false,
@@ -88,6 +89,7 @@
       },
       "transcript": {
         "api_block_index": 0,
+        "cwd": "/home/synthetic/project",
         "entrypoint": "cli",
         "git_branch": "main",
         "is_sidechain": false,
@@ -241,6 +243,7 @@
       },
       "transcript": {
         "api_block_index": 1,
+        "cwd": "/home/synthetic/project",
         "entrypoint": "cli",
         "git_branch": "main",
         "is_sidechain": false,

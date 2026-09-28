@@ -18,6 +18,7 @@
         }
       },
       "event": {
+        "cwd": "/home/synthetic/project",
         "parent_uuid": "a5000000-0000-4000-8000-000000000005",
         "tool_name": "Bash",
         "tool_use_id": "toolu_bash"
@@ -54,6 +55,7 @@
         }
       },
       "event": {
+        "cwd": "/home/synthetic/project",
         "parent_uuid": "a3000000-0000-4000-8000-000000000003",
         "tool_name": "Edit",
         "tool_use_id": "toolu_edit"
@@ -69,7 +71,12 @@
             "text": "Applied 1 edit.",
             "type": "text"
           }
-        ]
+        ],
+        "tool_use_result": {
+          "summary": "batched edit and write results",
+          "type": "text"
+        },
+        "tool_use_result_scope": "record"
       }
     }
   },
@@ -92,6 +99,7 @@
         }
       },
       "event": {
+        "cwd": "/home/synthetic/project",
         "is_sidechain": true,
         "parent_uuid": "a8000000-0000-4000-8000-000000000008",
         "tool_name": "Grep",
@@ -130,6 +138,7 @@
         }
       },
       "event": {
+        "cwd": "/home/synthetic/project",
         "parent_uuid": "a1000000-0000-4000-8000-000000000001",
         "tool_name": "Read",
         "tool_use_id": "toolu_read"
@@ -143,7 +152,15 @@
             "text": "package app\n// module",
             "type": "text"
           }
-        ]
+        ],
+        "tool_use_result": {
+          "file": {
+            "filePath": "internal/app/module.go",
+            "numLines": 2,
+            "totalBytes": 9007199254740993
+          },
+          "type": "text"
+        }
       }
     }
   },
@@ -166,6 +183,7 @@
         }
       },
       "event": {
+        "cwd": "/home/synthetic/project",
         "parent_uuid": "a7000000-0000-4000-8000-000000000007",
         "tool_name": "Task",
         "tool_use_id": "toolu_task"
@@ -204,6 +222,7 @@
         }
       },
       "event": {
+        "cwd": "/home/synthetic/project",
         "parent_uuid": "a5000000-0000-4000-8000-000000000005",
         "tool_name": "TodoWrite",
         "tool_use_id": "toolu_todo"
@@ -251,6 +270,7 @@
         }
       },
       "event": {
+        "cwd": "/home/synthetic/project",
         "parent_uuid": "a3000000-0000-4000-8000-000000000003",
         "tool_name": "Write",
         "tool_use_id": "toolu_write"
