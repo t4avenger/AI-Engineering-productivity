@@ -85,15 +85,21 @@ body if the change was primarily a CPD fix.
   field names and shapes are captured and asserted raw.
 - Local APIs bind to loopback by default.
 - Unknown values must not be represented as zero.
-- Provider-native session/conversation/request IDs, file paths, and command
-  lines are retained and displayed raw in the local-only edition with a stable
-  provider prefix for namespacing; account identifiers and email remain dropped
-  at the wire boundary in this edition.
+- Provider-native session/conversation/request IDs, file paths, command lines,
+  and session/environment identity (operator/organisation identity — `user.*`,
+  `organization.id`, `terminal.type` — and machine/app environment — `os.*`,
+  `host.arch`, `app.*`, `workspace.host_paths`) are retained and displayed raw in
+  the local-only edition with a stable provider prefix for namespacing. Nothing is
+  dropped at the local-only ingest boundary: account identifiers and email are
+  captured raw (they may not be surfaced everywhere yet, but they are retained for
+  later use); the per-field visibility decision is a downstream policy stage layered
+  over the retained raw data, never an ingest-time amputation.
 - Cloud, team, or cross-device sharing is a separate trust boundary and must
-  re-evaluate every field before any upload or aggregation; the no-hiding stance
-  above applies to the local-only single-user edition.
+  re-evaluate every field — account identifiers and email especially — before any
+  upload or aggregation; the no-hiding stance above applies to the local-only
+  single-user edition, and that upload-boundary re-evaluation is unchanged.
 
-Any proposed change that weakens these invariants must be rejected unless the product specification is explicitly revised. This section reflects the epic #87 revision.
+Any proposed change that weakens these invariants must be rejected unless the product specification is explicitly revised. This section reflects the epic #87 revision, extended by the #107 owner directive (nothing dropped at the local-only ingest boundary — see PRODUCT_MAP §11.3).
 
 ## Provider integration rules
 

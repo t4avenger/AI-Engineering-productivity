@@ -88,10 +88,14 @@ The first usable release must run entirely on a developer's machine. Cloud conne
 
 ### 2.2 Privacy by design
 In the local-only edition, retain raw provider content at ingest, including prompt
-text, response text, source code, file paths and command arguments (epic #87).
-Visibility policy is downstream of retention. Account identifiers and email
-remain excluded at the wire boundary; diagnostics must be sanitised and sharing
-requires a separate trust-boundary review. Section 11.3 governs older defaults.
+text, response text, source code, file paths, command arguments (epic #87) and
+session/environment identity — operator/organisation identity and machine/app
+environment (#107). Nothing is dropped at the local-only ingest boundary: account
+identifiers and email are captured raw (they may not be surfaced everywhere yet,
+but they are retained for later use). Visibility policy is downstream of retention.
+Diagnostics must be sanitised, and cloud/team/cross-device sharing requires a
+separate trust-boundary review that re-evaluates every field — account identifiers
+and email especially — before any upload. Section 11.3 governs older defaults.
 
 ### 2.3 Progressive telemetry
 Users and administrators must be able to select increasing levels of telemetry detail.
@@ -588,7 +592,8 @@ sharing:
 - Provider-native session/conversation/request IDs and MCP server names are persisted and displayed raw with a stable provider prefix for namespacing (`codex:`, `claude-code:`, `cursor-agent:`). When a native ID is genuinely absent, a non-keyed positional/content ID is used for uniqueness only — never a keyed hash.
 - Raw file paths and command lines are retained. `privacy.ClassifyPath` / `privacy.ClassifyCommandAccess` run *over the raw stored value* to add a governance class (`dotenv`, `ssh_key`, `cert`, `credentials_file`, `project_relative`, `non_project`) and a syntactic project boundary (`project`, `external`, `indeterminate`). The class is an additional governance signal layered on the retained raw value, not a replacement for it.
 - Prompt/response/source-code content is captured raw when the provider emits it (epic #87): the normalisers persist it verbatim with no ingest-time re-redaction, exactly as file paths and command lines are. The `collection.prompts` / `collection.responses` / `collection.source_code` flags (and any future hide policy) are a **downstream visibility policy over already-captured raw data** — a per-field decision deferred to a later policy stage or customer/enterprise configuration, evaluated on top of the retained raw value, not an ingest-time amputation. Content shape and gating are exercised by #94's fixtures.
-- Cloud, team, or cross-device sharing is a different trust boundary and must re-evaluate every field before any upload or aggregation; the no-hiding stance above applies only to the local-only single-user edition.
+- Session/environment identity is captured raw when the provider emits it (#107, owner directive extending epic #87): operator/organisation identity (`user.id`, `user.email`, `user.account_uuid`, `user.account_id`, `organization.id`, `terminal.type`) and machine/app environment (`os.type`, `os.version`, `host.arch`, `app.entrypoint`, `app.version`, `workspace.host_paths`) are retained verbatim under `provider_extensions.environment`, with no ingest-time drop. **This supersedes the earlier local-only carve-out that dropped account identifiers and email at the wire boundary.** The rationale is the same as for content: we do not drop data we may not surface yet but that may be useful later; the per-field visibility decision is a downstream policy stage, not an ingest-time amputation. Value-based governance classifiers still run *over* the retained raw value to add a class, never to drop it, and captured identity is never written to diagnostics/stderr.
+- Cloud, team, or cross-device sharing is a different trust boundary and must re-evaluate every field — account identifiers and email especially — before any upload or aggregation; the no-hiding stance above applies only to the local-only single-user edition, and this upload-boundary re-evaluation is unchanged by #107.
 - Provide field-level provenance showing why a field was retained.
 - Support complete local deletion.
 - Use synthetic secrets in tests.

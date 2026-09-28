@@ -49,21 +49,30 @@ func TestClaudeToolSpanIngestPromotesObservedPRLink(t *testing.T) {
 	}
 }
 
-// hookSpanCanaries are the synthetic identity/secret values withHookSpanCanaries
-// injects into the hook fixture; neither may survive the span-attribute
-// allow-list into the persisted event or the read API.
-func hookSpanCanaries() []string {
-	return []string{"tiq-canary@example.test", "tiq-canary-api-key"}
+// hookSpanSecretCanary is the synthetic secret withHookSpanCanaries injects into
+// the hook fixture; being neither a mapped identity key nor an allow-listed span
+// attribute, it must not survive into the persisted event or the read API. (The
+// identity canary it injects alongside is, by contrast, retained raw under
+// provider_extensions.environment per #107 X20 — asserted separately.)
+func hookSpanSecretCanary() []string {
+	return []string{"tiq-canary-api-key"}
 }
 
+// hookSpanIdentityCanary is the synthetic operator email withHookSpanCanaries
+// injects; per #107 X20 it is retained raw under provider_extensions.environment
+// (nothing dropped at the local-only boundary — owner directive / epic #87).
+const hookSpanIdentityCanary = "tiq-canary@example.test"
+
 // TestClaudeHookSpansIngestEndToEnd is the #103 (T16) live daemon ingest→read
-// gate: the synthetic claude_code.hook spans fixture — augmented with canary
-// identity and secret attributes — is POSTed to /v1/traces, and the HTTP read
-// API serves the two hook events (typed hook block, duration, honest
-// unavailable_fields) while the injected canaries never survive the allow-list
-// into the persisted span_attributes or the response. The gated hook_definitions
-// is retained raw in the typed block only (epic #87), proving TelemetryIQ carries
-// the hook intervention surface rather than dropping it.
+// gate: the synthetic claude_code.hook spans fixture — augmented with a canary
+// identity attribute and a canary secret — is POSTed to /v1/traces, and the HTTP
+// read API serves the two hook events (typed hook block, duration, honest
+// unavailable_fields). The injected secret never survives the allow-list into the
+// persisted span_attributes or the response, while the identity attribute is
+// retained raw under provider_extensions.environment (#107 X20 — nothing dropped at
+// the local-only boundary). The gated hook_definitions is retained raw in the typed
+// block only (epic #87), proving TelemetryIQ carries the hook intervention surface
+// rather than dropping it.
 func TestClaudeHookSpansIngestEndToEnd(t *testing.T) {
 	server, repository := newPersistentTestServer(t)
 	payload := withHookSpanCanaries(t, metricsFixturePayloadBytes(t, "claude-code-2.1.268-hook-spans-otlp.json"))
@@ -78,10 +87,10 @@ func TestClaudeHookSpansIngestEndToEnd(t *testing.T) {
 	assertHookSpanStorage(t, repository, sessionID)
 }
 
-// withHookSpanCanaries appends synthetic identity/secret attributes to the first
-// claude_code.hook span so the live gate proves the span-attribute allow-list
-// (safeSpanAttributeKeys) drops them end to end — they are deliberately not
-// allow-listed.
+// withHookSpanCanaries appends a synthetic identity attribute and a synthetic
+// secret to the first claude_code.hook span so the live gate proves both #107 X20
+// stances end to end: the secret (on no allow-list) is dropped, while the identity
+// key rides raw into provider_extensions.environment.
 func withHookSpanCanaries(t *testing.T, payload []byte) []byte {
 	t.Helper()
 	var envelope map[string]any
@@ -156,7 +165,7 @@ func assertHookSpanTimeline(t *testing.T, server *httptest.Server, sessionID str
 	if hooks != 2 {
 		t.Fatalf("hook timeline events = %d, want 2: %#v", hooks, timeline.Data)
 	}
-	assertNoRawIdentifiers(t, hookSpanCanaries(), marshalJSON(t, timeline))
+	assertNoRawIdentifiers(t, hookSpanSecretCanary(), marshalJSON(t, timeline))
 	assertHookSpanEnvelopes(t, server, sessionID)
 }
 
@@ -183,8 +192,10 @@ func assertHookSpanEnvelopes(t *testing.T, server *httptest.Server, sessionID st
 }
 
 // assertHookSpanStorage proves the persisted hook events carry the typed hook
-// block with the gated hook_definitions retained raw, while the injected
-// canaries were dropped from the allow-listed span_attributes passthrough.
+// block with the gated hook_definitions retained raw; that the injected secret was
+// dropped from the allow-listed span_attributes passthrough; and that the injected
+// identity attribute is retained raw under provider_extensions.environment (#107
+// X20), reading back on the span that carried it.
 func assertHookSpanStorage(t *testing.T, repository storage.Repository, sessionID string) {
 	t.Helper()
 	stored, err := repository.ListEvents(context.Background(), storage.EventFilter{SessionID: sessionID, Limit: 10})
@@ -203,13 +214,16 @@ func assertHookSpanStorage(t *testing.T, repository storage.Repository, sessionI
 		t.Fatalf("stored hook events = %d, want 2", hooks)
 	}
 	encoded := marshalJSON(t, stored)
-	assertNoRawIdentifiers(t, hookSpanCanaries(), encoded)
+	assertNoRawIdentifiers(t, hookSpanSecretCanary(), encoded)
+	assertEnvironmentIdentity(t, stored, map[string]string{"user_email": hookSpanIdentityCanary})
 	assertRawToolEvidence(t, encoded, "./scripts/format-guard.sh", "./scripts/deny-network.sh")
 }
 
 // assertHookBlock checks one persisted hook event exposes the typed hook block
-// (including gated hook_definitions) and that the injected canaries plus the
-// gated field never leaked into the allow-listed span_attributes passthrough.
+// (including gated hook_definitions) and that neither the injected canaries nor the
+// gated field leaked into the allow-listed span_attributes passthrough — user.email
+// has its own typed home (provider_extensions.environment, #107), so it is likewise
+// absent here.
 func assertHookBlock(t *testing.T, event canonical.Event) {
 	t.Helper()
 	block, ok := event.Attributes["hook"].(map[string]any)

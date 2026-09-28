@@ -122,9 +122,13 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 	}
 	echoExcluded := append(promotedEventFields(name), gatedEventFields()...)
 	echoExcluded = append(echoExcluded, correlationEventFields()...)
+	echoExcluded = append(echoExcluded, environmentEventFields()...)
 	extensions := map[string]any{
 		"correlation": correlation,
 		"event":       normalize.UnknownFields(raw, echoExcluded...),
+	}
+	if environment := claudeEnvironment(raw); environment != nil {
+		extensions["environment"] = environment
 	}
 	if requestID := normalize.OptionalString(raw, "request_id"); requestID != nil {
 		extensions["request_id"] = nativeSessionPrefix + *requestID
@@ -378,9 +382,10 @@ func attachRefusalContext(contract, raw map[string]any) {
 // gives downstream governance work (internal/governance) one key to read — a
 // bypassPermissions transition, a failed auth — without building any rule here
 // (out of scope for #96). Values ride verbatim (epic #87 — no ingest redaction);
-// no credential-adjacent field is promoted, and account identifiers
-// (user.email/user.account_id) are already dropped at the wire boundary
-// (logs.go droppedKeyPrefixes).
+// no credential-adjacent field is promoted into the governance block. Account and
+// operator identity (user.*/organization.*/terminal.*) is retained raw under
+// provider_extensions.environment (#107 X20) — per the owner directive nothing is
+// dropped at the local-only ingest boundary — not folded into governance here.
 //
 // Both the reviewed sample-event path and the raw /v1/logs wire path reach this
 // with the same keys: the wire path leaves event-specific attributes under their
@@ -667,6 +672,96 @@ func correlationKeys(raw map[string]any) map[string]any {
 func correlationEventFields() []string {
 	keys := make([]string, 0, len(correlationRawKeys))
 	for rawKey := range correlationRawKeys {
+		keys = append(keys, rawKey)
+	}
+	return keys
+}
+
+// environmentKeys map the wire attribute keys carrying Claude Code's session
+// environment and identity metadata (#107 X20) onto their canonical snake_case
+// names under provider_extensions.environment. Values are retained raw: per the
+// owner directive (and epic #87 / PRODUCT_MAP §11.3) nothing is dropped at the
+// local-only ingest boundary — the per-field visibility decision is deferred to a
+// downstream policy stage and re-evaluated only at the cloud/cross-device upload
+// boundary. Identity keys (user.*/organization.id) ride on the log record and the
+// trace span; the machine/app keys (os.*/host.arch/app.*/workspace.host_paths)
+// ride on the OTLP resource, so callers pass whichever attribute maps a path
+// exposes. app.entrypoint/app.version/workspace.host_paths are documented standard
+// attributes not yet on a committed fixture; they are mapped here so a capture that
+// carries them is retained without further change (capability-matrix marks them
+// unknown, not unavailable, until a fixture proves them — #107).
+var environmentKeys = map[string]string{
+	"user.id":              "user_id",
+	"user.email":           "user_email",
+	"user.account_uuid":    "user_account_uuid",
+	"user.account_id":      "user_account_id",
+	"organization.id":      "organization_id",
+	"terminal.type":        "terminal_type",
+	"app.entrypoint":       "app_entrypoint",
+	"app.version":          "app_version",
+	"os.type":              "os_type",
+	"os.version":           "os_version",
+	"host.arch":            "host_arch",
+	"workspace.host_paths": "workspace_host_paths",
+}
+
+// claudeEnvironment builds the present-only environment/identity block from the
+// supplied attribute maps (record + resource for logs; span + resource for
+// traces). It is present-only: a genuinely absent attribute is omitted, never
+// fabricated, and a blank string is skipped so an emptied wire value never becomes
+// an identity. Earlier maps win on an overlapping key. Returns nil when no
+// environment attribute is present, so a genuine absence stays an absent block
+// rather than a fabricated empty one.
+func claudeEnvironment(attrSets ...map[string]any) map[string]any {
+	environment := map[string]any{}
+	for _, attrs := range attrSets {
+		mergeEnvironment(environment, attrs)
+	}
+	if len(environment) == 0 {
+		return nil
+	}
+	return environment
+}
+
+// mergeEnvironment copies the present environment attributes from attrs into dst
+// under their canonical names, keeping the first value seen for a key so an earlier
+// attribute set (the record/span) wins over a later one (the resource).
+func mergeEnvironment(dst, attrs map[string]any) {
+	for rawKey, canonicalKey := range environmentKeys {
+		if _, present := dst[canonicalKey]; present {
+			continue
+		}
+		if value, ok := environmentValue(attrs, rawKey); ok {
+			dst[canonicalKey] = value
+		}
+	}
+}
+
+// environmentValue reads one environment attribute, reporting ok=false when it is
+// absent or is a blank string (an emptied wire value must never become an identity),
+// so a genuinely absent attribute is omitted rather than fabricated.
+func environmentValue(attrs map[string]any, rawKey string) (any, bool) {
+	value, ok := attrs[rawKey]
+	if !ok {
+		return nil, false
+	}
+	if text, isText := value.(string); isText {
+		if strings.TrimSpace(text) == "" {
+			return nil, false
+		}
+		return text, true
+	}
+	return value, true
+}
+
+// environmentEventFields lists the raw record keys the environment block owns, so
+// they are excluded from the provider_extensions.event echo and each known
+// identity/environment value has exactly one typed home. An unforeseen identity
+// key not listed here is not dropped — it still rides raw under
+// provider_extensions.event (owner directive: nothing dropped at ingest).
+func environmentEventFields() []string {
+	keys := make([]string, 0, len(environmentKeys))
+	for rawKey := range environmentKeys {
 		keys = append(keys, rawKey)
 	}
 	return keys

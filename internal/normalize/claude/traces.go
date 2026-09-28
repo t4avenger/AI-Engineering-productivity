@@ -42,11 +42,13 @@ const (
 // into provider_extensions.span_attributes, alongside the typed per-span-type
 // blocks in attributes.interaction / attributes.llm_request (#100). Ingest-time
 // storage sanitising was removed in #88, so this adapter is the sole guard: an
-// allow-list (not a deny-list) drops an unforeseen identity- or secret-bearing
-// attribute by default. session.id becomes the canonical session identity and
-// model is promoted onto the event, so neither is repeated here. Operator/machine
-// identity (user.*, organization.*, terminal.*) and the redacted user_prompt are
-// absent so they never reach provider_extensions. The free-text `error` message is
+// allow-list (not a deny-list) drops an unforeseen secret-bearing attribute from
+// this passthrough by default. session.id becomes the canonical session identity
+// and model is promoted onto the event, so neither is repeated here. Operator/
+// machine identity (user.*, organization.*, terminal.*) is not in this allow-list
+// because it has its own typed home — provider_extensions.environment (#107 X20),
+// where it is retained raw per the owner directive — so it is not duplicated into
+// span_attributes; the redacted user_prompt is absent. The free-text `error` message is
 // captured raw (epic #87) but lives in the typed llm_request/tool_execution block
 // (its canonical home, which governance walks), not in this allow-list, so it is
 // not duplicated into span_attributes.
@@ -163,6 +165,7 @@ type spanContext struct {
 	scopeName        string
 	resourceIdentity string
 	safeResource     map[string]any
+	resourceAttrs    map[string]any
 	version          string
 	receivedAt       time.Time
 }
@@ -214,6 +217,7 @@ func spanEventsFromResource(resource resourceSpan, receivedAt time.Time) ([]cano
 	ctx := spanContext{
 		resourceIdentity: resourceIdentityKey(resourceAttrs),
 		safeResource:     safeMetricAttributes(resourceAttrs),
+		resourceAttrs:    resourceAttrs,
 		version:          fallbackString(stringAttr(resourceAttrs, attrServiceVersion), unavailable),
 		receivedAt:       receivedAt,
 	}
@@ -318,6 +322,15 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 		},
 		"resource":        ctx.safeResource,
 		"span_attributes": safeSpanAttributes(fields),
+	}
+	// Session environment and identity (#107 X20): identity keys (user.*/
+	// organization.id/terminal.type) ride on the span attributes, the machine/app
+	// keys (os.*/host.arch/app.*/workspace.host_paths) on the resource; both are
+	// retained raw here — per the owner directive nothing is dropped at the
+	// local-only ingest boundary — giving a trace span the same environment surface
+	// a log event carries. Present-only, so a span without them omits the block.
+	if environment := claudeEnvironment(fields, ctx.resourceAttrs); environment != nil {
+		extensions["environment"] = environment
 	}
 	// A tool span's raw full_command carries the exact command line (#101), so a
 	// `gh pr create` / `gh pr view <url>` invocation surfaces a pull-request URL

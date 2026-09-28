@@ -400,8 +400,11 @@ func TestClaudeTokenUsageMetricsPersistThroughMetricsReceiver(t *testing.T) {
 // TestClaudeTraceSpansPersistThroughTracesReceiver proves the F3 route end to
 // end: the enhanced-telemetry beta span fixture POSTs to /v1/traces, persists,
 // and reads back correlated to the same raw provider-native session id as the
-// metrics/logs fixtures — with the interaction → llm_request span tree intact
-// and no raw identifiers leaked (#50 resolved; #88/#87 raw-identity invariant).
+// metrics/logs fixtures — with the interaction → llm_request span tree intact.
+// Per #107 X20 the fixture's session/environment identity is retained raw under
+// provider_extensions.environment (nothing dropped at the local-only boundary —
+// owner directive / epic #87); the guard is that no real operator email and no
+// HMAC-hashed identity (the pre-#88 shape) is ever emitted.
 func TestClaudeTraceSpansPersistThroughTracesReceiver(t *testing.T) {
 	repository, err := sqlite.Open(":memory:")
 	if err != nil {
@@ -435,7 +438,20 @@ func TestClaudeTraceSpansPersistThroughTracesReceiver(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertNoRawIdentifiers(t, []string{"microrutter2514@gmail.com", "synthetic@example.test", "user_synthetic", "8d699259db92da74599fd7d5007f335c54e8b16495fdb36464dfbf688d4145bc"}, encoded)
+	// The synthetic session/environment identity is retained raw under
+	// provider_extensions.environment (#107 X20) — read it back to prove the ingest
+	// →read path surfaces it rather than dropping it.
+	assertEnvironmentIdentity(t, events, map[string]string{
+		"user_id":         "synthetic-user",
+		"user_email":      "synthetic@example.test",
+		"user_account_id": "user_synthetic",
+		"organization_id": "00000000-0000-4000-8000-0000000000aa",
+		"terminal_type":   "gnome-terminal",
+	})
+	// The guard now targets genuine hazards only: the real operator email (git
+	// hygiene) and any HMAC-hashed identity (the pre-#88 shape #87 abolished) must
+	// never be emitted.
+	assertNoRawIdentifiers(t, []string{"microrutter2514@gmail.com", "8d699259db92da74599fd7d5007f335c54e8b16495fdb36464dfbf688d4145bc"}, encoded)
 
 	var sawInteraction, sawLLMRequest bool
 	for _, event := range events {

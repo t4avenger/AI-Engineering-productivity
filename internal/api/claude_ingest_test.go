@@ -332,6 +332,32 @@ func assertNoRawIdentifiers(t *testing.T, prohibited []string, documents ...[]by
 	}
 }
 
+// assertEnvironmentIdentity proves the session/environment identity captured at
+// ingest (#107 X20) is retained raw and reads back under
+// provider_extensions.environment on at least one event, matching every expected
+// key/value. It fails if no event carries the block or a value differs, so the
+// ingest→read gate asserts identity is surfaced rather than dropped.
+func assertEnvironmentIdentity(t *testing.T, events []canonical.Event, want map[string]string) {
+	t.Helper()
+	for _, event := range events {
+		environment, ok := event.ProviderExtensions["environment"].(map[string]any)
+		if !ok {
+			continue
+		}
+		matched := true
+		for key, value := range want {
+			if environment[key] != value {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return
+		}
+	}
+	t.Fatalf("no event carries provider_extensions.environment with %#v: %#v", want, events)
+}
+
 func marshalJSON(t *testing.T, value any) []byte {
 	t.Helper()
 	data, err := json.Marshal(value)
