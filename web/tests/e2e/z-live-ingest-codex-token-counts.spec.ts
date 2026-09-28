@@ -4,6 +4,7 @@ import {
   authToken,
   codexCachedReasoningOTLPLogs,
   ingestOTLPLogs,
+  openSessionTraceDisclosures,
   resetDaemonBetweenTests,
   unlockDashboard,
 } from './live-ingest-helpers';
@@ -38,6 +39,7 @@ test('renders Codex cached and reasoning tokens ingested through the live daemon
 
   await unlockDashboard(page, authToken);
   await page.goto('/sessions/codex:tiq-live-e2e-codex-token-session');
+  await openSessionTraceDisclosures(page);
   await expect(page.getByText('Cached input tokens')).toBeVisible();
   await expect(page.getByText('Reasoning tokens')).toBeVisible();
   await expect(page.getByText('300 tokens', { exact: true })).toBeVisible();

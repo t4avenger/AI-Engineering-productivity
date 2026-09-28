@@ -4,6 +4,7 @@ import {
   authToken,
   codexToolDecisionOTLPLogs,
   ingestOTLPLogs,
+  openSessionTraceDisclosures,
   resetDaemonBetweenTests,
   unlockDashboard,
 } from './live-ingest-helpers';
@@ -38,6 +39,7 @@ test('renders a Codex tool decision ingested through the live daemon', async ({
 
   await unlockDashboard(page, authToken);
   await page.goto('/sessions/codex:tiq-live-e2e-decision-session');
+  await openSessionTraceDisclosures(page);
   await expect(page.getByText('Approval')).toBeVisible();
   await expect(page.getByText('approved', { exact: true })).toBeVisible();
   await expect(page.getByText('policy')).toBeVisible();

@@ -41,7 +41,7 @@ test('renders Home highlights from live retained telemetry', async ({ page }) =>
 
   const governance = page.locator('#governance-highlights');
   await expect(governance.getByText('Risky access:', { exact: false })).toBeVisible();
-  await expect(governance.getByText('Violation')).toBeVisible();
+  await expect(governance.getByRole('listitem').filter({ hasText: 'Risky access' }).getByText('Violation')).toBeVisible();
   await expect(
     governance.getByRole('link', { name: 'Review governance evidence' }),
   ).toHaveAttribute('href', '/governance');

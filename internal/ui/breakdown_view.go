@@ -39,6 +39,7 @@ type breakdownSegmentView struct {
 }
 
 type legendEntry struct {
+	Kind   string
 	Label  string
 	Detail string
 }
@@ -133,41 +134,41 @@ func conicSlice(color string, start, width float64) string {
 func eventLegend(events []timelineRow, spans []spanEvidenceRow, conversation []conversationRow, trace sessionTraceView) []legendEntry {
 	seen := map[string]struct{}{}
 	entries := make([]legendEntry, 0)
-	add := func(label, detail string) {
+	add := func(kind, label, detail string) {
 		key := label + "\x00" + detail
 		if _, found := seen[key]; found {
 			return
 		}
 		seen[key] = struct{}{}
-		entries = append(entries, legendEntry{Label: label, Detail: detail})
+		entries = append(entries, legendEntry{Kind: kind, Label: label, Detail: detail})
 	}
 	for _, lane := range trace.Lanes {
 		for _, marker := range lane.Markers {
-			add(legendKindLabel(marker.Kind), marker.Label)
+			add(marker.Kind, legendKindLabel(marker.Kind), marker.Label)
 		}
 	}
 	for _, marker := range trace.Unplaced {
-		add(legendKindLabel(marker.Kind)+" (unplaced)", marker.Label)
+		add(marker.Kind, legendKindLabel(marker.Kind)+" (unplaced)", marker.Label)
 	}
 	if len(entries) > 0 {
 		return entries
 	}
 	for _, row := range conversation {
-		add("Conversation", row.Role)
+		add("conversation", "Conversation", row.Role)
 	}
 	for _, row := range spans {
 		label := "Span"
 		if row.Name != "" {
 			label = row.Name
 		}
-		add("Span", label)
+		add("span", "Span", label)
 	}
 	for _, row := range events {
 		detail := row.RawEventType
 		if detail == "" {
 			detail = row.Title
 		}
-		add("Timeline", detail)
+		add("", "Timeline", detail)
 	}
 	return entries
 }

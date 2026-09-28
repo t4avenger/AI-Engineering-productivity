@@ -27,6 +27,7 @@ export async function expectSessionDetailHeading(page: Page): Promise<void> {
     page.getByRole('heading', { level: 1, name: /^Session / }),
   ).toBeVisible();
   await expect(page.getByText('Session Trace', { exact: true }).first()).toBeVisible();
+  await openSessionTraceDisclosures(page);
 }
 
 /** Chronological lists under the Session Trace (T10 accessible alternative). */
@@ -36,6 +37,7 @@ export function chronologicalLists(page: Page) {
 
 /** Five-lane Session Trace shell (#159 / T02); shared to avoid Sonar CPD. */
 export async function expectSessionTraceLanes(page: Page): Promise<void> {
+  await openSessionTraceDisclosures(page);
   const trace = page.getByLabel('Shared session time axis');
   await expect(trace).toBeVisible();
   for (const lane of [
@@ -46,6 +48,17 @@ export async function expectSessionTraceLanes(page: Page): Promise<void> {
     'Spans lane',
   ]) {
     await expect(page.getByLabel(lane)).toBeVisible();
+  }
+}
+
+/** Environment and chronological evidence stay closed until the reader opens them. */
+export async function openSessionTraceDisclosures(page: Page): Promise<void> {
+  for (const selector of ['.session-trace-extra', '#chronological-list']) {
+    const details = page.locator(selector);
+    if ((await details.count()) === 0) continue;
+    if ((await details.getAttribute('open')) === null) {
+      await details.locator('summary').click();
+    }
   }
 }
 
@@ -115,10 +128,20 @@ export async function expectGovernanceAccessRulesShells(
   await expect(page).toHaveURL(/\/governance\?rules=skills$/);
   await expect(page.locator('#skills-allowlist-form')).toBeVisible();
   await expect(
-    page.getByText(/exact explicit skill identities/i),
+    page.locator('.governance-summary').getByText('Exact explicit skill identities', { exact: true }),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Publish' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Enforce' })).toHaveCount(0);
+}
+
+/** Reference layout keeps detect-and-report findings closed under the policy workspace. */
+export async function openGovernanceFindings(page: Page): Promise<void> {
+  const findings = page.locator('#governance-findings');
+  await expect(findings).toBeVisible();
+  if ((await findings.getAttribute('open')) === null) {
+    await findings.locator('summary').click();
+  }
+  await expect(page.getByRole('heading', { name: 'Risky access' })).toBeVisible();
 }
 
 /**

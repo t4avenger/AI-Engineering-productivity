@@ -6,6 +6,7 @@ import {
   expectFiveDestinationPrimaryNav,
   expectUtilityDestinations,
   followShellNavigation,
+  openGovernanceFindings,
   unlockDashboard,
 } from './live-ingest-helpers';
 
@@ -31,6 +32,7 @@ test('unlocks and walks the local dashboard journey', async ({ page }) => {
   await expect(
     page.getByRole('heading', { name: 'Governance Policies', exact: true }),
   ).toBeVisible();
+  await openGovernanceFindings(page);
   await expect(
     page.getByRole('heading', { name: 'Risky access' }),
   ).toBeVisible();

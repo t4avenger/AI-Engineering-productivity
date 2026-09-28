@@ -4,6 +4,7 @@ import {
   authToken,
   claudeContentOTLPLogs,
   ingestOTLPLogs,
+  openSessionTraceDisclosures,
   resetDaemonBetweenTests,
   unlockDashboard,
 } from './live-ingest-helpers';
@@ -39,6 +40,7 @@ test('renders retained Claude conversation evidence ingested through the live da
 
   await unlockDashboard(page, authToken);
   await page.goto(`/sessions/${encodeURIComponent(sessionId)}`);
+  await openSessionTraceDisclosures(page);
   await expect(page.getByRole('heading', { name: 'Retained conversation evidence' })).toBeVisible();
   await expect(page.getByLabel('Conversation lane')).toBeVisible();
   const conversation = page.locator('#conversation');

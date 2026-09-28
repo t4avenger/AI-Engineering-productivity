@@ -5,6 +5,7 @@ import {
   codexLifecycleOTLPLogs,
   codexPRLinkOTLPLogs,
   ingestOTLPLogs,
+  openSessionTraceDisclosures,
   resetDaemonBetweenTests,
   unlockDashboard,
 } from './live-ingest-helpers';
@@ -80,6 +81,7 @@ test('renders Codex lifecycle signals ingested through the live daemon', async (
 
   await unlockDashboard(page, authToken);
   await page.goto('/sessions/codex:tiq-live-e2e-lifecycle-session');
+  await openSessionTraceDisclosures(page);
   await expect(page.getByRole('heading', { name: 'Environment' })).toBeVisible();
   await expect(page.getByText('codex_exec')).toBeVisible();
   await expect(page.getByText('0.153.4')).toBeVisible();

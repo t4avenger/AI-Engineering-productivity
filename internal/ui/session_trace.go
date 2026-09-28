@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -22,6 +23,7 @@ const (
 
 	tracePointWidthPercent  = 1.2
 	traceMinBarWidthPercent = 0.8
+	traceFlowSlots          = 5
 
 	inspectorSourceTrace = "trace"
 )
@@ -31,6 +33,7 @@ type sessionTraceView struct {
 	OriginLabel          string
 	WindowLabel          string
 	WindowMs             int64
+	Ticks                []string
 	PartialCapture       bool
 	PlanningAvailability string
 	Lanes                []traceLaneView
@@ -55,6 +58,7 @@ type sessionTraceHeader struct {
 type traceLaneView struct {
 	ID           string
 	Label        string
+	Subtitle     string
 	Availability string
 	EmptyMessage string
 	Markers      []traceMarkerView
@@ -71,6 +75,7 @@ type traceMarkerView struct {
 	OffsetMs       int64
 	DurationMs     int64
 	HasDuration    bool
+	DurationLabel  string
 	Placed         bool
 	LeftPercent    float64
 	WidthPercent   float64
@@ -82,7 +87,17 @@ type traceMarkerView struct {
 	SelectPath     string
 	SourceEventIDs string
 	OffsetLabel    string
+	AccessibleName string
 	DOMID          string
+	Count          int
+	MemberIDs      []string
+	Members        []traceFlowMember
+}
+
+type traceFlowMember struct {
+	Label       string
+	SelectPath  string
+	OffsetLabel string
 }
 
 type timedTraceItem struct {
@@ -115,12 +130,13 @@ func buildSessionTrace(
 		OriginLabel:          formatTraceOrigin(origin, originKind),
 		WindowMs:             windowMs,
 		WindowLabel:          formatDurationMs(windowMs),
+		Ticks:                traceClockTicks(windowMs),
 		PlanningAvailability: planningAvailability(items),
 		Header:               buildTraceHeader(session, events),
 	}
 	markers := make([]traceMarkerView, 0, len(items))
 	for _, item := range items {
-		marker := markerFromItem(item, origin, windowMs, sessionID, r)
+		marker := finishTraceMarker(markerFromItem(item, origin, windowMs, sessionID, r))
 		markers = append(markers, marker)
 	}
 	sortTraceMarkers(markers)
@@ -128,7 +144,7 @@ func buildSessionTrace(
 	placed := filterMarkers(markers, true)
 	view.Chronological = append([]traceMarkerView(nil), placed...)
 	view.Chronological = append(view.Chronological, view.Unplaced...)
-	view.Lanes = buildTraceLanes(placed, view.PlanningAvailability)
+	view.Lanes = buildTraceLanes(placed, view.PlanningAvailability, windowMs)
 	view.PartialCapture = computePartialCapture(view, items, windowMs)
 	return view
 }
@@ -467,15 +483,15 @@ func markerFromItem(item timedTraceItem, origin time.Time, windowMs int64, sessi
 	return marker
 }
 
-func buildTraceLanes(placed []traceMarkerView, planningAvailability string) []traceLaneView {
+func buildTraceLanes(placed []traceMarkerView, planningAvailability string, windowMs int64) []traceLaneView {
 	defs := []struct {
-		id, label, empty string
+		id, label, subtitle, empty string
 	}{
-		{traceLaneConversation, "Conversation", "No retained conversation evidence for this session."},
-		{traceLaneAgent, "Agent", "No observed agent or model-work evidence for this session."},
-		{traceLaneTools, "Tools & MCP", "No observed tool, MCP, or skill evidence for this session."},
-		{traceLaneFiles, "Files", "No retained file-operation evidence for this session."},
-		{traceLaneSpans, "Spans", "No retained trace span evidence for this session."},
+		{traceLaneConversation, "Conversation", "User messages", "No retained conversation evidence for this session."},
+		{traceLaneAgent, "Agent", "Observed model work", "No observed agent or model-work evidence for this session."},
+		{traceLaneTools, "Tools & MCP", "Tools, MCP, and skills", "No observed tool, MCP, or skill evidence for this session."},
+		{traceLaneFiles, "Files", "Files read or changed", "No retained file-operation evidence for this session."},
+		{traceLaneSpans, "Spans", "Parent and child spans", "No retained trace span evidence for this session."},
 	}
 	lanes := make([]traceLaneView, 0, len(defs))
 	for _, def := range defs {
@@ -483,9 +499,9 @@ func buildTraceLanes(placed []traceMarkerView, planningAvailability string) []tr
 		if def.id == traceLaneSpans {
 			assignSpanNestDepth(markers)
 		}
-		assignOverlapStacks(markers)
+		markers = foldLaneFlow(markers, windowMs, def.id == traceLaneSpans)
 		lane := traceLaneView{
-			ID: def.id, Label: def.label, Markers: markers, TrackHeight: maxStack(markers) + 1,
+			ID: def.id, Label: def.label, Subtitle: def.subtitle, Markers: markers, TrackHeight: 1,
 		}
 		if len(markers) == 0 {
 			lane.EmptyMessage = def.empty
@@ -586,47 +602,152 @@ func sortTraceMarkers(markers []traceMarkerView) {
 	})
 }
 
-func assignOverlapStacks(markers []traceMarkerView) {
-	type active struct {
-		endMs int64
-		stack int
+func foldLaneFlow(markers []traceMarkerView, windowMs int64, bars bool) []traceMarkerView {
+	if len(markers) == 0 {
+		return markers
 	}
-	activeBars := make([]active, 0)
-	for i := range markers {
-		start := markers[i].OffsetMs
-		end := start + 1
-		if markers[i].HasDuration && markers[i].DurationMs > 0 {
-			end = start + markers[i].DurationMs
-		}
-		remaining := activeBars[:0]
-		used := map[int]struct{}{}
-		for _, bar := range activeBars {
-			if bar.endMs > start {
-				remaining = append(remaining, bar)
-				used[bar.stack] = struct{}{}
-			}
-		}
-		activeBars = remaining
-		stack := 0
-		for {
-			if _, taken := used[stack]; !taken {
-				break
-			}
-			stack++
-		}
-		markers[i].StackIndex = stack
-		activeBars = append(activeBars, active{endMs: end, stack: stack})
+	groups := singleFlowGroups(markers)
+	if len(markers) > traceFlowSlots && windowMs > 0 {
+		groups = bucketFlowMarkers(markers, windowMs)
 	}
+	nodes := make([]traceMarkerView, 0, len(groups))
+	for _, group := range groups {
+		nodes = append(nodes, flowNode(group, windowMs, bars))
+	}
+	return nodes
 }
 
-func maxStack(markers []traceMarkerView) int {
-	highest := 0
+func singleFlowGroups(markers []traceMarkerView) [][]traceMarkerView {
+	groups := make([][]traceMarkerView, 0, len(markers))
 	for _, marker := range markers {
-		if marker.StackIndex > highest {
-			highest = marker.StackIndex
+		groups = append(groups, []traceMarkerView{marker})
+	}
+	return groups
+}
+
+func bucketFlowMarkers(markers []traceMarkerView, windowMs int64) [][]traceMarkerView {
+	slot := windowMs / int64(traceFlowSlots)
+	if slot < 1 {
+		slot = 1
+	}
+	groups := make([][]traceMarkerView, 0)
+	var current []traceMarkerView
+	var boundary int64
+	for _, marker := range markers {
+		if len(current) > 0 && marker.OffsetMs < boundary {
+			current = append(current, marker)
+			continue
+		}
+		if len(current) > 0 {
+			groups = append(groups, current)
+		}
+		current = []traceMarkerView{marker}
+		boundary = marker.OffsetMs + slot
+	}
+	if len(current) > 0 {
+		groups = append(groups, current)
+	}
+	return groups
+}
+
+func flowNode(group []traceMarkerView, windowMs int64, bars bool) traceMarkerView {
+	node := group[0]
+	full := dominantFlowLabel(group)
+	node.Label = shortFlowLabel(full)
+	node.Preview = ""
+	node.Count = len(group)
+	node.StackIndex = 0
+	node.NestDepth = 0
+	node.MemberIDs = make([]string, 0, len(group))
+	node.Members = make([]traceFlowMember, 0, len(group))
+	for _, member := range group {
+		node.MemberIDs = append(node.MemberIDs, member.EventID)
+		node.Members = append(node.Members, traceFlowMember{
+			Label: member.Label, SelectPath: member.SelectPath, OffsetLabel: member.OffsetLabel,
+		})
+	}
+	if len(group) == 1 {
+		node.AccessibleName = group[0].AccessibleName
+	} else {
+		node.AccessibleName = fmt.Sprintf("%s · %d events", full, len(group))
+	}
+	node.OffsetLabel = formatTraceClock(group[0].OffsetMs, windowMs)
+	if bars {
+		start, end := flowGroupSpan(group)
+		node.HasDuration = end > start
+		node.OffsetMs = start
+		if windowMs > 0 {
+			node.LeftPercent = float64(start) / float64(windowMs) * 100
+			node.WidthPercent = float64(end-start) / float64(windowMs) * 100
+			if node.WidthPercent < 4 {
+				node.WidthPercent = 4
+			}
+		}
+		return node
+	}
+	node.HasDuration = false
+	node.WidthPercent = 0
+	left := group[0].LeftPercent
+	if left < 8 {
+		left = 8
+	}
+	if left > 92 {
+		left = 92
+	}
+	node.LeftPercent = left
+	return node
+}
+
+func shortFlowLabel(label string) string {
+	shown := label
+	if dot := strings.LastIndex(label, "."); dot >= 0 && dot < len(label)-1 {
+		shown = label[dot+1:]
+	}
+	return strings.ReplaceAll(shown, "_", " ")
+}
+
+func dominantFlowLabel(group []traceMarkerView) string {
+	counts := map[string]int{}
+	best := group[0].Label
+	highest := 0
+	for _, marker := range group {
+		counts[marker.Label]++
+		if counts[marker.Label] > highest {
+			best = marker.Label
+			highest = counts[marker.Label]
 		}
 	}
-	return highest
+	return best
+}
+
+func flowGroupSpan(group []traceMarkerView) (int64, int64) {
+	start := group[0].OffsetMs
+	end := start
+	for _, marker := range group {
+		if marker.OffsetMs < start {
+			start = marker.OffsetMs
+		}
+		stop := marker.OffsetMs
+		if marker.HasDuration && marker.DurationMs > 0 {
+			stop += marker.DurationMs
+		}
+		if stop > end {
+			end = stop
+		}
+	}
+	return start, end
+}
+
+func markerMatchesEvent(marker traceMarkerView, eventID string) bool {
+	if marker.EventID == eventID {
+		return true
+	}
+	for _, id := range marker.MemberIDs {
+		if id == eventID {
+			return true
+		}
+	}
+	return false
 }
 
 func buildTraceHeader(session canonical.Session, events []canonical.Event) sessionTraceHeader {
@@ -740,6 +861,85 @@ func firstSourceEventID(ids []string) string {
 	return ids[0]
 }
 
+func finishTraceMarker(marker traceMarkerView) traceMarkerView {
+	if marker.HasDuration {
+		marker.DurationLabel = formatDurationMs(marker.DurationMs)
+	}
+	marker.AccessibleName = marker.Label
+	if marker.HasDuration && marker.DurationLabel != "" {
+		marker.AccessibleName += " · " + marker.DurationLabel
+	} else {
+		marker.AccessibleName += " · point event, no duration"
+	}
+	if marker.OffsetLabel != "" {
+		marker.AccessibleName += " · " + marker.OffsetLabel
+	}
+	return marker
+}
+
+func traceClockTicks(windowMs int64) []string {
+	if windowMs <= 0 {
+		return nil
+	}
+	const count = 5
+	ticks := make([]string, count)
+	for i := 0; i < count; i++ {
+		ticks[i] = formatTraceClock(windowMs*int64(i)/int64(count-1), windowMs)
+	}
+	return ticks
+}
+
+func formatTraceClock(ms, windowMs int64) string {
+	if ms < 0 {
+		ms = 0
+	}
+	totalSeconds := ms / 1000
+	clock := fmt.Sprintf("%02d:%02d", totalSeconds/60, totalSeconds%60)
+	if windowMs > 0 && windowMs < 60_000 {
+		clock += fmt.Sprintf(".%d", (ms%1000)/100)
+	}
+	return clock
+}
+
+func attachFlowInterval(data *sessionDetailData) {
+	marker, ok := selectedFlowMarker(data.Trace.Lanes)
+	if !ok {
+		return
+	}
+	rows, extra := flowIntervalRows(marker.Members)
+	data.Inspector.IntervalEvents = rows
+	data.Inspector.IntervalMore = extra
+}
+
+func selectedFlowMarker(lanes []traceLaneView) (traceMarkerView, bool) {
+	for _, lane := range lanes {
+		for _, marker := range lane.Markers {
+			if marker.Selected && len(marker.Members) >= 2 {
+				return marker, true
+			}
+		}
+	}
+	return traceMarkerView{}, false
+}
+
+func flowIntervalRows(members []traceFlowMember) ([]inspectorRelationRow, int) {
+	const limit = 30
+	rows := make([]inspectorRelationRow, 0, limit)
+	for i, member := range members {
+		if i >= limit {
+			break
+		}
+		rows = append(rows, inspectorRelationRow{
+			Label: member.Label, Href: member.SelectPath, Meta: member.OffsetLabel,
+		})
+	}
+	extra := len(members) - len(rows)
+	if extra < 0 {
+		extra = 0
+	}
+	return rows, extra
+}
+
 func formatTraceOrigin(origin time.Time, kind string) string {
 	if origin.IsZero() {
 		return "No observed time window"
@@ -758,7 +958,7 @@ func markSelectedTrace(data *sessionDetailData, eventID string) {
 	focusAssigned := false
 	assign := func(markers []traceMarkerView) []traceMarkerView {
 		for i := range markers {
-			markers[i].Selected = markers[i].EventID == eventID
+			markers[i].Selected = markerMatchesEvent(markers[i], eventID)
 			if markers[i].Selected && !focusAssigned {
 				markers[i].DOMID = inspectorFocusID(inspectorSourceTrace, eventID)
 				focusAssigned = true
@@ -771,6 +971,7 @@ func markSelectedTrace(data *sessionDetailData, eventID string) {
 	}
 	data.Trace.Unplaced = assign(data.Trace.Unplaced)
 	data.Trace.Chronological = assign(data.Trace.Chronological)
+	attachFlowInterval(data)
 	if focusAssigned && data.Inspector.Source == inspectorSourceTrace {
 		data.Inspector.FocusTargetID = inspectorFocusID(inspectorSourceTrace, eventID)
 	}

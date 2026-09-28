@@ -48,6 +48,8 @@ type eventInspectorView struct {
 	Files               []inspectorRelationRow
 	Spans               []inspectorRelationRow
 	RelatedEvents       []inspectorRelationRow
+	IntervalEvents      []inspectorRelationRow
+	IntervalMore        int
 	FilesAvailability   string
 	SpansAvailability   string
 	RelatedAvailability string
