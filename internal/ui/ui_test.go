@@ -1945,6 +1945,9 @@ func TestGovernanceFindingsPage(t *testing.T) {
 		if strings.Contains(body, "Governance findings are not available") {
 			t.Fatalf("placeholder copy must be gone: %q", body)
 		}
+		if strings.Index(body, `id="findings-heading"`) < strings.Index(body, `id="access-rules"`) {
+			t.Fatal("findings must render below the active policy workspace")
+		}
 		if strings.Contains(body, `data-mcp-policy="not-allowlisted"`) {
 			t.Fatalf("empty allowlist must not mark rows as explicitly not-allowlisted: %q", body)
 		}

@@ -7,7 +7,7 @@
     <div>
       <p class="eyebrow">Local configuration</p>
       <h1>Governance Policies</h1>
-      <p>Detect and report only. This local edition does not enforce or publish policies or block provider actions.</p>
+      <p><span class="status status-partial">Detect and report</span> This local edition does not enforce or publish policies or block provider actions.</p>
     </div>
     {{if or (and .SaveAvailable (eq .ActiveRulesTab "mcp")) (and .SkillsSaveAvailable (eq .ActiveRulesTab "skills")) (and .PathRulesSaveAvailable (eq .ActiveRulesTab "paths")) (and .PromptKeywordsSaveAvailable (eq .ActiveRulesTab "prompts"))}}<button type="submit" form="{{if eq .ActiveRulesTab "mcp"}}mcp-allowlist-form{{else if eq .ActiveRulesTab "skills"}}skills-allowlist-form{{else if eq .ActiveRulesTab "paths"}}path-rules-form{{else}}prompt-keywords-form{{end}}" id="save-local-changes" disabled>Save local changes</button>{{else}}<p class="muted">Local configuration saving is unavailable.</p>{{end}}
   </header>
@@ -22,12 +22,154 @@
   </nav>
 
   <section class="governance-summary" aria-label="Local policy summary">
-    <article class="governance-summary-card"><h2>MCP servers</h2>{{if .MCPPolicyConfigured}}<p class="summary-value">{{.MCPConfiguredCount}} configured</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Configured rule identities</p></article>
-    <article class="governance-summary-card"><h2>Skills</h2>{{if .SkillsPolicyConfigured}}<p class="summary-value">{{.SkillsConfiguredCount}} configured</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Exact explicit skill identities</p></article>
-    <article class="governance-summary-card"><h2>File rules</h2>{{if .PathRulesConfigured}}<p class="summary-value">{{len .PathRulesConfig.Allowed}} allowed · {{len .PathRulesConfig.Blocked}} blocked</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Raw retained paths; detect only</p></article>
-    <article class="governance-summary-card"><h2>Prompt rules</h2>{{if .PromptKeywordsConfigured}}<p class="summary-value">{{.PromptKeywordCount}} configured</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Prompt findings — after capture</p></article>
+    <article class="governance-summary-card"><h2><svg class="nav-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M2 3h5v5H2zm7 0h5v5H9zM2 10h5v3H2zm7 0h5v3H9z"/></svg> MCP servers</h2>{{if .MCPPolicyConfigured}}<p class="summary-value">{{.MCPConfiguredCount}} configured</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Configured rule identities</p></article>
+    <article class="governance-summary-card"><h2><svg class="nav-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 1.2 9.6 5h3.9l-3.2 2.4 1.2 3.8L8 8.8 4.5 11.2 5.7 7.4 2.5 5h3.9z"/></svg> Skills</h2>{{if .SkillsPolicyConfigured}}<p class="summary-value">{{.SkillsConfiguredCount}} configured</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Exact explicit skill identities</p></article>
+    <article class="governance-summary-card"><h2><svg class="nav-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 2h7l3 3v9H3zm7 .8V5h2.2z"/></svg> File rules</h2>{{if .PathRulesConfigured}}<p class="summary-value">{{len .PathRulesConfig.Allowed}} allowed · {{len .PathRulesConfig.Blocked}} blocked</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Raw retained paths; detect only</p></article>
+    <article class="governance-summary-card"><h2><svg class="nav-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M2 3h12v2H2zm0 4h8v2H2zm0 4h10v2H2z"/></svg> Prompt rules</h2>{{if .PromptKeywordsConfigured}}<p class="summary-value">{{.PromptKeywordCount}} configured</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Prompt findings — after capture</p></article>
   </section>
 
+  <div class="governance-workspace">
+  <section id="access-rules" aria-labelledby="access-rules-heading">
+    <h2 id="access-rules-heading">Access Rules</h2>
+    <p>Manage local detect-and-report policies over retained evidence. Path rules inspect raw retained paths only; they never read the filesystem or block provider actions.</p>
+    <div class="rules-tabs" role="tablist" aria-label="Access Rules categories">
+      <a class="rules-tab{{if eq .ActiveRulesTab "mcp"}} active{{end}}" role="tab" id="rules-tab-mcp" href="{{governanceRulesPath "mcp"}}" aria-controls="rules-panel-mcp" aria-selected="{{if eq .ActiveRulesTab "mcp"}}true{{else}}false{{end}}"{{if eq .ActiveRulesTab "mcp"}} aria-current="page"{{end}}>MCP servers</a>
+      <a class="rules-tab{{if eq .ActiveRulesTab "skills"}} active{{end}}" role="tab" id="rules-tab-skills" href="{{governanceRulesPath "skills"}}" aria-controls="rules-panel-skills" aria-selected="{{if eq .ActiveRulesTab "skills"}}true{{else}}false{{end}}"{{if eq .ActiveRulesTab "skills"}} aria-current="page"{{end}}>Skills</a>
+      <a class="rules-tab{{if eq .ActiveRulesTab "paths"}} active{{end}}" role="tab" id="rules-tab-paths" href="{{governanceRulesPath "paths"}}" aria-controls="rules-panel-paths" aria-selected="{{if eq .ActiveRulesTab "paths"}}true{{else}}false{{end}}"{{if eq .ActiveRulesTab "paths"}} aria-current="page"{{end}}>Files &amp; Paths</a>
+      <a class="rules-tab{{if eq .ActiveRulesTab "prompts"}} active{{end}}" role="tab" id="rules-tab-prompts" href="{{governanceRulesPath "prompts"}}" aria-controls="rules-panel-prompts" aria-selected="{{if eq .ActiveRulesTab "prompts"}}true{{else}}false{{end}}"{{if eq .ActiveRulesTab "prompts"}} aria-current="page"{{end}}>Prompt Keywords</a>
+    </div>
+
+    {{if eq .ActiveRulesTab "mcp"}}
+    <div class="rules-panel" role="tabpanel" id="rules-panel-mcp" aria-labelledby="rules-tab-mcp">
+      <h3>MCP server access</h3>
+      <form method="post" action="/governance/mcp-allowlist" class="allowlist-form" id="mcp-allowlist-form" data-input-name="mcp_server" data-row-class="allowlist-row" data-policy-name="MCP">
+        <div class="mcp-rule-toolbar">
+          <label>Search servers <input type="search" id="mcp-rule-search" placeholder="Search retained identities"></label>
+          <label>Policy <select id="mcp-rule-filter"><option value="all">All</option><option value="allowlisted">Allowlisted</option><option value="not-allowlisted">Not allowlisted</option></select></label>
+        </div>
+        {{if .MCPServers}}
+        <section class="table-wrap" aria-label="MCP access rules">
+          <table>
+            <thead><tr><th scope="col">Server identity</th><th scope="col">Local access policy</th><th scope="col">Scope</th><th scope="col">Applies to</th><th scope="col">Last changed</th><th scope="col">Edit</th></tr></thead>
+            <tbody>
+              {{$policyConfigured := .MCPPolicyConfigured}}
+              {{range .MCPServers}}
+              <tr class="allowlist-row mcp-rule-row" data-allowlist-name="{{.Name}}" data-allowlist-policy="{{if $policyConfigured}}{{if .ActiveChecked}}allowlisted{{else}}not-allowlisted{{end}}{{else}}unconfigured{{end}}" data-mcp-policy="{{if $policyConfigured}}{{if .ActiveChecked}}allowlisted{{else}}not-allowlisted{{end}}{{else}}unconfigured{{end}}">
+                <td><code>{{.Name}}</code></td>
+                <td>{{if $policyConfigured}}{{if .ActiveChecked}}Allowlisted{{else}}Not allowlisted{{end}}{{else}}{{template "status-badge" "policy_unconfigured"}}{{end}}</td>
+                <td>Local daemon</td>
+                <td>{{if .Observed}}Observed provider identity{{else}}Configured; not currently observed{{end}}</td>
+                <td>{{template "status-badge" "unavailable"}}</td>
+                <td><label class="mcp-rule-edit" aria-label="{{.Name}}"><input type="checkbox" name="mcp_server" value="{{.Name}}" data-active-checked="{{.ActiveChecked}}"{{if .Checked}} checked{{end}}> Allowlist</label></td>
+              </tr>
+              {{end}}
+            </tbody>
+          </table>
+        </section>
+        {{else}}
+        <p class="muted">No provider-reported MCP server names are available yet.</p>
+        {{end}}
+        <div class="governance-save-bar">
+          <p class="muted allowlist-dirty-summary" id="mcp-dirty-summary" hidden></p>
+          {{if .SaveAvailable}}<div><button type="reset" class="secondary">Reset changes</button><button type="submit" class="allowlist-save-inline" disabled>Save local changes</button></div>{{else}}<p class="muted">Saving is unavailable because no writable configuration controller is active.</p>{{end}}
+        </div>
+      </form>
+    </div>
+    {{else if and (eq .ActiveRulesTab "skills") .SkillsSaveAvailable}}
+    <div class="rules-panel" role="tabpanel" id="rules-panel-skills" aria-labelledby="rules-tab-skills">
+      <h3>Skills access</h3>
+      <p>Compare provider-stamped exact explicit skill identities with the local <code>governance.skills_allowlist</code>. Inferred, anonymous, unavailable, and unknown skill telemetry remains indeterminate.</p>
+      <form method="post" action="/governance/skills-allowlist" class="allowlist-form" id="skills-allowlist-form" data-input-name="skill" data-row-class="allowlist-row" data-policy-name="Skills">
+        {{if .Skills}}
+        <section class="table-wrap" aria-label="Skills access rules">
+          <table>
+            <thead><tr><th scope="col">Skill identity</th><th scope="col">Local policy</th><th scope="col">Evidence</th><th scope="col">Edit</th></tr></thead>
+            <tbody>
+              {{$policyConfigured := .SkillsPolicyConfigured}}
+              {{range .Skills}}
+              <tr class="allowlist-row" data-allowlist-name="{{.Name}}" data-allowlist-policy="{{if $policyConfigured}}{{if .ActiveChecked}}allowlisted{{else}}not-allowlisted{{end}}{{else}}unconfigured{{end}}">
+                <td><code>{{.Name}}</code></td>
+                <td>{{if $policyConfigured}}{{if .ActiveChecked}}Allowlisted{{else}}Not allowlisted{{end}}{{else}}{{template "status-badge" "policy_unconfigured"}}{{end}}</td>
+                <td>{{if .Observed}}Explicit provider identity{{else}}Configured; not currently observed{{end}}</td>
+                <td><label aria-label="{{.Name}}"><input type="checkbox" name="skill" value="{{.Name}}" data-active-checked="{{.ActiveChecked}}"{{if .Checked}} checked{{end}}> Allowlist</label></td>
+              </tr>
+              {{end}}
+            </tbody>
+          </table>
+        </section>
+        {{else}}
+        <p class="muted">No explicit provider skill identities are available yet.</p>
+        {{end}}
+        <div class="governance-save-bar">
+          <p class="muted allowlist-dirty-summary" hidden></p>
+          {{if .SkillsSaveAvailable}}<div><button type="reset" class="secondary">Reset changes</button><button type="submit" class="allowlist-save-inline" disabled>Save local changes</button></div>{{else}}<p class="muted">Saving is unavailable because no writable configuration controller is active.</p>{{end}}
+        </div>
+      </form>
+    </div>
+    {{else if and (eq .ActiveRulesTab "paths") .PathRulesSaveAvailable}}
+    <div class="rules-panel" role="tabpanel" id="rules-panel-paths" aria-labelledby="rules-tab-paths">
+      <p>Evaluate retained raw filesystem paths after capture. Matching is case-sensitive; <code>*</code> stays within a segment, <code>**</code> crosses segments, and <code>?</code> matches one non-separator character. Paths are never expanded, resolved, or used to intercept access.</p>
+      <h3>Filesystem access policy</h3>
+      <p>Status {{template "status-badge" (printf "%s" .PathRules.Outcome)}} · Visibility {{template "status-badge" .PathRules.Visibility}}</p>
+      <!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token -- Go/HTMX form is protected by sameOriginCookieMutation; bearer clients are non-ambient. Owner: TelemetryIQ. Expiry: 2026-12-31. -->
+      <form method="post" action="/governance/path-rules" id="path-rules-form" class="path-rules-form" data-policy-name="Files &amp; Paths">
+        <fieldset><legend>Mode</legend>
+          <label><input type="radio" name="mode" value="monitor"{{if eq .PathRulesConfig.Mode "monitor"}} checked{{end}}> Monitor all</label>
+          <label><input type="radio" name="mode" value="approved_only"{{if eq .PathRulesConfig.Mode "approved_only"}} checked{{end}}> Approved paths only</label>
+          <label><input type="radio" name="mode" value="flag_all"{{if eq .PathRulesConfig.Mode "flag_all"}} checked{{end}}> Flag all</label>
+        </fieldset>
+        <div class="path-rule-groups">
+          <section><h3>Allowed paths</h3><p class="muted">Used only by Approved paths only.</p><div class="path-rule-list" data-group="allowed">{{range $index, $rule := .PathRulesConfig.Allowed}}<div class="path-rule-row"><label for="allowed-kind-{{$index}}" class="sr-only">Allowed path rule kind</label><select id="allowed-kind-{{$index}}" name="allowed_kind"><option value="exact"{{if eq $rule.Kind "exact"}} selected{{end}}>Exact</option><option value="glob"{{if eq $rule.Kind "glob"}} selected{{end}}>Glob</option></select><label for="allowed-value-{{$index}}" class="sr-only">Allowed path rule</label><input id="allowed-value-{{$index}}" name="allowed_value" value="{{$rule.Value}}"><button type="button" class="secondary remove-path-rule">Remove</button></div>{{end}}</div><button type="button" class="secondary add-path-rule" data-group="allowed">Add allowed path</button></section>
+          <section><h3>Blocked paths <span class="muted">detect only</span></h3><div class="path-rule-list" data-group="blocked">{{range $index, $rule := .PathRulesConfig.Blocked}}<div class="path-rule-row"><label for="blocked-kind-{{$index}}" class="sr-only">Blocked path rule kind</label><select id="blocked-kind-{{$index}}" name="blocked_kind"><option value="exact"{{if eq $rule.Kind "exact"}} selected{{end}}>Exact</option><option value="glob"{{if eq $rule.Kind "glob"}} selected{{end}}>Glob</option></select><label for="blocked-value-{{$index}}" class="sr-only">Blocked path rule</label><input id="blocked-value-{{$index}}" name="blocked_value" value="{{$rule.Value}}"><button type="button" class="secondary remove-path-rule">Remove</button></div>{{end}}</div><button type="button" class="secondary add-path-rule" data-group="blocked">Add blocked path</button></section>
+        </div>
+        <div class="governance-save-bar"><p class="muted allowlist-dirty-summary" hidden></p><div><button type="reset" class="secondary">Reset changes</button><button type="submit" class="allowlist-save-inline" disabled>Save local changes</button></div></div>
+      </form>
+    </div>
+    {{else if and (eq .ActiveRulesTab "prompts") .PromptKeywordsSaveAvailable}}
+    <div class="rules-panel" role="tabpanel" id="rules-panel-prompts" aria-labelledby="rules-tab-prompts">
+      <h3>Prompt findings — after capture</h3>
+      <p>Action: Record finding. Match retained user-prompt text only. Literal matching is case-sensitive. Regular expressions use RE2, and case folding happens only with an explicit flag such as <code>(?i)</code>. Missing bodies and provider-redacted text stay indeterminate. This does not filter prompts before they leave the device and does not promise comprehensive secret detection.</p>
+      <p>Status {{template "status-badge" (printf "%s" .PromptKeywordReport.Outcome)}} · Visibility {{template "status-badge" .PromptKeywordReport.Visibility}}</p>
+      {{if eq .PromptKeywordReport.Visibility "policy_unconfigured"}}<p class="muted">No enabled prompt rule is configured, so retained prompts are indeterminate.</p>
+      {{else if eq .PromptKeywordReport.Visibility "partial"}}<p class="muted">Some retained prompts are missing or provider-redacted, so this check cannot claim complete coverage.</p>
+      {{else if eq .PromptKeywordReport.Visibility "unavailable"}}<p class="muted">No retained user-prompt body is available, so this check is indeterminate.</p>
+      {{else if not .PromptKeywordReport.Findings}}<p class="muted">Enabled rules did not match the available retained user prompts.</p>{{end}}
+      <!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token -- Go/HTMX form is protected by sameOriginCookieMutation; bearer clients are non-ambient. Owner: TelemetryIQ. Expiry: 2026-12-31. -->
+      <form method="post" action="/governance/prompt-keywords" id="prompt-keywords-form" class="prompt-keywords-form" data-policy-name="Prompt findings">
+        <div class="prompt-keyword-groups">
+          {{range $group := .PromptKeywordGroups}}
+          <section>
+            <h3>{{$group.Label}}</h3>
+            {{if $group.Rules}}<ul class="prompt-keyword-chips" aria-label="{{$group.Label}} rules">{{range $group.Rules}}<li>{{.Label}}</li>{{end}}</ul>{{else}}<p class="muted">No {{$group.Label}} rules are configured.</p>{{end}}
+            <div class="prompt-rule-list" data-group="{{$group.ID}}">
+              {{range $index, $rule := $group.Rules}}
+              <div class="prompt-rule-row">
+                <label>Rule ID <input name="rule_id" value="{{$rule.ID}}" id="{{$group.ID}}-id-{{$index}}"></label>
+                <label>Rule label <input name="rule_label" value="{{$rule.Label}}" id="{{$group.ID}}-label-{{$index}}"></label>
+                <input type="hidden" name="rule_group" value="{{$group.ID}}">
+                <label>Enabled <select name="rule_enabled" id="{{$group.ID}}-enabled-{{$index}}"><option value="true"{{if $rule.Enabled}} selected{{end}}>Enabled</option><option value="false"{{if not $rule.Enabled}} selected{{end}}>Disabled</option></select></label>
+                <label>Match kind <select name="rule_kind" id="{{$group.ID}}-kind-{{$index}}"><option value="literal"{{if eq $rule.Kind "literal"}} selected{{end}}>Literal</option><option value="regex"{{if eq $rule.Kind "regex"}} selected{{end}}>RE2</option></select></label>
+                <label>Pattern <input name="rule_value" value="{{$rule.Value}}" id="{{$group.ID}}-value-{{$index}}"></label>
+                <button type="button" class="secondary remove-prompt-rule">Remove</button>
+              </div>
+              {{end}}
+            </div>
+            <button type="button" class="secondary add-prompt-rule" data-group="{{$group.ID}}">{{$group.AddLabel}}</button>
+          </section>
+          {{end}}
+        </div>
+        <div class="governance-save-bar"><p class="muted allowlist-dirty-summary" hidden></p><div><button type="reset" class="secondary">Reset changes</button><button type="submit" class="allowlist-save-inline" disabled>Save local changes</button></div></div>
+      </form>
+    </div>
+    {{else}}{{with .RulesShell}}
+    <div class="rules-panel" role="tabpanel" id="{{.PanelID}}" aria-labelledby="{{.TabID}}">
+      <p>Status {{template "status-badge" "unavailable"}}</p>
+      <p class="muted">{{.Subject}} is unavailable. A <code>{{.SchemaKey}}</code> (or equivalent) config schema and detectors are required before this control can be edited. Tracked under epic <a href="https://github.com/t4avenger/AI-Engineering-productivity/issues/148">#148</a>; see the <a href="https://github.com/t4avenger/AI-Engineering-productivity/blob/main/docs/ui/UI_PRODUCT_ROADMAP.md">UI product roadmap</a>.</p>
+      <p class="muted">No allow or block counts are shown — detectors are not implemented.</p>
+    </div>
+    {{end}}{{end}}
+  </section>
+  </div>
   <section aria-labelledby="findings-heading">
     <h2 id="findings-heading">Findings</h2>
 
@@ -120,61 +262,10 @@
       <p class="muted">No MCP servers were observed in retained events, so this check is indeterminate.</p>
       {{end}}
     </section>
-  </section>
 
-  <div class="governance-workspace">
-  <section id="access-rules" aria-labelledby="access-rules-heading">
-    <h2 id="access-rules-heading">Access Rules</h2>
-    <p>Manage local detect-and-report policies over retained evidence. Path rules inspect raw retained paths only; they never read the filesystem or block provider actions.</p>
-    <div class="rules-tabs" role="tablist" aria-label="Access Rules categories">
-      <a class="rules-tab{{if eq .ActiveRulesTab "mcp"}} active{{end}}" role="tab" id="rules-tab-mcp" href="{{governanceRulesPath "mcp"}}" aria-controls="rules-panel-mcp" aria-selected="{{if eq .ActiveRulesTab "mcp"}}true{{else}}false{{end}}"{{if eq .ActiveRulesTab "mcp"}} aria-current="page"{{end}}>MCP servers</a>
-      <a class="rules-tab{{if eq .ActiveRulesTab "skills"}} active{{end}}" role="tab" id="rules-tab-skills" href="{{governanceRulesPath "skills"}}" aria-controls="rules-panel-skills" aria-selected="{{if eq .ActiveRulesTab "skills"}}true{{else}}false{{end}}"{{if eq .ActiveRulesTab "skills"}} aria-current="page"{{end}}>Skills</a>
-      <a class="rules-tab{{if eq .ActiveRulesTab "paths"}} active{{end}}" role="tab" id="rules-tab-paths" href="{{governanceRulesPath "paths"}}" aria-controls="rules-panel-paths" aria-selected="{{if eq .ActiveRulesTab "paths"}}true{{else}}false{{end}}"{{if eq .ActiveRulesTab "paths"}} aria-current="page"{{end}}>Files &amp; Paths</a>
-      <a class="rules-tab{{if eq .ActiveRulesTab "prompts"}} active{{end}}" role="tab" id="rules-tab-prompts" href="{{governanceRulesPath "prompts"}}" aria-controls="rules-panel-prompts" aria-selected="{{if eq .ActiveRulesTab "prompts"}}true{{else}}false{{end}}"{{if eq .ActiveRulesTab "prompts"}} aria-current="page"{{end}}>Prompt Keywords</a>
-    </div>
-
-    {{if eq .ActiveRulesTab "mcp"}}
-    <div class="rules-panel" role="tabpanel" id="rules-panel-mcp" aria-labelledby="rules-tab-mcp">
-      <form method="post" action="/governance/mcp-allowlist" class="allowlist-form" id="mcp-allowlist-form" data-input-name="mcp_server" data-row-class="allowlist-row" data-policy-name="MCP">
-        <div class="mcp-rule-toolbar">
-          <label>Search servers <input type="search" id="mcp-rule-search" placeholder="Search retained identities"></label>
-          <label>Policy <select id="mcp-rule-filter"><option value="all">All</option><option value="allowlisted">Allowlisted</option><option value="not-allowlisted">Not allowlisted</option></select></label>
-        </div>
-        {{if .MCPServers}}
-        <section class="table-wrap" aria-label="MCP access rules">
-          <table>
-            <thead><tr><th scope="col">Server identity</th><th scope="col">Local access policy</th><th scope="col">Scope</th><th scope="col">Applies to</th><th scope="col">Last changed</th><th scope="col">Edit</th></tr></thead>
-            <tbody>
-              {{$policyConfigured := .MCPPolicyConfigured}}
-              {{range .MCPServers}}
-              <tr class="allowlist-row mcp-rule-row" data-allowlist-name="{{.Name}}" data-allowlist-policy="{{if $policyConfigured}}{{if .ActiveChecked}}allowlisted{{else}}not-allowlisted{{end}}{{else}}unconfigured{{end}}" data-mcp-policy="{{if $policyConfigured}}{{if .ActiveChecked}}allowlisted{{else}}not-allowlisted{{end}}{{else}}unconfigured{{end}}">
-                <td><code>{{.Name}}</code></td>
-                <td>{{if $policyConfigured}}{{if .ActiveChecked}}Allowlisted{{else}}Not allowlisted{{end}}{{else}}{{template "status-badge" "policy_unconfigured"}}{{end}}</td>
-                <td>Local daemon</td>
-                <td>{{if .Observed}}Observed provider identity{{else}}Configured; not currently observed{{end}}</td>
-                <td>{{template "status-badge" "unavailable"}}</td>
-                <td><label class="mcp-rule-edit" aria-label="{{.Name}}"><input type="checkbox" name="mcp_server" value="{{.Name}}" data-active-checked="{{.ActiveChecked}}"{{if .Checked}} checked{{end}}> Allowlist</label></td>
-              </tr>
-              {{end}}
-            </tbody>
-          </table>
-        </section>
-        {{else}}
-        <p class="muted">No provider-reported MCP server names are available yet.</p>
-        {{end}}
-        <div class="governance-save-bar">
-          <p class="muted allowlist-dirty-summary" id="mcp-dirty-summary" hidden></p>
-          {{if .SaveAvailable}}<div><button type="reset" class="secondary">Reset changes</button><button type="submit" class="allowlist-save-inline" disabled>Save local changes</button></div>{{else}}<p class="muted">Saving is unavailable because no writable configuration controller is active.</p>{{end}}
-        </div>
-      </form>
-    </div>
-    {{else if and (eq .ActiveRulesTab "skills") .SkillsSaveAvailable}}
-    <div class="rules-panel" role="tabpanel" id="rules-panel-skills" aria-labelledby="rules-tab-skills">
-      <p>Compare provider-stamped explicit skill identities with the local <code>governance.skills_allowlist</code>. Inferred, anonymous, unavailable, and unknown skill telemetry remains indeterminate.</p>
-      <p>
-        Status {{template "status-badge" (printf "%s" .UnapprovedSkills.Outcome)}}
-        · Visibility {{template "status-badge" .UnapprovedSkills.Visibility}}
-      </p>
+    <section aria-labelledby="unapproved-skills-heading">
+      <h3 id="unapproved-skills-heading">Unapproved skills</h3>
+      <p>Status {{template "status-badge" (printf "%s" .UnapprovedSkills.Outcome)}} · Visibility {{template "status-badge" .UnapprovedSkills.Visibility}}</p>
       {{if .UnapprovedSkills.Findings}}
       <section class="table-wrap" aria-label="Unapproved skill evidence preview">
         <table>
@@ -199,100 +290,21 @@
       {{else}}
       <p class="muted">No explicit provider skill identities are available yet.</p>
       {{end}}
-      <form method="post" action="/governance/skills-allowlist" class="allowlist-form" id="skills-allowlist-form" data-input-name="skill" data-row-class="allowlist-row" data-policy-name="Skills">
-        {{if .Skills}}
-        <section class="table-wrap" aria-label="Skills access rules">
-          <table>
-            <thead><tr><th scope="col">Skill identity</th><th scope="col">Local policy</th><th scope="col">Evidence</th><th scope="col">Edit</th></tr></thead>
-            <tbody>
-              {{$policyConfigured := .SkillsPolicyConfigured}}
-              {{range .Skills}}
-              <tr class="allowlist-row" data-allowlist-name="{{.Name}}" data-allowlist-policy="{{if $policyConfigured}}{{if .ActiveChecked}}allowlisted{{else}}not-allowlisted{{end}}{{else}}unconfigured{{end}}">
-                <td><code>{{.Name}}</code></td>
-                <td>{{if $policyConfigured}}{{if .ActiveChecked}}Allowlisted{{else}}Not allowlisted{{end}}{{else}}{{template "status-badge" "policy_unconfigured"}}{{end}}</td>
-                <td>{{if .Observed}}Explicit provider identity{{else}}Configured; not currently observed{{end}}</td>
-                <td><label aria-label="{{.Name}}"><input type="checkbox" name="skill" value="{{.Name}}" data-active-checked="{{.ActiveChecked}}"{{if .Checked}} checked{{end}}> Allowlist</label></td>
-              </tr>
-              {{end}}
-            </tbody>
-          </table>
-        </section>
-        {{else}}
-        <p class="muted">No explicit provider skill identities are available yet.</p>
-        {{end}}
-        <div class="governance-save-bar">
-          <p class="muted allowlist-dirty-summary" hidden></p>
-          {{if .SkillsSaveAvailable}}<div><button type="reset" class="secondary">Reset changes</button><button type="submit" class="allowlist-save-inline" disabled>Save local changes</button></div>{{else}}<p class="muted">Saving is unavailable because no writable configuration controller is active.</p>{{end}}
-        </div>
-      </form>
-    </div>
-    {{else if and (eq .ActiveRulesTab "paths") .PathRulesSaveAvailable}}
-    <div class="rules-panel" role="tabpanel" id="rules-panel-paths" aria-labelledby="rules-tab-paths">
-      <p>Evaluate retained raw filesystem paths after capture. Matching is case-sensitive; <code>*</code> stays within a segment, <code>**</code> crosses segments, and <code>?</code> matches one non-separator character. Paths are never expanded, resolved, or used to intercept access.</p>
+    </section>
+    <section aria-labelledby="path-findings-heading">
+      <h3 id="path-findings-heading">Path rules</h3>
       <p>Status {{template "status-badge" (printf "%s" .PathRules.Outcome)}} · Visibility {{template "status-badge" .PathRules.Visibility}}</p>
       {{if .PathRules.Findings}}<section class="table-wrap" aria-label="Path rule findings"><table><thead><tr><th scope="col">Path</th><th scope="col">Reason</th><th scope="col">Source event</th></tr></thead><tbody>{{range .PathRules.Findings}}<tr><td><code>{{.Path}}</code></td><td>{{.Reason}} · detect only</td><td>{{if and .SessionID .SourceEventID}}<a href="{{pathFindingEvidencePath .SessionID .SourceEventID}}"><code>{{.SourceEventID}}</code></a>{{else}}<code>{{.SourceEventID}}</code>{{end}}</td></tr>{{end}}</tbody></table></section>{{else if eq .PathRules.Visibility "policy_unconfigured"}}<p class="muted">No path policy is configured, so retained path evidence is indeterminate.</p>{{else if eq .PathRules.Visibility "unavailable"}}<p class="muted">No filesystem-path evidence is available from retained events, so this check is indeterminate.</p>{{else}}<p class="muted">No retained paths match the active local policy.</p>{{end}}
-      <!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token -- Go/HTMX form is protected by sameOriginCookieMutation; bearer clients are non-ambient. Owner: TelemetryIQ. Expiry: 2026-12-31. -->
-      <form method="post" action="/governance/path-rules" id="path-rules-form" class="path-rules-form" data-policy-name="Files &amp; Paths">
-        <fieldset><legend>Mode</legend>
-          <label><input type="radio" name="mode" value="monitor"{{if eq .PathRulesConfig.Mode "monitor"}} checked{{end}}> Monitor all</label>
-          <label><input type="radio" name="mode" value="approved_only"{{if eq .PathRulesConfig.Mode "approved_only"}} checked{{end}}> Approved paths only</label>
-          <label><input type="radio" name="mode" value="flag_all"{{if eq .PathRulesConfig.Mode "flag_all"}} checked{{end}}> Flag all</label>
-        </fieldset>
-        <div class="path-rule-groups">
-          <section><h3>Allowed paths</h3><p class="muted">Used only by Approved paths only.</p><div class="path-rule-list" data-group="allowed">{{range $index, $rule := .PathRulesConfig.Allowed}}<div class="path-rule-row"><label for="allowed-kind-{{$index}}" class="sr-only">Allowed path rule kind</label><select id="allowed-kind-{{$index}}" name="allowed_kind"><option value="exact"{{if eq $rule.Kind "exact"}} selected{{end}}>Exact</option><option value="glob"{{if eq $rule.Kind "glob"}} selected{{end}}>Glob</option></select><label for="allowed-value-{{$index}}" class="sr-only">Allowed path rule</label><input id="allowed-value-{{$index}}" name="allowed_value" value="{{$rule.Value}}"><button type="button" class="secondary remove-path-rule">Remove</button></div>{{end}}</div><button type="button" class="secondary add-path-rule" data-group="allowed">Add allowed path</button></section>
-          <section><h3>Blocked paths <span class="muted">detect only</span></h3><div class="path-rule-list" data-group="blocked">{{range $index, $rule := .PathRulesConfig.Blocked}}<div class="path-rule-row"><label for="blocked-kind-{{$index}}" class="sr-only">Blocked path rule kind</label><select id="blocked-kind-{{$index}}" name="blocked_kind"><option value="exact"{{if eq $rule.Kind "exact"}} selected{{end}}>Exact</option><option value="glob"{{if eq $rule.Kind "glob"}} selected{{end}}>Glob</option></select><label for="blocked-value-{{$index}}" class="sr-only">Blocked path rule</label><input id="blocked-value-{{$index}}" name="blocked_value" value="{{$rule.Value}}"><button type="button" class="secondary remove-path-rule">Remove</button></div>{{end}}</div><button type="button" class="secondary add-path-rule" data-group="blocked">Add blocked path</button></section>
-        </div>
-        <div class="governance-save-bar"><p class="muted allowlist-dirty-summary" hidden></p><div><button type="reset" class="secondary">Reset changes</button><button type="submit" class="allowlist-save-inline" disabled>Save local changes</button></div></div>
-      </form>
-    </div>
-    {{else if and (eq .ActiveRulesTab "prompts") .PromptKeywordsSaveAvailable}}
-    <div class="rules-panel" role="tabpanel" id="rules-panel-prompts" aria-labelledby="rules-tab-prompts">
-      <h3>Prompt findings — after capture</h3>
-      <p>Action: Record finding. Match retained user-prompt text only. Literal matching is case-sensitive. Regular expressions use RE2, and case folding happens only with an explicit flag such as <code>(?i)</code>. Missing bodies and provider-redacted text stay indeterminate. This does not filter prompts before they leave the device and does not promise comprehensive secret detection.</p>
-      <p>Status {{template "status-badge" (printf "%s" .PromptKeywordReport.Outcome)}} · Visibility {{template "status-badge" .PromptKeywordReport.Visibility}}</p>
+    </section>
+    <section aria-labelledby="prompt-findings-report-heading">
+      <h3 id="prompt-findings-report-heading">Prompt findings</h3>
       {{if .PromptKeywordReport.Findings}}
       <section class="table-wrap" aria-label="Prompt keyword findings"><table><thead><tr><th scope="col">Label</th><th scope="col">Group</th><th scope="col">Kind</th><th scope="col">Source event</th></tr></thead><tbody>{{range .PromptKeywordReport.Findings}}<tr><td>{{.Label}}</td><td>{{.Group}}</td><td>{{.Kind}}</td><td>{{if and .SessionID .SourceEventID}}<a href="{{pathFindingEvidencePath .SessionID .SourceEventID}}"><code>{{.SourceEventID}}</code></a>{{else}}<code>{{.SourceEventID}}</code>{{end}}</td></tr>{{end}}</tbody></table></section>
-      {{else if eq .PromptKeywordReport.Visibility "policy_unconfigured"}}<p class="muted">No enabled prompt rule is configured, so retained prompts are indeterminate.</p>
-      {{else if eq .PromptKeywordReport.Visibility "partial"}}<p class="muted">Some retained prompts are missing or provider-redacted, so this check cannot claim complete coverage.</p>
-      {{else if eq .PromptKeywordReport.Visibility "unavailable"}}<p class="muted">No retained user-prompt body is available, so this check is indeterminate.</p>
-      {{else}}<p class="muted">Enabled rules did not match the available retained user prompts.</p>{{end}}
-      <!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token -- Go/HTMX form is protected by sameOriginCookieMutation; bearer clients are non-ambient. Owner: TelemetryIQ. Expiry: 2026-12-31. -->
-      <form method="post" action="/governance/prompt-keywords" id="prompt-keywords-form" class="prompt-keywords-form" data-policy-name="Prompt findings">
-        <div class="prompt-keyword-groups">
-          {{range $group := .PromptKeywordGroups}}
-          <section>
-            <h3>{{$group.Label}}</h3>
-            {{if $group.Rules}}<ul class="prompt-keyword-chips" aria-label="{{$group.Label}} rules">{{range $group.Rules}}<li>{{.Label}}</li>{{end}}</ul>{{else}}<p class="muted">No {{$group.Label}} rules are configured.</p>{{end}}
-            <div class="prompt-rule-list" data-group="{{$group.ID}}">
-              {{range $index, $rule := $group.Rules}}
-              <div class="prompt-rule-row">
-                <label>Rule ID <input name="rule_id" value="{{$rule.ID}}" id="{{$group.ID}}-id-{{$index}}"></label>
-                <label>Rule label <input name="rule_label" value="{{$rule.Label}}" id="{{$group.ID}}-label-{{$index}}"></label>
-                <input type="hidden" name="rule_group" value="{{$group.ID}}">
-                <label>Enabled <select name="rule_enabled" id="{{$group.ID}}-enabled-{{$index}}"><option value="true"{{if $rule.Enabled}} selected{{end}}>Enabled</option><option value="false"{{if not $rule.Enabled}} selected{{end}}>Disabled</option></select></label>
-                <label>Match kind <select name="rule_kind" id="{{$group.ID}}-kind-{{$index}}"><option value="literal"{{if eq $rule.Kind "literal"}} selected{{end}}>Literal</option><option value="regex"{{if eq $rule.Kind "regex"}} selected{{end}}>RE2</option></select></label>
-                <label>Pattern <input name="rule_value" value="{{$rule.Value}}" id="{{$group.ID}}-value-{{$index}}"></label>
-                <button type="button" class="secondary remove-prompt-rule">Remove</button>
-              </div>
-              {{end}}
-            </div>
-            <button type="button" class="secondary add-prompt-rule" data-group="{{$group.ID}}">{{$group.AddLabel}}</button>
-          </section>
-          {{end}}
-        </div>
-        <div class="governance-save-bar"><p class="muted allowlist-dirty-summary" hidden></p><div><button type="reset" class="secondary">Reset changes</button><button type="submit" class="allowlist-save-inline" disabled>Save local changes</button></div></div>
-      </form>
-    </div>
-    {{else}}{{with .RulesShell}}
-    <div class="rules-panel" role="tabpanel" id="{{.PanelID}}" aria-labelledby="{{.TabID}}">
-      <p>Status {{template "status-badge" "unavailable"}}</p>
-      <p class="muted">{{.Subject}} is unavailable. A <code>{{.SchemaKey}}</code> (or equivalent) config schema and detectors are required before this control can be edited. Tracked under epic <a href="https://github.com/t4avenger/AI-Engineering-productivity/issues/148">#148</a>; see the <a href="https://github.com/t4avenger/AI-Engineering-productivity/blob/main/docs/ui/UI_PRODUCT_ROADMAP.md">UI product roadmap</a>.</p>
-      <p class="muted">No allow or block counts are shown — detectors are not implemented.</p>
-    </div>
-    {{end}}{{end}}
+      {{else}}<p class="muted">Prompt-rule matches, when any exist, are listed here after capture.</p>{{end}}
+    </section>
   </section>
-  </div>
   {{end}}
+
   <script>
   (function () {
     function setGovernanceUnsaved(text, hidden) {
