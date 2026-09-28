@@ -66,7 +66,7 @@
   {{if .Legend}}
   <ul class="legend-list" aria-label="Rendered event kinds">
     {{range .Legend}}
-    <li><span class="legend-kind">{{.Label}}</span> <span class="muted">{{.Detail}}</span></li>
+    <li>{{if .Kind}}{{template "event-kind-icon" .Kind}}{{end}}<span class="legend-kind">{{.Label}}</span> <span class="muted">{{.Detail}}</span></li>
     {{end}}
   </ul>
   {{else}}

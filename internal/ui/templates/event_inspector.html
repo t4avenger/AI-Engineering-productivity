@@ -21,15 +21,33 @@
     <a class="rules-tab{{if eq .ActiveTab "events"}} active{{end}}" role="tab" id="inspector-tab-events" href="{{.EventsTabURL}}" aria-controls="inspector-panel-events" aria-selected="{{if eq .ActiveTab "events"}}true{{else}}false{{end}}">Events</a>
   </div>
   {{if eq .ActiveTab "details"}}
-  <div class="rules-panel" role="tabpanel" id="inspector-panel-details" aria-labelledby="inspector-tab-details">
-    <dl class="timeline-facts">
-      <div><dt>Event type</dt><dd>{{.EventType}}</dd></div>
-      <div><dt>Occurred at</dt><dd>{{.OccurredAt}}</dd></div>
-      <div><dt>Outcome</dt><dd>{{if .Outcome}}{{.Outcome}}{{else}}{{template "status-badge" "unavailable"}}{{end}}</dd></div>
-      <div><dt>Duration</dt><dd>{{if .Duration}}{{.Duration}}{{else}}{{template "status-badge" "unavailable"}}{{end}}</dd></div>
-      <div><dt>Source version</dt><dd>{{if .SourceVersion}}{{.SourceVersion}}{{else}}{{template "status-badge" "unavailable"}}{{end}}</dd></div>
-      <div><dt>Operation ID</dt><dd>{{if .OperationID}}<code>{{.OperationID}}</code>{{else}}{{template "status-badge" "unavailable"}}{{end}}</dd></div>
-    </dl>
+  <div class="rules-panel inspector-columns" role="tabpanel" id="inspector-panel-details" aria-labelledby="inspector-tab-details">
+    <section>
+      <h3>Identity and timing</h3>
+      <dl class="timeline-facts">
+        <div><dt>Event type</dt><dd>{{.EventType}}</dd></div>
+        <div><dt>Occurred at</dt><dd>{{.OccurredAt}}</dd></div>
+        <div><dt>Outcome</dt><dd>{{if .Outcome}}{{.Outcome}}{{else}}{{template "status-badge" "unavailable"}}{{end}}</dd></div>
+        <div><dt>Duration</dt><dd>{{if .Duration}}{{.Duration}}{{else}}{{template "status-badge" "unavailable"}}{{end}}</dd></div>
+        <div><dt>Source version</dt><dd>{{if .SourceVersion}}{{.SourceVersion}}{{else}}{{template "status-badge" "unavailable"}}{{end}}</dd></div>
+        <div><dt>Operation ID</dt><dd>{{if .OperationID}}<code>{{.OperationID}}</code>{{else}}{{template "status-badge" "unavailable"}}{{end}}</dd></div>
+      </dl>
+    </section>
+    <section>
+      <h3>Attributes</h3>
+      <p class="muted">Retained attribute values stay on the Attributes tab, including unknown provider extensions.</p>
+      <p><a href="{{.AttributesTabURL}}">Open Attributes</a></p>
+    </section>
+    <section>
+      <h3>Related files</h3>
+      {{if eq .FilesAvailability "none"}}
+      <p class="muted">No proven file relationships for this event.</p>
+      {{else}}
+      <ul class="file-evidence-list">{{range .Files}}
+        <li>{{if .Href}}<a href="{{.Href}}">{{.Label}}</a>{{else}}{{.Label}}{{end}} <span class="muted">{{.Meta}}</span></li>
+      {{end}}</ul>
+      {{end}}
+    </section>
   </div>
   {{else if eq .ActiveTab "attributes"}}
   <div class="rules-panel" role="tabpanel" id="inspector-panel-attributes" aria-labelledby="inspector-tab-attributes">

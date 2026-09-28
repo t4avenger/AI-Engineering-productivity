@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -31,6 +32,7 @@ type sessionTraceView struct {
 	OriginLabel          string
 	WindowLabel          string
 	WindowMs             int64
+	Ticks                []string
 	PartialCapture       bool
 	PlanningAvailability string
 	Lanes                []traceLaneView
@@ -55,6 +57,7 @@ type sessionTraceHeader struct {
 type traceLaneView struct {
 	ID           string
 	Label        string
+	Subtitle     string
 	Availability string
 	EmptyMessage string
 	Markers      []traceMarkerView
@@ -71,6 +74,7 @@ type traceMarkerView struct {
 	OffsetMs       int64
 	DurationMs     int64
 	HasDuration    bool
+	DurationLabel  string
 	Placed         bool
 	LeftPercent    float64
 	WidthPercent   float64
@@ -82,6 +86,7 @@ type traceMarkerView struct {
 	SelectPath     string
 	SourceEventIDs string
 	OffsetLabel    string
+	AccessibleName string
 	DOMID          string
 }
 
@@ -115,12 +120,13 @@ func buildSessionTrace(
 		OriginLabel:          formatTraceOrigin(origin, originKind),
 		WindowMs:             windowMs,
 		WindowLabel:          formatDurationMs(windowMs),
+		Ticks:                traceClockTicks(windowMs),
 		PlanningAvailability: planningAvailability(items),
 		Header:               buildTraceHeader(session, events),
 	}
 	markers := make([]traceMarkerView, 0, len(items))
 	for _, item := range items {
-		marker := markerFromItem(item, origin, windowMs, sessionID, r)
+		marker := finishTraceMarker(markerFromItem(item, origin, windowMs, sessionID, r))
 		markers = append(markers, marker)
 	}
 	sortTraceMarkers(markers)
@@ -469,13 +475,13 @@ func markerFromItem(item timedTraceItem, origin time.Time, windowMs int64, sessi
 
 func buildTraceLanes(placed []traceMarkerView, planningAvailability string) []traceLaneView {
 	defs := []struct {
-		id, label, empty string
+		id, label, subtitle, empty string
 	}{
-		{traceLaneConversation, "Conversation", "No retained conversation evidence for this session."},
-		{traceLaneAgent, "Agent", "No observed agent or model-work evidence for this session."},
-		{traceLaneTools, "Tools & MCP", "No observed tool, MCP, or skill evidence for this session."},
-		{traceLaneFiles, "Files", "No retained file-operation evidence for this session."},
-		{traceLaneSpans, "Spans", "No retained trace span evidence for this session."},
+		{traceLaneConversation, "Conversation", "User messages", "No retained conversation evidence for this session."},
+		{traceLaneAgent, "Agent", "Observed model work", "No observed agent or model-work evidence for this session."},
+		{traceLaneTools, "Tools & MCP", "Tools, MCP, and skills", "No observed tool, MCP, or skill evidence for this session."},
+		{traceLaneFiles, "Files", "Files read or changed", "No retained file-operation evidence for this session."},
+		{traceLaneSpans, "Spans", "Parent and child spans", "No retained trace span evidence for this session."},
 	}
 	lanes := make([]traceLaneView, 0, len(defs))
 	for _, def := range defs {
@@ -485,7 +491,7 @@ func buildTraceLanes(placed []traceMarkerView, planningAvailability string) []tr
 		}
 		assignOverlapStacks(markers)
 		lane := traceLaneView{
-			ID: def.id, Label: def.label, Markers: markers, TrackHeight: maxStack(markers) + 1,
+			ID: def.id, Label: def.label, Subtitle: def.subtitle, Markers: markers, TrackHeight: maxStack(markers) + 1,
 		}
 		if len(markers) == 0 {
 			lane.EmptyMessage = def.empty
@@ -738,6 +744,42 @@ func firstSourceEventID(ids []string) string {
 		return ""
 	}
 	return ids[0]
+}
+
+func finishTraceMarker(marker traceMarkerView) traceMarkerView {
+	if marker.HasDuration {
+		marker.DurationLabel = formatDurationMs(marker.DurationMs)
+	}
+	marker.AccessibleName = marker.Label
+	if marker.HasDuration && marker.DurationLabel != "" {
+		marker.AccessibleName += " · " + marker.DurationLabel
+	} else {
+		marker.AccessibleName += " · point event, no duration"
+	}
+	if marker.OffsetLabel != "" {
+		marker.AccessibleName += " · " + marker.OffsetLabel
+	}
+	return marker
+}
+
+func traceClockTicks(windowMs int64) []string {
+	if windowMs <= 0 {
+		return nil
+	}
+	const count = 5
+	ticks := make([]string, count)
+	for i := 0; i < count; i++ {
+		ticks[i] = formatTraceClock(windowMs * int64(i) / int64(count-1))
+	}
+	return ticks
+}
+
+func formatTraceClock(ms int64) string {
+	if ms < 0 {
+		ms = 0
+	}
+	totalSeconds := ms / 1000
+	return fmt.Sprintf("%02d:%02d", totalSeconds/60, totalSeconds%60)
 }
 
 func formatTraceOrigin(origin time.Time, kind string) string {

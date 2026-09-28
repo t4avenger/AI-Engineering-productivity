@@ -97,6 +97,8 @@ func TestSessionTraceRendersFiveLanesAndSharedAxis(t *testing.T) {
 		`data-lane="files"`,
 		`data-lane="spans"`,
 		"User message",
+		"point event, no duration",
+		"00:00",
 		"trace user prompt",
 		"Model interaction",
 		"Operation",

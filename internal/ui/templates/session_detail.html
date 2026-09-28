@@ -2,51 +2,56 @@
 {{template "shell-start" .}}
 {{template "nav" .}}
 <main id="main-content" class="page session-trace-page">
-  <p class="breadcrumb"><a href="/sessions">Sessions</a> <span aria-hidden="true">/</span> <span>{{with .Content}}{{.Session.SessionID}}{{end}}</span></p>
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
   {{with .Content}}
   <header class="session-trace-header">
     <div class="session-trace-title-row">
       <div>
-        <p class="eyebrow">Session Trace</p>
-        <h1 id="session-trace-heading">Session {{.Session.SessionID}}</h1>
+        <p class="breadcrumb"><a href="/sessions">Sessions</a> <span aria-hidden="true">/</span> <span>{{.Session.SessionID}}</span></p>
+        <h1 id="session-trace-heading">Session Trace</h1>
         <p class="session-trace-meta">
           <span>{{template "status-badge" .Session.State}}</span>
           <span>{{.Session.Tool}} · {{.Session.Provider}}</span>
           {{if .Trace.Header.ModelObserved}}<span>Model {{.Trace.Header.Model}}</span>{{else}}<span>Model {{template "status-badge" "unavailable"}}</span>{{end}}
+          {{range .SessionMetadata}}{{if or (eq .Label "Branch") (eq .Label "PR")}}<span>{{.Label}} {{if .Observed}}{{.Value}}{{else}}{{template "status-badge" .Machine}}{{end}}</span>{{end}}{{end}}
           {{if .Trace.Header.DurationOK}}<span>Duration {{.Trace.Header.Duration}}</span>{{else}}<span>Duration {{template "status-badge" "unavailable"}}</span>{{end}}
           {{if .Trace.Header.TokensOK}}<span>Tokens {{.Trace.Header.Tokens}}</span>{{else}}<span>Tokens {{template "status-badge" "unavailable"}}</span>{{end}}
-          {{if .Trace.Header.OccurredAt}}<span>{{.Trace.Header.OccurredAt}}</span>{{end}}
         </p>
       </div>
-      <details class="session-overflow">
-        <summary>Actions</summary>
-        <ul>
-          <li><a href="{{.SessionPath}}?confirm=1">Delete this session</a></li>
-          <li><span class="muted" title="Share requires the environments and session-sharing architecture gate">Share unavailable</span></li>
-        </ul>
-      </details>
+      <div class="session-trace-actions">
+        {{if .Trace.Header.OccurredAt}}<p class="muted">{{.Trace.Header.OccurredAt}}</p>{{end}}
+        <details class="session-overflow">
+          <summary>Actions</summary>
+          <ul>
+            <li><a href="{{.SessionPath}}?confirm=1">Delete this session</a></li>
+            <li><span class="muted" title="Share requires the environments and session-sharing architecture gate">Share unavailable</span></li>
+          </ul>
+        </details>
+      </div>
     </div>
-    {{if .SessionMetadata}}
-    <section aria-labelledby="session-environment-heading">
-      <h2 id="session-environment-heading">Environment</h2>
-      <dl class="metadata-list session-trace-metadata">
-        {{range .SessionMetadata}}
-        <div><dt>{{.Label}}</dt><dd>{{if .Observed}}{{.Value}}{{else}}{{template "status-badge" .Machine}}{{end}}</dd></div>
-        {{end}}
-      </dl>
-    </section>
-    {{end}}
-    {{if .Availability}}
-    <section aria-labelledby="session-availability-heading">
-      <h2 id="session-availability-heading">Availability</h2>
-      <ul class="availability-list compact-availability" aria-label="Session capability availability">
-        {{range .Availability}}
-        <li><span>{{.Label}}</span> {{template "status-badge" .State}}</li>
-        {{end}}
-      </ul>
-    </section>
-    {{end}}
+    <details class="session-trace-extra">
+      <summary>Environment and availability</summary>
+      {{if .SessionMetadata}}
+      <section aria-labelledby="session-environment-heading">
+        <h2 id="session-environment-heading">Environment</h2>
+        <dl class="metadata-list session-trace-metadata">
+          {{range .SessionMetadata}}
+          <div><dt>{{.Label}}</dt><dd>{{if .Observed}}{{.Value}}{{else}}{{template "status-badge" .Machine}}{{end}}</dd></div>
+          {{end}}
+        </dl>
+      </section>
+      {{end}}
+      {{if .Availability}}
+      <section aria-labelledby="session-availability-heading">
+        <h2 id="session-availability-heading">Availability</h2>
+        <ul class="availability-list compact-availability" aria-label="Session capability availability">
+          {{range .Availability}}
+          <li><span>{{.Label}}</span> {{template "status-badge" .State}}</li>
+          {{end}}
+        </ul>
+      </section>
+      {{end}}
+    </details>
   </header>
 
   {{if .FilesError}}<p class="error" role="alert">{{.FilesError}}</p>{{end}}
@@ -58,7 +63,7 @@
 
   {{template "event_inspector.html" .Inspector}}
 
-  <details class="trace-chronological" id="chronological-list" open>
+  <details class="trace-chronological" id="chronological-list">
     <summary>Accessible chronological lists</summary>
     <p class="muted">Server-rendered alternatives to the lane axis. Selection and load-more preserve the current inspector query.</p>
     <section aria-labelledby="session-conversation-heading">
@@ -107,9 +112,9 @@
     </section>
   </details>
 
+  {{if .Confirm}}
   <section>
     <h2>Delete</h2>
-    {{if .Confirm}}
     <!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token -->
     <form method="post" action="{{.SessionPath}}/delete" class="stack">
       <p role="alert">This permanently deletes the session and its retained events.</p>
@@ -117,10 +122,8 @@
       <button type="submit" class="danger">Confirm delete</button>
       <a href="{{.SessionPath}}">Cancel</a>
     </form>
-    {{else}}
-    <p><a class="button danger" href="{{.SessionPath}}?confirm=1">Delete this session</a></p>
-    {{end}}
   </section>
+  {{end}}
   {{end}}
 </main>
 <script>
