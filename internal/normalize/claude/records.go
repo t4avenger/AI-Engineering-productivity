@@ -152,13 +152,15 @@ func sequenceSuffix(raw map[string]any, completed time.Time) string {
 // operationStructuralFields are the tool_result keys represented by the typed
 // Operation identity (OperationID, SessionID) or its correlation block, so they
 // are excluded from the verbatim event echo under provider_extensions. Every
-// remaining field — tool_name, tool_use_id, success, duration_ms, error_type,
-// decision_type, decision_source, the size counters, mcp_server_scope, and any
-// request_id — is preserved raw (epic #87), including the fields that also
-// derive the typed Category/Outcome, since those are derived views, not
-// replacements. request_id is deliberately not excluded here: the Operation has
-// no request-ID field and the correlation block does not carry it, so dropping
-// it would lose a safe correlation signal.
+// remaining field is preserved raw (epic #87, #173): not only tool_name,
+// tool_use_id, success, duration_ms, error_type, decision_type, decision_source,
+// the size counters, mcp_server_scope, and any request_id, but also the content-
+// bearing command/cwd/file_path/input/output/tool_result a prior adapter revision
+// stripped — nothing is amputated at ingest, and the fields that also derive the
+// typed Category/Outcome stay raw since those are derived views, not replacements.
+// request_id is deliberately not excluded here: the Operation has no request-ID
+// field and the correlation block does not carry it, so dropping it would lose a
+// safe correlation signal.
 var operationStructuralFields = []string{"event_name", "event_timestamp", "event_sequence", "session_id"}
 
 // ExtractOperations maps tool_result sample events into stable-primitive
@@ -227,10 +229,18 @@ func sampleOperation(index int, raw map[string]any) (canonical.Operation, bool, 
 	}, true, nil
 }
 
+// operationExtensions echoes every tool_result field not already represented by
+// the typed Operation identity/correlation block, raw and verbatim (#173, epic #87):
+// command/cwd/file_path/input/output/tool_result and the rest are no longer amputated
+// at ingest, matching the JSONL tool Operation's raw tool_call block. A downstream
+// visibility decision is layered over the retained value, never taken here; the
+// governance classifiers run over the raw value, not in place of it. The Operation ID
+// is derived by operationSuffix from tool_use_id/event_sequence/the full raw hash, not
+// from this echo, so retaining more fields leaves every Operation ID byte-stable.
 func operationExtensions(raw map[string]any, operationID string, occurredAt time.Time) map[string]any {
 	return map[string]any{
 		"correlation": operationCorrelation(operationID, occurredAt, "Claude Code tool_result telemetry has no reviewed task-boundary signal"),
-		"event":       safeOperationEventFields(normalize.UnknownFields(raw, operationStructuralFields...)),
+		"event":       normalize.UnknownFields(raw, operationStructuralFields...),
 	}
 }
 
@@ -247,26 +257,6 @@ func operationCorrelation(operationID string, occurredAt time.Time, reason strin
 			"confidence": "unknown",
 			"reason":     reason,
 		},
-	}
-}
-
-func safeOperationEventFields(fields map[string]any) map[string]any {
-	safe := make(map[string]any, len(fields))
-	for key, value := range fields {
-		if sensitiveOperationEventField(key) {
-			continue
-		}
-		safe[key] = value
-	}
-	return safe
-}
-
-func sensitiveOperationEventField(key string) bool {
-	switch strings.ToLower(strings.TrimSpace(key)) {
-	case "api_key", "arguments", "authorization", "cmd", "command", "command_args", "command_line", "content", "cwd", "file", "file_path", "filename", "host.name", "input", "output", "path", "prompt", "response", "slug", "source_code", "tool_input", "tool_result", "user.email", "user.account_id":
-		return true
-	default:
-		return false
 	}
 }
 
