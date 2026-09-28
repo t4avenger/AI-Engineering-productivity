@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
@@ -184,6 +185,58 @@ func TestExtractOperationsPreservesRawFields(t *testing.T) {
 	mcp := byID["claude-code:synthetic-session-tools:tool:toolu_synthetic_mcp"].ProviderExtensions["event"].(map[string]any)
 	if _, present := mcp["duration_ms"]; present {
 		t.Fatalf("absent duration_ms must be omitted, not fabricated: %#v", mcp)
+	}
+}
+
+// TestExtractLogOperationsRetainsVerboseToolFieldsRaw proves the OTLP tool_result
+// Operation echo retains the content-bearing command/cwd/file_path/input/output/
+// tool_result attributes raw (#173, epic #87), through the wire path
+// (ExtractLogOperations → sampleEventFromRecord → sampleOperation), not only the
+// reviewed-fixture wrapper. These verbose fields ride on the wire only under
+// tool-detail logging (like tool_parameters on tool_decision); a prior adapter
+// revision stripped them, which this reconciliation reverses — nothing is amputated
+// at ingest, and the Operation ID stays derived from tool_use_id, not the echo.
+func TestExtractLogOperationsRetainsVerboseToolFieldsRaw(t *testing.T) {
+	payload := `{"resourceLogs":[{"resource":{"attributes":[
+	  {"key":"service.name","value":{"stringValue":"claude-code"}},
+	  {"key":"service.version","value":{"stringValue":"2.1.270"}}]},
+	 "scopeLogs":[{"logRecords":[{"attributes":[
+	   {"key":"event.name","value":{"stringValue":"tool_result"}},
+	   {"key":"event.timestamp","value":{"stringValue":"2026-09-13T18:53:08.640Z"}},
+	   {"key":"event.sequence","value":{"intValue":"3"}},
+	   {"key":"session.id","value":{"stringValue":"synthetic-verbose-session"}},
+	   {"key":"tool_name","value":{"stringValue":"Bash"}},
+	   {"key":"tool_use_id","value":{"stringValue":"toolu_verbose"}},
+	   {"key":"success","value":{"stringValue":"true"}},
+	   {"key":"command","value":{"stringValue":"tiq-verbose-command"}},
+	   {"key":"cwd","value":{"stringValue":"/home/tiq-verbose/project"}},
+	   {"key":"file_path","value":{"stringValue":"/tiq-verbose/path"}},
+	   {"key":"input","value":{"stringValue":"tiq-verbose-input"}},
+	   {"key":"output","value":{"stringValue":"tiq-verbose-output"}},
+	   {"key":"tool_result","value":{"stringValue":"tiq-verbose-result"}}]}]}]}]}`
+	operations, err := ExtractLogOperations([]byte(payload), time.Unix(0, 0).UTC())
+	if err != nil {
+		t.Fatalf("extract log operations: %v", err)
+	}
+	if len(operations) != 1 {
+		t.Fatalf("operation count = %d, want 1", len(operations))
+	}
+	operation := operations[0]
+	if operation.OperationID != "claude-code:synthetic-verbose-session:tool:toolu_verbose" {
+		t.Fatalf("operation id = %q, want the tool_use_id-derived id (unchanged by retention)", operation.OperationID)
+	}
+	echo := operation.ProviderExtensions["event"].(map[string]any)
+	for key, want := range map[string]any{
+		"command":     "tiq-verbose-command",
+		"cwd":         "/home/tiq-verbose/project",
+		"file_path":   "/tiq-verbose/path",
+		"input":       "tiq-verbose-input",
+		"output":      "tiq-verbose-output",
+		"tool_result": "tiq-verbose-result",
+	} {
+		if echo[key] != want {
+			t.Fatalf("verbose field %q = %#v, want %#v retained raw on the Operation echo", key, echo[key], want)
+		}
 	}
 }
 

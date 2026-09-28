@@ -118,9 +118,10 @@ var safeSpanAttributeKeys = map[string]struct{}{
 // raw command line on tool spans (#101), so a `gh pr create` / `gh pr view <url>`
 // invocation surfaces a PR URL here. The URL grammar and extraction live in
 // normalize.AttachPRLinkEvidence, shared with Codex (no CPD-duplicated block).
-// tool_decision tool_parameters (dropped, pending #173) and JSONL tool output
-// (allow-listed out, pending #105) are the other candidate surfaces, documented
-// as unavailable until those issues retain them raw.
+// tool_decision tool_parameters (#173) and JSONL tool input/output (#94/#105) are
+// now retained raw on their own surfaces, but PR-link scanning still covers only
+// full_command; extending the scan to those retained surfaces is future work, not
+// a capture gap.
 var claudePRLinkScanFields = []string{"full_command"}
 
 type tracesPayload struct {

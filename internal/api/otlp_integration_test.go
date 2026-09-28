@@ -382,7 +382,21 @@ func TestClaudeTokenUsageMetricsPersistThroughMetricsReceiver(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertNoRawIdentifiers(t, []string{"microrutter2514@gmail.com", "synthetic@example.test", "user_synthetic"}, encoded)
+	// Per #173 the metrics path retains session/environment identity raw under
+	// provider_extensions.environment — the same reconciliation #107 X20 applied to
+	// logs/traces (nothing dropped at the local-only boundary; owner directive / epic
+	// #87). Read it back to prove the metrics ingest→read path surfaces it rather than
+	// amputating it at the former allow-list.
+	assertEnvironmentIdentity(t, events, map[string]string{
+		"user_id":         "synthetic-user",
+		"user_email":      "synthetic@example.test",
+		"user_account_id": "user_synthetic",
+		"organization_id": "00000000-0000-4000-8000-0000000000aa",
+		"terminal_type":   "gnome-terminal",
+	})
+	// The guard targets genuine hazards only: the real operator email (git hygiene)
+	// must never be emitted; synthetic identity is legitimately retained above.
+	assertNoRawIdentifiers(t, []string{"microrutter2514@gmail.com"}, encoded)
 	var sawInput bool
 	for _, event := range events {
 		if event.EventType != "claude_code.token.usage" {

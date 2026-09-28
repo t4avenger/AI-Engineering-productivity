@@ -51,6 +51,7 @@ test-fuzz-smoke:
 	go test ./internal/normalize/claude -run='^$$' -fuzz=FuzzNormalizeTranscript -fuzztime=3s
 	go test ./internal/normalize/claude -run='^$$' -fuzz=FuzzNormalizeTraces -fuzztime=3s
 	go test ./internal/normalize/claude -run='^$$' -fuzz=FuzzNormalizeLogs -fuzztime=3s
+	go test ./internal/normalize/claude -run='^$$' -fuzz=FuzzNormalizeMetrics -fuzztime=3s
 	go test ./internal/normalize/cursor -run='^$$' -fuzz=FuzzNormalizeMetrics -fuzztime=3s
 	go test ./internal/normalize/cursor -run='^$$' -fuzz=FuzzNormalizeLogs -fuzztime=3s
 	go test ./internal/governance -run='^$$' -fuzz=FuzzPromptKeywordMatch -fuzztime=3s

@@ -37,8 +37,14 @@ type transcriptContentEnvelope struct {
 	SessionID   string                 `json:"sessionId"`
 	Timestamp   string                 `json:"timestamp"`
 	Version     string                 `json:"version"`
+	Cwd         string                 `json:"cwd"`
 	IsSidechain *bool                  `json:"isSidechain"`
 	Message     *transcriptContentBody `json:"message"`
+	// ToolUseResult is the record-scoped structured tool result Claude Code writes
+	// as a sibling of message on a user record (stdout/stderr, structured patch,
+	// file body, …). It is retained raw (#173, epic #87), decoded with UseNumber so
+	// large integers round-trip; a downstream visibility decision is layered over it.
+	ToolUseResult json.RawMessage `json:"toolUseResult"`
 }
 
 // transcriptContentBody holds the raw content payload. It is decoded as
@@ -85,8 +91,16 @@ type transcriptToolCall struct {
 	server      string // MCP only
 	toolName    string // MCP only
 	toolUseID   string
+	cwd         string // workspace path of the tool_use / tool_result record (#173)
 	input       any
 	result      any
+	// resultMeta is the record-scoped structured tool result (toolUseResult sibling
+	// of message) retained raw (#173). resultScope is "" when it is unambiguously this
+	// call's result (the record held exactly one tool_result block that paired here)
+	// and "record" when the record held several result blocks, so a consumer never
+	// mis-reads a shared record-scoped result as this call's own.
+	resultMeta  any
+	resultScope string
 	outcome     string
 }
 
@@ -149,6 +163,7 @@ func (c *toolCallCollector) collectToolUses(line []byte) {
 			server:      server,
 			toolName:    toolName,
 			toolUseID:   block.ID,
+			cwd:         strings.TrimSpace(envelope.Cwd),
 			input:       decodeRawContent(block.Input),
 			outcome:     "unknown",
 		}
@@ -157,22 +172,59 @@ func (c *toolCallCollector) collectToolUses(line []byte) {
 
 // collectToolResults pairs each tool_result block with a pending tool_use of the
 // same tool_use_id. A result for a tool_use never seen is ignored, so only
-// observed invocations gain an outcome and result body.
+// observed invocations gain an outcome and result body. It also rides the record's
+// cwd onto any matched call whose tool_use record carried none (a pure tool_result
+// user record is skipped by userEvent, so its cwd would otherwise be dropped — #173,
+// Site 2) and retains the record-scoped structured result (toolUseResult) raw
+// (#173, Site 3): attached to the matched call when the record held exactly one
+// result block, otherwise carried on the first matched call with a "record" scope
+// marker so a shared result is never mis-read as one call's own. A toolUseResult on a
+// record whose result blocks all reference unseen tool_uses has no operation to ride
+// (the block bodies are likewise unmatched) and is not retained here — the residual
+// unmatched-record allow-list scope this change does not widen.
 func (c *toolCallCollector) collectToolResults(line []byte) {
-	_, blocks, ok := decodeContentBlocks(line)
+	envelope, blocks, ok := decodeContentBlocks(line)
 	if !ok {
 		return
 	}
+	recordCwd := strings.TrimSpace(envelope.Cwd)
+	resultBlockCount := 0
+	var matched []*transcriptToolCall
 	for _, block := range blocks {
 		if block.Type != "tool_result" || strings.TrimSpace(block.ToolUseID) == "" {
 			continue
 		}
+		resultBlockCount++
 		call, pending := c.calls[block.ToolUseID]
 		if !pending {
 			continue
 		}
 		call.result = decodeRawContent(block.Content)
 		call.outcome = toolResultBlockOutcome(block.IsError)
+		if call.cwd == "" && recordCwd != "" {
+			call.cwd = recordCwd
+		}
+		matched = append(matched, call)
+	}
+	c.attachRecordResult(envelope.ToolUseResult, resultBlockCount, matched)
+}
+
+// attachRecordResult retains a record-scoped toolUseResult on a matched tool call.
+// A record carrying exactly one result block that paired to a call attaches the
+// result unambiguously (scope ""); a record with several result blocks attaches it
+// to the first matched call with scope "record" so the shared structured result is
+// retained raw without being mis-attributed to a single call.
+func (c *toolCallCollector) attachRecordResult(raw json.RawMessage, resultBlockCount int, matched []*transcriptToolCall) {
+	if len(raw) == 0 || len(matched) == 0 {
+		return
+	}
+	meta := decodeRawContent(raw)
+	if meta == nil {
+		return
+	}
+	matched[0].resultMeta = meta
+	if resultBlockCount > 1 || len(matched) > 1 {
+		matched[0].resultScope = "record"
 	}
 }
 
@@ -346,6 +398,7 @@ func (c transcriptToolCall) toolOperation() canonical.Operation {
 	if c.isSidechain {
 		event["is_sidechain"] = true
 	}
+	c.addCwd(event)
 	extensions := map[string]any{
 		"correlation": operationCorrelation(operationID, c.occurredAt, transcriptTaskBoundaryReason),
 		"event":       event,
@@ -357,6 +410,7 @@ func (c transcriptToolCall) toolOperation() canonical.Operation {
 	if c.result != nil {
 		call["result"] = c.result
 	}
+	c.addResultMeta(call)
 	if len(call) > 0 {
 		extensions["tool_call"] = call
 	}
@@ -370,6 +424,31 @@ func (c transcriptToolCall) toolOperation() canonical.Operation {
 		Outcome:            c.outcome,
 		Provenance:         canonical.ProvenanceObserved,
 		ProviderExtensions: extensions,
+	}
+}
+
+// addCwd rides the record's workspace path onto an operation's event block when
+// observed (#173, Site 2). Shared by the generic and MCP operation shapers so the
+// retention is expressed once, not pasted per shape (SonarCloud duplication is a
+// hard merge blocker).
+func (c transcriptToolCall) addCwd(event map[string]any) {
+	if c.cwd != "" {
+		event["cwd"] = c.cwd
+	}
+}
+
+// addResultMeta rides the record-scoped structured tool result (toolUseResult) onto
+// an operation's tool_call/mcp_call block when observed (#173, Site 3). A "record"
+// scope marker rides alongside when the result was shared across several result
+// blocks, so it is retained raw yet never mis-read as this call's own result. Shared
+// by both operation shapers so the retention is expressed once.
+func (c transcriptToolCall) addResultMeta(call map[string]any) {
+	if c.resultMeta == nil {
+		return
+	}
+	call["tool_use_result"] = c.resultMeta
+	if c.resultScope != "" {
+		call["tool_use_result_scope"] = c.resultScope
 	}
 }
 

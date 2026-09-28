@@ -64,6 +64,9 @@ func (c transcriptToolCall) mcpOperation() canonical.Operation {
 	if c.result != nil {
 		call["result"] = c.result
 	}
+	c.addResultMeta(call)
+	event := map[string]any{"tool_name": c.fullName, "tool_use_id": c.toolUseID}
+	c.addCwd(event)
 	return canonical.Operation{
 		SchemaVersion: canonical.RecordSchemaVersion,
 		OperationID:   operationID,
@@ -75,7 +78,7 @@ func (c transcriptToolCall) mcpOperation() canonical.Operation {
 		Provenance:    canonical.ProvenanceObserved,
 		ProviderExtensions: map[string]any{
 			"correlation": operationCorrelation(operationID, c.occurredAt, transcriptTaskBoundaryReason),
-			"event":       map[string]any{"tool_name": c.fullName, "tool_use_id": c.toolUseID},
+			"event":       event,
 			"mcp_call":    call,
 		},
 	}

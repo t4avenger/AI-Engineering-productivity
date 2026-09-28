@@ -298,14 +298,15 @@ func TestNormalizeTranscriptMalformedAssistantAbortsImport(t *testing.T) {
 }
 
 // TestNormalizeTranscriptCapturesContentRaw is the raw-capture invariant guard
-// (epic #87, superseding the pre-#88 content-free canary this replaces). It is
-// built from direct in-test NDJSON (NOT the committed fixture, which is scanned
-// for likely secret values): an assistant record with response text, thinking,
-// and Bash/Edit tool_use blocks, plus the paired user tool_result. The behaviour
-// content IS now captured — response + thinking on the assistant event, the raw
-// file_path/full_command on the tool_call event, and the full input body (Edit
-// diff strings) + result on the Operation. What stays excluded is cwd (out of the
-// six named signals — flagged as follow-up), never emitted on either surface.
+// (epic #87, extended by #173). It is built from direct in-test NDJSON (NOT the
+// committed fixture, which is scanned for likely secret values): an assistant record
+// with response text, thinking, and Bash/Edit tool_use blocks, plus the paired user
+// tool_result carrying a structured toolUseResult sibling. The behaviour content IS
+// captured — response + thinking on the assistant event, the raw file_path/
+// full_command on the tool_call event, and the full input body (Edit diff strings) +
+// result on the Operation. cwd (the workspace path) and the record-scoped
+// toolUseResult are now retained raw too (#173, Sites 2 & 3), no longer amputated at
+// ingest; a downstream visibility decision is layered over the retained value.
 func TestNormalizeTranscriptCapturesContentRaw(t *testing.T) {
 	data := []byte(strings.Join([]string{
 		`{` +
@@ -321,6 +322,8 @@ func TestNormalizeTranscriptCapturesContentRaw(t *testing.T) {
 			`"usage":{"input_tokens":10,"output_tokens":20}}` +
 			`}`,
 		`{"type":"user","uuid":"u1","sessionId":"s1","timestamp":"2026-09-12T09:00:01Z",` +
+			`"cwd":"/home/tiq-canary-user/secret-project",` +
+			`"toolUseResult":{"stdout":"tiq-canary-toolresult-meta","exit_code":0},` +
 			`"message":{"content":[{"type":"tool_result","tool_use_id":"toolu_bash","is_error":false,` +
 			`"content":[{"type":"text","text":"tiq-canary-stdout"}]}]}}`,
 	}, "\n"))
@@ -337,35 +340,38 @@ func TestNormalizeTranscriptCapturesContentRaw(t *testing.T) {
 	opsJSON := marshalForCanary(t, operations)
 
 	// Raw content is captured on the event surface (epic #87): response + thinking
-	// on the assistant event; the raw command/path on the tool_call event.
+	// on the assistant event; the raw command/path on the tool_call event; cwd on the
+	// assistant event's transcript envelope (#173).
 	for _, present := range []string{
 		"tiq-canary-response-body",
 		"tiq-canary-thinking-body",
 		"tiq-canary-command",
 		"tiq-canary-path",
+		"secret-project",
 	} {
 		if !strings.Contains(eventsJSON, present) {
 			t.Fatalf("content %q must be captured on events (epic #87): %s", present, eventsJSON)
 		}
 	}
-	// The full input body (Edit diff strings) and the tool result ride on the
-	// Operation, raw and complete.
+	// The full input body (Edit diff strings), the tool result, cwd, and the record-
+	// scoped toolUseResult ride on the Operation, raw and complete (#173).
 	for _, present := range []string{
 		"tiq-canary-command",
 		"tiq-canary-path",
 		"tiq-canary-old",
 		"tiq-canary-new",
 		"tiq-canary-stdout",
+		"tiq-canary-toolresult-meta",
+		"secret-project",
 	} {
 		if !strings.Contains(opsJSON, present) {
-			t.Fatalf("content %q must be captured on operations (epic #87): %s", present, opsJSON)
+			t.Fatalf("content %q must be captured on operations (#173): %s", present, opsJSON)
 		}
 	}
-	// cwd stays excluded on both surfaces — out of the six named signals.
-	for _, excluded := range []string{"tiq-canary-user", "secret-project"} {
-		if strings.Contains(eventsJSON, excluded) || strings.Contains(opsJSON, excluded) {
-			t.Fatalf("cwd content %q must not be emitted on either surface", excluded)
-		}
+	// A single-result record attaches the structured result unambiguously — no
+	// "record" scope marker (that marks a result shared across several blocks).
+	if strings.Contains(opsJSON, "tool_use_result_scope") {
+		t.Fatalf("single-result record must not carry a record scope marker: %s", opsJSON)
 	}
 	// The numeric usage and model are still captured alongside the raw content.
 	assistant := firstEventOfType(t, events, eventTypeAssistantMessage)
@@ -374,6 +380,93 @@ func TestNormalizeTranscriptCapturesContentRaw(t *testing.T) {
 	}
 	if assistant.Attributes["input_token_count"] != int64(10) {
 		t.Fatalf("input tokens dropped: %#v", assistant.Attributes["input_token_count"])
+	}
+}
+
+// TestNormalizeTranscriptRetainsRecordScopedResult proves the record-scoped
+// toolUseResult retention (#173, Site 3) across the shapes a user record can take:
+// a single result block attaches the structured result to the matched call
+// unambiguously; several result blocks attach it to the first matched call with a
+// "record" scope marker so it is retained raw yet never mis-read as one call's own;
+// an unmatched result block leaves nothing to ride and is not retained (the residual
+// unmatched-record scope this change does not widen); and a large integer inside the
+// structured result round-trips exactly via the UseNumber decode, not through a
+// lossy float64. The cases share one operation-extraction + assertion helper so the
+// four shapes are not four pasted assertion blocks.
+func TestNormalizeTranscriptRetainsRecordScopedResult(t *testing.T) {
+	const assistant = `{"type":"assistant","uuid":"a1","sessionId":"s1","timestamp":"2026-09-12T09:00:00Z","version":"2.1.269",` +
+		`"message":{"model":"claude-opus-4-8","content":[` +
+		`{"type":"tool_use","id":"toolu_a","name":"Bash","input":{"command":"one"}},` +
+		`{"type":"tool_use","id":"toolu_b","name":"Bash","input":{"command":"two"}}]}}`
+	cases := []struct {
+		name      string
+		user      string
+		wantMeta  string // substring the structured result must contain, "" when none retained
+		wantScope bool   // whether a "record" scope marker must be present
+	}{
+		{
+			name: "single result attaches unambiguously",
+			user: `{"type":"user","uuid":"u1","sessionId":"s1","timestamp":"2026-09-12T09:00:01Z",` +
+				`"toolUseResult":{"stdout":"tiq-single-meta"},` +
+				`"message":{"content":[{"type":"tool_result","tool_use_id":"toolu_a","content":[{"type":"text","text":"x"}]}]}}`,
+			wantMeta:  "tiq-single-meta",
+			wantScope: false,
+		},
+		{
+			name: "several result blocks carry a record scope marker",
+			user: `{"type":"user","uuid":"u1","sessionId":"s1","timestamp":"2026-09-12T09:00:01Z",` +
+				`"toolUseResult":{"stdout":"tiq-shared-meta"},` +
+				`"message":{"content":[` +
+				`{"type":"tool_result","tool_use_id":"toolu_a","content":[{"type":"text","text":"x"}]},` +
+				`{"type":"tool_result","tool_use_id":"toolu_b","content":[{"type":"text","text":"y"}]}]}}`,
+			wantMeta:  "tiq-shared-meta",
+			wantScope: true,
+		},
+		{
+			name: "unmatched result block retains nothing",
+			user: `{"type":"user","uuid":"u1","sessionId":"s1","timestamp":"2026-09-12T09:00:01Z",` +
+				`"toolUseResult":{"stdout":"tiq-orphan-meta"},` +
+				`"message":{"content":[{"type":"tool_result","tool_use_id":"toolu_never","content":[{"type":"text","text":"x"}]}]}}`,
+			wantMeta:  "",
+			wantScope: false,
+		},
+		{
+			name: "large integer round-trips exactly",
+			user: `{"type":"user","uuid":"u1","sessionId":"s1","timestamp":"2026-09-12T09:00:01Z",` +
+				`"toolUseResult":{"bytes":9007199254740993},` +
+				`"message":{"content":[{"type":"tool_result","tool_use_id":"toolu_a","content":[{"type":"text","text":"x"}]}]}}`,
+			wantMeta:  "9007199254740993",
+			wantScope: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			operations, err := ExtractTranscriptOperations([]byte(assistant+"\n"+tc.user), time.Now().UTC())
+			if err != nil {
+				t.Fatalf("ExtractTranscriptOperations: %v", err)
+			}
+			assertRecordScopedResult(t, marshalForCanary(t, operations), tc.wantMeta, tc.wantScope)
+		})
+	}
+}
+
+// assertRecordScopedResult checks how a record-scoped toolUseResult surfaces in
+// the marshalled operations: wantMeta "" means nothing was retained (unmatched
+// block), otherwise the raw value must appear and the record-scope marker must be
+// present only for a multi-result record.
+func assertRecordScopedResult(t *testing.T, opsJSON, wantMeta string, wantScope bool) {
+	t.Helper()
+	if wantMeta == "" {
+		if strings.Contains(opsJSON, "tool_use_result") {
+			t.Fatalf("unmatched record must retain no structured result: %s", opsJSON)
+		}
+		return
+	}
+	if !strings.Contains(opsJSON, wantMeta) {
+		t.Fatalf("structured result %q must be retained raw: %s", wantMeta, opsJSON)
+	}
+	if got := strings.Contains(opsJSON, "tool_use_result_scope"); got != wantScope {
+		t.Fatalf("record scope marker present = %v, want %v: %s", got, wantScope, opsJSON)
 	}
 }
 

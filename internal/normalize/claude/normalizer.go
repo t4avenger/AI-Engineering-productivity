@@ -44,8 +44,8 @@ const (
 	// primitives and their gated raw content (prompt/response/body/body_ref) ride
 	// verbatim under provider_extensions.event via normalize.UnknownFields — the
 	// same generic path api_request's numeric primitives take; there is no typed
-	// content record. Content keys are deliberately absent from gatedEventFields
-	// and logs.go droppedKeys so nothing is re-redacted at ingest.
+	// content record. Nothing is excluded from the event echo beyond the fields
+	// promoted elsewhere (promotedEventFields), so nothing is re-redacted at ingest.
 	eventUserPrompt        = "user_prompt"
 	eventAssistantResponse = "assistant_response"
 	eventAPIRequestBody    = "api_request_body"
@@ -120,7 +120,7 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 	for key, value := range correlationKeys(raw) {
 		correlation[key] = value
 	}
-	echoExcluded := append(promotedEventFields(name), gatedEventFields()...)
+	echoExcluded := promotedEventFields(name)
 	echoExcluded = append(echoExcluded, correlationEventFields()...)
 	echoExcluded = append(echoExcluded, environmentEventFields()...)
 	extensions := map[string]any{
@@ -272,11 +272,12 @@ func claudeApprovalDecisionStatus(value any) string {
 }
 
 // toolDecisionFieldKeys are the wire fields preserved verbatim under
-// provider_extensions.tool_decision. tool_parameters is deliberately excluded —
-// it carries gated content (full commands, MCP server/tool names) and is dropped
-// at the wire boundary by NormalizeLogs (logs.go droppedKeys).
+// provider_extensions.tool_decision. tool_parameters is retained raw here (#173,
+// closing epic #87): it carries the full command and MCP server/tool names —
+// behavioural/governance evidence, not a secret — so it is captured at ingest, with
+// any downstream visibility decision layered over the retained value, never amputated.
 func toolDecisionFieldKeys() []string {
-	return []string{"decision", "source", "tool_name", "tool_source", "tool_use_id"}
+	return []string{"decision", "source", "tool_name", "tool_source", "tool_use_id", "tool_parameters"}
 }
 
 // attachSkillDetection stamps explicit skill identity on skill_activated events.
@@ -561,10 +562,11 @@ func promotedEventFields(eventName string) []string {
 	case eventSkillActivated:
 		return append(fields, "skill.name", "skill_name", "skill.status", "skill_status", "invocation_trigger", "skill.source", "skill_source")
 	case eventToolDecision:
-		// The decision fields are promoted verbatim into
-		// provider_extensions.tool_decision, so they must not double-echo under
-		// provider_extensions.event.
-		return append(fields, "decision", "source", "tool_name", "tool_source", "tool_use_id")
+		// The decision fields (including the raw tool_parameters retained under
+		// provider_extensions.tool_decision, #173) are promoted verbatim there, so
+		// they must not double-echo under provider_extensions.event. toolDecisionFieldKeys
+		// is the single source of truth for that set.
+		return append(fields, toolDecisionFieldKeys()...)
 	case eventPermissionModeChanged:
 		return append(fields, "from_mode", "to_mode", "trigger")
 	case eventAuth:
@@ -580,18 +582,6 @@ func promotedEventFields(eventName string) []string {
 			"skill_path_count", "command_path_count", "agent_path_count", "safe_mode")
 	}
 	return fields
-}
-
-// gatedEventFields carry content that must never surface under
-// provider_extensions.event, whatever the event type. tool_parameters holds the
-// full command and MCP server/tool names (present under OTEL_LOG_TOOL_DETAILS=1);
-// NormalizeLogs drops it at the wire boundary (logs.go droppedKeys), and it is
-// dropped from the event echo here too — NormalizeEvents replays reviewed
-// fixtures whose validator does not prohibit this key, so this is the
-// defence-in-depth that makes "gated content never surfaces" hold on both paths
-// (epic #87 keeps behaviour, not command bodies).
-func gatedEventFields() []string {
-	return []string{"tool_parameters"}
 }
 
 // unavailableFields lists the behaviour signals a Claude Code event does not

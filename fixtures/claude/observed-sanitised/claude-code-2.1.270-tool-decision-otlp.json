@@ -50,7 +50,7 @@
                   { "key": "tool_name", "value": { "stringValue": "mcp_tool" } },
                   { "key": "tool_source", "value": { "stringValue": "mcp" } },
                   { "key": "tool_use_id", "value": { "stringValue": "toolu_synthetic_mcp" } },
-                  { "key": "tool_parameters", "value": { "stringValue": "{\"canary\":\"drop-me\"}" } }
+                  { "key": "tool_parameters", "value": { "stringValue": "{\"command\":\"tiq-canary-cmd\"}" } }
                 ]
               },
               {
@@ -66,7 +66,7 @@
                   { "key": "tool_name", "value": { "stringValue": "Bash" } },
                   { "key": "tool_source", "value": { "stringValue": "builtin" } },
                   { "key": "tool_use_id", "value": { "stringValue": "toolu_synthetic_bash" } },
-                  { "key": "tool_parameters", "value": { "stringValue": "{\"canary\":\"drop-me\"}" } }
+                  { "key": "tool_parameters", "value": { "stringValue": "{\"command\":\"tiq-canary-cmd\"}" } }
                 ]
               }
             ]

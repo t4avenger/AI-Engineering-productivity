@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -164,8 +165,53 @@ func TestNormalizeTranscriptCapturesDiffAndTodoRaw(t *testing.T) {
 	}
 }
 
-// toolCallInput fetches the raw tool_call.input map for one operation id.
-func toolCallInput(t *testing.T, byID map[string]canonical.Operation, id string) map[string]any {
+// TestNormalizeTranscriptRetainsToolUseResultFromFixture proves the record-scoped
+// toolUseResult retention (#173, Site 3) on the committed synthetic fixture: the
+// single-result Read record attaches its structured result unambiguously (no scope
+// marker) with a >2^53 byte count preserved exactly, and the batched edit/write
+// record — two result blocks — carries its shared result on the first matched call
+// with a "record" scope marker so it is retained raw yet never mis-read as one
+// call's own result.
+func TestNormalizeTranscriptRetainsToolUseResultFromFixture(t *testing.T) {
+	data := transcriptFixtureNDJSONFrom(t, "synthetic", toolIOTranscriptFixture)
+	operations, err := ExtractTranscriptOperations(data, time.Unix(0, 0).UTC())
+	if err != nil {
+		t.Fatalf("extract: %v", err)
+	}
+	byID := operationsByID(operations)
+	const prefix = "claude-code:33333333-3333-4333-8333-333333333333:tool:"
+
+	read := toolCall(t, byID, prefix+"toolu_read")
+	single, ok := read["tool_use_result"].(map[string]any)
+	if !ok {
+		t.Fatalf("single-result record must retain tool_use_result: %#v", read)
+	}
+	file, ok := single["file"].(map[string]any)
+	if !ok {
+		t.Fatalf("tool_use_result must round-trip the structured body: %#v", single)
+	}
+	if got, _ := file["totalBytes"].(json.Number); got.String() != "9007199254740993" {
+		t.Fatalf("totalBytes = %#v, want the exact >2^53 integer preserved", file["totalBytes"])
+	}
+	if _, marked := read["tool_use_result_scope"]; marked {
+		t.Fatalf("single-result record must not carry a record scope marker: %#v", read)
+	}
+
+	edit := toolCall(t, byID, prefix+"toolu_edit")
+	if _, ok := edit["tool_use_result"].(map[string]any); !ok {
+		t.Fatalf("multi-result record must retain its shared tool_use_result: %#v", edit)
+	}
+	if edit["tool_use_result_scope"] != "record" {
+		t.Fatalf("multi-result record must mark tool_use_result_scope=record: %#v", edit["tool_use_result_scope"])
+	}
+	write := toolCall(t, byID, prefix+"toolu_write")
+	if _, present := write["tool_use_result"]; present {
+		t.Fatalf("shared result must ride only the first matched call, not toolu_write: %#v", write)
+	}
+}
+
+// toolCall fetches the raw tool_call extension map for one operation id.
+func toolCall(t *testing.T, byID map[string]canonical.Operation, id string) map[string]any {
 	t.Helper()
 	operation, ok := byID[id]
 	if !ok {
@@ -175,6 +221,13 @@ func toolCallInput(t *testing.T, byID map[string]canonical.Operation, id string)
 	if !ok {
 		t.Fatalf("%s missing tool_call: %#v", id, operation.ProviderExtensions)
 	}
+	return call
+}
+
+// toolCallInput fetches the raw tool_call.input map for one operation id.
+func toolCallInput(t *testing.T, byID map[string]canonical.Operation, id string) map[string]any {
+	t.Helper()
+	call := toolCall(t, byID, id)
 	input, ok := call["input"].(map[string]any)
 	if !ok {
 		t.Fatalf("%s missing tool_call.input: %#v", id, call)

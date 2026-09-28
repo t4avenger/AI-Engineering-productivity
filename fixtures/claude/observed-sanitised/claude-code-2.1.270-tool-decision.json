@@ -12,7 +12,7 @@
       "workspace": "isolated_tmp",
       "telemetry_endpoint": "loopback_dump_receiver",
       "outcome_signal": "tool_decision",
-      "note": "tool_decision is the only signal that reports a reject: an allow came from config (source:config), both denials came from PreToolUse hooks (source:hook). tool_source distinguishes builtin from mcp. The gated tool_parameters attribute (full command / MCP server+tool names) is present on the wire under OTEL_LOG_TOOL_DETAILS=1 and is dropped at ingest (see the -otlp fixture); it is not reproduced here."
+      "note": "tool_decision is the only signal that reports a reject: an allow came from config (source:config), both denials came from PreToolUse hooks (source:hook). tool_source distinguishes builtin from mcp. The tool_parameters attribute (full command / MCP server+tool names) is present on the wire under OTEL_LOG_TOOL_DETAILS=1 and is retained raw under provider_extensions.tool_decision (#173, see the -otlp fixture); it is not reproduced here."
     },
     "observations": [
       {

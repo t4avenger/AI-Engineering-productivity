@@ -9,7 +9,7 @@
     "tool": "claude-code",
     "source_schema": "otel",
     "source_version": "2.1.268",
-    "actor_id": "unavailable",
+    "actor_id": "claude-code:synthetic-user",
     "device_id": "unavailable",
     "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
     "task_id": null,
@@ -40,17 +40,40 @@
           "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
         }
       },
+      "environment": {
+        "host_arch": "amd64",
+        "organization_id": "00000000-0000-4000-8000-0000000000aa",
+        "os_type": "linux",
+        "os_version": "0.0.0-synthetic",
+        "terminal_type": "gnome-terminal",
+        "user_account_id": "user_synthetic",
+        "user_account_uuid": "00000000-0000-4000-8000-0000000000bb",
+        "user_email": "synthetic@example.test",
+        "user_id": "synthetic-user"
+      },
       "metric": {
         "name": "claude_code.token.usage",
         "token_type": "output",
         "unit": "tokens"
       },
       "metric_attributes": {
-        "query_source": "main"
+        "model": "claude-haiku-4-5-20251001",
+        "organization.id": "00000000-0000-4000-8000-0000000000aa",
+        "query_source": "main",
+        "session.id": "00000000-0000-4000-8000-000000000001",
+        "terminal.type": "gnome-terminal",
+        "type": "output",
+        "user.account_id": "user_synthetic",
+        "user.account_uuid": "00000000-0000-4000-8000-0000000000bb",
+        "user.email": "synthetic@example.test",
+        "user.id": "synthetic-user"
       },
       "resource": {
         "host.arch": "amd64",
-        "os.type": "linux"
+        "os.type": "linux",
+        "os.version": "0.0.0-synthetic",
+        "service.name": "claude-code",
+        "service.version": "2.1.268"
       }
     }
   },
@@ -64,7 +87,7 @@
     "tool": "claude-code",
     "source_schema": "otel",
     "source_version": "2.1.268",
-    "actor_id": "unavailable",
+    "actor_id": "claude-code:synthetic-user",
     "device_id": "unavailable",
     "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
     "task_id": null,
@@ -95,17 +118,40 @@
           "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
         }
       },
+      "environment": {
+        "host_arch": "amd64",
+        "organization_id": "00000000-0000-4000-8000-0000000000aa",
+        "os_type": "linux",
+        "os_version": "0.0.0-synthetic",
+        "terminal_type": "gnome-terminal",
+        "user_account_id": "user_synthetic",
+        "user_account_uuid": "00000000-0000-4000-8000-0000000000bb",
+        "user_email": "synthetic@example.test",
+        "user_id": "synthetic-user"
+      },
       "metric": {
         "name": "claude_code.token.usage",
         "token_type": "input",
         "unit": "tokens"
       },
       "metric_attributes": {
-        "query_source": "main"
+        "model": "claude-haiku-4-5-20251001",
+        "organization.id": "00000000-0000-4000-8000-0000000000aa",
+        "query_source": "main",
+        "session.id": "00000000-0000-4000-8000-000000000001",
+        "terminal.type": "gnome-terminal",
+        "type": "input",
+        "user.account_id": "user_synthetic",
+        "user.account_uuid": "00000000-0000-4000-8000-0000000000bb",
+        "user.email": "synthetic@example.test",
+        "user.id": "synthetic-user"
       },
       "resource": {
         "host.arch": "amd64",
-        "os.type": "linux"
+        "os.type": "linux",
+        "os.version": "0.0.0-synthetic",
+        "service.name": "claude-code",
+        "service.version": "2.1.268"
       }
     }
   },
@@ -119,7 +165,7 @@
     "tool": "claude-code",
     "source_schema": "otel",
     "source_version": "2.1.268",
-    "actor_id": "unavailable",
+    "actor_id": "claude-code:synthetic-user",
     "device_id": "unavailable",
     "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
     "task_id": null,
@@ -150,17 +196,40 @@
           "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
         }
       },
+      "environment": {
+        "host_arch": "amd64",
+        "organization_id": "00000000-0000-4000-8000-0000000000aa",
+        "os_type": "linux",
+        "os_version": "0.0.0-synthetic",
+        "terminal_type": "gnome-terminal",
+        "user_account_id": "user_synthetic",
+        "user_account_uuid": "00000000-0000-4000-8000-0000000000bb",
+        "user_email": "synthetic@example.test",
+        "user_id": "synthetic-user"
+      },
       "metric": {
         "name": "claude_code.token.usage",
         "token_type": "cacheCreation",
         "unit": "tokens"
       },
       "metric_attributes": {
-        "query_source": "main"
+        "model": "claude-haiku-4-5-20251001",
+        "organization.id": "00000000-0000-4000-8000-0000000000aa",
+        "query_source": "main",
+        "session.id": "00000000-0000-4000-8000-000000000001",
+        "terminal.type": "gnome-terminal",
+        "type": "cacheCreation",
+        "user.account_id": "user_synthetic",
+        "user.account_uuid": "00000000-0000-4000-8000-0000000000bb",
+        "user.email": "synthetic@example.test",
+        "user.id": "synthetic-user"
       },
       "resource": {
         "host.arch": "amd64",
-        "os.type": "linux"
+        "os.type": "linux",
+        "os.version": "0.0.0-synthetic",
+        "service.name": "claude-code",
+        "service.version": "2.1.268"
       }
     }
   },
@@ -174,7 +243,7 @@
     "tool": "claude-code",
     "source_schema": "otel",
     "source_version": "2.1.268",
-    "actor_id": "unavailable",
+    "actor_id": "claude-code:synthetic-user",
     "device_id": "unavailable",
     "session_id": "claude-code:00000000-0000-4000-8000-000000000001",
     "task_id": null,
@@ -205,17 +274,40 @@
           "reason": "Claude Code usage metrics have no reviewed task-boundary signal"
         }
       },
+      "environment": {
+        "host_arch": "amd64",
+        "organization_id": "00000000-0000-4000-8000-0000000000aa",
+        "os_type": "linux",
+        "os_version": "0.0.0-synthetic",
+        "terminal_type": "gnome-terminal",
+        "user_account_id": "user_synthetic",
+        "user_account_uuid": "00000000-0000-4000-8000-0000000000bb",
+        "user_email": "synthetic@example.test",
+        "user_id": "synthetic-user"
+      },
       "metric": {
         "name": "claude_code.token.usage",
         "token_type": "cacheRead",
         "unit": "tokens"
       },
       "metric_attributes": {
-        "query_source": "main"
+        "model": "claude-haiku-4-5-20251001",
+        "organization.id": "00000000-0000-4000-8000-0000000000aa",
+        "query_source": "main",
+        "session.id": "00000000-0000-4000-8000-000000000001",
+        "terminal.type": "gnome-terminal",
+        "type": "cacheRead",
+        "user.account_id": "user_synthetic",
+        "user.account_uuid": "00000000-0000-4000-8000-0000000000bb",
+        "user.email": "synthetic@example.test",
+        "user.id": "synthetic-user"
       },
       "resource": {
         "host.arch": "amd64",
-        "os.type": "linux"
+        "os.type": "linux",
+        "os.version": "0.0.0-synthetic",
+        "service.name": "claude-code",
+        "service.version": "2.1.268"
       }
     }
   }

@@ -18,6 +18,7 @@
         }
       },
       "event": {
+        "cwd": "/home/synthetic/project",
         "parent_uuid": "10000000-0000-4000-8000-000000000001",
         "tool_name": "Bash",
         "tool_use_id": "toolu_bash_ls"
@@ -54,6 +55,7 @@
         }
       },
       "event": {
+        "cwd": "/home/synthetic/project",
         "tool_name": "mcp__synthetic-github__list_issues",
         "tool_use_id": "toolu_mcp_pending"
       },
@@ -86,6 +88,7 @@
         }
       },
       "event": {
+        "cwd": "/home/synthetic/project",
         "tool_name": "mcp__synthetic-fs__read_file",
         "tool_use_id": "toolu_mcp_read"
       },
@@ -124,6 +127,7 @@
         }
       },
       "event": {
+        "cwd": "/home/synthetic/project",
         "tool_name": "mcp__synthetic-fs__write_file",
         "tool_use_id": "toolu_mcp_write"
       },

@@ -48,16 +48,18 @@ const (
 )
 
 // Datapoint attribute keys read from a Claude Code metrics payload. session.id
-// becomes the session identity on every metric event, so it is read (not
-// allow-listed into provider_extensions) by each datapoint builder.
+// becomes the session identity on every metric event; it is also retained raw in
+// provider_extensions.metric_attributes like every other attribute (#173).
 const attrSessionID = "session.id"
 
-// safeMetricAttributeKeys is the allow-list of datapoint/resource attribute keys
-// carried into provider_extensions. Ingest-time storage sanitising was removed
-// in #88, so this adapter is now the only guard: an allow-list (not a deny-list)
-// ensures an unforeseen identity or secret-bearing attribute is dropped by
-// default rather than persisted. model and type are promoted onto the canonical
-// event and session.id becomes the session identity, so they are not repeated here.
+// safeMetricAttributeKeys is the stable, low-cardinality set of behaviour
+// attribute keys that feed a metric event's identity hash (see
+// safeMetricAttributes). #173 retains every datapoint/resource attribute raw under
+// provider_extensions, so this is no longer an ingest filter — it only scopes the
+// hash input to the pre-#173 behaviour dimensions so retaining identity/unforeseen
+// attributes raw does not perturb event IDs (a re-ingested historical datapoint
+// still deduplicates). model and type are promoted onto the canonical event and
+// session.id becomes the session identity, so they are not repeated here.
 //
 // The attribution dimensions (#97, M10) answer the epic's central efficiency
 // question — which skill / MCP tool / sub-agent / plugin burned the tokens and
@@ -164,9 +166,12 @@ type metricDataPoint struct {
 //     the route does not silently 202-accept and drop supported Claude data
 //     (#89 token, #97 cost).
 //
-// The raw session identity is retained verbatim as a provider-native ID; no
-// ingest-time hiding is applied (epic #87). Identity and unforeseen attributes
-// are dropped by the safeMetricAttributeKeys allow-list.
+// The raw session identity is retained verbatim as a provider-native ID and every
+// datapoint/resource attribute — operator/machine identity included — is retained
+// raw under provider_extensions (metric_attributes/resource/environment); no
+// ingest-time hiding is applied (#173, epic #87). The safeMetricAttributeKeys
+// allow-list now scopes only the event-ID hash input, so raw retention does not
+// perturb metric event IDs.
 func NormalizeMetrics(data []byte, receivedAt time.Time) ([]canonical.Event, error) {
 	var payload metricsPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
@@ -192,9 +197,14 @@ func NormalizeMetrics(data []byte, receivedAt time.Time) ([]canonical.Event, err
 type metricContext struct {
 	scopeName        string
 	resourceIdentity string
-	safeResource     map[string]any
-	version          string
-	receivedAt       time.Time
+	// rawResource is the resource attribute block retained raw (array-aware, int64
+	// precision preserved) for provider_extensions.resource and as the resource
+	// half of the environment/identity derivation — nothing dropped at the
+	// local-only ingest boundary (#173, epic #87). resourceIdentity is still
+	// derived from the scalar allow-listed view so metric event IDs stay stable.
+	rawResource map[string]any
+	version     string
+	receivedAt  time.Time
 	// costCaptured is true when the same claude-code resource also emits a
 	// cost.usage datapoint, so a token.usage event stops declaring provider_cost
 	// unavailable — the sibling cost.usage event carries it, correlated by
@@ -219,7 +229,7 @@ func metricEventsFromResource(resource resourceMetric, receivedAt time.Time) ([]
 	}
 	ctx := metricContext{
 		resourceIdentity: resourceIdentityKey(resourceAttrs),
-		safeResource:     safeMetricAttributes(resourceAttrs),
+		rawResource:      rawMetricAttributeValues(resource.Resource.Attributes),
 		version:          fallbackString(stringAttr(resourceAttrs, attrServiceVersion), unavailable),
 		receivedAt:       receivedAt,
 		costCaptured:     resourceEmitsCostUsage(resource),
@@ -327,13 +337,15 @@ func tokenUsageEvent(point metricDataPoint, index int, ctx metricContext, unit s
 	occurredAt := metricTime(point.TimeUnixNano, ctx.receivedAt)
 	model, modelObserved := normalize.ObservedString(fields["model"])
 	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, attrSessionID))
+	rawFields := rawMetricAttributeValues(point.Attributes)
 	safeFields := safeMetricAttributes(fields)
 
 	// session.id is part of the event's semantic identity but is not in the
 	// safe-attribute allow-list, so it is added to the hash input explicitly:
 	// two concurrent sessions emitting the same metric/type/model/timestamp must
 	// not collide on one event ID and have one silently dropped by CorrelateEvents
-	// (or the global event_id primary key in storage).
+	// (or the global event_id primary key in storage). safeFields (not rawFields)
+	// still feeds the hash so retaining attributes raw keeps event IDs stable.
 	identity := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%d|%d", tokenUsageMetric, sessionID, model, tokenType, point.TimeUnixNano, ctx.resourceIdentity, ctx.scopeName, index, *tokens)
 	identity += "|" + stableJSON(safeFields)
 	eventID := contentID("claude-code:token:", []byte(identity))
@@ -345,33 +357,32 @@ func tokenUsageEvent(point metricDataPoint, index int, ctx metricContext, unit s
 	if modelObserved {
 		attributes["model"] = model
 	}
-	extensions := map[string]any{
-		"correlation": metricCorrelation(eventID, occurredAt),
-		"metric": map[string]any{
-			"name":       tokenUsageMetric,
-			"token_type": tokenType,
-			"unit":       unit,
+	event := canonical.Event{
+		SchemaVersion: canonicalSchemaVersion,
+		EventID:       eventID,
+		EventType:     tokenUsageMetric,
+		OccurredAt:    occurredAt,
+		ReceivedAt:    ctx.receivedAt.UTC(),
+		Provider:      provider,
+		Tool:          tool,
+		SourceSchema:  sourceSchema,
+		SourceVersion: ctx.version,
+		ActorID:       unavailable,
+		DeviceID:      unavailable,
+		SessionID:     sessionID,
+		PrivacyLevel:  "operational",
+		Attributes:    attributes,
+		ProviderExtensions: map[string]any{
+			"correlation": metricCorrelation(eventID, occurredAt),
+			"metric": map[string]any{
+				"name":       tokenUsageMetric,
+				"token_type": tokenType,
+				"unit":       unit,
+			},
 		},
-		"resource":          ctx.safeResource,
-		"metric_attributes": safeFields,
 	}
-	return canonical.Event{
-		SchemaVersion:      canonicalSchemaVersion,
-		EventID:            eventID,
-		EventType:          tokenUsageMetric,
-		OccurredAt:         occurredAt,
-		ReceivedAt:         ctx.receivedAt.UTC(),
-		Provider:           provider,
-		Tool:               tool,
-		SourceSchema:       sourceSchema,
-		SourceVersion:      ctx.version,
-		ActorID:            unavailable,
-		DeviceID:           unavailable,
-		SessionID:          sessionID,
-		PrivacyLevel:       "operational",
-		Attributes:         attributes,
-		ProviderExtensions: extensions,
-	}, true, nil
+	finalizeMetricEvent(&event, rawFields, ctx)
+	return event, true, nil
 }
 
 // costUsageEvent maps one claude_code.cost.usage datapoint into a canonical
@@ -390,11 +401,13 @@ func costUsageEvent(point metricDataPoint, index int, ctx metricContext, unit st
 	occurredAt := metricTime(point.TimeUnixNano, ctx.receivedAt)
 	model, modelObserved := normalize.ObservedString(fields["model"])
 	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, attrSessionID))
+	rawFields := rawMetricAttributeValues(point.Attributes)
 	safeFields := safeMetricAttributes(fields)
 
 	// The formatted cost joins the identity so two same-timestamp cost points in
 	// one session (e.g. distinct attribution dims) stay distinct under
-	// CorrelateEvents, mirroring the token.usage collision-safety.
+	// CorrelateEvents, mirroring the token.usage collision-safety. safeFields (not
+	// rawFields) still feeds the hash so retaining attributes raw keeps IDs stable.
 	identity := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%s", costUsageMetric, sessionID, model, point.TimeUnixNano, ctx.resourceIdentity, ctx.scopeName, index, strconv.FormatFloat(*cost, 'f', -1, 64))
 	identity += "|" + stableJSON(safeFields)
 	eventID := contentID("claude-code:cost:", []byte(identity))
@@ -406,32 +419,31 @@ func costUsageEvent(point metricDataPoint, index int, ctx metricContext, unit st
 	if modelObserved {
 		attributes["model"] = model
 	}
-	extensions := map[string]any{
-		"correlation": metricCorrelation(eventID, occurredAt),
-		"metric": map[string]any{
-			"name": costUsageMetric,
-			"unit": unit,
+	event := canonical.Event{
+		SchemaVersion: canonicalSchemaVersion,
+		EventID:       eventID,
+		EventType:     costUsageMetric,
+		OccurredAt:    occurredAt,
+		ReceivedAt:    ctx.receivedAt.UTC(),
+		Provider:      provider,
+		Tool:          tool,
+		SourceSchema:  sourceSchema,
+		SourceVersion: ctx.version,
+		ActorID:       unavailable,
+		DeviceID:      unavailable,
+		SessionID:     sessionID,
+		PrivacyLevel:  "operational",
+		Attributes:    attributes,
+		ProviderExtensions: map[string]any{
+			"correlation": metricCorrelation(eventID, occurredAt),
+			"metric": map[string]any{
+				"name": costUsageMetric,
+				"unit": unit,
+			},
 		},
-		"resource":          ctx.safeResource,
-		"metric_attributes": safeFields,
 	}
-	return canonical.Event{
-		SchemaVersion:      canonicalSchemaVersion,
-		EventID:            eventID,
-		EventType:          costUsageMetric,
-		OccurredAt:         occurredAt,
-		ReceivedAt:         ctx.receivedAt.UTC(),
-		Provider:           provider,
-		Tool:               tool,
-		SourceSchema:       sourceSchema,
-		SourceVersion:      ctx.version,
-		ActorID:            unavailable,
-		DeviceID:           unavailable,
-		SessionID:          sessionID,
-		PrivacyLevel:       "operational",
-		Attributes:         attributes,
-		ProviderExtensions: extensions,
-	}, true, nil
+	finalizeMetricEvent(&event, rawFields, ctx)
+	return event, true, nil
 }
 
 // linesOfCodeEvent maps one claude_code.lines_of_code.count datapoint (#98, M11).
@@ -499,8 +511,12 @@ func activeTimeEvent(point metricDataPoint, index int, ctx metricContext, unit s
 	occurredAt := metricTime(point.TimeUnixNano, ctx.receivedAt)
 	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, attrSessionID))
 	activityType, activityObserved := normalize.ObservedString(fields["type"])
+	rawFields := rawMetricAttributeValues(point.Attributes)
 	safeFields := safeMetricAttributes(fields)
 
+	// safeFields (not rawFields) still feeds the hash so retaining attributes raw
+	// keeps event IDs stable; activityType folds in so user/cli datapoints sharing
+	// a session/timestamp stay distinct under CorrelateEvents.
 	identity := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%s", activeTimeMetric, sessionID, activityType, point.TimeUnixNano, ctx.resourceIdentity, ctx.scopeName, index, strconv.FormatFloat(*seconds, 'f', -1, 64))
 	identity += "|" + stableJSON(safeFields)
 	eventID := contentID("claude-code:count:", []byte(identity))
@@ -512,32 +528,31 @@ func activeTimeEvent(point metricDataPoint, index int, ctx metricContext, unit s
 	if activityObserved {
 		attributes["activity_type"] = activityType
 	}
-	extensions := map[string]any{
-		"correlation": metricCorrelation(eventID, occurredAt),
-		"metric": map[string]any{
-			"name": activeTimeMetric,
-			"unit": unit,
+	event := canonical.Event{
+		SchemaVersion: canonicalSchemaVersion,
+		EventID:       eventID,
+		EventType:     activeTimeMetric,
+		OccurredAt:    occurredAt,
+		ReceivedAt:    ctx.receivedAt.UTC(),
+		Provider:      provider,
+		Tool:          tool,
+		SourceSchema:  sourceSchema,
+		SourceVersion: ctx.version,
+		ActorID:       unavailable,
+		DeviceID:      unavailable,
+		SessionID:     sessionID,
+		PrivacyLevel:  "operational",
+		Attributes:    attributes,
+		ProviderExtensions: map[string]any{
+			"correlation": metricCorrelation(eventID, occurredAt),
+			"metric": map[string]any{
+				"name": activeTimeMetric,
+				"unit": unit,
+			},
 		},
-		"resource":          ctx.safeResource,
-		"metric_attributes": safeFields,
 	}
-	return canonical.Event{
-		SchemaVersion:      canonicalSchemaVersion,
-		EventID:            eventID,
-		EventType:          activeTimeMetric,
-		OccurredAt:         occurredAt,
-		ReceivedAt:         ctx.receivedAt.UTC(),
-		Provider:           provider,
-		Tool:               tool,
-		SourceSchema:       sourceSchema,
-		SourceVersion:      ctx.version,
-		ActorID:            unavailable,
-		DeviceID:           unavailable,
-		SessionID:          sessionID,
-		PrivacyLevel:       "operational",
-		Attributes:         attributes,
-		ProviderExtensions: extensions,
-	}, true, nil
+	finalizeMetricEvent(&event, rawFields, ctx)
+	return event, true, nil
 }
 
 // buildCountEvent maps one integer-count datapoint into a canonical event: a
@@ -559,11 +574,13 @@ func buildCountEvent(metricName, countKey string, promoteModel bool, point metri
 	occurredAt := metricTime(point.TimeUnixNano, ctx.receivedAt)
 	model, modelObserved := normalize.ObservedString(fields["model"])
 	sessionID := normalize.ProviderNativeSessionID(nativeSessionPrefix, stringAttr(fields, attrSessionID))
+	rawFields := rawMetricAttributeValues(point.Attributes)
 	safeFields := safeMetricAttributes(fields)
 
 	// countKey joins the identity so lines_added and lines_removed points that
 	// share a session/timestamp stay distinct under CorrelateEvents, mirroring the
-	// token.usage/cost.usage collision-safety.
+	// token.usage/cost.usage collision-safety. safeFields (not rawFields) still
+	// feeds the hash so retaining attributes raw keeps event IDs stable.
 	identity := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%d|%d", metricName, countKey, sessionID, model, point.TimeUnixNano, ctx.resourceIdentity, ctx.scopeName, index, *count)
 	identity += "|" + stableJSON(safeFields)
 	eventID := contentID("claude-code:count:", []byte(identity))
@@ -575,32 +592,31 @@ func buildCountEvent(metricName, countKey string, promoteModel bool, point metri
 	if promoteModel && modelObserved {
 		attributes["model"] = model
 	}
-	extensions := map[string]any{
-		"correlation": metricCorrelation(eventID, occurredAt),
-		"metric": map[string]any{
-			"name": metricName,
-			"unit": unit,
+	event := canonical.Event{
+		SchemaVersion: canonicalSchemaVersion,
+		EventID:       eventID,
+		EventType:     metricName,
+		OccurredAt:    occurredAt,
+		ReceivedAt:    ctx.receivedAt.UTC(),
+		Provider:      provider,
+		Tool:          tool,
+		SourceSchema:  sourceSchema,
+		SourceVersion: ctx.version,
+		ActorID:       unavailable,
+		DeviceID:      unavailable,
+		SessionID:     sessionID,
+		PrivacyLevel:  "operational",
+		Attributes:    attributes,
+		ProviderExtensions: map[string]any{
+			"correlation": metricCorrelation(eventID, occurredAt),
+			"metric": map[string]any{
+				"name": metricName,
+				"unit": unit,
+			},
 		},
-		"resource":          ctx.safeResource,
-		"metric_attributes": safeFields,
 	}
-	return canonical.Event{
-		SchemaVersion:      canonicalSchemaVersion,
-		EventID:            eventID,
-		EventType:          metricName,
-		OccurredAt:         occurredAt,
-		ReceivedAt:         ctx.receivedAt.UTC(),
-		Provider:           provider,
-		Tool:               tool,
-		SourceSchema:       sourceSchema,
-		SourceVersion:      ctx.version,
-		ActorID:            unavailable,
-		DeviceID:           unavailable,
-		SessionID:          sessionID,
-		PrivacyLevel:       "operational",
-		Attributes:         attributes,
-		ProviderExtensions: extensions,
-	}, true, nil
+	finalizeMetricEvent(&event, rawFields, ctx)
+	return event, true, nil
 }
 
 // tokenUnavailableFields lists the canonical fields a token.usage event does not
@@ -675,9 +691,11 @@ func metricCorrelation(eventID string, occurredAt time.Time) map[string]any {
 	}
 }
 
-// safeMetricAttributes reduces OTLP attributes to the allow-listed safe keys,
-// dropping operator/identity and unforeseen attributes by default (#88 removed
-// storage-side sanitising, so the adapter is the sole guard).
+// safeMetricAttributes reduces OTLP attributes to the allow-listed behaviour keys
+// that feed a metric event's identity hash. It is no longer an ingest filter
+// (#173 retains all attributes raw under provider_extensions) — it exists only to
+// keep the event-ID hash input on the stable pre-#173 behaviour dimensions so raw
+// retention does not shift event IDs.
 func safeMetricAttributes(fields map[string]any) map[string]any {
 	safe := make(map[string]any)
 	for key, value := range fields {
@@ -686,6 +704,81 @@ func safeMetricAttributes(fields map[string]any) map[string]any {
 		}
 	}
 	return safe
+}
+
+// rawMetricAttributeValues flattens OTLP datapoint or resource attributes into a
+// key/value map that retains every attribute raw (#173, epic #87) — unlike
+// safeMetricAttributes it applies no allow-list, so operator/machine identity
+// (user.*/organization.id/terminal.type) and any unforeseen attribute ride into
+// provider_extensions rather than being amputated at the local-only ingest
+// boundary; what (if anything) to hide is a downstream visibility decision layered
+// over the retained raw value, re-evaluated only at the cloud/upload boundary. It
+// preserves int64 precision by keeping an OTLP intValue as a json.Number
+// (OTLP/JSON encodes 64-bit integers as strings), so a value beyond a float64's
+// 53-bit mantissa round-trips exactly rather than being rounded by
+// attributeValue's ParseFloat.
+func rawMetricAttributeValues(attributes []otlpAttribute) map[string]any {
+	values := make(map[string]any, len(attributes))
+	for _, attribute := range attributes {
+		if value, ok := rawAttributeValue(attribute.Value); ok {
+			values[attribute.Key] = value
+		}
+	}
+	return values
+}
+
+// rawAttributeValue decodes a single OTLP attribute value for raw retention. A
+// scalar is returned as its natural Go value; an intValue is kept as a json.Number
+// so large integers do not lose precision; a string array (workspace.host_paths,
+// user.groups) is decoded via decodeStringArray. An unforeseen AnyValue shape
+// (arrayValue of non-strings, kvlistValue, bytesValue) is retained as its raw OTLP
+// value map rather than dropped — nothing is amputated at ingest (#173, epic #87).
+// A sanitiser-emptied value ({}) yields ok=false and is skipped.
+func rawAttributeValue(value map[string]any) (any, bool) {
+	if len(value) == 0 {
+		return nil, false
+	}
+	if text, ok := value["stringValue"].(string); ok {
+		return text, true
+	}
+	if boolean, ok := value["boolValue"].(bool); ok {
+		return boolean, true
+	}
+	if number, ok := value["doubleValue"].(float64); ok {
+		return number, true
+	}
+	switch integer := value["intValue"].(type) {
+	case string:
+		if trimmed := strings.TrimSpace(integer); trimmed != "" {
+			return json.Number(trimmed), true
+		}
+	case float64:
+		return json.Number(strconv.FormatFloat(integer, 'f', -1, 64)), true
+	}
+	if array := decodeStringArray(value); array != nil {
+		return array, true
+	}
+	return value, true
+}
+
+// finalizeMetricEvent attaches the raw datapoint attributes, the raw resource
+// block, and the derived environment/identity onto a metric event, then fills
+// actor_id/repository_id from that environment. It is the single place metric
+// events retain attributes raw and route operator identity (#173, epic #87 / #107
+// X20), so the four datapoint builders do not each repeat the raw-retention +
+// environment wiring (one home keeps SonarCloud CPD off the metric surface). The
+// datapoint environment is seeded before the resource one so datapoint identity
+// wins on an overlapping key, mirroring the logs record-over-resource precedence.
+// The caller owns the correlation/metric extension fields and the identity-hash
+// inputs (safeMetricAttributes/resourceIdentity), which are left untouched so
+// event IDs stay stable.
+func finalizeMetricEvent(event *canonical.Event, rawFields map[string]any, ctx metricContext) {
+	event.ProviderExtensions["metric_attributes"] = rawFields
+	event.ProviderExtensions["resource"] = ctx.rawResource
+	if environment := claudeEnvironment(rawFields, ctx.rawResource); environment != nil {
+		event.ProviderExtensions["environment"] = environment
+	}
+	applyEnvironmentIdentity(event)
 }
 
 func resourceIdentityKey(resourceAttrs map[string]any) string {
