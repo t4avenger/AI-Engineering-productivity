@@ -117,21 +117,108 @@ async function captureDestination(
   await expect(
     page.getByRole('heading', { name: destination.heading, level: 1 }),
   ).toBeVisible();
-  await expect(page).toHaveScreenshot(
-    `${destination.name}-${viewport.name}.png`,
-    {
-      animations: 'disabled',
-      // Playwright pins Chromium, but system-ui resolves to a different
-      // system font on the supported Ubuntu runners. The 5% budget is
-      // calibrated above the observed 4% glyph-rasterisation variance and
-      // still rejects material layout or colour regressions.
-      maxDiffPixelRatio: 0.05,
-    },
-  );
+  await expectReferenceGeometry(page, destination, viewport);
   await page.screenshot({
     path: path.join(evidenceDir, `${destination.name}-${viewport.name}.png`),
     animations: 'disabled',
   });
+}
+
+async function expectReferenceGeometry(
+  page: Page,
+  destination: Destination,
+  viewport: Viewport,
+): Promise<void> {
+  const overflow = await page.evaluate(() => {
+    const root = document.documentElement;
+    return root.scrollWidth <= root.clientWidth + 1;
+  });
+  expect(overflow, `${destination.name} ${viewport.name} must not scroll the page horizontally`).toBe(true);
+  if (viewport.width < 1440) {
+    if (viewport.width === 1024 && (destination.name === 'governance' || destination.name === 'sessions')) {
+      const boxes = await page.evaluate(() => {
+        const content = document.querySelector('.app-content')?.getBoundingClientRect();
+        const rail = document.querySelector('.right-rail')?.getBoundingClientRect();
+        return {
+          contentBottom: content?.bottom ?? 0,
+          contentWidth: content?.width ?? 0,
+          railTop: rail?.top ?? 0,
+          railWidth: rail?.width ?? 0,
+        };
+      });
+      expect(boxes.railTop).toBeGreaterThanOrEqual(boxes.contentBottom - 2);
+      expect(boxes.railWidth).toBeGreaterThan(boxes.contentWidth * 0.9);
+    }
+    return;
+  }
+  const sidebarWidth = (await page.locator('.app-sidebar').boundingBox())?.width ?? 0;
+  expect(sidebarWidth).toBeGreaterThanOrEqual(198);
+  expect(sidebarWidth).toBeLessThanOrEqual(202);
+  if (destination.name === 'overview') {
+    await expect(page.locator('.right-rail')).toHaveCount(0);
+    return;
+  }
+  if (destination.name === 'governance') {
+    const rail = page.locator('.right-rail');
+    await expect(rail).toContainText('Policy Preview');
+    await expect(page.locator('.app-content .governance-preview-rail')).toHaveCount(0);
+    const railWidth = (await rail.boundingBox())?.width ?? 0;
+    expect(railWidth).toBeGreaterThanOrEqual(298);
+    expect(railWidth).toBeLessThanOrEqual(302);
+    const order = await page.evaluate(() => ({
+      access: document.getElementById('access-rules')?.getBoundingClientRect().top ?? 0,
+      findings: document.getElementById('findings-heading')?.getBoundingClientRect().top ?? 0,
+    }));
+    expect(order.findings).toBeGreaterThan(order.access);
+    const row = page.locator('.mcp-rule-row').first();
+    if (await row.count()) {
+      expect((await row.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
+  }
+  if (destination.name === 'sessions') {
+    const rail = page.locator('.right-rail');
+    await expect(rail).toContainText('Session Breakdown');
+    await expect(rail).toContainText('Event Legend');
+    const railWidth = (await rail.boundingBox())?.width ?? 0;
+    expect(railWidth).toBeGreaterThanOrEqual(298);
+    expect(railWidth).toBeLessThanOrEqual(302);
+    const point = page.locator('.trace-marker.is-point').first();
+    await expect(point).toBeVisible();
+    const pointLayout = await point.evaluate((marker) => {
+      const track = marker.closest('.trace-lane-track');
+      return {
+        inlineWidth: getComputedStyle(marker).width,
+        trackWidth: track?.getBoundingClientRect().width ?? 0,
+        width: marker.getBoundingClientRect().width,
+      };
+    });
+    expect(pointLayout.inlineWidth.endsWith('%')).toBe(false);
+    expect(pointLayout.width).toBeGreaterThan(120);
+    expect(pointLayout.width).toBeLessThan(pointLayout.trackWidth);
+    const dock = await page.evaluate(() => {
+      const inspector = document.getElementById('event-inspector');
+      const trace = document.querySelector('.session-trace');
+      return {
+        inspectorTop: inspector?.getBoundingClientRect().top ?? 0,
+        position: inspector ? getComputedStyle(inspector).position : '',
+        traceBottom: trace?.getBoundingClientRect().bottom ?? 0,
+      };
+    });
+    expect(dock.position).not.toBe('fixed');
+    expect(dock.inspectorTop).toBeGreaterThan(dock.traceBottom - 8);
+    const cardLabel = page.locator('.trace-marker-label').first();
+    const colours = await cardLabel.evaluate((element) => {
+      const backgroundFor = (node: Element): string => {
+        for (let current: Element | null = node; current; current = current.parentElement) {
+          const background = getComputedStyle(current).backgroundColor;
+          if (background !== 'rgba(0, 0, 0, 0)') return background;
+        }
+        return getComputedStyle(document.documentElement).backgroundColor;
+      };
+      return { background: backgroundFor(element), foreground: getComputedStyle(element).color };
+    });
+    expect(contrastRatio(rgb(colours.foreground), rgb(colours.background))).toBeGreaterThanOrEqual(4.5);
+  }
 }
 
 function contrastRatio(first: number[], second: number[]): number {

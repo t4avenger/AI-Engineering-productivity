@@ -769,17 +769,21 @@ func traceClockTicks(windowMs int64) []string {
 	const count = 5
 	ticks := make([]string, count)
 	for i := 0; i < count; i++ {
-		ticks[i] = formatTraceClock(windowMs * int64(i) / int64(count-1))
+		ticks[i] = formatTraceClock(windowMs*int64(i)/int64(count-1), windowMs)
 	}
 	return ticks
 }
 
-func formatTraceClock(ms int64) string {
+func formatTraceClock(ms, windowMs int64) string {
 	if ms < 0 {
 		ms = 0
 	}
 	totalSeconds := ms / 1000
-	return fmt.Sprintf("%02d:%02d", totalSeconds/60, totalSeconds%60)
+	clock := fmt.Sprintf("%02d:%02d", totalSeconds/60, totalSeconds%60)
+	if windowMs > 0 && windowMs < 60_000 {
+		clock += fmt.Sprintf(".%d", (ms%1000)/100)
+	}
+	return clock
 }
 
 func formatTraceOrigin(origin time.Time, kind string) string {

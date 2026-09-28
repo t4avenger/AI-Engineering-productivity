@@ -2,8 +2,11 @@
 
 `reference-design.spec.ts` drives the local daemon with existing synthetic,
 wire-shaped fixtures and records deterministic screenshots for the five primary
-destinations. The test also maintains Playwright screenshot assertions, so later
-visual changes require an intentional baseline review.
+destinations. The test records review screenshots and checks source-derived geometry
+(200px sidebar, 300px rail, findings below the workspace, point-event cards).
+Playwright `toHaveScreenshot` baselines stay frozen until those pages are
+visually approved. The side-by-side deviation record is
+[deviation-checklist.md](deviation-checklist.md).
 
 ## Captures
 
@@ -16,11 +19,9 @@ The browser scenario selects a retained conversation event to show the Session
 Trace inspector and opens the Files & Paths editor on Governance. It uses
 synthetic fixture values only. Screenshot text is evidence, not product data.
 
-Playwright pins Chromium for the screenshot baseline. Its `system-ui` font still
-varies slightly between supported Linux image versions, so the regression
-assertion permits at most a 5% pixel difference. That bound is calibrated above
-the observed 4% glyph-rasterisation difference on Ubuntu 24.04; layout, colour
-and larger visual regressions remain test failures.
+These PNGs are review evidence only. The spec does not call
+`toHaveScreenshot`, so a pixel-difference budget is not in force. Snapshot
+baselines stay frozen until the reconstructed pages are visually approved.
 
 ## Intentional deviations checklist
 
