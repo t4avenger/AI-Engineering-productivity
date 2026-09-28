@@ -57,21 +57,15 @@ var wireKeyMapping = map[string]string{
 	"request.id":      "request_id",
 }
 
-// droppedKeys are attributes dropped at the wire boundary. tool_parameters is
-// gated content: on tool_decision (and with OTEL_LOG_TOOL_DETAILS=1 more broadly)
-// it carries the full command and MCP server/tool names, so it is not surfaced
-// here. That drop is pre-existing and owned by #173; whether the epic #87
-// raw-capture stance should retain it is #173's decision, not settled here. It is
-// the only remaining wire-boundary drop: operator/machine identity
-// (user.*/organization.*/terminal.*) is no longer dropped — per the owner directive
-// (and epic #87 / PRODUCT_MAP §11.3) nothing is dropped at the local-only ingest
-// boundary; those keys ride raw into provider_extensions.environment (#107 X20),
-// the per-field visibility decision deferred downstream and re-evaluated only at
-// the cloud/cross-device upload boundary. prompt.id/message.uuid are the per-prompt
-// / per-message correlation ids retained under provider_extensions.correlation
-// (#106), not dropped — the normaliser lifts them there and excludes them from the
-// event echo.
-var droppedKeys = map[string]struct{}{"tool_parameters": {}}
+// Nothing is dropped at the wire boundary any more (#173, closing out epic #87 /
+// PRODUCT_MAP §11.3): operator/machine identity (user.*/organization.*/terminal.*)
+// rides raw into provider_extensions.environment (#107 X20); prompt.id/message.uuid
+// ride under provider_extensions.correlation (#106); and tool_parameters — the full
+// command and MCP server/tool names present on tool_decision (and with
+// OTEL_LOG_TOOL_DETAILS=1 more broadly) — is now retained raw under
+// provider_extensions.tool_decision (see attachToolDecision / toolDecisionFieldKeys).
+// The per-field visibility decision is deferred downstream and re-evaluated only at
+// the cloud/cross-device upload boundary, never amputated at ingest.
 
 // serverIdentityKeys carry a provider-reported MCP server identity. The raw name
 // is retained for local inventory display and correlation (epic #87 — no hiding).
@@ -145,14 +139,12 @@ func normaliseResourceLogs(resource resourceLog, receivedAt time.Time, indexBase
 // keys, retains provider session, operator/machine identity, and MCP server
 // display identities raw (nothing dropped at the local-only ingest boundary —
 // owner directive / epic #87; identity rides into provider_extensions.environment,
-// #107), and forwards the remaining behaviour attributes verbatim. Only the gated
-// droppedKeys (tool_parameters, #173) are withheld.
+// #107), and forwards every behaviour attribute verbatim. Nothing is withheld at the
+// wire boundary (#173) — tool_parameters is retained raw under
+// provider_extensions.tool_decision by the shared normaliser.
 func sampleEventFromRecord(record logRecord) map[string]any {
 	sample := make(map[string]any, len(record.Attributes))
 	for _, attribute := range record.Attributes {
-		if _, dropped := droppedKeys[attribute.Key]; dropped {
-			continue
-		}
 		value, ok := attributeValue(attribute.Value)
 		if !ok {
 			continue

@@ -156,12 +156,13 @@ func TestNormalizeLogsToolDecisionUnknownIsNeverInferred(t *testing.T) {
 	}
 }
 
-// TestNormalizeEventsDropsGatedToolParameters proves gated content never
-// surfaces on the reviewed-fixture path either: a sample event carrying
-// tool_parameters (which the fixture validator does not prohibit) must not echo
-// it under provider_extensions.event.
-func TestNormalizeEventsDropsGatedToolParameters(t *testing.T) {
-	fixture := `{"fixture_version":1,"fixture_origin":"observed-sanitised","provider":"anthropic","tool":"claude-code","tool_version":"2.1.270","captured_at":"2026-09-13T18:53:00Z","sanitisation_reviewed":true,"payload":{"source_type":"otlp_http_json_logs","sample_events":[{"event_name":"tool_decision","session_id":"synthetic-decision-session","event_timestamp":"2026-09-13T18:53:10.354Z","event_sequence":14,"decision":"reject","source":"hook","tool_name":"Bash","tool_source":"builtin","tool_use_id":"toolu_synthetic_bash","tool_parameters":"{\"canary\":\"drop-me\"}"}]}}`
+// TestNormalizeEventsRetainsToolParameters proves tool_parameters is retained raw
+// on the reviewed-fixture path (#173, epic #87): a tool_decision sample event
+// carrying tool_parameters surfaces it verbatim under
+// provider_extensions.tool_decision, and — to avoid a double-echo — never under
+// provider_extensions.event.
+func TestNormalizeEventsRetainsToolParameters(t *testing.T) {
+	fixture := `{"fixture_version":1,"fixture_origin":"observed-sanitised","provider":"anthropic","tool":"claude-code","tool_version":"2.1.270","captured_at":"2026-09-13T18:53:00Z","sanitisation_reviewed":true,"payload":{"source_type":"otlp_http_json_logs","sample_events":[{"event_name":"tool_decision","session_id":"synthetic-decision-session","event_timestamp":"2026-09-13T18:53:10.354Z","event_sequence":14,"decision":"reject","source":"hook","tool_name":"Bash","tool_source":"builtin","tool_use_id":"toolu_synthetic_bash","tool_parameters":"{\"command\":\"tiq-canary-cmd\"}"}]}}`
 	events, err := NormalizeEvents([]byte(fixture))
 	if err != nil {
 		t.Fatalf("normalise: %v", err)
@@ -169,18 +170,13 @@ func TestNormalizeEventsDropsGatedToolParameters(t *testing.T) {
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
-	serialized, err := json.Marshal(events)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	for _, leaked := range []string{"tool_parameters", "drop-me"} {
-		if strings.Contains(string(serialized), leaked) {
-			t.Fatalf("gated content leaked through NormalizeEvents: %q", leaked)
-		}
+	decision, _ := events[0].ProviderExtensions["tool_decision"].(map[string]any)
+	if got, _ := decision["tool_parameters"].(string); got != `{"command":"tiq-canary-cmd"}` {
+		t.Fatalf("tool_parameters not retained raw under provider_extensions.tool_decision: %#v", decision)
 	}
 	echo, _ := events[0].ProviderExtensions["event"].(map[string]any)
 	if _, present := echo["tool_parameters"]; present {
-		t.Fatalf("tool_parameters must not echo under provider_extensions.event: %#v", echo)
+		t.Fatalf("tool_parameters must not double-echo under provider_extensions.event: %#v", echo)
 	}
 }
 
@@ -221,9 +217,9 @@ func TestNormalizeLogsToolDecisionFallbackApprovalIDsAreUnique(t *testing.T) {
 }
 
 // TestNormalizeLogsRecognisesToolDecisionEvent runs the raw OTLP capture through
-// the wire adapter and proves the gated tool_parameters content (full command /
-// MCP server+tool names on the wire) stays dropped (#173) while the prompt.id
-// correlation id is retained under provider_extensions.correlation (#106).
+// the wire adapter and proves tool_parameters (full command / MCP server+tool names
+// on the wire) is retained raw under provider_extensions.tool_decision (#173) while
+// the prompt.id correlation id is retained under provider_extensions.correlation (#106).
 func TestNormalizeLogsRecognisesToolDecisionEvent(t *testing.T) {
 	events := normalizeObservedOTLPLogs(t, "claude-code-2.1.270-tool-decision-otlp.json")
 	if len(events) != 3 {
@@ -243,13 +239,13 @@ func TestNormalizeLogsRecognisesToolDecisionEvent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal events: %v", err)
 	}
-	for _, leaked := range []string{"tool_parameters", "drop-me"} {
-		if strings.Contains(string(serialized), leaked) {
-			t.Fatalf("gated content leaked into canonical events: %q", leaked)
-		}
+	// tool_parameters (full command / MCP server+tool names on the wire) is retained
+	// raw under provider_extensions.tool_decision (#173, epic #87), not dropped.
+	if !strings.Contains(string(serialized), `"tool_parameters":"{\"command\":\"tiq-canary-cmd\"}"`) {
+		t.Fatalf("tool_parameters not retained raw under tool_decision: %s", serialized)
 	}
 	// The prompt.id correlation id is retained under provider_extensions.correlation
-	// (#106), while the gated tool_parameters content above stays dropped (#173).
+	// (#106).
 	if !strings.Contains(string(serialized), `"prompt_id":"synthetic-prompt-id"`) {
 		t.Fatalf("prompt.id correlation id not retained under correlation: %s", serialized)
 	}
