@@ -39,7 +39,6 @@
             {{if .ParentSpanID}}data-parent-span-id="{{.ParentSpanID}}"{{end}}
             style="left: {{printf "%.3f" .LeftPercent}}%;{{if .HasDuration}} width: {{printf "%.3f" .WidthPercent}}%;{{end}}"
             title="{{.AccessibleName}}"
-            aria-label="{{.AccessibleName}}"
           >
             {{template "event-kind-icon" .Kind}}
             <span class="trace-marker-copy">

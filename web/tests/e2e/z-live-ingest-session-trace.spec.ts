@@ -27,7 +27,7 @@ test('assembles five-lane Session Trace from live retained evidence', async ({
   await page.goto(`/sessions/${encodeURIComponent(conversationSession)}`);
   await expectSessionDetailHeading(page);
   await expectSessionTraceLanes(page);
-  await expect(page.getByLabel('Conversation lane')).toContainText(
+  await expect(page.locator('#conversation')).toContainText(
     'tiq-live-e2e retained user',
   );
   await page.getByLabel('Conversation lane').getByRole('link').first().click();
@@ -36,7 +36,7 @@ test('assembles five-lane Session Trace from live retained evidence', async ({
 
   await page.goto(`/sessions/${encodeURIComponent(filesSession)}`);
   await expectSessionTraceLanes(page);
-  await expect(page.getByLabel('Files lane')).toContainText(
+  await expect(page.getByRole('list', { name: 'File evidence' })).toContainText(
     '/workspace/tiq-live-e2e-session-files.go',
   );
   await expect(page.getByLabel('Spans lane')).toBeVisible();

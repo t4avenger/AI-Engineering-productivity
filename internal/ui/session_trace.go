@@ -606,38 +606,48 @@ func foldLaneFlow(markers []traceMarkerView, windowMs int64, bars bool) []traceM
 	if len(markers) == 0 {
 		return markers
 	}
-	groups := make([][]traceMarkerView, 0)
-	if len(markers) <= traceFlowSlots || windowMs <= 0 {
-		for _, marker := range markers {
-			groups = append(groups, []traceMarkerView{marker})
-		}
-	} else {
-		slot := windowMs / int64(traceFlowSlots)
-		if slot < 1 {
-			slot = 1
-		}
-		var current []traceMarkerView
-		var boundary int64
-		for _, marker := range markers {
-			if len(current) == 0 || marker.OffsetMs >= boundary {
-				if len(current) > 0 {
-					groups = append(groups, current)
-				}
-				current = []traceMarkerView{marker}
-				boundary = marker.OffsetMs + slot
-				continue
-			}
-			current = append(current, marker)
-		}
-		if len(current) > 0 {
-			groups = append(groups, current)
-		}
+	groups := singleFlowGroups(markers)
+	if len(markers) > traceFlowSlots && windowMs > 0 {
+		groups = bucketFlowMarkers(markers, windowMs)
 	}
 	nodes := make([]traceMarkerView, 0, len(groups))
 	for _, group := range groups {
 		nodes = append(nodes, flowNode(group, windowMs, bars))
 	}
 	return nodes
+}
+
+func singleFlowGroups(markers []traceMarkerView) [][]traceMarkerView {
+	groups := make([][]traceMarkerView, 0, len(markers))
+	for _, marker := range markers {
+		groups = append(groups, []traceMarkerView{marker})
+	}
+	return groups
+}
+
+func bucketFlowMarkers(markers []traceMarkerView, windowMs int64) [][]traceMarkerView {
+	slot := windowMs / int64(traceFlowSlots)
+	if slot < 1 {
+		slot = 1
+	}
+	groups := make([][]traceMarkerView, 0)
+	var current []traceMarkerView
+	var boundary int64
+	for _, marker := range markers {
+		if len(current) > 0 && marker.OffsetMs < boundary {
+			current = append(current, marker)
+			continue
+		}
+		if len(current) > 0 {
+			groups = append(groups, current)
+		}
+		current = []traceMarkerView{marker}
+		boundary = marker.OffsetMs + slot
+	}
+	if len(current) > 0 {
+		groups = append(groups, current)
+	}
+	return groups
 }
 
 func flowNode(group []traceMarkerView, windowMs int64, bars bool) traceMarkerView {
@@ -738,49 +748,6 @@ func markerMatchesEvent(marker traceMarkerView, eventID string) bool {
 		}
 	}
 	return false
-}
-
-func assignOverlapStacks(markers []traceMarkerView) {
-	type active struct {
-		endMs int64
-		stack int
-	}
-	activeBars := make([]active, 0)
-	for i := range markers {
-		start := markers[i].OffsetMs
-		end := start + 1
-		if markers[i].HasDuration && markers[i].DurationMs > 0 {
-			end = start + markers[i].DurationMs
-		}
-		remaining := activeBars[:0]
-		used := map[int]struct{}{}
-		for _, bar := range activeBars {
-			if bar.endMs > start {
-				remaining = append(remaining, bar)
-				used[bar.stack] = struct{}{}
-			}
-		}
-		activeBars = remaining
-		stack := 0
-		for {
-			if _, taken := used[stack]; !taken {
-				break
-			}
-			stack++
-		}
-		markers[i].StackIndex = stack
-		activeBars = append(activeBars, active{endMs: end, stack: stack})
-	}
-}
-
-func maxStack(markers []traceMarkerView) int {
-	highest := 0
-	for _, marker := range markers {
-		if marker.StackIndex > highest {
-			highest = marker.StackIndex
-		}
-	}
-	return highest
 }
 
 func buildTraceHeader(session canonical.Session, events []canonical.Event) sessionTraceHeader {
@@ -935,28 +902,42 @@ func formatTraceClock(ms, windowMs int64) string {
 }
 
 func attachFlowInterval(data *sessionDetailData) {
-	const limit = 30
-	for _, lane := range data.Trace.Lanes {
+	marker, ok := selectedFlowMarker(data.Trace.Lanes)
+	if !ok {
+		return
+	}
+	rows, extra := flowIntervalRows(marker.Members)
+	data.Inspector.IntervalEvents = rows
+	data.Inspector.IntervalMore = extra
+}
+
+func selectedFlowMarker(lanes []traceLaneView) (traceMarkerView, bool) {
+	for _, lane := range lanes {
 		for _, marker := range lane.Markers {
-			if !marker.Selected || len(marker.Members) < 2 {
-				continue
+			if marker.Selected && len(marker.Members) >= 2 {
+				return marker, true
 			}
-			rows := make([]inspectorRelationRow, 0, limit)
-			for i, member := range marker.Members {
-				if i >= limit {
-					break
-				}
-				rows = append(rows, inspectorRelationRow{
-					Label: member.Label, Href: member.SelectPath, Meta: member.OffsetLabel,
-				})
-			}
-			data.Inspector.IntervalEvents = rows
-			if extra := len(marker.Members) - len(rows); extra > 0 {
-				data.Inspector.IntervalMore = extra
-			}
-			return
 		}
 	}
+	return traceMarkerView{}, false
+}
+
+func flowIntervalRows(members []traceFlowMember) ([]inspectorRelationRow, int) {
+	const limit = 30
+	rows := make([]inspectorRelationRow, 0, limit)
+	for i, member := range members {
+		if i >= limit {
+			break
+		}
+		rows = append(rows, inspectorRelationRow{
+			Label: member.Label, Href: member.SelectPath, Meta: member.OffsetLabel,
+		})
+	}
+	extra := len(members) - len(rows)
+	if extra < 0 {
+		extra = 0
+	}
+	return rows, extra
 }
 
 func formatTraceOrigin(origin time.Time, kind string) string {

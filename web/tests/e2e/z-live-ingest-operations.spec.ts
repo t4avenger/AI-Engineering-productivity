@@ -5,6 +5,7 @@ import {
   claudeToolResultOTLPLogs,
   codexToolResultOTLPLogs,
   ingestOTLPLogs,
+  openSessionTraceDisclosures,
   resetDaemonBetweenTests,
   unlockDashboard,
 } from './live-ingest-helpers';
@@ -44,6 +45,7 @@ test('renders operation stats for data ingested through the live daemon', async 
   await expect(page.getByText('tiq-canary-live-operation')).toHaveCount(0);
 
   await page.goto('/sessions/codex:tiq-live-e2e-operation-codex');
+  await openSessionTraceDisclosures(page);
   const operation = page.getByLabel('Operation details');
   await expect(operation).toBeVisible();
   await expect(operation.getByText('shell command', { exact: true })).toBeVisible();

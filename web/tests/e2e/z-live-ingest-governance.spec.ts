@@ -106,6 +106,7 @@ test('saves an observed MCP server and reloads findings without mocks', async ({
 
   await expect(page).toHaveURL(/\/governance\?saved=1$/);
   await expect(page.getByRole('status')).toContainText('MCP allowlist saved');
+  await openGovernanceFindings(page);
   await expect(page.getByText('All identifiable observed MCP servers')).toBeVisible();
   await expect(checkbox).toBeChecked();
 
@@ -154,6 +155,7 @@ test('saves an explicit skill policy and reloads its finding without mocks', asy
 
   await expect(page).toHaveURL(/\/governance\?rules=skills&saved=1$/);
   await expect(page.getByRole('status')).toContainText('Skills allowlist saved');
+  await openGovernanceFindings(page);
   await expect(page.getByText('All explicitly identified observed skills')).toBeVisible();
   await expect(checkbox).toBeChecked();
 
@@ -184,6 +186,7 @@ test('saves raw-path rules and renders their detect-only finding without mocks',
 
   await expect(page).toHaveURL(/\/governance\?rules=paths&saved=1$/);
   await expect(page.getByRole('status')).toContainText('Files & Paths rules saved');
+  await openGovernanceFindings(page);
   await expect(page.getByText(rawPath).first()).toBeVisible();
   await expect(page.getByText('detect only', { exact: false }).first()).toBeVisible();
 
@@ -231,6 +234,7 @@ test('saves a prompt finding rule and records the retained match', async ({
   await expect(page.getByRole('status')).toContainText('Prompt findings saved');
   await expect(page.getByText('Retained user phrase').first()).toBeVisible();
   await expect(page.getByText('Record finding').first()).toBeVisible();
+  await openGovernanceFindings(page);
 
   await page.getByLabel('Prompt keyword findings').getByRole('link').first().click();
   await expect(page).toHaveURL(

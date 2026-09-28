@@ -6,6 +6,7 @@ import {
   codexFilesystemWriteOTLPLogs,
   ingestOTLPLogs,
   ingestOTLPTraces,
+  openSessionTraceDisclosures,
   resetDaemonBetweenTests,
   unlockDashboard,
 } from './live-ingest-helpers';
@@ -66,6 +67,7 @@ test('projects file evidence from live Claude path and Codex write ingest', asyn
 
   await unlockDashboard(page, authToken);
   await page.goto(`/sessions/${encodeURIComponent(claudeSession)}`);
+  await openSessionTraceDisclosures(page);
   const evidence = page.getByLabel('File evidence');
   await expect(page.getByRole('heading', { name: 'File evidence' })).toBeVisible();
   await expect(evidence.getByText('/workspace/tiq-live-e2e-session-files.go')).toBeVisible();

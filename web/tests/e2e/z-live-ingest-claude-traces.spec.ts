@@ -59,7 +59,7 @@ test('joins Claude trace spans and content logs on a shared session.id', async (
     );
 
   await openSessionTrace(page, 'claude-code:tiq-live-e2e-claude-corr');
-  await expect(page.getByLabel('Conversation lane')).toContainText(
+  await expect(page.locator('#conversation')).toContainText(
     'tiq-live-e2e retained user',
   );
   await expect(page.getByLabel('Spans lane')).toBeVisible();

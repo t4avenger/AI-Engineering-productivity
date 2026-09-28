@@ -7,6 +7,7 @@ import {
   fetchLiveSessions,
   ingestOTLPLogs,
   ingestOTLPTraces,
+  openSessionTraceDisclosures,
   resetDaemonBetweenTests,
   unlockDashboard,
 } from './live-ingest-helpers';
@@ -45,6 +46,7 @@ test('renders Codex trace evidence ingested through the live daemon', async ({
   await expect(page.getByText('trace.id')).toBeVisible();
 
   await page.getByRole('link', { name: /codex · started/ }).click();
+  await openSessionTraceDisclosures(page);
   await expect(page.getByText('codex_exec')).toBeVisible();
   await expect(page.getByText('0.154.0')).toBeVisible();
   await expect(page.getByText('codex exec')).toBeVisible();
@@ -82,6 +84,7 @@ test("renders Codex trace evidence joined to its provider conversation", async (
   await page.getByRole("link", { name: "Sessions", exact: true }).click();
   await expect(page.getByText("conversation.id")).toBeVisible();
   await page.getByRole("link", { name: /codex · started/ }).click();
+  await openSessionTraceDisclosures(page);
   await expect(
     page.getByRole("heading", { name: "Span evidence", exact: true }),
   ).toBeVisible();
