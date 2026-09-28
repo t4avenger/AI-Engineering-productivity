@@ -61,8 +61,20 @@ func TestOperationStatsInsightIngestEndToEnd(t *testing.T) {
 	if stats.Data.Totals.AverageDurationMs == nil || *stats.Data.Totals.AverageDurationMs != 663 {
 		t.Fatalf("average duration = %#v", stats.Data.Totals.AverageDurationMs)
 	}
+	// The aggregate operation-stats insight is a derived rollup (totals, durations),
+	// so it must never echo raw tool content or identity — that boundary is unchanged
+	// by #173, which only lifts the drop at the raw ingest→store layer below.
 	serialized := marshalJSON(t, stats)
-	canaries := []string{"tiq-canary-tool-resource-token", "tool-host.example.test", "tool-account-123", "tiq-canary-claude-tool-input", "tiq-canary-claude-tool-result", "tiq-canary-claude-tool-body", "claude-tool@example.test"}
-	assertNoRawIdentifiers(t, canaries, serialized)
-	assertNoRawIdentifiers(t, canaries, marshalJSON(t, stored))
+	insightCanaries := []string{"tiq-canary-tool-resource-token", "tool-host.example.test", "tool-account-123", "tiq-canary-claude-tool-input", "tiq-canary-claude-tool-result", "tiq-canary-claude-tool-body", "claude-tool@example.test"}
+	assertNoRawIdentifiers(t, insightCanaries, serialized)
+
+	// The raw operation store retains the Claude tool_result echo verbatim (#173
+	// Site 4 — the former safeOperationEventFields allow-list is gone): the tool
+	// input/result content and operator email now read back raw rather than being
+	// amputated at ingest (AGENTS.md privacy invariant / epic #87 / §11.3).
+	storedJSON := marshalJSON(t, stored)
+	assertContainsAll(t, []string{"tiq-canary-claude-tool-input", "tiq-canary-claude-tool-result", "claude-tool@example.test"}, storedJSON)
+	// Genuine hazards still never appear: the real operator email (git hygiene) and
+	// any HMAC-hashed identity (the pre-#88 shape #87 abolished) must stay absent.
+	assertNoRawIdentifiers(t, []string{"microrutter2514@gmail.com"}, storedJSON)
 }

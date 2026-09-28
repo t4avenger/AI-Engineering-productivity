@@ -445,20 +445,28 @@ func TestNormalizeTranscriptRetainsRecordScopedResult(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ExtractTranscriptOperations: %v", err)
 			}
-			opsJSON := marshalForCanary(t, operations)
-			if tc.wantMeta == "" {
-				if strings.Contains(opsJSON, "tool_use_result") {
-					t.Fatalf("unmatched record must retain no structured result: %s", opsJSON)
-				}
-				return
-			}
-			if !strings.Contains(opsJSON, tc.wantMeta) {
-				t.Fatalf("structured result %q must be retained raw: %s", tc.wantMeta, opsJSON)
-			}
-			if got := strings.Contains(opsJSON, "tool_use_result_scope"); got != tc.wantScope {
-				t.Fatalf("record scope marker present = %v, want %v: %s", got, tc.wantScope, opsJSON)
-			}
+			assertRecordScopedResult(t, marshalForCanary(t, operations), tc.wantMeta, tc.wantScope)
 		})
+	}
+}
+
+// assertRecordScopedResult checks how a record-scoped toolUseResult surfaces in
+// the marshalled operations: wantMeta "" means nothing was retained (unmatched
+// block), otherwise the raw value must appear and the record-scope marker must be
+// present only for a multi-result record.
+func assertRecordScopedResult(t *testing.T, opsJSON, wantMeta string, wantScope bool) {
+	t.Helper()
+	if wantMeta == "" {
+		if strings.Contains(opsJSON, "tool_use_result") {
+			t.Fatalf("unmatched record must retain no structured result: %s", opsJSON)
+		}
+		return
+	}
+	if !strings.Contains(opsJSON, wantMeta) {
+		t.Fatalf("structured result %q must be retained raw: %s", wantMeta, opsJSON)
+	}
+	if got := strings.Contains(opsJSON, "tool_use_result_scope"); got != wantScope {
+		t.Fatalf("record scope marker present = %v, want %v: %s", got, wantScope, opsJSON)
 	}
 }
 

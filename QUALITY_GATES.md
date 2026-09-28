@@ -41,9 +41,20 @@ claims to surface retained telemetry:
 
 1. **Daemon live ingest→read gate** — POST a real captured (or synthetic
    wire-shaped) payload to the running receiver (`POST /v1/logs` today) and
-   assert the HTTP read API serves the expected session/insight fields, with
-   canary identity/secret values absent from the response. Follow the pattern
-   in `internal/api/claude_ingest_test.go` and `internal/api/codex_ingest_test.go`.
+   assert the HTTP read API serves the expected session/insight fields. The
+   read-back must confirm **identity and behaviour signals are present raw**
+   (session/environment identity — `user.*`, `organization.id`, `terminal.type`
+   — provider IDs, file paths, command lines, tool parameters, `cwd`,
+   `toolUseResult`): per PRODUCT_MAP §11.3 as revised by epic #87 and the #107
+   owner directive, nothing is dropped, tokenised, hashed, or disguised at the
+   local-only ingest boundary, so a gate that asserts identity is *absent* is
+   now wrong. The "absent from the response" assertion applies **only to genuine
+   value-based secrets** — the credential/high-entropy strings the fixture value
+   guard (`likelySecret`, `internal/fixture/validator.go`) catches — never to
+   identity/behaviour fields that are retained raw. Upload/cross-device boundaries
+   re-evaluate account identity/email separately and are out of scope for this
+   local-only gate. Follow the pattern in `internal/api/claude_ingest_test.go`
+   and `internal/api/codex_ingest_test.go`.
 2. **At least one non-mocked frontend e2e** — a Playwright spec that uses the
    daemon already started by `web/playwright.config.ts` (HTML UI on the daemon
    origin per ADR 0002), ingests live data, and asserts the UI renders that

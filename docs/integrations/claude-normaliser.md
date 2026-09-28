@@ -76,11 +76,12 @@ decision references a tool but is not evidence of an executed call. Every other
 event lists `approvals` as unavailable, so the capability is explicit per event.
 
 The gated `tool_parameters` attribute — which under `OTEL_LOG_TOOL_DETAILS=1`
-carries the full command and MCP server/tool names — is dropped at the wire
-boundary by `NormalizeLogs` (`logs.go` `droppedKeys`) and never reaches
-`provider_extensions`; the reviewed-wrapper fixture omits it entirely. Extracting
-the MCP server/tool identity from that gated blob is deferred to a follow-up
-(the reject/`mcp` decision here classifies only `tool_source: mcp`).
+carries the full command and MCP server/tool names — is **retained raw** (#173,
+closing out epic #87): the former `logs.go` `droppedKeys` guard is removed, and
+`tool_parameters` rides verbatim under `provider_extensions.tool_decision` via the
+shared normaliser (`toolDecisionFieldKeys`), echoed exactly once. Extracting the
+MCP server/tool identity from that raw blob is deferred to a follow-up (the
+reject/`mcp` decision here classifies only `tool_source: mcp`).
 
 ### Prompt & response content path
 
@@ -114,8 +115,9 @@ model output). No content key is added to `gatedEventFields()`, and none is in
 `logs.go` `droppedKeys`, so content survives both the reviewed-fixture and live-wire
 paths. The `prompt.id`/`message.uuid` correlation identifiers **are** retained under
 `provider_extensions.correlation` (#106 (X19), see Correlation keys below), not E7's
-concern; the only remaining `droppedKeys` entry is `tool_parameters` (gated command /
-MCP argument content, owned by #173).
+concern. `logs.go` `droppedKeys` is gone entirely (#173): no log attribute is
+dropped at the wire boundary any more — `tool_parameters` (gated command / MCP
+argument content) is now retained raw under `provider_extensions.tool_decision`.
 
 ### Session & environment metadata path
 
@@ -136,9 +138,11 @@ blocks per event:
   record yields no block. The identity keys are excluded from the
   `provider_extensions.event` echo (`environmentEventFields`) so each has one home.
 - `provider_extensions.resource` — the **full raw** OTLP resource attribute set
-  (`copyAttributes`, `attachResourceEnvironment`), nothing dropped. (This is the raw
-  counterpart to the metrics/traces `resource` block, which is still allow-listed by
-  `safeMetricAttributes` pending #173.)
+  (`copyAttributes`, `attachResourceEnvironment`), nothing dropped. The metrics
+  `resource`/`metric_attributes` blocks are now the raw counterpart too (#173,
+  below); the **traces** `resource` block remains allow-listed by
+  `safeMetricAttributes` as a tracked residual (#173 scoped to the audited logs +
+  metrics + JSONL drops; the trace resource block is a separate follow-up).
 
 Resource attributes are flattened by `resourceAttributeValues`, which — unlike the
 scalar record-level `attributeValue` — also decodes OTLP `arrayValue` members via
@@ -440,24 +444,37 @@ synthetic fixture
 No documented Claude Code metric now routes-tolerated unmapped; an undocumented
 future metric still route-tolerates (yields no event).
 
-Because #88 removed storage-side sanitising, the adapter is the sole guard for
-metric attributes: it carries only an **allow-list** of safe keys into
-`provider_extensions.metric_attributes`/`resource`, dropping operator/identity
-and any unforeseen attribute (`user.*`, `organization.*`, `terminal.*`,
-secrets, paths) by default. The allow-list carries `query_source`, `host.arch`,
-`os.type` and — the M10 attribution dimensions that answer the epic's central
-efficiency question, which skill / MCP tool / sub-agent / plugin burned the
-tokens and cost — `skill.name`, `mcp_server.name`, `mcp_tool.name`,
-`agent.name`, `plugin.name`, `marketplace.name`, `speed`, and `effort` (each
-allow-listed in both its dotted wire form and the underscore variant so the same
-key survives whichever an exporter build emits; the match lower-cases and
-trims), plus the M12 engagement dims `decision`, `tool_name`, `source`,
-`start_type`, and `language`. These dims are pre-redacted behaviour metadata, not
-identities. Event
+Every datapoint and resource attribute is **retained raw** (#173, closing out
+epic #87): `rawMetricAttributeValues` carries the full attribute set into
+`provider_extensions.metric_attributes`/`resource` with no allow-list, so
+operator/identity (`user.*`, `organization.id`, `terminal.type`), machine/app
+metadata, and any unforeseen attribute survive verbatim rather than being
+amputated at the local-only ingest boundary. Operator identity is additionally
+routed into `provider_extensions.environment` (`claudeEnvironment`, datapoint
+fields before resource so datapoint identity wins), and `applyEnvironmentIdentity`
+then derives the canonical `actor_id` from it — exactly as on the logs and traces
+paths. What (if anything) to hide is a downstream visibility layer re-evaluated
+only at the cloud/upload boundary, never an ingest-time drop. `rawMetricAttributeValues`
+preserves int64 precision (an OTLP `intValue` string is kept as a `json.Number`,
+so a value beyond a float64's 53-bit mantissa round-trips exactly) and retains an
+unforeseen `AnyValue` shape as its raw OTLP value map.
+
+The former `safeMetricAttributes` allow-list survives only as the **event-ID hash
+input**: it still scopes the identity hash to the stable pre-#173 behaviour
+dimensions (`query_source`, `host.arch`, `os.type`; the M10 attribution dims
+`skill.name`, `mcp_server.name`, `mcp_tool.name`, `agent.name`, `plugin.name`,
+`marketplace.name`, `speed`, `effort` in both dotted and underscore forms; and the
+M12 engagement dims `decision`, `tool_name`, `source`, `start_type`, `language`),
+so retaining identity/unforeseen attributes raw does **not** perturb any metric
+event ID — a re-ingested historical datapoint still deduplicates rather than
+fanning out a second copy (guarded by `TestNormalizeMetricsEventIDsStable`). Event
 IDs are a content hash over the metric name, the per-metric count key (token type
 for token.usage, `lines_added`/`removed` for lines_of_code), model, timestamp,
-resource/scope identity, datapoint index, and value, so same-timestamp datapoints
-in one session stay distinct under `CorrelateEvents`.
+resource/scope identity (also allow-list-scoped, unchanged), datapoint index,
+value, and that behaviour-dimension set, so same-timestamp datapoints in one
+session stay distinct under `CorrelateEvents`. `model`, `type`, and `session.id`
+are promoted onto the event yet also retained raw in `metric_attributes`
+(promoted ≠ raw).
 The attributed token.usage + cost.usage surface is exercised by the synthetic
 fixture `fixtures/claude/observed-sanitised/claude-code-2.1.268-cost-attribution-metrics.json`
 → `fixtures/claude/expected/claude-code-2.1.268-cost-attribution-metrics.events.json`;
@@ -586,8 +603,9 @@ grammar lives once in `internal/normalize/prlink.go`, shared with the Codex
 adapter (#205), so there is no CPD-duplicated regex. The metric
 `claude_code.pull_request.count` is a counter and never stands in for a URL
 (#98); the `tool_decision` `tool_parameters` and session-JSONL tool-output
-surfaces can also carry a URL but are dropped at ingest until #173 / #105 retain
-them raw (#183).
+surfaces can also carry a URL and are now retained raw (#173 / #105), but PR-link
+scanning does not yet cover them — extending the scan to those retained surfaces
+is tracked under #183.
 
 Issue #102 (T15) reconstructs the **sub-agent tree** from those span attributes.
 The per-span sub-agent correlation `agent_id`/`parent_agent_id`/`subagent_type`/
@@ -647,8 +665,10 @@ staying out of `span_attributes`. As on the logs path, `applyEnvironmentIdentity
 then derives the span's canonical `actor_id` (from `user.id`) and `repository_id`
 (from `workspace.host_paths`) from that block, with `device_id` staying `unavailable`.
 (The `provider_extensions.resource` block on a span is still reduced by
-`safeMetricAttributes`; reconciling that allow-list to full raw retention, like the
-logs path, is tracked under #173.)
+`safeMetricAttributes`. #173 reconciled the audited logs, metrics, and JSONL drops
+to full raw retention but was scoped to those five sites; the span `resource`
+block is the remaining allow-listed surface, tracked as a separate follow-up — a
+residual drop, not closed by #173.)
 
 ## Privacy
 
@@ -744,11 +764,12 @@ it to canonical events and is served live at `POST /v1/claude/transcript`
   slash command (leading `<command-name>…</command-name>` markup is captured verbatim,
   not re-parsed). `attributes.unavailable_fields` is computed per-presence, so a field
   is only listed when the record genuinely does not carry it. The per-adapter
-  allow-list remains the sole guard (epic #88 removed ingest-time hiding): safe scalar
-  envelope fields (`git_branch`, `entrypoint`, `user_type`, `request_id`, `effort`,
-  `api_block_index`, `is_sidechain`) reach `provider_extensions.transcript`; `cwd` is
-  the one deliberately excluded envelope field (not one of the six #105 signals — out
-  of scope, flagged follow-up), and account/email identifiers are never on this surface.
+  scalar envelope fields (`git_branch`, `entrypoint`, `user_type`, `request_id`,
+  `effort`, `api_block_index`, `is_sidechain`) reach `provider_extensions.transcript`;
+  `cwd` is now retained raw there too (#173 — it was the one deliberately excluded
+  envelope field, and is captured for both content-bearing records and pure
+  `tool_result` user records, riding onto the tool Operation), and account/email
+  identifiers are never on this surface.
 - **MCP tool calls (J17 #104).** MCP invocations are the one tool body read here.
   Each assistant `message.content[]` `tool_use` block named `mcp__<server>__<tool>`
   is paired with its later `user` `tool_result` (by `tool_use_id`, in a single

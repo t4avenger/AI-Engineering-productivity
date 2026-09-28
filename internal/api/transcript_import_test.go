@@ -32,8 +32,10 @@ const e2eTranscriptNDJSON = `{"type":"user","uuid":"e2e-user-1","sessionId":"tra
 {"type":"user","uuid":"e2e-user-2","parentUuid":"e2e-assistant-1","sessionId":"transcript-e2e-session","timestamp":"2026-09-12T10:00:03.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_bash_e2e_1","is_error":false,"content":[{"type":"text","text":"tiq-canary-stdout"}]}]}}`
 
 // transcriptCapturedContent are the raw content bodies epic #87 now retains and
-// surfaces through storage: the user prompt, assistant response + thinking, and the
-// tool IO (command, edit target path, command result).
+// surfaces through storage: the user prompt, assistant response + thinking, the
+// tool IO (command, edit target path, command result), and — per #173 Site 2 —
+// the record cwd, which the earlier adapter dropped as a deferred #105 follow-up
+// and is now retained raw at the local-only ingest boundary.
 var transcriptCapturedContent = []string{
 	"tiq-canary-user-prompt",
 	"tiq-canary-response",
@@ -41,12 +43,6 @@ var transcriptCapturedContent = []string{
 	"tiq-canary-command",
 	"tiq-canary-file-path",
 	"tiq-canary-stdout",
-}
-
-// transcriptExcludedContent are the values that stay off every surface: cwd is not
-// one of the six #105 signals (out of scope, flagged follow-up), so it must never
-// reach storage, the read API, or the dev inspector.
-var transcriptExcludedContent = []string{
 	"tiq-canary-cwd",
 }
 
@@ -55,8 +51,8 @@ var transcriptExcludedContent = []string{
 // SAME session to /v1/claude/transcript, and proves both merge into one
 // anthropic/claude-code session whose transcript model + token counts surface
 // through the read API. Per epic #87 it also proves the raw content bodies (prompt,
-// response, thinking, tool command/path/result) are captured to storage, while cwd
-// stays off every surface including the dev inspector.
+// response, thinking, tool command/path/result) are captured to storage, and per
+// #173 Site 2 the record cwd is now retained raw there too.
 func TestTranscriptImportMergesWithOTLPSession(t *testing.T) {
 	repository, server := transcriptTestServer(t, true)
 	postAcceptedOTLP(t, server.URL, "/v1/logs", claudeOTLPLogPayload(t, []any{
@@ -84,12 +80,15 @@ func TestTranscriptImportMergesWithOTLPSession(t *testing.T) {
 // record invoking one MCP tool (mcp__canary-fs__read_file) alongside a non-MCP
 // Bash tool_use, paired with a later user tool_result. Under epic #87 the prompt
 // and the Bash command are captured raw (the Bash call becomes a generic shell
-// operation); only cwd — not a #105 signal — stays off the read API.
+// operation); per #173 Site 2 the record cwd is retained raw on the store too.
 const mcpTranscriptE2ENDJSON = `{"type":"user","uuid":"mcp-e2e-user-1","sessionId":"mcp-transcript-e2e-session","timestamp":"2026-09-12T10:00:00.000Z","version":"2.1.269","message":{"role":"user","content":"tiq-canary-mcp-prompt"}}
 {"type":"assistant","uuid":"mcp-e2e-assistant-1","parentUuid":"mcp-e2e-user-1","sessionId":"mcp-transcript-e2e-session","timestamp":"2026-09-12T10:00:02.000Z","version":"2.1.269","cwd":"/home/tiq-canary-mcp-cwd/project","gitBranch":"main","entrypoint":"cli","requestId":"req_mcp_e2e_1","message":{"role":"assistant","model":"claude-opus-4-8","stop_reason":"tool_use","content":[{"type":"tool_use","id":"toolu_mcp_e2e","name":"mcp__canary-fs__read_file","input":{"path":"docs/overview.md"}},{"type":"tool_use","id":"toolu_bash_e2e","name":"Bash","input":{"command":"tiq-canary-mcp-command"}}],"usage":{"input_tokens":64,"output_tokens":8}}}
 {"type":"user","uuid":"mcp-e2e-user-2","parentUuid":"mcp-e2e-assistant-1","sessionId":"mcp-transcript-e2e-session","timestamp":"2026-09-12T10:00:03.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_mcp_e2e","is_error":false,"content":[{"type":"text","text":"# Overview"}]}]}}`
 
-var mcpTranscriptExcludedContent = []string{
+// mcpTranscriptCapturedCwd is the record cwd on the MCP-bearing transcript: per
+// #173 Site 2 it is now retained raw on the stored events and operations rather
+// than dropped as a deferred #105 follow-up.
+var mcpTranscriptCapturedCwd = []string{
 	"tiq-canary-mcp-cwd",
 }
 
@@ -99,7 +98,7 @@ var mcpTranscriptExcludedContent = []string{
 // insight (an MCP-call operation) and the MCP-inventory insight (the connected-but-
 // unused vs used state now reports the server as used with its invocation count).
 // Under #105 the sibling non-MCP Bash tool_use now also becomes a generic shell
-// operation, so the transcript yields two operations; only cwd stays off the read API.
+// operation, so the transcript yields two operations; the record cwd is retained raw (#173 Site 2).
 func TestTranscriptImportSurfacesMCPCallsThroughReadAPI(t *testing.T) {
 	repository, server := transcriptTestServer(t, true)
 	postAcceptedTranscript(t, server.URL, mcpTranscriptE2ENDJSON)
@@ -138,10 +137,14 @@ func TestTranscriptImportSurfacesMCPCallsThroughReadAPI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list operations: %v", err)
 	}
-	assertNoRawIdentifiers(t, mcpTranscriptExcludedContent,
-		marshalJSON(t, stats), marshalJSON(t, inventory), marshalJSON(t, storedEvents), marshalJSON(t, storedOperations))
+	// #173 Site 2: the record cwd is retained raw on the stored events and
+	// operations rather than dropped at ingest.
+	assertContainsAll(t, mcpTranscriptCapturedCwd, marshalJSON(t, storedEvents), marshalJSON(t, storedOperations))
+	// The real operator email (git hygiene) must never appear on any surface,
+	// including the aggregate insights and the dev inspector diagnostic.
 	lastIngest := getInsightJSON[map[string]any](t, server.URL+"/api/v1/development/last-ingest")
-	assertNoRawIdentifiers(t, mcpTranscriptExcludedContent, marshalJSON(t, lastIngest))
+	assertNoRawIdentifiers(t, []string{"microrutter2514@gmail.com"},
+		marshalJSON(t, stats), marshalJSON(t, inventory), marshalJSON(t, storedEvents), marshalJSON(t, storedOperations), marshalJSON(t, lastIngest))
 }
 
 // genericToolTranscriptNDJSON is a synthetic transcript exercising the full generic
@@ -361,12 +364,13 @@ func assertTranscriptContentCapture(t *testing.T, repository storage.Repository,
 	if err != nil {
 		t.Fatalf("list operations: %v", err)
 	}
-	// Epic #87: the raw content bodies must be retained on the stored events and
-	// operations.
+	// Epic #87 + #173 Site 2: the raw content bodies and the record cwd must be
+	// retained on the stored events and operations.
 	assertContainsAll(t, transcriptCapturedContent, marshalJSON(t, events), marshalJSON(t, operations))
-	// cwd stays excluded from every read surface and the dev inspector.
+	// The real operator email (git hygiene) must never appear on any surface,
+	// including the dev inspector diagnostic.
 	lastIngest := getInsightJSON[map[string]any](t, baseURL+"/api/v1/development/last-ingest")
-	assertNoRawIdentifiers(t, transcriptExcludedContent,
+	assertNoRawIdentifiers(t, []string{"microrutter2514@gmail.com"},
 		marshalJSON(t, timeline), marshalJSON(t, sessions), marshalJSON(t, events), marshalJSON(t, operations), marshalJSON(t, lastIngest))
 }
 
