@@ -40,25 +40,28 @@ export async function expectSessionTraceLanes(page: Page): Promise<void> {
   await openSessionTraceDisclosures(page);
   const trace = page.getByLabel('Shared session time axis');
   await expect(trace).toBeVisible();
-  for (const lane of [
-    'Conversation lane',
-    'Agent lane',
-    'Tools & MCP lane',
-    'Files lane',
-    'Spans lane',
-  ]) {
-    await expect(page.getByLabel(lane)).toBeVisible();
-  }
+  await Promise.all(
+    [
+      'Conversation lane',
+      'Agent lane',
+      'Tools & MCP lane',
+      'Files lane',
+      'Spans lane',
+    ].map((lane) => expect(page.getByLabel(lane)).toBeVisible()),
+  );
 }
 
 /** Environment and chronological evidence stay closed until the reader opens them. */
 export async function openSessionTraceDisclosures(page: Page): Promise<void> {
-  for (const selector of ['.session-trace-extra', '#chronological-list']) {
-    const details = page.locator(selector);
-    if ((await details.count()) === 0) continue;
-    if ((await details.getAttribute('open')) === null) {
-      await details.locator('summary').click();
-    }
+  await openDisclosure(page, '.session-trace-extra');
+  await openDisclosure(page, '#chronological-list');
+}
+
+async function openDisclosure(page: Page, selector: string): Promise<void> {
+  const details = page.locator(selector);
+  if ((await details.count()) === 0) return;
+  if ((await details.getAttribute('open')) === null) {
+    await details.locator('summary').click();
   }
 }
 
@@ -85,11 +88,11 @@ export async function expectFiveDestinationPrimaryNav(page: Page): Promise<void>
     'Models',
     'Governance',
   ]);
-  for (const name of ['Insights', 'Privacy', 'Costs', 'Integrations']) {
-    await expect(
-      primaryNavigation.getByRole('link', { name, exact: true }),
-    ).toHaveCount(0);
-  }
+  await Promise.all(
+    ['Insights', 'Privacy', 'Costs', 'Integrations'].map((name) =>
+      expect(primaryNavigation.getByRole('link', { name, exact: true })).toHaveCount(0),
+    ),
+  );
 }
 
 /** Utility destinations after #161 primary shell. */
@@ -1008,9 +1011,11 @@ export async function expectSessionBreakdownRail(
   await expect(rail.getByRole('heading', { name: 'Governance' })).toBeVisible();
   await expect(rail.getByRole('heading', { name: 'Event Legend' })).toBeVisible();
   if (opts.available) {
-    for (const label of opts.categoryLabels ?? []) {
-      await expect(rail.getByText(label, { exact: true })).toBeVisible();
-    }
+    await Promise.all(
+      (opts.categoryLabels ?? []).map((label) =>
+        expect(rail.getByText(label, { exact: true })).toBeVisible(),
+      ),
+    );
     await expect(rail.getByRole('link', { name: 'Evidence' }).first()).toBeVisible();
   } else {
     await expect(rail.getByText(/Duration breakdown unavailable/)).toBeVisible();
@@ -1058,6 +1063,86 @@ export async function ingestClaudeTranscript(body: string): Promise<void> {
     body,
   });
   expect(ingest.status).toBe(202);
+}
+
+// ingestCodexRollout exercises the authenticated local-only rollout receiver.
+// Unlike OTLP intake, this body contains raw conversation and tool evidence and
+// therefore requires the same token as the management APIs.
+export async function ingestCodexRollout(body: string): Promise<void> {
+  const ingest = await fetch(`${daemonBase}/v1/codex/rollout`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${authToken}`,
+      'Content-Type': 'application/x-ndjson',
+    },
+    body,
+  });
+  expect(ingest.status).toBe(202);
+}
+
+export const codexRolloutSessionID = 'tiq-live-e2e-codex-rollout';
+
+// Synchronized OTLP evidence carrying the exact provider-native identifier used
+// by codexRolloutNDJSON; the daemon must merge these into one codex:* session.
+export function codexRolloutOTLPLogs(): string {
+  return codexExecOTLPLogs([
+    {
+      attributes: codexStringAttrs([
+        ['event.name', 'codex.synthetic_rollout_probe'],
+        ['conversation.id', codexRolloutSessionID],
+      ]),
+      body: { stringValue: 'synthetic rollout probe' },
+    },
+  ]);
+}
+
+// Minimal observed Codex 0.157.1 rollout shapes for the live daemon gate. The
+// parser retains every record raw; only the two provider message roles are
+// projected into the shared conversation model.
+export function codexRolloutNDJSON(): string {
+  return [
+    {
+      ordinal: 0,
+      timestamp: '2026-09-29T07:01:40.785Z',
+      type: 'session_meta',
+      payload: {
+        id: codexRolloutSessionID,
+        cli_version: '0.157.1',
+        creator_user_id: 'tiq-live-synthetic-user',
+        unknown_session_field: { retained: true },
+      },
+    },
+    {
+      ordinal: 1,
+      timestamp: '2026-09-29T07:01:43.115Z',
+      type: 'response_item',
+      payload: {
+        type: 'message',
+        id: 'tiq-live-rollout-user',
+        role: 'user',
+        content: [{ type: 'input_text', text: 'tiq-live retained Codex prompt' }],
+      },
+    },
+    {
+      ordinal: 2,
+      timestamp: '2026-09-29T07:01:46.209Z',
+      type: 'response_item',
+      payload: {
+        type: 'message',
+        id: 'tiq-live-rollout-assistant',
+        role: 'assistant',
+        content: [{ type: 'output_text', text: 'tiq-live retained Codex response' }],
+      },
+    },
+    {
+      ordinal: 3,
+      timestamp: '2026-09-29T07:02:32.300Z',
+      type: 'future_provider_record',
+      payload: { unknown_flag: true, nested: { retained: 'verbatim' } },
+    },
+  ]
+    .map((record) => JSON.stringify(record))
+    .join('\n');
 }
 
 /**

@@ -11,8 +11,31 @@ func TestValidateAcceptsAllReviewedProviderFixtures(t *testing.T) {
 	for _, path := range providerFixturePaths(t) {
 		t.Run(path, func(t *testing.T) {
 			data := readFixtureFile(t, path)
-			if err := Validate(data); err != nil {
+			var err error
+			if filepath.Ext(path) == ".jsonl" {
+				err = ValidateNDJSON(data)
+			} else {
+				err = Validate(data)
+			}
+			if err != nil {
 				t.Fatalf("validate fixture: %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateNDJSONRejectsMalformedAndSensitiveRecords(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		data string
+	}{
+		{name: "empty"},
+		{name: "malformed", data: `{`},
+		{name: "secret", data: `{"type":"message","payload":"Bearer token-value-that-must-never-be-committed"}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := ValidateNDJSON([]byte(test.data)); err == nil {
+				t.Fatal("ValidateNDJSON() error = nil")
 			}
 		})
 	}
@@ -104,7 +127,8 @@ func providerFixturePaths(t *testing.T) []string {
 			if err != nil {
 				return err
 			}
-			if entry.IsDir() || filepath.Ext(path) != ".json" {
+			extension := filepath.Ext(path)
+			if entry.IsDir() || (extension != ".json" && extension != ".jsonl") {
 				return nil
 			}
 			paths = append(paths, path)

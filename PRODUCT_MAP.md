@@ -47,11 +47,15 @@ semantically equivalent data. Separate immutable **observations** from versioned
 - **P1 — Minimal observation envelope + real Codex extraction.** Add only stable-primitive
   records (model interaction; generic operation/invocation). Make the Codex normaliser
   extract real model/token/tool data. Make correlation (dedup keys, ordering, task
-  boundaries) first-class. Redaction lands here, proven by canary-string leakage tests.
+  boundaries) first-class. Codex CLI 0.157.1 rollout JSONL is accepted by authenticated
+  `POST /v1/codex/rollout`: every record is retained, user/assistant messages project into
+  conversation views, and exact `session_meta.payload.id` joins matching OTLP evidence (#232).
+  Diagnostic sanitisation is proven by canary-string leakage tests.
 - **P2 — Claude Code adapter + capability-driven conformance suite.** OTLP + session JSONL
   (the JSONL half is now implemented: `claude.NormalizeTranscript` via `POST /v1/claude/transcript`
   emits `assistant_message` events with model + full token usage, correlated to the same
-  session as OTLP; content bodies deferred to E7/#94, J17/#104, and J18/#105 — #91).
+  session as OTLP; raw provider fields follow the §11.3 retention invariant, while further
+  semantic extraction remains owned by E7/#94, J17/#104, and J18/#105 — #91).
   Skill detection marked `explicit | inferred | unavailable`. Cross-tool session view with
   honest "unavailable" cells.
 - **P3 — Behaviour, efficiency & model-performance insights.** MCP inventory & context cost
@@ -597,7 +601,8 @@ sharing:
 - Provide field-level provenance showing why a field was retained.
 - Support complete local deletion.
 - Use synthetic secrets in tests.
-- Add tests that prove prohibited fields never reach storage.
+- Add tests proving raw fields reach local storage while real sensitive values never enter
+  committed fixtures, diagnostics, logs, stderr, or diagnostic exports.
 
 ---
 

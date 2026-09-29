@@ -16,6 +16,8 @@ func TestManagementAuthProtectsLocalData(t *testing.T) {
 		status int
 	}{
 		{name: "health remains available", path: "/api/v1/health", status: http.StatusNoContent},
+		{name: "rollout missing token", path: "/v1/codex/rollout", status: http.StatusUnauthorized},
+		{name: "rollout valid token", path: "/v1/codex/rollout", token: "test-token", status: http.StatusNoContent},
 		{name: "session CORS preflight remains available", path: "/api/v1/sessions", status: http.StatusNoContent},
 		{name: "missing token", path: "/api/v1/sessions", status: http.StatusUnauthorized},
 		{name: "invalid token", path: "/api/v1/sessions/a", token: "wrong", status: http.StatusUnauthorized},

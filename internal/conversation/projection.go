@@ -91,11 +91,16 @@ func projectEvent(event canonical.Event) (Record, bool) {
 // guard (only Claude Code content events are conversation records) as the
 // projection, not just the event-type shape.
 func IsConversationEvent(event canonical.Event) bool {
-	if event.Provider != "anthropic" || event.Tool != "claude-code" {
+	if !isConversationProvider(event.Provider, event.Tool) {
 		return false
 	}
 	_, _, _, ok := contentShape(event.EventType)
 	return ok
+}
+
+func isConversationProvider(provider, tool string) bool {
+	return (provider == "anthropic" && tool == "claude-code") ||
+		(provider == "openai" && tool == "codex")
 }
 
 func contentShape(eventType string) (key, role string, lengthKeys []string, ok bool) {

@@ -1,0 +1,18 @@
+{
+  "event_count": 11,
+  "session_id": "codex:synthetic-codex-0.157.1-session",
+  "source_version": "0.157.1",
+  "event_types": [
+    "codex.rollout.session_meta",
+    "codex.rollout.event_msg",
+    "user_prompt",
+    "codex.rollout.world_state",
+    "codex.rollout.turn_context",
+    "assistant_response",
+    "codex.rollout.response_item",
+    "codex.rollout.response_item",
+    "codex.rollout.token_usage_record",
+    "codex.rollout.event_msg",
+    "codex.rollout.future_provider_record"
+  ]
+}

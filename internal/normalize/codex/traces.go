@@ -140,12 +140,15 @@ func normalizeLiveTraceSpan(resource, scope, span, resourceAttributes map[string
 }
 
 // codexTraceSessionIdentity promotes only reviewed provider-emitted identity
-// keys. CLI 0.155.1 supplies conversation.id at the resource level and a
-// session_task.turn can instead carry thread.id, whose raw value is observed on
-// the log surface. All other traces remain trace-scoped observations.
+// keys. CLI 0.155.1 supplies conversation.id at the resource level, while
+// thread.id has been observed both at the resource level and on a
+// session_task.turn span. All other traces remain trace-scoped observations.
 func codexTraceSessionIdentity(resourceAttributes, spanAttributes map[string]any, traceID string) (string, string) {
 	if conversationID, ok := normalize.ObservedString(resourceAttributes[codexConversationIDKey]); ok {
 		return normalize.ProviderNativeSessionID(codexSessionPrefix, conversationID), codexConversationIDKey
+	}
+	if threadID, ok := normalize.ObservedString(resourceAttributes[codexThreadIDKey]); ok {
+		return normalize.ProviderNativeSessionID(codexSessionPrefix, threadID), codexThreadIDKey
 	}
 	if threadID, ok := normalize.ObservedString(spanAttributes[codexThreadIDKey]); ok {
 		return normalize.ProviderNativeSessionID(codexSessionPrefix, threadID), codexThreadIDKey

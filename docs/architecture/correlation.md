@@ -1,6 +1,6 @@
 # Correlation and deterministic replay
 
-P1 correlation is a normalisation responsibility. Provider adapters must emit canonical observations in a stable order, collapse exact duplicate source observations, and preserve the source relationships that are available without retaining prompt, response, source-code, file-path, or command-argument content.
+P1 correlation is a normalisation responsibility. Provider adapters must emit canonical observations in a stable order, collapse exact duplicate source observations, and preserve both source relationships and locally retained raw provider evidence. Visibility policy is downstream of retention.
 
 ## Deduplication
 
@@ -17,6 +17,13 @@ trace batches, so live ingest persists recognized `codex_exec` and
 The same value is used as the canonical `event_id` and is copied to `provider_extensions.correlation.dedup_key` so downstream storage, diagnostics, and tests can explain why a duplicate collapsed. Replaying a fixture twice must not create a second observation. If two source spans present the same trace/span identity, the normaliser sorts first and keeps one deterministic canonical event for that key.
 
 Codex OTLP log records observed in 0.145.0 can carry `conversation.id`. CLI 0.155.1 traces can carry the same provider-emitted value as a resource attribute; only that exact field maps their spans to `codex:<conversation.id>`. Log-derived events and `canonical.ModelInteraction` records use the same raw session ID. Records without a conversation ID fall back to a non-keyed content ID (epic #87 removed ingest-time hiding — no HMAC fingerprint). Their deduplication key remains the `request_id`, which is copied to `provider_extensions.correlation.dedup_key`.
+
+Codex CLI 0.157.1 rollout JSONL carries `session_meta.payload.id`. A synchronized
+synthetic capture proves it exactly equals same-run OTLP `conversation.id` and
+`thread.id`, so rollout and OTLP events use the same `codex:<id>` session. A
+rollout record ID is preferred for deduplication; otherwise its original line
+position plus raw-record digest provides a deterministic replay key. Metrics
+without that exact provider key remain observation-only.
 
 For Claude Code, the single join key across all three surfaces is the raw
 `session.id`: OTLP trace spans, OTLP content logs, and the on-disk session JSONL

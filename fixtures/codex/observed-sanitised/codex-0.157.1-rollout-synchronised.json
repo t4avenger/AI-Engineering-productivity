@@ -1,0 +1,83 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "openai",
+  "tool": "codex",
+  "tool_version": "0.157.1",
+  "captured_at": "2026-09-29T07:03:00Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "capture_id": "synthetic-codex-0.157.1-capture",
+    "rollout_file": "codex-0.157.1-rollout-synchronised.jsonl",
+    "correlation": {
+      "rollout_session_meta_id": "synthetic-codex-0.157.1-session",
+      "otlp_log_conversation_id": "synthetic-codex-0.157.1-session",
+      "otlp_trace_thread_id": "synthetic-codex-0.157.1-session",
+      "metric_session_dimension": "not_emitted"
+    },
+    "otlp_surfaces": {
+      "logs": {
+        "endpoint": "/v1/logs",
+        "content_type": "application/json",
+        "observed": true,
+        "payload": {
+          "resourceLogs": [{
+            "resource": {"attributes": [
+              {"key": "service.name", "value": {"stringValue": "codex_cli_rs"}},
+              {"key": "service.version", "value": {"stringValue": "0.157.1"}}
+            ]},
+            "scopeLogs": [{"logRecords": [{
+              "timeUnixNano": "1790665300000000000",
+              "body": {"stringValue": "synthetic rollout probe"},
+              "attributes": [
+                {"key": "event.name", "value": {"stringValue": "codex.synthetic_rollout_probe"}},
+                {"key": "conversation.id", "value": {"stringValue": "synthetic-codex-0.157.1-session"}}
+              ]
+            }]}]
+          }]
+        }
+      },
+      "metrics": {
+        "endpoint": "/v1/metrics",
+        "content_type": "application/json",
+        "observed": true,
+        "payload": {
+          "resourceMetrics": [{
+            "resource": {"attributes": [
+              {"key": "service.name", "value": {"stringValue": "codex_cli_rs"}},
+              {"key": "service.version", "value": {"stringValue": "0.157.1"}}
+            ]},
+            "scopeMetrics": [{"metrics": [{
+              "name": "codex.turn.count",
+              "sum": {"dataPoints": [{
+                "asInt": "1",
+                "attributes": [{"key": "model", "value": {"stringValue": "synthetic-model"}}]
+              }]}
+            }]}]
+          }]
+        }
+      },
+      "traces": {
+        "endpoint": "/v1/traces",
+        "content_type": "application/json",
+        "observed": true,
+        "payload": {
+          "resourceSpans": [{
+            "resource": {"attributes": [
+              {"key": "service.name", "value": {"stringValue": "codex_cli_rs"}},
+              {"key": "service.version", "value": {"stringValue": "0.157.1"}},
+              {"key": "thread.id", "value": {"stringValue": "synthetic-codex-0.157.1-session"}}
+            ]},
+            "scopeSpans": [{"spans": [{
+              "traceId": "11111111111111111111111111111111",
+              "spanId": "2222222222222222",
+              "name": "codex.synthetic_rollout_probe",
+              "startTimeUnixNano": "1790665300000000000",
+              "endTimeUnixNano": "1790665301000000000"
+            }]}]
+          }]
+        }
+      }
+    }
+  }
+}

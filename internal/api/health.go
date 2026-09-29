@@ -45,6 +45,7 @@ func newHandler(logger *slog.Logger, inspector *ingestInspector, repository stor
 	ingest := newOTLPHTTPIngest(inspector, repository)
 	cursorIngest := newCursorAgentIngest(inspector, repository)
 	transcriptIngest := newTranscriptIngest(ingest, repository)
+	rolloutIngest := newCodexRolloutIngest(ingest, repository)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", healthHandler(logger))
 	sessionAPI := newSessionAPI(sessions, thresholds)
@@ -74,6 +75,7 @@ func newHandler(logger *slog.Logger, inspector *ingestInspector, repository stor
 	mux.HandleFunc("POST /v1/logs", ingest.logsHandler)
 	mux.HandleFunc("POST /v1/cursor-agent", cursorIngest.handler)
 	mux.HandleFunc("POST /v1/claude/transcript", transcriptIngest.handler)
+	mux.HandleFunc("POST /v1/codex/rollout", rolloutIngest.handler)
 	mux.HandleFunc("GET /api/v1/ingest/counters", ingest.countersHandler)
 	if inspector != nil {
 		mux.HandleFunc("GET /api/v1/development/last-ingest", inspector.handler)
