@@ -157,7 +157,7 @@ The operation stats insight response (`GET /api/v1/insights/operations`) reads r
 
 The daemon opens the existing local SQLite repository at the platform
 configuration directory and reuses its installation-specific privacy salt.
-The API never reads raw intake payloads. Session endpoints require a bearer token; the auth-token CLI command deliberately prints the protected local token for dashboard setup. Health and OTLP intake remain unauthenticated, and the daemon remains loopback-only by default.
+The API never logs raw intake payloads. Session endpoints and Codex rollout intake require a bearer token; the auth-token CLI command deliberately prints the protected local token for dashboard setup. Health and OTLP intake remain unauthenticated for exporter compatibility, and the daemon remains loopback-only by default.
 
 Live OTLP persistence accepts `POST /v1/logs` (provider log events and reviewed Codex/Claude Code operation records), a
 `POST /v1/metrics` path that persists reviewed Codex `codex.skill.injected`,
@@ -176,3 +176,12 @@ evidence remains historical; 0.154.0 support is fixture-backed (#172).
 or `application/jsonl`, 32 MiB cap) and persists normalised `assistant_message`
 events correlated to the same provider-native session id as OTLP. Prompt/response
 and tool content bodies are not retained on this path.
+
+`POST /v1/codex/rollout` accepts authenticated Codex rollout JSONL with the same
+media types and 32 MiB cap. It persists every record under
+`provider_extensions.rollout`, correlates through the exact 0.157.1-observed
+`session_meta.payload.id`, and projects observed user/assistant message roles
+through the existing conversation response. Replay is idempotent. The route is
+excluded from development intake inspection and error responses never include
+rollout values. `telemetryiq import-codex-rollout --file <path>` is the supported
+loopback-only one-shot importer.

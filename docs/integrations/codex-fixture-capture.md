@@ -1,13 +1,13 @@
 # Codex Fixture Capture Procedure
 
-Task 006 defines the supported process for adding a Codex telemetry fixture. Fixtures are sensitive even when prompt and response capture is disabled.
+Task 006 defines the supported process for adding a Codex telemetry fixture. Fixtures are sensitive because local raw capture includes provider-emitted prompt, response, path, command, identity, and unknown-extension fields.
 
 ## Capture rules
 
 1. Use an isolated local test repository with synthetic prompts, source files, commands, and credentials only.
-2. Enable only the minimum supported local Codex telemetry export needed for the experiment. Never enable prompt, response, or source-code capture.
+2. Enable only the minimum supported local Codex telemetry export needed for the experiment. When testing raw rollout capture, use synthetic prompt, response, source, path, command, account, and email values rather than removing their fields.
 3. Record the Codex tool version and export format before copying an event into a temporary local file outside this repository.
-4. Remove prohibited fields and replace file paths, identifiers, and command arguments with synthetic values. Preserve unknown field names and structural shape where safe.
+4. Replace every real or secret-bearing value with an obvious synthetic value while preserving provider field names, nesting, types, and unknown structure. Do not use sanitisation as evidence that the local ingest path drops a field.
 5. Add fixture metadata: fixture_version, fixture_origin, provider, tool, tool_version, RFC3339 captured_at, and sanitisation_reviewed true.
 6. Run the validator and a second human review before staging the file. Never commit the original capture.
 
@@ -22,8 +22,9 @@ The checked-in fixture is deliberately synthetic. It documents the wrapper forma
 The local receiver accepts Codex OTLP logs at `http://127.0.0.1:8080/v1/logs`
 and skill-relevant OTLP metrics at `http://127.0.0.1:8080/v1/metrics`. Use
 `test-harness/codex-otel-config.toml` only in an isolated temporary Codex home
-with a synthetic repository. It keeps prompt logging disabled and selects the
-JSON protocol required by the current receiver.
+with a synthetic repository. The template keeps OTLP prompt logging disabled and
+selects the JSON protocol required by the current receiver; rollout probes may
+enable synthetic prompt logging in the isolated copy only.
 
 Start the receiver, copy the template to the temporary home as `config.toml`,
 then run one synthetic Codex session with that home. Confirm the accepted ingest
@@ -52,6 +53,21 @@ exporter flushes. The 0.154.0 capture produced both JSON and protobuf from
 `codex_exec`; interactive Codex flushed multiple protobuf batches. Never commit
 the raw bodies or copied authentication material. Reduce the capture to a
 reviewed structural fixture with synthetic identifiers and values.
+
+## Rollout JSONL capture
+
+Issue #232 captured Codex CLI 0.157.1 with a temporary `CODEX_HOME`, synthetic
+Git repository, and raw loopback receiver for `/v1/logs`, `/v1/metrics`, and
+`/v1/traces`. After a graceful `codex exec` shutdown, the generated rollout
+`session_meta.payload.id` exactly matched OTLP `conversation.id` and `thread.id`.
+The metric surface emitted no session dimension; it must remain observation-only.
+
+The reviewed fixture is
+`fixtures/codex/observed-sanitised/codex-0.157.1-rollout-synchronised.json`.
+It preserves representative session metadata, content messages, world state,
+turn context, tool call/result, token usage, lifecycle, and unknown record
+shapes with synthetic values. The local route accepts the original NDJSON, not
+the metadata wrapper; tests reconstruct NDJSON from `payload.rollout_records`.
 
 Committed evidence:
 
@@ -125,7 +141,7 @@ The run covered `codex_exec` and a PTY-backed `codex_cli_rs` session. The nested
 
 ## Review checklist
 
-- Confirm prompts, responses, source code, paths, command arguments, account identifiers, and credentials are absent.
-- Confirm remaining values are synthetic or structurally necessary telemetry metadata.
+- Confirm every committed value is synthetic and no real credential or account value survives.
+- Confirm prompt, response, source, path, command, and identity field names and shapes remain represented when observed.
 - Confirm unknown fields have not been silently discarded.
 - Run go test ./internal/fixture and the repository security scan before commit.

@@ -33,6 +33,7 @@ Secure cookie over local HTTP). The daemon exposes HTML dashboard routes plus
 `GET /api/v1/health`, `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}`,
 `DELETE /api/v1/sessions/{id}`, `DELETE /api/v1/sessions`, `POST /v1/logs`,
 `POST /v1/traces`, `POST /v1/metrics`, `POST /v1/claude/transcript`,
+`POST /v1/codex/rollout`,
 `POST /v1/cursor-agent`, and `GET /api/v1/ingest/counters`.
 
 ## OTLP/HTTP ingest
@@ -101,6 +102,18 @@ TELEMETRYIQ_DAEMON=http://localhost:8080 scripts/cursor-agent-tiq "say ok"
 ```
 
 ## Codex fixture normalisation
+
+Authenticated Codex CLI 0.157.1 rollout import is available with:
+
+```bash
+telemetryiq import-codex-rollout --file /path/to/rollout.jsonl
+```
+
+The importer accepts only an explicit loopback daemon endpoint, loads the local
+API token without placing it on the command line, and sends the original NDJSON
+to `POST /v1/codex/rollout`. Rollout user/assistant messages appear through the
+existing conversation API; all record types and unknown fields remain retained
+under provider extensions and merge with OTLP only by the exact provider ID.
 
 The Codex adapter supports the observed Codex CLI 0.154.0 trace surface and the
 observed Codex CLI 0.145.0 OTLP log shape. It retains model and available token metadata, uses the

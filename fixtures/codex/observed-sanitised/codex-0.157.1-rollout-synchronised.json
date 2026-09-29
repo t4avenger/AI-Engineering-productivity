@@ -1,0 +1,170 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "openai",
+  "tool": "codex",
+  "tool_version": "0.157.1",
+  "captured_at": "2026-09-29T07:03:00Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "capture_id": "synthetic-codex-0.157.1-capture",
+    "correlation": {
+      "rollout_session_meta_id": "synthetic-codex-0.157.1-session",
+      "otlp_log_conversation_id": "synthetic-codex-0.157.1-session",
+      "otlp_trace_thread_id": "synthetic-codex-0.157.1-session",
+      "metric_session_dimension": "not_emitted"
+    },
+    "otlp_surfaces": {
+      "logs": {
+        "endpoint": "/v1/logs",
+        "content_type": "application/json",
+        "observed": true,
+        "payload": {
+          "resourceLogs": [{
+            "resource": {"attributes": [
+              {"key": "service.name", "value": {"stringValue": "codex_cli_rs"}},
+              {"key": "service.version", "value": {"stringValue": "0.157.1"}}
+            ]},
+            "scopeLogs": [{"logRecords": [{
+              "timeUnixNano": "1790665300000000000",
+              "body": {"stringValue": "synthetic rollout probe"},
+              "attributes": [
+                {"key": "event.name", "value": {"stringValue": "codex.synthetic_rollout_probe"}},
+                {"key": "conversation.id", "value": {"stringValue": "synthetic-codex-0.157.1-session"}}
+              ]
+            }]}]
+          }]
+        }
+      },
+      "metrics": {
+        "endpoint": "/v1/metrics",
+        "content_type": "application/json",
+        "observed": true,
+        "payload": {
+          "resourceMetrics": [{
+            "resource": {"attributes": [
+              {"key": "service.name", "value": {"stringValue": "codex_cli_rs"}},
+              {"key": "service.version", "value": {"stringValue": "0.157.1"}}
+            ]},
+            "scopeMetrics": [{"metrics": [{
+              "name": "codex.turn.count",
+              "sum": {"dataPoints": [{
+                "asInt": "1",
+                "attributes": [{"key": "model", "value": {"stringValue": "synthetic-model"}}]
+              }]}
+            }]}]
+          }]
+        }
+      },
+      "traces": {
+        "endpoint": "/v1/traces",
+        "content_type": "application/json",
+        "observed": true,
+        "payload": {
+          "resourceSpans": [{
+            "resource": {"attributes": [
+              {"key": "service.name", "value": {"stringValue": "codex_cli_rs"}},
+              {"key": "service.version", "value": {"stringValue": "0.157.1"}},
+              {"key": "thread.id", "value": {"stringValue": "synthetic-codex-0.157.1-session"}}
+            ]},
+            "scopeSpans": [{"spans": [{
+              "traceId": "11111111111111111111111111111111",
+              "spanId": "2222222222222222",
+              "name": "codex.synthetic_rollout_probe",
+              "startTimeUnixNano": "1790665300000000000",
+              "endTimeUnixNano": "1790665301000000000"
+            }]}]
+          }]
+        }
+      }
+    },
+    "rollout_records": [
+      {
+        "ordinal": 0,
+        "timestamp": "2026-09-29T07:01:40.785Z",
+        "type": "session_meta",
+        "payload": {
+          "id": "synthetic-codex-0.157.1-session",
+          "cli_version": "0.157.1",
+          "creator_user_id": "synthetic-user",
+          "creator_account_id": "synthetic-account",
+          "cwd": "/tmp/synthetic-codex-workspace",
+          "source": "exec",
+          "model_provider": "openai",
+          "unknown_session_field": {"retained": true}
+        }
+      },
+      {
+        "ordinal": 1,
+        "timestamp": "2026-09-29T07:01:40.800Z",
+        "type": "event_msg",
+        "payload": {"type": "task_started", "turn_id": "synthetic-turn-1", "model_context_window": 400000}
+      },
+      {
+        "ordinal": 2,
+        "timestamp": "2026-09-29T07:01:43.115Z",
+        "type": "response_item",
+        "payload": {
+          "type": "message",
+          "id": "synthetic-user-message-1",
+          "role": "user",
+          "content": [{"type": "input_text", "text": "append synthetic rollout evidence"}],
+          "unknown_message_field": "retained-user-field"
+        }
+      },
+      {
+        "ordinal": 3,
+        "timestamp": "2026-09-29T07:01:43.120Z",
+        "type": "world_state",
+        "payload": {"full": true, "state": {"cwd": "/tmp/synthetic-codex-workspace", "git_branch": "main"}}
+      },
+      {
+        "ordinal": 4,
+        "timestamp": "2026-09-29T07:01:43.229Z",
+        "type": "turn_context",
+        "payload": {"cwd": "/tmp/synthetic-codex-workspace", "approval_policy": "on-request", "sandbox_policy": "workspace-write"}
+      },
+      {
+        "ordinal": 5,
+        "timestamp": "2026-09-29T07:01:46.209Z",
+        "type": "response_item",
+        "payload": {
+          "type": "message",
+          "id": "synthetic-assistant-message-1",
+          "role": "assistant",
+          "content": [{"type": "output_text", "text": "I will update the synthetic file."}]
+        }
+      },
+      {
+        "ordinal": 6,
+        "timestamp": "2026-09-29T07:01:47.000Z",
+        "type": "response_item",
+        "payload": {"type": "custom_tool_call", "id": "synthetic-tool-call-1", "call_id": "synthetic-call-1", "name": "exec", "input": "printf synthetic >> probe.txt"}
+      },
+      {
+        "ordinal": 7,
+        "timestamp": "2026-09-29T07:01:47.100Z",
+        "type": "response_item",
+        "payload": {"type": "custom_tool_call_output", "id": "synthetic-tool-output-1", "call_id": "synthetic-call-1", "output": "Process exited with code 0"}
+      },
+      {
+        "ordinal": 8,
+        "timestamp": "2026-09-29T07:01:48.000Z",
+        "type": "token_usage_record",
+        "payload": {"session_id": "synthetic-codex-0.157.1-session", "thread_id": "synthetic-codex-0.157.1-session", "input_tokens": 9007199254740993, "output_tokens": 42}
+      },
+      {
+        "ordinal": 9,
+        "timestamp": "2026-09-29T07:02:32.200Z",
+        "type": "event_msg",
+        "payload": {"type": "task_complete", "turn_id": "synthetic-turn-1", "last_agent_message": "I updated the synthetic file."}
+      },
+      {
+        "ordinal": 10,
+        "timestamp": "2026-09-29T07:02:32.300Z",
+        "type": "future_provider_record",
+        "payload": {"future_shape": {"nested": [1, "two", true]}, "unknown_flag": true}
+      }
+    ]
+  }
+}

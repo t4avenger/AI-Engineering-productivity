@@ -16,7 +16,7 @@ func TestProjectPreservesContentAvailabilityWithoutInventingMessages(t *testing.
 		contentEvent("body-ref", "api_request_body", at.Add(3*time.Second), map[string]any{"body_ref": "local/body.json"}),
 		contentEvent("body", "api_response_body", at.Add(4*time.Second), map[string]any{"body": "raw provider response"}),
 		contentEvent("absent", "assistant_response", at.Add(5*time.Second), map[string]any{}),
-		{EventID: "other-provider", EventType: "user_prompt", Provider: "openai", Tool: "codex"},
+		{EventID: "other-provider", EventType: "user_prompt", Provider: "cursor", Tool: "cursor"},
 	}
 
 	records := Project(events)
@@ -32,9 +32,9 @@ func TestProjectPreservesContentAvailabilityWithoutInventingMessages(t *testing.
 }
 
 // TestIsConversationEventGuardsProviderAndTool proves the shared eligibility
-// predicate applies the same provider/tool guard as Project, so a non-Claude
-// event carrying a generic user_prompt/assistant_response type is NOT treated as
-// a conversation event. This keeps the session-availability conversation signal
+// predicate applies the same provider/tool guard as Project. Claude and Codex
+// retained content events are eligible; unrelated providers carrying a generic
+// event type are not. This keeps the session-availability conversation signal
 // aligned with what the conversation endpoint actually emits.
 func TestIsConversationEventGuardsProviderAndTool(t *testing.T) {
 	tests := []struct {
@@ -43,7 +43,8 @@ func TestIsConversationEventGuardsProviderAndTool(t *testing.T) {
 		want  bool
 	}{
 		{name: "claude content event", event: canonical.Event{Provider: "anthropic", Tool: "claude-code", EventType: "user_prompt"}, want: true},
-		{name: "non-claude content event", event: canonical.Event{Provider: "openai", Tool: "codex", EventType: "user_prompt"}, want: false},
+		{name: "codex content event", event: canonical.Event{Provider: "openai", Tool: "codex", EventType: "user_prompt"}, want: true},
+		{name: "unrelated provider content event", event: canonical.Event{Provider: "cursor", Tool: "cursor", EventType: "user_prompt"}, want: false},
 		{name: "claude non-content event", event: canonical.Event{Provider: "anthropic", Tool: "claude-code", EventType: "api_request"}, want: false},
 	}
 	for _, test := range tests {

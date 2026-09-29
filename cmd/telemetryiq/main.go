@@ -21,7 +21,7 @@ import (
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	if authTokenCommand(logger, os.Args[1:]) {
+	if localCommand(logger, os.Args[1:]) {
 		return
 	}
 

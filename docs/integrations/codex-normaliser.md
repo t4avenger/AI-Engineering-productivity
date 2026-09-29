@@ -1,5 +1,23 @@
 # Codex Normaliser
 
+## Rollout JSONL
+
+`codex.NormalizeRollout` ingests the observed Codex CLI 0.157.1 on-disk JSONL
+surface through authenticated `POST /v1/codex/rollout`. Every valid record is
+retained verbatim under `provider_extensions.rollout.record`, including unknown
+record types and fields. The adapter maps only observed `response_item` message
+roles to `user_prompt` and `assistant_response`; other records keep the
+provider's type as `codex.rollout.<type>` without inferred lifecycle, tool, plan,
+reasoning, or governance semantics.
+
+The exact `session_meta.payload.id` is normalized to `codex:<id>`. A synchronized
+0.157.1 capture proves that identifier equals OTLP `conversation.id` and
+`thread.id`; no time, model, content, or ordering join is permitted. Provider
+record IDs are used for event identity when present. Records without one use a
+deterministic session/line/raw-record digest only for replay identity while the
+raw record remains unchanged. The parser uses `json.Number`, so large provider
+numbers do not pass through `float64`.
+
 `codex.NormalizeTraces` ingests the observed Codex CLI 0.154.0 OTLP trace
 surface from `codex_exec` and `codex_cli_rs`. Both OTLP/HTTP JSON and binary
 protobuf feed the same adapter. Recognized resources are hard-fail normalized:
@@ -103,8 +121,9 @@ under session `provider_extensions.resource_attributes`, while session attribute
 `service_name`, `service_version`, and the normalized entrypoint
 (`codex_cli_rs` -> `interactive`, `codex_exec` -> `codex exec`) for the sessions
 evidence browser. Log-derived sessions and Codex CLI 0.155.1 traces carrying the observed resource-level `conversation.id` get `session_id_source=conversation.id`; reviewed `session_task.turn` spans carrying `thread.id` retain `session_id_source=thread.id`. Content-derived metrics and traces without an exact provider key do not.
-Prompt/response/source-code content is not captured by
-default; its configurable capture is tracked in #94.
+The OTLP adapter captures only fields present on OTLP. Raw rollout ingestion is
+the complementary local-only content surface and retains provider-emitted
+prompt/response/source/path/command/identity fields under the rollout extension.
 
 ## Model-interaction records
 
