@@ -28,6 +28,22 @@ const (
 		`{"timestamp":"2026-09-29T07:01:44Z","type":"future_provider_record","payload":{"unknown_flag":true,"future_shape":{"retained":"synthetic-api-value"}}}` + "\n"
 )
 
+type synchronizedRolloutTraceFixture struct {
+	Payload synchronizedRolloutCapture `json:"payload"`
+}
+
+type synchronizedRolloutCapture struct {
+	OTLPSurfaces synchronizedRolloutOTLPSurfaces `json:"otlp_surfaces"`
+}
+
+type synchronizedRolloutOTLPSurfaces struct {
+	Traces synchronizedRolloutTraceSurface `json:"traces"`
+}
+
+type synchronizedRolloutTraceSurface struct {
+	Payload json.RawMessage `json:"payload"`
+}
+
 func TestCodexRolloutImportMergesIdempotentlyAndProjectsConversation(t *testing.T) {
 	repository, server := authenticatedRolloutTestServer(t)
 	postAcceptedOTLP(t, server.URL, "/v1/logs", rolloutOTLPLog)
@@ -123,15 +139,7 @@ func synchronizedRolloutTracePayload(t *testing.T) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var fixture struct {
-		Payload struct {
-			OTLPSurfaces struct {
-				Traces struct {
-					Payload json.RawMessage `json:"payload"`
-				} `json:"traces"`
-			} `json:"otlp_surfaces"`
-		} `json:"payload"`
-	}
+	var fixture synchronizedRolloutTraceFixture
 	if err := json.Unmarshal(data, &fixture); err != nil {
 		t.Fatal(err)
 	}
