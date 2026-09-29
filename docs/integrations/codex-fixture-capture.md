@@ -63,11 +63,13 @@ Git repository, and raw loopback receiver for `/v1/logs`, `/v1/metrics`, and
 The metric surface emitted no session dimension; it must remain observation-only.
 
 The reviewed fixture is
-`fixtures/codex/observed-sanitised/codex-0.157.1-rollout-synchronised.json`.
-It preserves representative session metadata, content messages, world state,
-turn context, tool call/result, token usage, lifecycle, and unknown record
-shapes with synthetic values. The local route accepts the original NDJSON, not
-the metadata wrapper; tests reconstruct NDJSON from `payload.rollout_records`.
+`fixtures/codex/observed-sanitised/codex-0.157.1-rollout-synchronised.json`,
+with the native record stream in the sibling `.jsonl` file. The sidecar preserves
+capture/correlation metadata plus synchronized OTLP shapes; the JSONL preserves
+representative session metadata, content messages, world state, turn context,
+tool call/result, token usage, lifecycle, and unknown records with synthetic
+values. Both files run through fixture validation, and the local route/test path
+uses the native NDJSON directly.
 
 Committed evidence:
 

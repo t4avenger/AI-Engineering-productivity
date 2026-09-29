@@ -13,12 +13,6 @@ import (
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
-type rolloutFixture struct {
-	Payload struct {
-		Records []json.RawMessage `json:"rollout_records"`
-	} `json:"payload"`
-}
-
 type rolloutGoldenProjection struct {
 	EventCount    int      `json:"event_count"`
 	SessionID     string   `json:"session_id"`
@@ -91,22 +85,11 @@ func FuzzNormalizeRollout(f *testing.F) {
 
 func rolloutFixtureNDJSON(t testing.TB) []byte {
 	t.Helper()
-	var fixture rolloutFixture
-	raw, err := os.ReadFile(filepath.Join(codexFixturesDir(t), "observed-sanitised", "codex-0.157.1-rollout-synchronised.json"))
+	raw, err := os.ReadFile(filepath.Join(codexFixturesDir(t), "observed-sanitised", "codex-0.157.1-rollout-synchronised.jsonl"))
 	if err != nil {
 		t.Fatalf("read rollout fixture: %v", err)
 	}
-	if err := json.Unmarshal(raw, &fixture); err != nil {
-		t.Fatalf("decode rollout fixture: %v", err)
-	}
-	var data bytes.Buffer
-	for _, record := range fixture.Payload.Records {
-		if err := json.Compact(&data, record); err != nil {
-			t.Fatalf("compact rollout record: %v", err)
-		}
-		data.WriteByte('\n')
-	}
-	return data.Bytes()
+	return raw
 }
 
 func projectRolloutGolden(events []canonical.Event) rolloutGoldenProjection {
@@ -126,6 +109,12 @@ func assertRolloutContentAndUnknownFields(t *testing.T, events []canonical.Event
 	t.Helper()
 	var user, assistant, future *canonical.Event
 	for index := range events {
+		if events[index].ActorID != "codex:synthetic-user" {
+			t.Fatalf("actor id = %q, want namespaced provider identity", events[index].ActorID)
+		}
+		if events[index].PrivacyLevel != "governed-content" {
+			t.Fatalf("privacy level = %q, want governed-content", events[index].PrivacyLevel)
+		}
 		switch events[index].EventType {
 		case "user_prompt":
 			user = &events[index]

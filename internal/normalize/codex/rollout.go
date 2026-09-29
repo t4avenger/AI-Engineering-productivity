@@ -148,7 +148,7 @@ func (metadata *rolloutMetadata) observeSessionMeta(record map[string]any) error
 		metadata.sourceVersion = version
 	}
 	if actorID, ok := normalize.ObservedString(payload["creator_user_id"]); ok {
-		metadata.actorID = actorID
+		metadata.actorID = normalize.ProviderNativeSessionID(codexSessionPrefix, actorID)
 	}
 	return nil
 }
@@ -181,7 +181,7 @@ func rolloutEvent(record rolloutRecord, metadata rolloutMetadata, receivedAt tim
 		ActorID:            metadata.actorID,
 		DeviceID:           unavailable,
 		SessionID:          normalize.ProviderNativeSessionID(codexSessionPrefix, metadata.sessionID),
-		PrivacyLevel:       "content",
+		PrivacyLevel:       "governed-content",
 		Attributes:         map[string]any{"unavailable_fields": []string{}},
 		ProviderExtensions: extensions,
 	}

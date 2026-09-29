@@ -57,6 +57,23 @@ func TestCanonicalEventAcceptsProviderExtensions(t *testing.T) {
 	}
 }
 
+func TestCanonicalEventContentPrivacyLevel(t *testing.T) {
+	root := repositoryRoot(t)
+	schema, err := jsonschema.NewCompiler().Compile(filepath.Join(root, "schemas", "canonical-event.schema.json"))
+	if err != nil {
+		t.Fatalf("compile schema: %v", err)
+	}
+	event := readJSON(t, filepath.Join(root, "fixtures", "schemas", "valid", "canonical-event.json")).(map[string]any)
+	event["privacy_level"] = "governed-content"
+	if err := schema.Validate(event); err != nil {
+		t.Fatalf("governed content event must validate: %v", err)
+	}
+	event["privacy_level"] = "content"
+	if err := schema.Validate(event); err == nil {
+		t.Fatal("unrecognised content privacy level must fail validation")
+	}
+}
+
 func TestCanonicalEventAcceptsCodexNormaliserGoldenFixture(t *testing.T) {
 	t.Parallel()
 

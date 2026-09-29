@@ -2,9 +2,11 @@
 package fixture
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"regexp"
 	"sort"
@@ -30,6 +32,33 @@ func Validate(data []byte) error {
 		return err
 	}
 	return scan(document, "")
+}
+
+// ValidateNDJSON scans native newline-delimited provider evidence. Metadata for
+// the capture remains in its reviewed JSON sidecar; every record here still
+// receives the same prohibited-field and likely-secret validation as JSON
+// fixture payloads.
+func ValidateNDJSON(data []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	count := 0
+	for {
+		var record map[string]any
+		if err := decoder.Decode(&record); err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return fmt.Errorf("NDJSON fixture record %d must be valid JSON", count+1)
+		}
+		count++
+		if err := scan(record, fmt.Sprintf("record[%d]", count-1)); err != nil {
+			return err
+		}
+	}
+	if count == 0 {
+		return errors.New("NDJSON fixture must contain at least one record")
+	}
+	return nil
 }
 
 func validateMetadata(document map[string]any) error {
