@@ -34,6 +34,7 @@ type resourceMetric struct {
 		Attributes []attribute `json:"attributes"`
 	} `json:"resource"`
 	ScopeMetrics []scopeMetric `json:"scopeMetrics"`
+	raw          map[string]any
 }
 
 type scopeMetric struct {
@@ -42,12 +43,14 @@ type scopeMetric struct {
 		Attributes []attribute `json:"attributes"`
 	} `json:"scope"`
 	Metrics []otlpMetric `json:"metrics"`
+	raw     map[string]any
 }
 
 type otlpMetric struct {
 	Name      string           `json:"name"`
 	Sum       *metricSum       `json:"sum"`
 	Histogram *metricHistogram `json:"histogram"`
+	raw       map[string]any
 }
 
 type metricSum struct {
@@ -59,6 +62,7 @@ type metricDataPoint struct {
 	AsInt             any         `json:"asInt"`
 	TimeUnixNano      string      `json:"timeUnixNano"`
 	StartTimeUnixNano string      `json:"startTimeUnixNano"`
+	raw               map[string]any
 }
 
 type metricHistogram struct {
@@ -70,6 +74,67 @@ type histogramDataPoint struct {
 	Count        any         `json:"count"`
 	Sum          any         `json:"sum"`
 	TimeUnixNano string      `json:"timeUnixNano"`
+	raw          map[string]any
+}
+
+func (value *resourceMetric) UnmarshalJSON(data []byte) error {
+	type decoded resourceMetric
+	var typed decoded
+	raw, err := decodeRawJSONObject(data, &typed)
+	if err != nil {
+		return err
+	}
+	*value = resourceMetric(typed)
+	value.raw = raw
+	return nil
+}
+
+func (value *scopeMetric) UnmarshalJSON(data []byte) error {
+	type decoded scopeMetric
+	var typed decoded
+	raw, err := decodeRawJSONObject(data, &typed)
+	if err != nil {
+		return err
+	}
+	*value = scopeMetric(typed)
+	value.raw = raw
+	return nil
+}
+
+func (value *otlpMetric) UnmarshalJSON(data []byte) error {
+	type decoded otlpMetric
+	var typed decoded
+	raw, err := decodeRawJSONObject(data, &typed)
+	if err != nil {
+		return err
+	}
+	*value = otlpMetric(typed)
+	value.raw = raw
+	return nil
+}
+
+func (value *metricDataPoint) UnmarshalJSON(data []byte) error {
+	type decoded metricDataPoint
+	var typed decoded
+	raw, err := decodeRawJSONObject(data, &typed)
+	if err != nil {
+		return err
+	}
+	*value = metricDataPoint(typed)
+	value.raw = raw
+	return nil
+}
+
+func (value *histogramDataPoint) UnmarshalJSON(data []byte) error {
+	type decoded histogramDataPoint
+	var typed decoded
+	raw, err := decodeRawJSONObject(data, &typed)
+	if err != nil {
+		return err
+	}
+	*value = histogramDataPoint(typed)
+	value.raw = raw
+	return nil
 }
 
 // NormalizeMetrics maps reviewed Codex OTLP metrics into canonical events.
@@ -112,10 +177,29 @@ func skillEventsFromResource(resource resourceMetric, receivedAt time.Time) ([]c
 			if err != nil {
 				return nil, err
 			}
+			for index := range extracted {
+				extracted[index].ProviderExtensions["scope"] = map[string]any{
+					"name":       scope.Scope.Name,
+					"attributes": rawCodexAttributes(attributes(scope.Scope.Attributes)),
+				}
+				extracted[index].ProviderExtensions["resource_metric"] = rawObjectWithout(resource.raw, "scopeMetrics")
+				extracted[index].ProviderExtensions["scope_metric"] = rawObjectWithout(scope.raw, "metrics")
+				extracted[index].ProviderExtensions["metric_envelope"] = rawMetricEnvelope(item.raw)
+			}
 			events = append(events, extracted...)
 		}
 	}
 	return events, nil
+}
+
+func rawMetricEnvelope(raw map[string]any) map[string]any {
+	envelope := rawObjectWithout(raw, "sum", "histogram")
+	for _, instrument := range []string{"sum", "histogram"} {
+		if fields, ok := raw[instrument].(map[string]any); ok {
+			envelope[instrument] = rawObjectWithout(fields, "dataPoints")
+		}
+	}
+	return envelope
 }
 
 func skillEventsFromMetric(resourceAttrs map[string]any, scopeID string, version string, item otlpMetric, receivedAt time.Time) ([]canonical.Event, error) {
@@ -164,10 +248,10 @@ func tokenUsageEvent(resource map[string]any, scopeID string, version string, po
 	}
 	occurredAt := metricTime(point.TimeUnixNano, receivedAt)
 	model, modelObserved := normalize.ObservedString(fields["model"])
-	safeResource := safeCodexMetricAttributes(normalize.UnknownFields(resource, serviceNameAttribute, serviceVersionAttribute))
-	safeFields := safeCodexMetricAttributes(normalize.UnknownFields(fields, "model", "token_type"))
-	identity := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d", turnTokenUsageMetric, model, tokenType, point.TimeUnixNano, metricResourceIdentity(resource, safeResource), scopeID, index, *tokens)
-	identity += "|" + stableJSON(safeFields)
+	identityResource := codexMetricIdentityAttributes(normalize.UnknownFields(resource, serviceNameAttribute, serviceVersionAttribute))
+	identityFields := codexMetricIdentityAttributes(normalize.UnknownFields(fields, "model", "token_type"))
+	identity := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d", turnTokenUsageMetric, model, tokenType, point.TimeUnixNano, metricResourceIdentity(resource, identityResource), scopeID, index, *tokens)
+	identity += "|" + stableJSON(identityFields)
 	eventID := contentID("codex:token:", []byte(identity))
 
 	attributes := map[string]any{
@@ -184,24 +268,27 @@ func tokenUsageEvent(resource map[string]any, scopeID string, version string, po
 			"token_type": tokenType,
 			"count":      metricCount(point.Count),
 		},
-		"resource":          safeResource,
-		"metric_attributes": safeFields,
+		"datapoint":         point.raw,
+		"resource":          rawCodexAttributes(resource),
+		"metric_attributes": rawCodexAttributes(fields),
 	}
-	return tokenEvent(eventID, occurredAt, receivedAt, version, attributes, extensions), true
+	event := tokenEvent(eventID, occurredAt, receivedAt, version, attributes, extensions)
+	applyCodexEnvironment(&event, fields, resource)
+	return event, true
 }
 
 func metricScopeIdentity(scope scopeMetric) string {
 	return stableJSON(map[string]any{
 		"name":       scope.Scope.Name,
-		"attributes": safeCodexMetricAttributes(attributes(scope.Scope.Attributes)),
+		"attributes": codexMetricIdentityAttributes(attributes(scope.Scope.Attributes)),
 	})
 }
 
-func metricResourceIdentity(resource map[string]any, safeResource map[string]any) string {
+func metricResourceIdentity(resource, identityResource map[string]any) string {
 	return stableJSON(map[string]any{
 		"service.name":    stringValue(resource[serviceNameAttribute], ""),
 		"service.version": stringValue(resource[serviceVersionAttribute], ""),
-		"resource":        safeResource,
+		"resource":        identityResource,
 	})
 }
 
@@ -213,7 +300,10 @@ func stableJSON(value any) string {
 	return string(data)
 }
 
-func safeCodexMetricAttributes(fields map[string]any) map[string]any {
+// codexMetricIdentityAttributes is the historical allow-list used only to keep
+// metric event IDs stable. It is not a retention filter: complete resource and
+// datapoint attributes are persisted in provider extensions.
+func codexMetricIdentityAttributes(fields map[string]any) map[string]any {
 	allowed := map[string]struct{}{
 		"app.version":            {},
 		"auth_mode":              {},
@@ -222,13 +312,13 @@ func safeCodexMetricAttributes(fields map[string]any) map[string]any {
 		"session_source":         {},
 		"tmp_mem_enabled":        {},
 	}
-	safe := make(map[string]any)
+	identity := make(map[string]any)
 	for key, value := range fields {
 		if _, ok := allowed[strings.ToLower(strings.TrimSpace(key))]; ok {
-			safe[key] = value
+			identity[key] = value
 		}
 	}
-	return safe
+	return identity
 }
 
 func tokenUsageAttribute(tokenType string) (string, bool) {
@@ -301,13 +391,17 @@ func skillTurnEvent(resource map[string]any, version string, point histogramData
 			"name":  skillTurnDurationMetric,
 			"count": metricCount(point.Count),
 		},
-		"resource": normalize.UnknownFields(resource, serviceNameAttribute, serviceVersionAttribute),
+		"datapoint":         point.raw,
+		"resource":          rawCodexAttributes(resource),
+		"metric_attributes": rawCodexAttributes(fields),
 		"skill_turn": map[string]any{
 			"outcome":   mapSkillStatus(stringValue(fields["status"], "")),
 			"plugin_id": stringValue(fields["plugin_id"], unavailable),
 		},
 	}
-	return skillEvent(eventID, skillTurnDurationMetric, occurredAt, receivedAt, version, extensions)
+	event := skillEvent(eventID, skillTurnDurationMetric, occurredAt, receivedAt, version, extensions)
+	applyCodexEnvironment(&event, fields, resource)
+	return event
 }
 
 func skillInjectedEvent(resource map[string]any, version string, point metricDataPoint, index int, receivedAt time.Time) (canonical.Event, bool, error) {
@@ -329,10 +423,14 @@ func skillInjectedEvent(resource map[string]any, version string, point metricDat
 			"name":  skillInjectedMetric,
 			"count": metricCount(point.AsInt),
 		},
-		"resource": normalize.UnknownFields(resource, serviceNameAttribute, serviceVersionAttribute),
+		"datapoint":         point.raw,
+		"resource":          rawCodexAttributes(resource),
+		"metric_attributes": rawCodexAttributes(fields),
 	}
 
-	return skillEvent(eventID, skillInjectedMetric, occurredAt, receivedAt, version, extensions), true, nil
+	event := skillEvent(eventID, skillInjectedMetric, occurredAt, receivedAt, version, extensions)
+	applyCodexEnvironment(&event, fields, resource)
+	return event, true, nil
 }
 
 func skillEvent(eventID, eventType string, occurredAt, receivedAt time.Time, version string, extensions map[string]any) canonical.Event {

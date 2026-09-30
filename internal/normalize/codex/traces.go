@@ -113,7 +113,7 @@ func normalizeLiveTraceSpan(resource, scope, span, resourceAttributes map[string
 	attributes := codexTraceAttributes(spanAttributes)
 	sessionID, sessionIDSource := codexTraceSessionIdentity(resourceAttributes, spanAttributes, fields.traceID)
 
-	return canonical.Event{
+	event := canonical.Event{
 		SchemaVersion: canonicalSchemaVersion,
 		EventID:       fields.eventID,
 		EventType:     fields.name,
@@ -136,7 +136,9 @@ func normalizeLiveTraceSpan(resource, scope, span, resourceAttributes map[string
 			"span":                normalize.UnknownFields(span, "traceId", "spanId", "parentSpanId", "name", "startTimeUnixNano", "attributes"),
 			"span_attributes":     spanAttributes,
 		},
-	}, nil
+	}
+	applyCodexEnvironment(&event, spanAttributes, resourceAttributes)
+	return event, nil
 }
 
 // codexTraceSessionIdentity promotes only reviewed provider-emitted identity

@@ -403,6 +403,28 @@ func TestPersistenceStoresEventRaw(t *testing.T) {
 	}
 }
 
+func TestDiagnosticSummaryDoesNotReadRawEventJSON(t *testing.T) {
+	repo, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = repo.Close() }()
+	input := event(t, "event-diagnostic", "session-diagnostic", "session.created", "2026-01-02T09:00:00Z")
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{input}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.db.Exec("UPDATE events SET event_json='deliberately not JSON' WHERE event_id=?", input.EventID); err != nil {
+		t.Fatal(err)
+	}
+	summary, err := repo.DiagnosticSummary(context.Background())
+	if err != nil {
+		t.Fatalf("diagnostic summary must use denormalized columns: %v", err)
+	}
+	if len(summary.ProviderTools) != 1 || summary.ProviderTools[0].Provider != input.Provider || summary.ProviderTools[0].Tool != input.Tool {
+		t.Fatalf("provider/tool counts = %#v", summary.ProviderTools)
+	}
+}
+
 func TestPersistenceClearsCompletionForLaterActiveEvent(t *testing.T) {
 	repo, err := Open(":memory:")
 	if err != nil {

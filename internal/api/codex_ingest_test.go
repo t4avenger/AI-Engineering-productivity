@@ -132,11 +132,12 @@ func assertCodexTraceStorage(t *testing.T, repository storage.Repository, sessio
 
 // TestCodexLogsIngestEndToEnd is the Codex counterpart of the Claude live gate:
 // POST a raw OTLP log payload to /v1/logs, then prove the HTTP read API serves
-// the resulting session (tool, model) without leaking identity or secrets.
+// the resulting session and raw retained evidence. Diagnostic non-leakage is
+// covered independently by the diagnostic preview/export tests.
 func TestCodexLogsIngestEndToEnd(t *testing.T) {
 	server, repository := newPersistentTestServer(t)
 	postCodexSessionAndMetrics(t, server)
-	sessions := assertCodexPrimarySession(t, server)
+	assertCodexPrimarySession(t, server)
 	assertCodexSessionTimeline(t, server)
 	assertCodexTokenObservations(t, server)
 
@@ -146,14 +147,34 @@ func TestCodexLogsIngestEndToEnd(t *testing.T) {
 		"synthetic@example.test",
 		"synthetic body",
 	}
-	assertNoRawIdentifiers(t, canaries, marshalJSON(t, sessions))
-
 	stored, err := repository.ListEvents(t.Context(), storage.EventFilter{SessionID: "codex:synthetic-conversation", Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertNoRawIdentifiers(t, canaries, marshalJSON(t, stored))
-	assertRawToolEvidence(t, marshalJSON(t, stored), "tiq-canary-argument-token", "tiq-canary-output")
+	retained := append(canaries, "tiq-canary-argument-token", "tiq-canary-output")
+	assertContainsAll(t, retained, marshalJSON(t, stored))
+	assertContainsAll(t, retained, marshalJSON(t, fetchCodexEventDetail(t, server.URL, stored[0])))
+}
+
+func fetchCodexEventDetail(t *testing.T, serverURL string, event canonical.Event) eventDetailResponse {
+	t.Helper()
+	response, err := http.Get(serverURL + "/api/v1/sessions/" + event.SessionID + "/events/" + event.EventID + "?expand=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			t.Errorf("close event detail response: %v", err)
+		}
+	}()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("event detail status = %d", response.StatusCode)
+	}
+	var detail eventDetailResponse
+	if err := json.NewDecoder(response.Body).Decode(&detail); err != nil {
+		t.Fatal(err)
+	}
+	return detail
 }
 
 func TestCodexToolEvidenceIngestPromotesObservedPRLink(t *testing.T) {
@@ -311,15 +332,11 @@ func TestCodexLifecycleIngestExposesActiveSession(t *testing.T) {
 	}
 	assertCodexLifecycleTimeline(t, events.Data)
 
-	canaries := codexLifecycleCanaries()
-	assertNoRawIdentifiers(t, canaries, marshalJSON(t, sessions))
-	assertNoRawIdentifiers(t, canaries, marshalJSON(t, events))
-
 	stored, err := repository.ListEvents(t.Context(), storage.EventFilter{SessionID: "codex:synthetic-lifecycle-session", Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertNoRawIdentifiers(t, canaries, marshalJSON(t, stored))
+	assertContainsAll(t, codexLifecycleCanaries(), marshalJSON(t, stored))
 }
 
 func assertAvailabilityObserved(t *testing.T, availability map[string]string, keys ...string) {
@@ -453,14 +470,11 @@ func TestCodexToolResultIngestExposesToolCallSignal(t *testing.T) {
 		"tool-user@example.test",
 		"tiq-canary-tool-body",
 	}
-	assertNoRawIdentifiers(t, canaries, marshalJSON(t, events))
-
 	stored, err := repository.ListEvents(t.Context(), storage.EventFilter{SessionID: "codex:synthetic-tool-session", Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertNoRawIdentifiers(t, canaries, marshalJSON(t, stored))
-	assertRawToolEvidence(t, marshalJSON(t, stored), "tiq-canary-tool-argument", "tiq-canary-tool-output")
+	assertContainsAll(t, append(canaries, "tiq-canary-tool-argument", "tiq-canary-tool-output"), marshalJSON(t, stored))
 }
 
 func assertRawToolEvidence(t *testing.T, document []byte, values ...string) {
@@ -522,13 +536,11 @@ func TestCodexToolDecisionIngestExposesApprovalSignal(t *testing.T) {
 		t.Fatalf("timeline events = %d, want 1: %#v", len(events.Data), events.Data)
 	}
 	assertCodexToolDecisionTimelineEvent(t, events.Data[0])
-	assertNoRawIdentifiers(t, codexToolDecisionCanaries(), marshalJSON(t, events))
-
 	stored, err := repository.ListEvents(t.Context(), storage.EventFilter{SessionID: "codex:synthetic-decision-session", Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertNoRawIdentifiers(t, codexToolDecisionCanaries(), marshalJSON(t, stored))
+	assertContainsAll(t, codexToolDecisionCanaries(), marshalJSON(t, stored))
 }
 
 func assertCodexToolDecisionTimelineEvent(t *testing.T, event timelineEvent) {
@@ -634,13 +646,11 @@ func TestCodexSandboxOutcomeIngestExposesCommandExecutionSignal(t *testing.T) {
 		"tiq-canary-sandbox-cwd",
 		"tiq-canary-sandbox-path",
 	}
-	assertNoRawIdentifiers(t, canaries, marshalJSON(t, events))
-
 	stored, err := repository.ListEvents(t.Context(), storage.EventFilter{SessionID: "codex:synthetic-sandbox-session", Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertNoRawIdentifiers(t, canaries, marshalJSON(t, stored))
+	assertContainsAll(t, canaries, marshalJSON(t, stored))
 }
 
 func assertCodexSandboxTimelineEvent(t *testing.T, event timelineEvent) {

@@ -263,6 +263,38 @@ export function codexOTLPLogs(model: string): string {
   });
 }
 
+// Rich Codex log evidence for #233. Every value is synthetic; the live gate
+// proves local raw retention while diagnostics remain metadata-only.
+export function codexRawRetentionOTLPLogs(): string {
+  return codexExecOTLPLogs(
+    [
+      {
+        body: { stringValue: 'tiq-live-codex-body' },
+        attributes: codexStringAttrs([
+          ['event.name', 'codex.sandbox_outcome'],
+          ['conversation.id', 'tiq-live-e2e-codex-raw-retention'],
+          ['call_id', 'tiq-live-codex-call'],
+          ['path', '.env'],
+          ['command', 'cat .env'],
+          ['cwd', '/workspace/tiq-live-codex-workspace'],
+          ['input', 'tiq-live-codex-input'],
+          ['output', 'tiq-live-codex-output'],
+          ['prompt', 'tiq-live-codex-prompt'],
+          ['response', 'tiq-live-codex-response'],
+          ['source_code', 'tiq-live-codex-source'],
+          ['user.email', 'tiq-live-codex@example.test'],
+          ['authorization', 'Bearer tiq-live-codex-token'],
+        ]),
+      },
+    ],
+    '0.157.1',
+    codexStringAttrs([
+      ['host.name', 'tiq-live-codex-host'],
+      ['user.account_id', 'tiq-live-codex-account'],
+    ]),
+  );
+}
+
 // Paired Codex trace/log evidence for #218. The trace thread.id exactly joins
 // the log conversation.id, while turn.id identifies the one model response
 // whose span interval may be shown as Model generation.
@@ -483,6 +515,7 @@ function otlpLogs(
   serviceName: string,
   serviceVersion: string,
   logRecords: OTLPLogRecord[],
+  resourceAttributes: OTLPAttribute[] = [],
 ): string {
   return JSON.stringify({
     resourceLogs: [
@@ -491,6 +524,7 @@ function otlpLogs(
           attributes: [
             { key: 'service.name', value: { stringValue: serviceName } },
             { key: 'service.version', value: { stringValue: serviceVersion } },
+            ...resourceAttributes,
           ],
         },
         scopeLogs: [{ logRecords }],
@@ -502,8 +536,9 @@ function otlpLogs(
 function codexExecOTLPLogs(
   logRecords: OTLPLogRecord[],
   version = '0.153.4',
+  resourceAttributes: OTLPAttribute[] = [],
 ): string {
-  return otlpLogs('codex_exec', version, logRecords);
+  return otlpLogs('codex_exec', version, logRecords, resourceAttributes);
 }
 
 function codexExecOTLPLog(attributes: OTLPAttribute[], body: string): string {
@@ -998,6 +1033,20 @@ export async function fetchEventDetail(
   );
   expect(response.status).toBe(200);
   const body = (await response.json()) as { data: LiveEventDetail };
+  return body.data;
+}
+
+export async function fetchLiveSessionEvents(
+  sessionId: string,
+): Promise<Array<{ event_id: string; event_type: string }>> {
+  const response = await fetch(
+    `${daemonBase}/api/v1/sessions/${encodeURIComponent(sessionId)}/events?limit=100`,
+    { headers: { Authorization: `Bearer ${authToken}` } },
+  );
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as {
+    data: Array<{ event_id: string; event_type: string }>;
+  };
   return body.data;
 }
 

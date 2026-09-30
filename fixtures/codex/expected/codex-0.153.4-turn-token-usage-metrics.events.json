@@ -40,16 +40,82 @@
           "reason": "Codex token metrics have no reviewed task-boundary signal"
         }
       },
+      "datapoint": {
+        "attributes": [
+          {
+            "key": "model",
+            "value": {
+              "stringValue": "gpt-5-codex-synthetic"
+            }
+          },
+          {
+            "key": "token_type",
+            "value": {
+              "stringValue": "input"
+            }
+          },
+          {
+            "key": "originator",
+            "value": {
+              "stringValue": "codex_exec"
+            }
+          }
+        ],
+        "count": "1",
+        "sum": "1200",
+        "timeUnixNano": "1789042160000000000"
+      },
       "metric": {
         "count": 1,
         "name": "codex.turn.token_usage",
         "token_type": "input"
       },
       "metric_attributes": {
-        "originator": "codex_exec"
+        "model": "gpt-5-codex-synthetic",
+        "originator": "codex_exec",
+        "token_type": "input"
+      },
+      "metric_envelope": {
+        "histogram": {},
+        "name": "codex.turn.token_usage"
       },
       "resource": {
-        "deployment.environment": "telemetryiq-synthetic"
+        "deployment.environment": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.153.4"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.153.4"
+              }
+            },
+            {
+              "key": "deployment.environment",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex"
+        }
       }
     }
   },
@@ -94,14 +160,75 @@
           "reason": "Codex token metrics have no reviewed task-boundary signal"
         }
       },
+      "datapoint": {
+        "attributes": [
+          {
+            "key": "model",
+            "value": {
+              "stringValue": "gpt-5-codex-synthetic"
+            }
+          },
+          {
+            "key": "token_type",
+            "value": {
+              "stringValue": "cached_input"
+            }
+          }
+        ],
+        "count": "1",
+        "sum": "300",
+        "timeUnixNano": "1789042160000000001"
+      },
       "metric": {
         "count": 1,
         "name": "codex.turn.token_usage",
         "token_type": "cached_input"
       },
-      "metric_attributes": {},
+      "metric_attributes": {
+        "model": "gpt-5-codex-synthetic",
+        "token_type": "cached_input"
+      },
+      "metric_envelope": {
+        "histogram": {},
+        "name": "codex.turn.token_usage"
+      },
       "resource": {
-        "deployment.environment": "telemetryiq-synthetic"
+        "deployment.environment": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.153.4"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.153.4"
+              }
+            },
+            {
+              "key": "deployment.environment",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex"
+        }
       }
     }
   },
@@ -146,14 +273,75 @@
           "reason": "Codex token metrics have no reviewed task-boundary signal"
         }
       },
+      "datapoint": {
+        "attributes": [
+          {
+            "key": "model",
+            "value": {
+              "stringValue": "gpt-5-codex-synthetic"
+            }
+          },
+          {
+            "key": "token_type",
+            "value": {
+              "stringValue": "cache_write_input"
+            }
+          }
+        ],
+        "count": "1",
+        "sum": "75",
+        "timeUnixNano": "1789042160000000002"
+      },
       "metric": {
         "count": 1,
         "name": "codex.turn.token_usage",
         "token_type": "cache_write_input"
       },
-      "metric_attributes": {},
+      "metric_attributes": {
+        "model": "gpt-5-codex-synthetic",
+        "token_type": "cache_write_input"
+      },
+      "metric_envelope": {
+        "histogram": {},
+        "name": "codex.turn.token_usage"
+      },
       "resource": {
-        "deployment.environment": "telemetryiq-synthetic"
+        "deployment.environment": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.153.4"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.153.4"
+              }
+            },
+            {
+              "key": "deployment.environment",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex"
+        }
       }
     }
   },
@@ -198,14 +386,75 @@
           "reason": "Codex token metrics have no reviewed task-boundary signal"
         }
       },
+      "datapoint": {
+        "attributes": [
+          {
+            "key": "model",
+            "value": {
+              "stringValue": "gpt-5-codex-synthetic"
+            }
+          },
+          {
+            "key": "token_type",
+            "value": {
+              "stringValue": "output"
+            }
+          }
+        ],
+        "count": "1",
+        "sum": "144",
+        "timeUnixNano": "1789042160000000003"
+      },
       "metric": {
         "count": 1,
         "name": "codex.turn.token_usage",
         "token_type": "output"
       },
-      "metric_attributes": {},
+      "metric_attributes": {
+        "model": "gpt-5-codex-synthetic",
+        "token_type": "output"
+      },
+      "metric_envelope": {
+        "histogram": {},
+        "name": "codex.turn.token_usage"
+      },
       "resource": {
-        "deployment.environment": "telemetryiq-synthetic"
+        "deployment.environment": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.153.4"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.153.4"
+              }
+            },
+            {
+              "key": "deployment.environment",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex"
+        }
       }
     }
   },
@@ -250,14 +499,75 @@
           "reason": "Codex token metrics have no reviewed task-boundary signal"
         }
       },
+      "datapoint": {
+        "attributes": [
+          {
+            "key": "model",
+            "value": {
+              "stringValue": "gpt-5-codex-synthetic"
+            }
+          },
+          {
+            "key": "token_type",
+            "value": {
+              "stringValue": "reasoning_output"
+            }
+          }
+        ],
+        "count": "1",
+        "sum": "55",
+        "timeUnixNano": "1789042160000000004"
+      },
       "metric": {
         "count": 1,
         "name": "codex.turn.token_usage",
         "token_type": "reasoning_output"
       },
-      "metric_attributes": {},
+      "metric_attributes": {
+        "model": "gpt-5-codex-synthetic",
+        "token_type": "reasoning_output"
+      },
+      "metric_envelope": {
+        "histogram": {},
+        "name": "codex.turn.token_usage"
+      },
       "resource": {
-        "deployment.environment": "telemetryiq-synthetic"
+        "deployment.environment": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.153.4"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.153.4"
+              }
+            },
+            {
+              "key": "deployment.environment",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex"
+        }
       }
     }
   },
@@ -302,14 +612,75 @@
           "reason": "Codex token metrics have no reviewed task-boundary signal"
         }
       },
+      "datapoint": {
+        "attributes": [
+          {
+            "key": "model",
+            "value": {
+              "stringValue": "gpt-5-codex-synthetic"
+            }
+          },
+          {
+            "key": "token_type",
+            "value": {
+              "stringValue": "total"
+            }
+          }
+        ],
+        "count": "1",
+        "sum": "1774",
+        "timeUnixNano": "1789042160000000005"
+      },
       "metric": {
         "count": 1,
         "name": "codex.turn.token_usage",
         "token_type": "total"
       },
-      "metric_attributes": {},
+      "metric_attributes": {
+        "model": "gpt-5-codex-synthetic",
+        "token_type": "total"
+      },
+      "metric_envelope": {
+        "histogram": {},
+        "name": "codex.turn.token_usage"
+      },
       "resource": {
-        "deployment.environment": "telemetryiq-synthetic"
+        "deployment.environment": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.153.4"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.153.4"
+              }
+            },
+            {
+              "key": "deployment.environment",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex"
+        }
       }
     }
   }

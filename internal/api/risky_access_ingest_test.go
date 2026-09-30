@@ -31,6 +31,23 @@ func TestRiskyAccessInsightIngestEndToEnd(t *testing.T) {
 	}
 }
 
+func TestCodexRiskyAccessClassifiesRetainedRawEvidence(t *testing.T) {
+	server, _ := newPersistentTestServer(t)
+	payload := `{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sandbox_outcome"}},{"key":"conversation.id","value":{"stringValue":"codex-risk-session"}},{"key":"path","value":{"stringValue":".env"}},{"key":"command","value":{"stringValue":"cat .env"}}]}]}]}]}`
+	postAcceptedOTLP(t, server.URL, "/v1/logs", payload)
+
+	risky := getInsightJSON[riskyAccessResponse](t, server.URL+"/api/v1/insights/risky-access")
+	if string(risky.Data.Outcome) != "violation" || len(risky.Data.Findings) != 2 {
+		t.Fatalf("Codex risky access = %#v", risky.Data)
+	}
+	serialized := string(marshalJSON(t, risky))
+	for _, evidence := range []string{".env", "cat .env", `"class":"dotenv"`, `"class":"credential_access"`, `"boundary":"project"`} {
+		if !strings.Contains(serialized, evidence) {
+			t.Fatalf("Codex classification missing %q: %s", evidence, serialized)
+		}
+	}
+}
+
 func rawClaudeRiskyAccessOTLP(t *testing.T) string {
 	t.Helper()
 	return string(marshalJSON(t, map[string]any{

@@ -41,12 +41,108 @@
           "reason": "Codex skill metrics have no reviewed task-boundary signal"
         }
       },
+      "datapoint": {
+        "asInt": 1,
+        "attributes": [
+          {
+            "key": "app.version",
+            "value": {
+              "stringValue": "0.153.4"
+            }
+          },
+          {
+            "key": "invoke_type",
+            "value": {
+              "stringValue": "implicit"
+            }
+          },
+          {
+            "key": "originator",
+            "value": {
+              "stringValue": "codex_exec"
+            }
+          },
+          {
+            "key": "session_source",
+            "value": {
+              "stringValue": "exec"
+            }
+          },
+          {
+            "key": "skill",
+            "value": {
+              "stringValue": "tiq-probe"
+            }
+          },
+          {
+            "key": "status",
+            "value": {
+              "stringValue": "ok"
+            }
+          }
+        ],
+        "startTimeUnixNano": "1788706408772193927",
+        "timeUnixNano": "1788706421601372612"
+      },
+      "environment": {
+        "app_version": "0.153.4"
+      },
       "metric": {
         "count": 1,
         "name": "codex.skill.injected"
       },
+      "metric_attributes": {
+        "app.version": "0.153.4",
+        "invoke_type": "implicit",
+        "originator": "codex_exec",
+        "session_source": "exec",
+        "skill": "tiq-probe",
+        "status": "ok"
+      },
+      "metric_envelope": {
+        "name": "codex.skill.injected",
+        "sum": {
+          "aggregationTemporality": 1,
+          "isMonotonic": true
+        }
+      },
       "resource": {
-        "env": "telemetryiq-synthetic"
+        "env": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.153.4"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.153.4"
+              }
+            },
+            {
+              "key": "env",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex"
+        }
       },
       "skill": {
         "invoke_type": "implicit",
@@ -98,12 +194,108 @@
           "reason": "Codex skill metrics have no reviewed task-boundary signal"
         }
       },
+      "datapoint": {
+        "asInt": 1,
+        "attributes": [
+          {
+            "key": "app.version",
+            "value": {
+              "stringValue": "0.153.4"
+            }
+          },
+          {
+            "key": "invoke_type",
+            "value": {
+              "stringValue": "explicit"
+            }
+          },
+          {
+            "key": "originator",
+            "value": {
+              "stringValue": "codex_exec"
+            }
+          },
+          {
+            "key": "session_source",
+            "value": {
+              "stringValue": "exec"
+            }
+          },
+          {
+            "key": "skill",
+            "value": {
+              "stringValue": "tiq-probe"
+            }
+          },
+          {
+            "key": "status",
+            "value": {
+              "stringValue": "ok"
+            }
+          }
+        ],
+        "startTimeUnixNano": "1788706408772193927",
+        "timeUnixNano": "1788706421601372612"
+      },
+      "environment": {
+        "app_version": "0.153.4"
+      },
       "metric": {
         "count": 1,
         "name": "codex.skill.injected"
       },
+      "metric_attributes": {
+        "app.version": "0.153.4",
+        "invoke_type": "explicit",
+        "originator": "codex_exec",
+        "session_source": "exec",
+        "skill": "tiq-probe",
+        "status": "ok"
+      },
+      "metric_envelope": {
+        "name": "codex.skill.injected",
+        "sum": {
+          "aggregationTemporality": 1,
+          "isMonotonic": true
+        }
+      },
       "resource": {
-        "env": "telemetryiq-synthetic"
+        "env": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.153.4"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.153.4"
+              }
+            },
+            {
+              "key": "env",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex"
+        }
       },
       "skill": {
         "invoke_type": "explicit",

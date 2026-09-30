@@ -46,6 +46,7 @@ func newHandler(logger *slog.Logger, inspector *ingestInspector, repository stor
 	cursorIngest := newCursorAgentIngest(inspector, repository)
 	transcriptIngest := newTranscriptIngest(ingest, repository)
 	rolloutIngest := newCodexRolloutIngest(ingest, repository)
+	diagnostics := diagnosticAPI{reader: repository, counters: ingest}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", healthHandler(logger))
 	sessionAPI := newSessionAPI(sessions, thresholds)
@@ -77,6 +78,8 @@ func newHandler(logger *slog.Logger, inspector *ingestInspector, repository stor
 	mux.HandleFunc("POST /v1/claude/transcript", transcriptIngest.handler)
 	mux.HandleFunc("POST /v1/codex/rollout", rolloutIngest.handler)
 	mux.HandleFunc("GET /api/v1/ingest/counters", ingest.countersHandler)
+	mux.HandleFunc("GET /api/v1/diagnostics/preview", diagnostics.preview)
+	mux.HandleFunc("POST /api/v1/diagnostics/export", diagnostics.export)
 	if inspector != nil {
 		mux.HandleFunc("GET /api/v1/development/last-ingest", inspector.handler)
 	}

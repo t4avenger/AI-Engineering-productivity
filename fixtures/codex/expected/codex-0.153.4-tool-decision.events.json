@@ -30,13 +30,100 @@
     "provider": "openai",
     "provider_extensions": {
       "log_attributes": {
+        "call_id": "synthetic-decision-approved",
+        "conversation.id": "synthetic-decision-session",
+        "decision": "allow",
         "event.name": "codex.tool_decision",
-        "model": "gpt-6-astra"
+        "model": "gpt-6-astra",
+        "source": "policy",
+        "tool_name": "exec_command",
+        "tool_namespace": "functions"
+      },
+      "log_record": {
+        "attributes": [
+          {
+            "key": "event.name",
+            "value": {
+              "stringValue": "codex.tool_decision"
+            }
+          },
+          {
+            "key": "conversation.id",
+            "value": {
+              "stringValue": "synthetic-decision-session"
+            }
+          },
+          {
+            "key": "call_id",
+            "value": {
+              "stringValue": "synthetic-decision-approved"
+            }
+          },
+          {
+            "key": "decision",
+            "value": {
+              "stringValue": "allow"
+            }
+          },
+          {
+            "key": "source",
+            "value": {
+              "stringValue": "policy"
+            }
+          },
+          {
+            "key": "tool_name",
+            "value": {
+              "stringValue": "exec_command"
+            }
+          },
+          {
+            "key": "tool_namespace",
+            "value": {
+              "stringValue": "functions"
+            }
+          },
+          {
+            "key": "model",
+            "value": {
+              "stringValue": "gpt-6-astra"
+            }
+          }
+        ],
+        "observedTimeUnixNano": "1788717763628000000",
+        "severityText": "INFO",
+        "timeUnixNano": "1788717763628000000"
       },
       "resource_attributes": {
+        "env": "telemetryiq-synthetic",
         "service.name": "codex_exec",
         "service.version": "0.153.4"
       },
+      "resource_log": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.153.4"
+              }
+            },
+            {
+              "key": "env",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope_log": {},
       "severity": "INFO",
       "tool_decision": {
         "approval_id": "codex:synthetic-decision-session:approval:synthetic-decision-approved",
@@ -88,12 +175,93 @@
     "provider": "openai",
     "provider_extensions": {
       "log_attributes": {
-        "event.name": "codex.tool_decision"
+        "call_id": "synthetic-decision-denied",
+        "conversation.id": "synthetic-decision-session",
+        "decision": "deny",
+        "event.name": "codex.tool_decision",
+        "source": "sandbox",
+        "tool_name": "apply_patch",
+        "tool_namespace": "functions"
+      },
+      "log_record": {
+        "attributes": [
+          {
+            "key": "event.name",
+            "value": {
+              "stringValue": "codex.tool_decision"
+            }
+          },
+          {
+            "key": "conversation.id",
+            "value": {
+              "stringValue": "synthetic-decision-session"
+            }
+          },
+          {
+            "key": "call_id",
+            "value": {
+              "stringValue": "synthetic-decision-denied"
+            }
+          },
+          {
+            "key": "decision",
+            "value": {
+              "stringValue": "deny"
+            }
+          },
+          {
+            "key": "source",
+            "value": {
+              "stringValue": "sandbox"
+            }
+          },
+          {
+            "key": "tool_name",
+            "value": {
+              "stringValue": "apply_patch"
+            }
+          },
+          {
+            "key": "tool_namespace",
+            "value": {
+              "stringValue": "functions"
+            }
+          }
+        ],
+        "observedTimeUnixNano": "1788717763629000000",
+        "severityText": "INFO",
+        "timeUnixNano": "1788717763629000000"
       },
       "resource_attributes": {
+        "env": "telemetryiq-synthetic",
         "service.name": "codex_exec",
         "service.version": "0.153.4"
       },
+      "resource_log": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.153.4"
+              }
+            },
+            {
+              "key": "env",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope_log": {},
       "severity": "INFO",
       "tool_decision": {
         "approval_id": "codex:synthetic-decision-session:approval:synthetic-decision-denied",

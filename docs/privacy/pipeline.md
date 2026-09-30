@@ -14,9 +14,8 @@ lines intact, and those raw values are shown to the local user.
 - File paths and command lines are retained verbatim. `privacy.ClassifyPath` /
   `privacy.ClassifyCommandAccess` run over those raw values to add a governance class + project
   boundary signal; they do not replace the value.
-- Prompt/response/source-code content is not captured by default: the normalisers declare it
-  unavailable and refuse content at the ingest boundary. Configurable capture is tracked in #94
-  and gated by `collection.prompts` / `collection.responses` / `collection.source_code`.
+- Prompt/response/source-code content is retained whenever the provider emits it. Provider-side
+  exporter gates may mean a field is absent, but a normaliser never removes an observed value.
 - Other fields are retained as operational metadata, including unknown provider-extension fields.
 
 ## Storage
@@ -30,4 +29,5 @@ remain queryable); see `internal/storage/sqlite/sqlite.go` and `migrate_test.go`
 Raw-survival tests seed synthetic identifiers, file paths, and command lines and assert they
 reach storage and read APIs verbatim, with no `hmac-`/`path-class:`/`command-access:` placeholder.
 Governance tests assert risky-access findings carry the raw path/command as evidence. Content
-tests assert prompt/response/source-code content is not captured by default.
+tests assert emitted prompt/response/source-code values survive local persistence. Authenticated
+diagnostic preview/export tests assert only aggregate metadata leaves that boundary.
