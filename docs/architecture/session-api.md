@@ -173,9 +173,14 @@ flush, but are not turned into insight rows. The Codex CLI 0.153.4 no-trace
 evidence remains historical; 0.154.0 support is fixture-backed (#172).
 
 `POST /v1/claude/transcript` accepts Claude Code session JSONL (`application/x-ndjson`
-or `application/jsonl`, 32 MiB cap) and persists normalised `assistant_message`
-events correlated to the same provider-native session id as OTLP. Prompt/response
-and tool content bodies are not retained on this path.
+or `application/jsonl`, 32 MiB cap) and persists normalised events correlated to
+the same provider-native session id as OTLP: `assistant_message` (with raw
+thinking and response text), `user_message` (raw prompt text), and content-free
+`tool_call` / `mcp_call` correlation events, plus one Operation per tool call
+carrying the raw tool input, tool_result body, and record-scoped `toolUseResult`
+(raw capture, epic #87 / #94 / #105 / #173). A pull/merge-request URL in that tool
+I/O is recorded as `pr_link_candidates` on the correlation event (#251). Only the
+raw request body itself is never echoed (no dev ingest inspector on this route).
 
 `POST /v1/codex/rollout` accepts authenticated Codex rollout JSONL with the same
 media types and 32 MiB cap. It persists every record under

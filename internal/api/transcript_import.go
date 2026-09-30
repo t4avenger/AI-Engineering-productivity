@@ -17,14 +17,15 @@ import (
 const maxTranscriptPayloadBytes int64 = 32 << 20 // 32 MiB
 
 // transcriptIngest receives a Claude Code session JSONL transcript (F4, #91) as
-// newline-delimited JSON — the real on-disk format — normalises the assistant
-// records, and persists the resulting canonical events verbatim.
+// newline-delimited JSON — the real on-disk format — normalises it, and persists
+// the resulting canonical events and tool-call Operations. Prompt, response,
+// thinking, and tool input/output content are retained raw on those normalised
+// records (epic #87 / #94 / #105 / #173).
 //
 // It deliberately does NOT hold an ingestInspector: the dev inspector echoes the
-// raw captured payload, and a raw transcript body carries prompt/response/tool
-// content, so echoing it would re-expose exactly the content F4 refuses to
-// persist. This route captures nothing raw and persists only the normalised,
-// allow-listed events.
+// whole raw request body to a diagnostics surface, which is a separate
+// sanitised-diagnostics boundary (AGENTS.md: diagnostic exports must be
+// sanitised), not the captured governance record.
 //
 // Accepted/rejected counters are shared with the OTLP ingest (via counters) so
 // /api/v1/ingest/counters reports one consistent ingest tally across every push

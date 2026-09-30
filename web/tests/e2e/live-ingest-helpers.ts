@@ -827,12 +827,18 @@ export function claudePRLinkOTLPLogs(): string {
         },
       ],
     },
-  ]);
+  ], '2.1.286');
 }
 
 // Claude session JSONL where the PR URL exists only in the Bash tool_result
 // output: the tool_use input is a printf template, as captured live on 2.1.286
 // (fixtures/claude/observed-sanitised/claude-code-2.1.286-tool-output-pr-link-transcript.json, #251).
+// claudeLivePRLinkBaseURL is the URL minus its PR number, so the printf template
+// never contains a complete pull-request URL.
+const claudeLivePRLinkBaseURL = claudeLivePRLinkURL.slice(
+  0,
+  claudeLivePRLinkURL.lastIndexOf('/') + 1,
+);
 export const claudePRLinkTranscriptSessionID =
   'tiq-live-e2e-session-pr-link-transcript';
 export function claudePRLinkTranscriptNDJSON(): string {
@@ -855,7 +861,7 @@ export function claudePRLinkTranscriptNDJSON(): string {
             id: 'toolu_live_pr_link_output',
             name: 'Bash',
             input: {
-              command: `printf '${claudeLivePRLinkURL.replace(/\d+$/, '%s')}\\n' 183`,
+              command: String.raw`printf '${claudeLivePRLinkBaseURL}%s\n' 183`,
             },
           },
         ],
@@ -1517,14 +1523,17 @@ type OTLPAttributeValue =
 
 type OTLPAttribute = { key: string; value: OTLPAttributeValue };
 
-function claudeOTLPLogs(logRecords: Array<{ attributes: OTLPAttribute[] }>): string {
+function claudeOTLPLogs(
+  logRecords: Array<{ attributes: OTLPAttribute[] }>,
+  serviceVersion = '2.1.263',
+): string {
   return JSON.stringify({
     resourceLogs: [
       {
         resource: {
           attributes: [
             { key: 'service.name', value: { stringValue: 'claude-code' } },
-            { key: 'service.version', value: { stringValue: '2.1.263' } },
+            { key: 'service.version', value: { stringValue: serviceVersion } },
           ],
         },
         scopeLogs: [{ logRecords }],
