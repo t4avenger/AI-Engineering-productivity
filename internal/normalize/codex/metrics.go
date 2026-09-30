@@ -34,6 +34,7 @@ type resourceMetric struct {
 		Attributes []attribute `json:"attributes"`
 	} `json:"resource"`
 	ScopeMetrics []scopeMetric `json:"scopeMetrics"`
+	raw          map[string]any
 }
 
 type scopeMetric struct {
@@ -42,12 +43,14 @@ type scopeMetric struct {
 		Attributes []attribute `json:"attributes"`
 	} `json:"scope"`
 	Metrics []otlpMetric `json:"metrics"`
+	raw     map[string]any
 }
 
 type otlpMetric struct {
 	Name      string           `json:"name"`
 	Sum       *metricSum       `json:"sum"`
 	Histogram *metricHistogram `json:"histogram"`
+	raw       map[string]any
 }
 
 type metricSum struct {
@@ -59,6 +62,7 @@ type metricDataPoint struct {
 	AsInt             any         `json:"asInt"`
 	TimeUnixNano      string      `json:"timeUnixNano"`
 	StartTimeUnixNano string      `json:"startTimeUnixNano"`
+	raw               map[string]any
 }
 
 type metricHistogram struct {
@@ -70,6 +74,67 @@ type histogramDataPoint struct {
 	Count        any         `json:"count"`
 	Sum          any         `json:"sum"`
 	TimeUnixNano string      `json:"timeUnixNano"`
+	raw          map[string]any
+}
+
+func (value *resourceMetric) UnmarshalJSON(data []byte) error {
+	type decoded resourceMetric
+	var typed decoded
+	raw, err := decodeRawJSONObject(data, &typed)
+	if err != nil {
+		return err
+	}
+	*value = resourceMetric(typed)
+	value.raw = raw
+	return nil
+}
+
+func (value *scopeMetric) UnmarshalJSON(data []byte) error {
+	type decoded scopeMetric
+	var typed decoded
+	raw, err := decodeRawJSONObject(data, &typed)
+	if err != nil {
+		return err
+	}
+	*value = scopeMetric(typed)
+	value.raw = raw
+	return nil
+}
+
+func (value *otlpMetric) UnmarshalJSON(data []byte) error {
+	type decoded otlpMetric
+	var typed decoded
+	raw, err := decodeRawJSONObject(data, &typed)
+	if err != nil {
+		return err
+	}
+	*value = otlpMetric(typed)
+	value.raw = raw
+	return nil
+}
+
+func (value *metricDataPoint) UnmarshalJSON(data []byte) error {
+	type decoded metricDataPoint
+	var typed decoded
+	raw, err := decodeRawJSONObject(data, &typed)
+	if err != nil {
+		return err
+	}
+	*value = metricDataPoint(typed)
+	value.raw = raw
+	return nil
+}
+
+func (value *histogramDataPoint) UnmarshalJSON(data []byte) error {
+	type decoded histogramDataPoint
+	var typed decoded
+	raw, err := decodeRawJSONObject(data, &typed)
+	if err != nil {
+		return err
+	}
+	*value = histogramDataPoint(typed)
+	value.raw = raw
+	return nil
 }
 
 // NormalizeMetrics maps reviewed Codex OTLP metrics into canonical events.
@@ -117,11 +182,24 @@ func skillEventsFromResource(resource resourceMetric, receivedAt time.Time) ([]c
 					"name":       scope.Scope.Name,
 					"attributes": rawCodexAttributes(attributes(scope.Scope.Attributes)),
 				}
+				extracted[index].ProviderExtensions["resource_metric"] = rawObjectWithout(resource.raw, "scopeMetrics")
+				extracted[index].ProviderExtensions["scope_metric"] = rawObjectWithout(scope.raw, "metrics")
+				extracted[index].ProviderExtensions["metric_envelope"] = rawMetricEnvelope(item.raw)
 			}
 			events = append(events, extracted...)
 		}
 	}
 	return events, nil
+}
+
+func rawMetricEnvelope(raw map[string]any) map[string]any {
+	envelope := rawObjectWithout(raw, "sum", "histogram")
+	for _, instrument := range []string{"sum", "histogram"} {
+		if fields, ok := raw[instrument].(map[string]any); ok {
+			envelope[instrument] = rawObjectWithout(fields, "dataPoints")
+		}
+	}
+	return envelope
 }
 
 func skillEventsFromMetric(resourceAttrs map[string]any, scopeID string, version string, item otlpMetric, receivedAt time.Time) ([]canonical.Event, error) {
@@ -190,11 +268,7 @@ func tokenUsageEvent(resource map[string]any, scopeID string, version string, po
 			"token_type": tokenType,
 			"count":      metricCount(point.Count),
 		},
-		"datapoint": map[string]any{
-			"count":          point.Count,
-			"sum":            point.Sum,
-			"time_unix_nano": point.TimeUnixNano,
-		},
+		"datapoint":         point.raw,
 		"resource":          rawCodexAttributes(resource),
 		"metric_attributes": rawCodexAttributes(fields),
 	}
@@ -317,11 +391,7 @@ func skillTurnEvent(resource map[string]any, version string, point histogramData
 			"name":  skillTurnDurationMetric,
 			"count": metricCount(point.Count),
 		},
-		"datapoint": map[string]any{
-			"count":          point.Count,
-			"sum":            point.Sum,
-			"time_unix_nano": point.TimeUnixNano,
-		},
+		"datapoint":         point.raw,
 		"resource":          rawCodexAttributes(resource),
 		"metric_attributes": rawCodexAttributes(fields),
 		"skill_turn": map[string]any{
@@ -353,11 +423,7 @@ func skillInjectedEvent(resource map[string]any, version string, point metricDat
 			"name":  skillInjectedMetric,
 			"count": metricCount(point.AsInt),
 		},
-		"datapoint": map[string]any{
-			"as_int":               point.AsInt,
-			"start_time_unix_nano": point.StartTimeUnixNano,
-			"time_unix_nano":       point.TimeUnixNano,
-		},
+		"datapoint":         point.raw,
 		"resource":          rawCodexAttributes(resource),
 		"metric_attributes": rawCodexAttributes(fields),
 	}

@@ -724,6 +724,7 @@ func TestRawAttributeValueDecodesEachShape(t *testing.T) {
 		{name: "bool", value: map[string]any{"boolValue": true}, want: true, wantOK: true},
 		{name: "double", value: map[string]any{"doubleValue": 1.5}, want: 1.5, wantOK: true},
 		{name: "int string keeps precision", value: map[string]any{"intValue": "9007199254740993"}, want: json.Number("9007199254740993"), wantOK: true},
+		{name: "malformed int string remains raw", value: map[string]any{"intValue": "900719925474099�3"}, want: "900719925474099�3", wantOK: true},
 		{name: "int float becomes number", value: map[string]any{"intValue": float64(42)}, want: json.Number("42"), wantOK: true},
 		{name: "string array", value: map[string]any{"arrayValue": map[string]any{"values": []any{map[string]any{"stringValue": "a"}, map[string]any{"stringValue": "b"}}}}, want: []string{"a", "b"}, wantOK: true},
 		{name: "unforeseen shape retained raw", value: map[string]any{"bytesValue": "deadbeef"}, want: map[string]any{"bytesValue": "deadbeef"}, wantOK: true},

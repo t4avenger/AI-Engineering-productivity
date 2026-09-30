@@ -56,8 +56,8 @@ raw values it receives under epic #87.
 Codex CLI 0.145.0 was observed exporting OTLP JSON logs with `service.name`
 `codex_cli_rs` (interactive TUI) and `codex_exec` (the non-interactive `codex
 exec` subcommand); the log adapter accepts both. The log adapter retains every
-resource attribute, log attribute, body and unknown field raw under provider
-extensions. Stable operational attributes (`event.name`, `model`, token counts,
+resource-log, scope-log and record envelope field raw under provider extensions,
+including resource/log attributes, bodies and unknown fields. Stable operational attributes (`event.name`, `model`, token counts,
 lifecycle and operation evidence) are additionally projected into canonical
 fields; this projection never removes their raw representation. Cached and
 reasoning counts are promoted only
@@ -214,7 +214,9 @@ IDs include service/resource, scope, token type, model, timestamp, series
 attributes, and token sum so distinct resource or series datapoints do not
 collapse during replay deduplication. The datapoint `count` is preserved as
 metric evidence under `provider_extensions.metric`. Complete resource, scope and
-datapoint attributes are retained raw. The historical scalar allowlist
+metric envelopes plus each selected datapoint are retained raw, including
+instrument description/unit, aggregation settings, exemplars, flags and unknown
+fields. The historical scalar allowlist
 (`app.version`, `auth_mode`, `deployment.environment`, `originator`,
 `session_source`, `tmp_mem_enabled`) is used only as part of the deterministic
 event-ID input so newly emitted raw fields cannot change replay deduplication

@@ -34,7 +34,10 @@ do not `json_extract`-scan the whole table. Migration 7 adds
 `events_session_type_occurred`), and `insight_signals` — thin payloads rebuilt
 on each `SaveEvents` session rebuild so Home, Insights, Models, Governance, and
 insight API endpoints do not scan raw `event_json`. Deleting a session removes
-its events, signals, and reconstructed session in one transaction.
+its events, signals, and reconstructed session in one transaction. Migration 8
+refreshes prompt insight signals. Migration 9 denormalises the canonical event
+`provider` and `tool` labels and indexes them for aggregate diagnostic counts;
+diagnostic preview/export queries never read or parse `event_json`.
 
 ## Retention
 

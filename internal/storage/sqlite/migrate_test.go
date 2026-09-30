@@ -37,8 +37,8 @@ func TestMigrationDropsProvenanceFromV2Database(t *testing.T) {
 	if err := repo.db.QueryRowContext(ctx, "SELECT MAX(version) FROM schema_migrations").Scan(&version); err != nil {
 		t.Fatalf("read migration version: %v", err)
 	}
-	if version != 8 {
-		t.Fatalf("schema version = %d, want 8", version)
+	if version != 9 {
+		t.Fatalf("schema version = %d, want 9", version)
 	}
 	if _, err := repo.ListOperations(ctx, storage.OperationFilter{}); err != nil {
 		t.Fatalf("operations table after migration: %v", err)
@@ -55,6 +55,7 @@ func TestMigrationDropsProvenanceFromV2Database(t *testing.T) {
 	if len(page) != 1 || page[0].EventID != "legacy-event" {
 		t.Fatalf("migrated events = %#v", page)
 	}
+	assertMigratedDiagnosticDimensions(t, ctx, repo)
 
 	session, found, err := repo.Session(ctx, "legacy-session")
 	if err != nil || !found {
@@ -62,6 +63,21 @@ func TestMigrationDropsProvenanceFromV2Database(t *testing.T) {
 	}
 	if raw, _ := session.Attributes["last_event_at"].(string); !strings.HasPrefix(raw, "2026-01-02T10:00:00") {
 		t.Fatalf("last_event_at = %q, want event occurred_at hydrated into session attributes", raw)
+	}
+}
+
+func assertMigratedDiagnosticDimensions(t *testing.T, ctx context.Context, repo *Repository) {
+	t.Helper()
+	summary, err := repo.DiagnosticSummary(ctx)
+	if err != nil {
+		t.Fatalf("diagnostic summary: %v", err)
+	}
+	if len(summary.ProviderTools) != 1 {
+		t.Fatalf("migrated diagnostic dimensions = %#v", summary.ProviderTools)
+	}
+	got := summary.ProviderTools[0]
+	if got.Provider != "openai" || got.Tool != "codex" {
+		t.Fatalf("migrated diagnostic dimensions = %#v", got)
 	}
 }
 

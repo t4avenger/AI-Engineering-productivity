@@ -97,9 +97,8 @@ func (r *Repository) applyConnectionPragmas(ctx context.Context, path string) er
 
 func (r *Repository) Close() error { return r.db.Close() }
 
-// DiagnosticSummary returns aggregate-only support metadata. The query never
-// selects raw event/session JSON values into Go; JSON extraction is limited to
-// the canonical provider/tool labels used for grouped counts.
+// DiagnosticSummary returns aggregate-only support metadata from denormalized
+// dimensions. It never reads or parses raw event/session JSON.
 func (r *Repository) DiagnosticSummary(ctx context.Context) (storage.DiagnosticSummary, error) {
 	var summary storage.DiagnosticSummary
 	if err := r.db.QueryRowContext(ctx, `SELECT
@@ -109,8 +108,8 @@ func (r *Repository) DiagnosticSummary(ctx context.Context) (storage.DiagnosticS
 		return storage.DiagnosticSummary{}, fmt.Errorf("read diagnostic counts: %w", err)
 	}
 	rows, err := r.db.QueryContext(ctx, `SELECT
-		json_extract(event_json, '$.provider'),
-		json_extract(event_json, '$.tool'),
+		provider,
+		tool,
 		COUNT(*)
 		FROM events
 		GROUP BY 1, 2
@@ -170,6 +169,48 @@ CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, session_json B
 	}
 	if err := r.ensurePromptInsightSignals(ctx); err != nil {
 		return err
+	}
+	if err := r.ensureDiagnosticDimensions(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ensureDiagnosticDimensions is migration 9. Provider/tool labels are copied
+// into narrow columns once during upgrade so every later diagnostic preview or
+// export can aggregate without reading the retained raw event_json corpus.
+func (r *Repository) ensureDiagnosticDimensions(ctx context.Context) error {
+	applied, err := r.migrationApplied(ctx, 9)
+	if err != nil {
+		return err
+	}
+	if applied {
+		return nil
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin migration 9: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := addMissingColumns(ctx, tx, "events", [][2]string{
+		{"provider", "ALTER TABLE events ADD COLUMN provider TEXT"},
+		{"tool", "ALTER TABLE events ADD COLUMN tool TEXT"},
+	}); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE events SET
+		provider = COALESCE(provider, json_extract(event_json, '$.provider')),
+		tool = COALESCE(tool, json_extract(event_json, '$.tool'))`); err != nil {
+		return fmt.Errorf("backfill diagnostic event dimensions: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, "CREATE INDEX IF NOT EXISTS events_provider_tool ON events(provider, tool)"); err != nil {
+		return fmt.Errorf("index diagnostic event dimensions: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO schema_migrations(version) VALUES (9)"); err != nil {
+		return fmt.Errorf("record migration 9: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit migration 9: %w", err)
 	}
 	return nil
 }
@@ -483,7 +524,7 @@ func (r *Repository) saveEventTx(ctx context.Context, tx *sql.Tx, event canonica
 	if err != nil {
 		return fmt.Errorf("marshal event: %w", err)
 	}
-	result, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO events(event_id,session_id,occurred_at,event_type,event_json) VALUES(?,?,?,?,?)", event.EventID, event.SessionID, event.OccurredAt.UTC().Format(timeFormat), event.EventType, payload)
+	result, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO events(event_id,session_id,occurred_at,event_type,provider,tool,event_json) VALUES(?,?,?,?,?,?,?)", event.EventID, event.SessionID, event.OccurredAt.UTC().Format(timeFormat), event.EventType, event.Provider, event.Tool, payload)
 	if err != nil {
 		return err
 	}

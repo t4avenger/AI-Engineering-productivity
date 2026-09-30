@@ -48,10 +48,12 @@ type resourceLog struct {
 		Attributes []attribute `json:"attributes"`
 	} `json:"resource"`
 	ScopeLogs []scopeLog `json:"scopeLogs"`
+	raw       map[string]any
 }
 
 type scopeLog struct {
 	LogRecords []logRecord `json:"logRecords"`
+	raw        map[string]any
 }
 
 type logRecord struct {
@@ -60,6 +62,48 @@ type logRecord struct {
 	ObservedTimeUnixNano string          `json:"observedTimeUnixNano"`
 	SeverityText         string          `json:"severityText"`
 	TimeUnixNano         string          `json:"timeUnixNano"`
+	raw                  map[string]any
+}
+
+type logEnvelopeEvidence struct {
+	resourceLog map[string]any
+	scopeLog    map[string]any
+}
+
+func (value *resourceLog) UnmarshalJSON(data []byte) error {
+	type decoded resourceLog
+	var typed decoded
+	raw, err := decodeRawJSONObject(data, &typed)
+	if err != nil {
+		return err
+	}
+	*value = resourceLog(typed)
+	value.raw = raw
+	return nil
+}
+
+func (value *scopeLog) UnmarshalJSON(data []byte) error {
+	type decoded scopeLog
+	var typed decoded
+	raw, err := decodeRawJSONObject(data, &typed)
+	if err != nil {
+		return err
+	}
+	*value = scopeLog(typed)
+	value.raw = raw
+	return nil
+}
+
+func (value *logRecord) UnmarshalJSON(data []byte) error {
+	type decoded logRecord
+	var typed decoded
+	raw, err := decodeRawJSONObject(data, &typed)
+	if err != nil {
+		return err
+	}
+	*value = logRecord(typed)
+	value.raw = raw
+	return nil
 }
 
 // NormalizeLogs maps the reviewed Codex OTLP log shape directly to canonical
@@ -93,8 +137,9 @@ func normalizeResourceLog(raw resourceLog, receivedAt time.Time) ([]canonical.Ev
 	}
 	var events []canonical.Event
 	for _, scope := range raw.ScopeLogs {
+		evidence := retainedLogEnvelope(raw, scope)
 		for _, record := range scope.LogRecords {
-			event, err := normalizeLogRecord(resource, record, receivedAt)
+			event, err := normalizeLogRecord(resource, evidence, record, receivedAt)
 			if err != nil {
 				return nil, err
 			}
@@ -104,7 +149,14 @@ func normalizeResourceLog(raw resourceLog, receivedAt time.Time) ([]canonical.Ev
 	return events, nil
 }
 
-func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt time.Time) (canonical.Event, error) {
+func retainedLogEnvelope(resource resourceLog, scope scopeLog) logEnvelopeEvidence {
+	return logEnvelopeEvidence{
+		resourceLog: rawObjectWithout(resource.raw, "scopeLogs"),
+		scopeLog:    rawObjectWithout(scope.raw, "logRecords"),
+	}
+}
+
+func normalizeLogRecord(resource map[string]any, evidence logEnvelopeEvidence, record logRecord, receivedAt time.Time) (canonical.Event, error) {
 	recordData, err := json.Marshal(record)
 	if err != nil {
 		return canonical.Event{}, fmt.Errorf("marshal Codex log record: %w", err)
@@ -131,7 +183,9 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 	extensions := map[string]any{
 		"resource_attributes": rawCodexAttributes(resource),
 		"log_attributes":      rawCodexAttributes(fields),
-		"log_record":          codexLogRecordEvidence(record),
+		"resource_log":        evidence.resourceLog,
+		"scope_log":           evidence.scopeLog,
+		"log_record":          record.raw,
 		"severity":            record.SeverityText,
 	}
 	attachCodexLogBody(extensions, record.Body)
@@ -146,23 +200,6 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 	event := canonical.Event{SchemaVersion: canonicalSchemaVersion, EventID: id, EventType: canonicalEventType, OccurredAt: occurredAt.UTC(), ReceivedAt: receivedAt.UTC(), Provider: "openai", Tool: "codex", SourceSchema: sourceSchema, SourceVersion: stringValue(resource["service.version"], unavailable), ActorID: unavailable, DeviceID: unavailable, SessionID: sessionID, PrivacyLevel: "operational", Attributes: attributes, ProviderExtensions: extensions}
 	applyCodexEnvironment(&event, fields, resource)
 	return event, nil
-}
-
-func codexLogRecordEvidence(record logRecord) map[string]any {
-	evidence := map[string]any{}
-	if len(record.Body) > 0 && string(record.Body) != "null" {
-		evidence["body"] = append(json.RawMessage(nil), record.Body...)
-	}
-	if record.ObservedTimeUnixNano != "" {
-		evidence["observed_time_unix_nano"] = record.ObservedTimeUnixNano
-	}
-	if record.SeverityText != "" {
-		evidence["severity_text"] = record.SeverityText
-	}
-	if record.TimeUnixNano != "" {
-		evidence["time_unix_nano"] = record.TimeUnixNano
-	}
-	return evidence
 }
 
 func codexCanonicalEventType(eventName string) string {

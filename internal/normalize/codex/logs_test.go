@@ -114,6 +114,22 @@ func TestNormalizeLogsRetainsAllProviderFieldsAndBody(t *testing.T) {
 	})
 }
 
+func TestNormalizeLogsRetainsRawResourceScopeAndRecordEnvelopes(t *testing.T) {
+	data := []byte(`{"resourceLogs":[{"schemaUrl":"resource-schema-canary","resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}],"droppedAttributesCount":7},"scopeLogs":[{"schemaUrl":"scope-schema-canary","scope":{"name":"codex_otel.log_only","version":"scope-version-canary"},"logRecords":[{"traceId":"trace-canary","flags":1,"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}}]}]}]}]}`)
+	events, err := NormalizeLogs(data, time.Unix(1, 0))
+	if err != nil || len(events) != 1 {
+		t.Fatalf("events = %#v, %v", events, err)
+	}
+	encoded, err := json.Marshal(events[0].ProviderExtensions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertStringCanariesPresent(t, string(encoded), []string{
+		"resource-schema-canary", "scope-schema-canary", "scope-version-canary", "trace-canary",
+		"droppedAttributesCount", "flags",
+	})
+}
+
 func assertCodexSessionStartEvent(t *testing.T, event canonical.Event) {
 	t.Helper()
 	if event.EventType != "session.active" || event.SessionID != "codex:lifecycle-session" {

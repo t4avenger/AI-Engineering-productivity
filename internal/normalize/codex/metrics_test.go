@@ -161,6 +161,26 @@ func TestNormalizeMetricsTokenUsageRetainsAllAttributes(t *testing.T) {
 	}
 }
 
+func TestNormalizeMetricsRetainsRawEnvelopesAndDatapoint(t *testing.T) {
+	payload := []byte(`{"resourceMetrics":[{"schemaUrl":"resource-schema-canary","resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}],"droppedAttributesCount":7},"scopeMetrics":[{"schemaUrl":"scope-schema-canary","scope":{"name":"codex","version":"scope-version-canary"},"metrics":[{"name":"codex.skill.injected","description":"metric-description-canary","unit":"1","sum":{"aggregationTemporality":1,"isMonotonic":true,"dataPoints":[{"attributes":[{"key":"skill","value":{"stringValue":"synthetic-skill"}}],"asInt":"1","flags":1,"exemplars":[{"asInt":"42"}]}]}}]}]}]}`)
+	events, err := NormalizeMetrics(payload, time.Unix(1, 0))
+	if err != nil || len(events) != 1 {
+		t.Fatalf("events = %#v, %v", events, err)
+	}
+	encoded, err := json.Marshal(events[0].ProviderExtensions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, retained := range []string{
+		"resource-schema-canary", "scope-schema-canary", "scope-version-canary",
+		"metric-description-canary", "aggregationTemporality", "isMonotonic", "exemplars", "flags",
+	} {
+		if !strings.Contains(string(encoded), retained) {
+			t.Fatalf("raw envelope value %q missing from %s", retained, encoded)
+		}
+	}
+}
+
 func TestNormalizeMetricsTokenUsageIdentityIncludesSeries(t *testing.T) {
 	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"deployment.environment","value":{"stringValue":"one"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.turn.token_usage","histogram":{"dataPoints":[{"attributes":[{"key":"token_type","value":{"stringValue":"input"}},{"key":"originator","value":{"stringValue":"codex_exec"}}],"count":"1","sum":"12","timeUnixNano":"1789042160000000000"}]}}]}]},{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"deployment.environment","value":{"stringValue":"two"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.turn.token_usage","histogram":{"dataPoints":[{"attributes":[{"key":"token_type","value":{"stringValue":"input"}},{"key":"originator","value":{"stringValue":"codex_exec"}}],"count":"1","sum":"12","timeUnixNano":"1789042160000000000"}]}}]}]}]}`)
 	events, err := NormalizeMetrics(payload, time.Date(2026, 9, 10, 20, 9, 21, 0, time.UTC))

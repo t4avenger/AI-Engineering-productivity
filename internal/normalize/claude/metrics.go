@@ -749,9 +749,17 @@ func rawAttributeValue(value map[string]any) (any, bool) {
 	}
 	switch integer := value["intValue"].(type) {
 	case string:
-		if trimmed := strings.TrimSpace(integer); trimmed != "" {
-			return json.Number(trimmed), true
+		trimmed := strings.TrimSpace(integer)
+		number := json.Number(trimmed)
+		if _, err := number.Int64(); err == nil {
+			if _, err := json.Marshal(number); err == nil {
+				return number, true
+			}
 		}
+		// A malformed OTLP intValue is still provider evidence. Retain its exact
+		// string instead of manufacturing an invalid json.Number that prevents
+		// the containing canonical event from being persisted.
+		return integer, true
 	case float64:
 		return json.Number(strconv.FormatFloat(integer, 'f', -1, 64)), true
 	}

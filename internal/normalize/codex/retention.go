@@ -1,12 +1,37 @@
 package codex
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 
 	"github.com/wayne/telemetryiq/internal/normalize"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
+
+func decodeRawJSONObject(data []byte, target any) (map[string]any, error) {
+	if err := json.Unmarshal(data, target); err != nil {
+		return nil, err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	var raw map[string]any
+	if err := decoder.Decode(&raw); err != nil {
+		return nil, err
+	}
+	return raw, nil
+}
+
+func rawObjectWithout(raw map[string]any, omitted ...string) map[string]any {
+	copy := make(map[string]any, len(raw))
+	for key, value := range raw {
+		copy[key] = value
+	}
+	for _, key := range omitted {
+		delete(copy, key)
+	}
+	return copy
+}
 
 var codexEnvironmentKeys = map[string]string{
 	"user.id":              "user_id",
