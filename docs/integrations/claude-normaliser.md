@@ -602,10 +602,29 @@ session `pr_link` availability the enterprise header (#158) renders. The URL
 grammar lives once in `internal/normalize/prlink.go`, shared with the Codex
 adapter (#205), so there is no CPD-duplicated regex. The metric
 `claude_code.pull_request.count` is a counter and never stands in for a URL
-(#98); the `tool_decision` `tool_parameters` and session-JSONL tool-output
-surfaces can also carry a URL and are now retained raw (#173 / #105), but PR-link
-scanning does not yet cover them — extending the scan to those retained surfaces
-is tracked under #183.
+(#98).
+
+The other retained tool surfaces are scanned with the same extractor (#251),
+so a URL that never reaches a span still promotes:
+
+- **OTLP logs** — `tool_decision` and `tool_result` events are scanned over
+  `claudeLogPRLinkScanFields` (`tool_parameters`, `tool_input`), the
+  `OTEL_LOG_TOOL_DETAILS`-gated JSON strings carrying the raw `full_command` and
+  tool arguments. A `git_branch` / `git_commit_id` in `tool_parameters` never
+  becomes a link.
+- **Session JSONL** — each reconstructed tool call scans its raw `tool_input`
+  (tool_use input), `tool_output` (paired tool_result body), and
+  `tool_use_result` (record-scoped `toolUseResult`); structured values are
+  rendered by `normalize.PRLinkScanText`. The candidates ride on the `tool_call` /
+  `mcp_call` correlation **event** (not the Operation), because
+  `attachSessionPRLink` aggregates events.
+
+Evidence: `claude-code-2.1.286-tool-params-pr-link-otlp.json` and
+`claude-code-2.1.286-tool-output-pr-link-transcript.json` (both captured live on
+2.1.286; in the transcript the URL exists only in the tool output). Not scanned:
+the `claude_code.tool` span's `tool.output` span event and `new_context`
+attribute (`OTEL_LOG_TOOL_CONTENT`), which the span adapter does not yet capture
+(tracked as a follow-up capture issue), and assistant response prose.
 
 Issue #102 (T15) reconstructs the **sub-agent tree** from those span attributes.
 The per-span sub-agent correlation `agent_id`/`parent_agent_id`/`subagent_type`/

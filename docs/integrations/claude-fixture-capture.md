@@ -442,6 +442,37 @@ the trace-span and shared-prompt goldens (`environment`/`resource` blocks); no n
 fixture is added because the live capture's only new signal is the negative result on
 the three absent keys.
 
+## Tool-parameter and tool-output capture (#251)
+
+Tool-executing captures do **not** need `--dangerously-skip-permissions`: pre-approve
+only the synthetic command with `--allowedTools` (use the `--allowedTools='…'` form —
+the flag is variadic and otherwise swallows the prompt). A user `~/.claude/settings.json`
+`env` block overrides shell `OTEL_*` variables, so point the exporter at the loopback
+sink with a `--settings <file>` override instead of exported variables:
+
+```bash
+# capture-settings.json: {"env": {"CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+#   "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1", "OTEL_LOGS_EXPORTER": "otlp",
+#   "OTEL_TRACES_EXPORTER": "otlp", "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
+#   "OTEL_EXPORTER_OTLP_ENDPOINT": "http://127.0.0.1:4399", "OTEL_LOG_TOOL_DETAILS": "1"}}
+claude -p "Run: echo https://github.com/acme-synthetic/telemetryiq/pull/251" \
+  --settings capture-settings.json --allowedTools='Bash(echo:*)' < /dev/null
+```
+
+Observed on 2.1.286: `tool_decision` carries `tool_parameters` (JSON string with
+`bash_command`/`full_command`); `tool_result` adds `tool_input` and, after a `git
+commit`, `git_commit_id`/`git_branch` in `tool_parameters` plus `vcs.ref.head.*`
+attributes. The session JSONL (`~/.claude/projects/<workspace>/<session>.jsonl`)
+records the tool_use input, the tool_result content, and the record-scoped
+`toolUseResult`. With `OTEL_LOG_TOOL_CONTENT=1` the `claude_code.tool` span also
+carries a `tool.output` span event (`bash_command`, `output`), which the span
+adapter does not yet capture.
+
+Committed evidence:
+
+- `fixtures/claude/observed-sanitised/claude-code-2.1.286-tool-params-pr-link-otlp.json`
+- `fixtures/claude/observed-sanitised/claude-code-2.1.286-tool-output-pr-link-transcript.json`
+
 ## Validation
 
 The validator rejects missing origin or tool-version metadata, prohibited field

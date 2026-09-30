@@ -23,29 +23,16 @@ func (c transcriptToolCall) mcpCorrelationEvent(receivedAt time.Time) canonical.
 	eventID := c.sessionID + ":mcp:" + c.toolUseID
 	call := mcpCallExtension(c.server, c.toolName)
 	call["tool_use_id"] = c.toolUseID
-	return canonical.Event{
-		SchemaVersion: canonicalSchemaVersion,
-		EventID:       eventID,
-		EventType:     eventTypeMCPCall,
-		OccurredAt:    c.occurredAt,
-		ReceivedAt:    receivedAt.UTC(),
-		Provider:      provider,
-		Tool:          tool,
-		SourceSchema:  sourceSchemaTranscript,
-		SourceVersion: fallbackString(c.version, unavailable),
-		ActorID:       unavailable,
-		DeviceID:      unavailable,
-		SessionID:     c.sessionID,
-		PrivacyLevel:  "operational",
-		Attributes: map[string]any{
-			"category":           string(canonical.OperationCategoryMCPCall),
-			"unavailable_fields": mcpCallUnavailableFields(),
-		},
-		ProviderExtensions: map[string]any{
-			"correlation": transcriptCorrelation(eventID, c.occurredAt, c.uuid, c.parentUUID),
-			"mcp_call":    call,
-		},
+	attributes := map[string]any{
+		"category":           string(canonical.OperationCategoryMCPCall),
+		"unavailable_fields": mcpCallUnavailableFields(),
 	}
+	extensions := map[string]any{
+		"correlation": transcriptCorrelation(eventID, c.occurredAt, c.uuid, c.parentUUID),
+		"mcp_call":    call,
+	}
+	c.attachPRLinkEvidence(attributes, extensions)
+	return c.correlationEventShape(eventID, eventTypeMCPCall, receivedAt, attributes, extensions)
 }
 
 // mcpOperation builds the canonical Operation for an MCP tool call. The operation

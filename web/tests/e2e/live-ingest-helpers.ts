@@ -797,6 +797,98 @@ export function claudePRLinkOTLPTraces(): string {
   });
 }
 
+// Claude tool_decision whose retained tool_parameters full_command carries the
+// PR URL (#251) — the OTEL_LOG_TOOL_DETAILS shape observed live on 2.1.286
+// (fixtures/claude/observed-sanitised/claude-code-2.1.286-tool-params-pr-link-otlp.json).
+export const claudePRLinkLogsSessionID = 'tiq-live-e2e-session-pr-link-logs';
+export function claudePRLinkOTLPLogs(): string {
+  return claudeOTLPLogs([
+    {
+      attributes: [
+        { key: 'event.name', value: { stringValue: 'tool_decision' } },
+        {
+          key: 'event.timestamp',
+          value: { stringValue: '2026-09-30T20:01:34.516Z' },
+        },
+        { key: 'event.sequence', value: { intValue: '17' } },
+        { key: 'session.id', value: { stringValue: claudePRLinkLogsSessionID } },
+        { key: 'decision', value: { stringValue: 'accept' } },
+        { key: 'source', value: { stringValue: 'config' } },
+        { key: 'tool_name', value: { stringValue: 'Bash' } },
+        { key: 'tool_use_id', value: { stringValue: 'toolu_live_pr_link_logs' } },
+        {
+          key: 'tool_parameters',
+          value: {
+            stringValue: JSON.stringify({
+              bash_command: 'gh',
+              full_command: `gh pr view ${claudeLivePRLinkURL}`,
+            }),
+          },
+        },
+      ],
+    },
+  ], '2.1.286');
+}
+
+// Claude session JSONL where the PR URL exists only in the Bash tool_result
+// output: the tool_use input is a printf template, as captured live on 2.1.286
+// (fixtures/claude/observed-sanitised/claude-code-2.1.286-tool-output-pr-link-transcript.json, #251).
+// claudeLivePRLinkBaseURL is the URL minus its PR number, so the printf template
+// never contains a complete pull-request URL.
+const claudeLivePRLinkBaseURL = claudeLivePRLinkURL.slice(
+  0,
+  claudeLivePRLinkURL.lastIndexOf('/') + 1,
+);
+export const claudePRLinkTranscriptSessionID =
+  'tiq-live-e2e-session-pr-link-transcript';
+export function claudePRLinkTranscriptNDJSON(): string {
+  const record = {
+    sessionId: claudePRLinkTranscriptSessionID,
+    version: '2.1.286',
+  };
+  return [
+    JSON.stringify({
+      ...record,
+      type: 'assistant',
+      uuid: 'tiq-live-pr-link-assistant-1',
+      timestamp: '2026-09-30T20:02:23.000Z',
+      message: {
+        role: 'assistant',
+        model: 'claude-haiku-4-5-20251001',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'toolu_live_pr_link_output',
+            name: 'Bash',
+            input: {
+              command: String.raw`printf '${claudeLivePRLinkBaseURL}%s\n' 183`,
+            },
+          },
+        ],
+      },
+    }),
+    JSON.stringify({
+      ...record,
+      type: 'user',
+      uuid: 'tiq-live-pr-link-user-1',
+      parentUuid: 'tiq-live-pr-link-assistant-1',
+      timestamp: '2026-09-30T20:02:25.000Z',
+      toolUseResult: { stdout: claudeLivePRLinkURL, stderr: '' },
+      message: {
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'toolu_live_pr_link_output',
+            content: claudeLivePRLinkURL,
+            is_error: false,
+          },
+        ],
+      },
+    }),
+  ].join('\n');
+}
+
 // Codex apply_patch tool_result proves filesystem write category without a path.
 export function codexFilesystemWriteOTLPLogs(): string {
   return codexToolResultOTLPLog({
@@ -1431,14 +1523,17 @@ type OTLPAttributeValue =
 
 type OTLPAttribute = { key: string; value: OTLPAttributeValue };
 
-function claudeOTLPLogs(logRecords: Array<{ attributes: OTLPAttribute[] }>): string {
+function claudeOTLPLogs(
+  logRecords: Array<{ attributes: OTLPAttribute[] }>,
+  serviceVersion = '2.1.263',
+): string {
   return JSON.stringify({
     resourceLogs: [
       {
         resource: {
           attributes: [
             { key: 'service.name', value: { stringValue: 'claude-code' } },
-            { key: 'service.version', value: { stringValue: '2.1.263' } },
+            { key: 'service.version', value: { stringValue: serviceVersion } },
           ],
         },
         scopeLogs: [{ logRecords }],

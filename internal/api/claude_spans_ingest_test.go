@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -28,25 +29,82 @@ func TestClaudeTraceIngestProjectsSpanEvidence(t *testing.T) {
 	assertSecondClaudeSpanPage(t, second)
 }
 
-// TestClaudeToolSpanIngestPromotesObservedPRLink is the #183 live daemon
-// ingest→read gate: a Claude tool span whose raw full_command carries a verbatim
-// pull-request URL is POSTed to /v1/traces, and the session read API reports
-// pr_link observed with that exact URL — the same provider-agnostic aggregation
-// (attachSessionPRLink → PRLinkAvailability) the Codex path uses, proving Claude
-// now fills the header cell that #158 shipped as always-unavailable.
-func TestClaudeToolSpanIngestPromotesObservedPRLink(t *testing.T) {
-	server, _ := newPersistentTestServer(t)
-	response := postOTLPToPath(t, server.URL, "/v1/traces", metricsFixturePayloadBytes(t, "claude-code-2.1.273-tool-pr-link-otlp.json"), otlpContentTypeJSON)
-	if response.StatusCode != http.StatusAccepted {
-		t.Fatalf("trace ingest status = %d", response.StatusCode)
+// TestClaudeToolIngestPromotesObservedPRLink is the #183 / #251 live daemon
+// ingest→read gate. Each retained Claude tool surface — a tool span's raw
+// full_command (/v1/traces), the tool_decision/tool_result tool_parameters and
+// tool_input captured live from 2.1.286 (/v1/logs), and a JSONL tool_result
+// output captured live from 2.1.286 (/v1/claude/transcript) — is POSTed on its
+// own route, and the session read API reports pr_link through the same
+// provider-agnostic aggregation (attachSessionPRLink → PRLinkAvailability) the
+// Codex path uses. Two distinct URLs in one session stay partial, and the
+// pull_request.count metric alone never becomes a link.
+func TestClaudeToolIngestPromotesObservedPRLink(t *testing.T) {
+	const liveURL = "https://github.com/acme-synthetic/telemetryiq/pull/251"
+	logs := metricsFixturePayloadBytes(t, "claude-code-2.1.286-tool-params-pr-link-otlp.json")
+	cases := []struct {
+		name        string
+		path        string
+		contentType string
+		body        []byte
+		wantLink    string
+		wantState   string
+	}{
+		{name: "tool span full_command", path: "/v1/traces", contentType: otlpContentTypeJSON, body: metricsFixturePayloadBytes(t, "claude-code-2.1.273-tool-pr-link-otlp.json"), wantLink: "https://github.com/acme-synthetic/telemetryiq/pull/183", wantState: "observed"},
+		{name: "log tool_parameters and tool_input", path: "/v1/logs", contentType: otlpContentTypeJSON, body: logs, wantLink: liveURL, wantState: "observed"},
+		{name: "transcript tool output", path: "/v1/claude/transcript", contentType: "application/x-ndjson", body: transcriptFixturePayloadNDJSON(t, "claude-code-2.1.286-tool-output-pr-link-transcript.json"), wantLink: liveURL, wantState: "observed"},
+		// The first URL occurrence is the tool_decision tool_parameters; rewriting
+		// only it leaves the tool_result URL intact, so one session holds two.
+		{name: "conflicting candidates", path: "/v1/logs", contentType: otlpContentTypeJSON, body: bytes.Replace(logs, []byte("pull/251"), []byte("pull/252"), 1), wantState: "partial"},
+		{name: "pull_request.count only", path: "/v1/metrics", contentType: otlpContentTypeJSON, body: metricsFixturePayloadBytes(t, "claude-code-2.1.268-code-output-metrics.json"), wantState: "unavailable"},
 	}
-	closeBody(t, response)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			server, _ := newPersistentTestServer(t)
+			response := postOTLPToPath(t, server.URL, tc.path, tc.body, tc.contentType)
+			if response.StatusCode != http.StatusAccepted {
+				t.Fatalf("%s ingest status = %d", tc.path, response.StatusCode)
+			}
+			closeBody(t, response)
+			assertEverySessionPRLink(t, server.URL, tc.wantLink, tc.wantState)
+		})
+	}
+}
 
-	const wantURL = "https://github.com/acme-synthetic/telemetryiq/pull/183"
-	sessions := fetchSessionList(t, server.URL+"/api/v1/sessions?limit=10")
-	if len(sessions.Data) != 1 || sessions.Data[0].Attributes["pr_link"] != wantURL || sessions.Data[0].Availability["pr_link"] != "observed" {
-		t.Fatalf("PR-link session = %#v", sessions.Data)
+// assertEverySessionPRLink requires at least one session and that every session
+// reports exactly the wanted pr_link value and availability state.
+func assertEverySessionPRLink(t *testing.T, baseURL, wantLink, wantState string) {
+	t.Helper()
+	sessions := fetchSessionList(t, baseURL+"/api/v1/sessions?limit=10")
+	if len(sessions.Data) == 0 {
+		t.Fatal("ingest must produce a session")
 	}
+	for _, session := range sessions.Data {
+		link, _ := session.Attributes["pr_link"].(string)
+		if link != wantLink || session.Availability["pr_link"] != wantState {
+			t.Fatalf("session %s pr_link = %q/%q, want %q/%q", session.SessionID, link, session.Availability["pr_link"], wantLink, wantState)
+		}
+	}
+}
+
+// transcriptFixturePayloadNDJSON re-serialises a transcript fixture's
+// transcript_lines as the newline-delimited JSON the /v1/claude/transcript route
+// accepts, preserving numbers verbatim.
+func transcriptFixturePayloadNDJSON(t *testing.T, name string) []byte {
+	t.Helper()
+	var payload struct {
+		Lines []json.RawMessage `json:"transcript_lines"`
+	}
+	if err := json.Unmarshal(metricsFixturePayloadBytes(t, name), &payload); err != nil {
+		t.Fatal(err)
+	}
+	var body bytes.Buffer
+	for _, line := range payload.Lines {
+		if err := json.Compact(&body, line); err != nil {
+			t.Fatal(err)
+		}
+		body.WriteByte('\n')
+	}
+	return body.Bytes()
 }
 
 // hookSpanSecretCanary is the synthetic secret withHookSpanCanaries injects into

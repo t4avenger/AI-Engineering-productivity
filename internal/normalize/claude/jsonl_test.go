@@ -32,6 +32,11 @@ func FuzzNormalizeTranscript(f *testing.F) {
 		`{"type":"user","uuid":"u1","sessionId":"s1","timestamp":"2026-09-12T09:00:01Z","message":{"content":"/review the diff"}}` +
 		"\n" +
 		`{"type":"assistant","uuid":"a2","sessionId":"s1","timestamp":"2026-09-12T09:00:02Z","version":"2.1.269","isSidechain":true,"parentUuid":"a1","message":{"model":"claude-opus-4-8","content":[{"type":"tool_use","id":"g1","name":"Grep","input":{"pattern":"TODO"}}]}}`))
+	// A Bash call whose URL appears only in the tool_result output and the
+	// record-scoped toolUseResult — the #251 transcript PR-link scan surfaces.
+	f.Add([]byte(`{"type":"assistant","uuid":"a1","sessionId":"s1","timestamp":"2026-09-30T20:02:23Z","version":"2.1.286","message":{"content":[{"type":"tool_use","id":"b1","name":"Bash","input":{"command":"printf 'https://github.com/o/r/pull/%s' 1"}}]}}` +
+		"\n" +
+		`{"type":"user","uuid":"u1","sessionId":"s1","timestamp":"2026-09-30T20:02:25Z","toolUseResult":{"stdout":"https://github.com/o/r/pull/1"},"message":{"content":[{"type":"tool_result","tool_use_id":"b1","is_error":false,"content":"https://github.com/o/r/pull/1"}]}}`))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		_, _ = NormalizeTranscript(data, time.Unix(0, 0).UTC())
 		_, _ = ExtractTranscriptOperations(data, time.Unix(0, 0).UTC())

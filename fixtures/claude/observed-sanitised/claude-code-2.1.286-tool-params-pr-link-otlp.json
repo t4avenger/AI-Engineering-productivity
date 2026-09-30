@@ -1,0 +1,563 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.286",
+  "captured_at": "2026-09-30T20:01:38Z",
+  "sanitisation_reviewed": true,
+  "capture_note": "PR-URL-in-tool-parameters proof for #251. Captured live from Claude Code 2.1.286 (`claude -p` with --allowedTools='Bash(echo:*)' 'Bash(git commit:*)', OTEL_LOG_TOOL_DETAILS=1, http/json to a loopback sink) in an isolated synthetic git workspace. Only the tool_decision/tool_result records are kept. The first Bash call echoes a synthetic pull-request URL, so it appears verbatim in tool_decision.tool_parameters and in tool_result.tool_parameters + tool_input. The second call is a real `git commit` whose tool_result.tool_parameters carries git_branch/git_commit_id (and vcs.ref.head.*) but no URL, so a branch must never become a link. Identity, session, prompt, tool_use ids and the commit SHA are replaced with synthetic values; field names and shapes are verbatim (epic #87).",
+  "payload": {
+    "resourceLogs": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "host.arch",
+              "value": {
+                "stringValue": "amd64"
+              }
+            },
+            {
+              "key": "os.type",
+              "value": {
+                "stringValue": "linux"
+              }
+            },
+            {
+              "key": "os.version",
+              "value": {
+                "stringValue": "6.0.0-synthetic"
+              }
+            },
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "claude-code"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "2.1.286"
+              }
+            }
+          ],
+          "droppedAttributesCount": 0
+        },
+        "scopeLogs": [
+          {
+            "scope": {
+              "name": "com.anthropic.claude_code.events",
+              "version": "2.1.286"
+            },
+            "logRecords": [
+              {
+                "timeUnixNano": "1790798494516000000",
+                "observedTimeUnixNano": "1790798494516000000",
+                "body": {
+                  "stringValue": "claude_code.tool_decision"
+                },
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-id"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "synthetic-pr-link-session"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "synthetic-org-id"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "synthetic-account-uuid"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "synthetic-account-id"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "synthetic-terminal"
+                    }
+                  },
+                  {
+                    "key": "event.name",
+                    "value": {
+                      "stringValue": "tool_decision"
+                    }
+                  },
+                  {
+                    "key": "event.timestamp",
+                    "value": {
+                      "stringValue": "2026-09-30T20:01:34.516Z"
+                    }
+                  },
+                  {
+                    "key": "event.sequence",
+                    "value": {
+                      "intValue": 17
+                    }
+                  },
+                  {
+                    "key": "prompt.id",
+                    "value": {
+                      "stringValue": "synthetic-pr-link-prompt"
+                    }
+                  },
+                  {
+                    "key": "decision",
+                    "value": {
+                      "stringValue": "accept"
+                    }
+                  },
+                  {
+                    "key": "source",
+                    "value": {
+                      "stringValue": "config"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Bash"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_pr_link_1"
+                    }
+                  },
+                  {
+                    "key": "tool_source",
+                    "value": {
+                      "stringValue": "builtin"
+                    }
+                  },
+                  {
+                    "key": "tool_parameters",
+                    "value": {
+                      "stringValue": "{\"bash_command\":\"echo\",\"full_command\":\"echo https://github.com/acme-synthetic/telemetryiq/pull/251\"}"
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "flags": 1,
+                "traceId": "00000000000000000000000000000251",
+                "spanId": "0000000000251000"
+              },
+              {
+                "timeUnixNano": "1790798494884000000",
+                "observedTimeUnixNano": "1790798494884000000",
+                "body": {
+                  "stringValue": "claude_code.tool_result"
+                },
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-id"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "synthetic-pr-link-session"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "synthetic-org-id"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "synthetic-account-uuid"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "synthetic-account-id"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "synthetic-terminal"
+                    }
+                  },
+                  {
+                    "key": "event.name",
+                    "value": {
+                      "stringValue": "tool_result"
+                    }
+                  },
+                  {
+                    "key": "event.timestamp",
+                    "value": {
+                      "stringValue": "2026-09-30T20:01:34.884Z"
+                    }
+                  },
+                  {
+                    "key": "event.sequence",
+                    "value": {
+                      "intValue": 18
+                    }
+                  },
+                  {
+                    "key": "prompt.id",
+                    "value": {
+                      "stringValue": "synthetic-pr-link-prompt"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Bash"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_pr_link_1"
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "stringValue": "true"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "stringValue": "363"
+                    }
+                  },
+                  {
+                    "key": "tool_parameters",
+                    "value": {
+                      "stringValue": "{\"bash_command\":\"echo\",\"full_command\":\"echo https://github.com/acme-synthetic/telemetryiq/pull/251\"}"
+                    }
+                  },
+                  {
+                    "key": "tool_input",
+                    "value": {
+                      "stringValue": "{\"command\":\"echo https://github.com/acme-synthetic/telemetryiq/pull/251\"}"
+                    }
+                  },
+                  {
+                    "key": "tool_input_size_bytes",
+                    "value": {
+                      "stringValue": "73"
+                    }
+                  },
+                  {
+                    "key": "tool_result_size_bytes",
+                    "value": {
+                      "stringValue": "54"
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "flags": 1,
+                "traceId": "00000000000000000000000000000251",
+                "spanId": "0000000000251001"
+              },
+              {
+                "timeUnixNano": "1790798497580000000",
+                "observedTimeUnixNano": "1790798497580000000",
+                "body": {
+                  "stringValue": "claude_code.tool_decision"
+                },
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-id"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "synthetic-pr-link-session"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "synthetic-org-id"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "synthetic-account-uuid"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "synthetic-account-id"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "synthetic-terminal"
+                    }
+                  },
+                  {
+                    "key": "event.name",
+                    "value": {
+                      "stringValue": "tool_decision"
+                    }
+                  },
+                  {
+                    "key": "event.timestamp",
+                    "value": {
+                      "stringValue": "2026-09-30T20:01:37.580Z"
+                    }
+                  },
+                  {
+                    "key": "event.sequence",
+                    "value": {
+                      "intValue": 22
+                    }
+                  },
+                  {
+                    "key": "prompt.id",
+                    "value": {
+                      "stringValue": "synthetic-pr-link-prompt"
+                    }
+                  },
+                  {
+                    "key": "decision",
+                    "value": {
+                      "stringValue": "accept"
+                    }
+                  },
+                  {
+                    "key": "source",
+                    "value": {
+                      "stringValue": "config"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Bash"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_pr_link_2"
+                    }
+                  },
+                  {
+                    "key": "tool_source",
+                    "value": {
+                      "stringValue": "builtin"
+                    }
+                  },
+                  {
+                    "key": "tool_parameters",
+                    "value": {
+                      "stringValue": "{\"bash_command\":\"git\",\"full_command\":\"git commit -m tiq-canary-251 .\"}"
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "flags": 1,
+                "traceId": "00000000000000000000000000000251",
+                "spanId": "0000000000251002"
+              },
+              {
+                "timeUnixNano": "1790798497625000000",
+                "observedTimeUnixNano": "1790798497625000000",
+                "body": {
+                  "stringValue": "claude_code.tool_result"
+                },
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-id"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "synthetic-pr-link-session"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "synthetic-org-id"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "synthetic-account-uuid"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "synthetic-account-id"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "synthetic-terminal"
+                    }
+                  },
+                  {
+                    "key": "event.name",
+                    "value": {
+                      "stringValue": "tool_result"
+                    }
+                  },
+                  {
+                    "key": "event.timestamp",
+                    "value": {
+                      "stringValue": "2026-09-30T20:01:37.625Z"
+                    }
+                  },
+                  {
+                    "key": "event.sequence",
+                    "value": {
+                      "intValue": 23
+                    }
+                  },
+                  {
+                    "key": "prompt.id",
+                    "value": {
+                      "stringValue": "synthetic-pr-link-prompt"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Bash"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_pr_link_2"
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "stringValue": "true"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "stringValue": "39"
+                    }
+                  },
+                  {
+                    "key": "tool_parameters",
+                    "value": {
+                      "stringValue": "{\"bash_command\":\"git\",\"full_command\":\"git commit -m tiq-canary-251 .\",\"git_commit_id\":\"0000000000000000000000000000000000000251\",\"git_branch\":\"feature/tiq-251\"}"
+                    }
+                  },
+                  {
+                    "key": "tool_input",
+                    "value": {
+                      "stringValue": "{\"command\":\"git commit -m tiq-canary-251 .\"}"
+                    }
+                  },
+                  {
+                    "key": "tool_input_size_bytes",
+                    "value": {
+                      "stringValue": "44"
+                    }
+                  },
+                  {
+                    "key": "tool_result_size_bytes",
+                    "value": {
+                      "stringValue": "112"
+                    }
+                  },
+                  {
+                    "key": "vcs.ref.head.revision",
+                    "value": {
+                      "stringValue": "0000000000000000000000000000000000000251"
+                    }
+                  },
+                  {
+                    "key": "vcs.ref.head.name",
+                    "value": {
+                      "stringValue": "feature/tiq-251"
+                    }
+                  },
+                  {
+                    "key": "vcs.ref.head.type",
+                    "value": {
+                      "stringValue": "branch"
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "flags": 1,
+                "traceId": "00000000000000000000000000000251",
+                "spanId": "0000000000251003"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

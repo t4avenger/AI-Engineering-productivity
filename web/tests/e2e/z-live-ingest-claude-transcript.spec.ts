@@ -5,7 +5,11 @@ import {
   claudeGenericToolTranscriptNDJSON,
   claudeLivePRLinkURL,
   claudeMCPTranscriptNDJSON,
+  claudePRLinkLogsSessionID,
+  claudePRLinkOTLPLogs,
   claudePRLinkOTLPTraces,
+  claudePRLinkTranscriptNDJSON,
+  claudePRLinkTranscriptSessionID,
   claudeTranscriptNDJSON,
   expectOperationCategory,
   expectSessionDetailHeading,
@@ -13,6 +17,7 @@ import {
   fetchLiveSessionFiles,
   fetchLiveSessions,
   ingestClaudeTranscript,
+  ingestOTLPLogs,
   ingestOTLPTraces,
   resetDaemonBetweenTests,
   unlockDashboard,
@@ -24,8 +29,9 @@ import {
  * mocking. POSTs NDJSON to /v1/claude/transcript, then asserts the UI renders the
  * session + assistant_message model/token counts, that the Bash tool_use surfaces
  * as a shell-command operation (#105 raw capture), and that cwd — not a #105 signal
- * — never reaches any surface. A second gate (#183) proves a tool-span full_command
- * PR URL promotes to an observed pr_link and renders on /pull-requests.
+ * — never reaches any surface. A parameterised gate (#183 / #251) proves a PR URL on
+ * each retained Claude tool surface promotes to an observed pr_link and renders
+ * on /pull-requests.
  */
 const liveModel = 'tiq-live-e2e-transcript-model';
 
@@ -100,33 +106,52 @@ test('surfaces generic tool calls and sub-agent file paths from a transcript', a
   expect(paths).toContain('/repo/tiq-live-generic-write.go');
 });
 
-// #183: a Claude tool span whose raw full_command carries a verbatim
-// pull-request URL must promote pr_link to observed through the same
-// provider-agnostic aggregation the Codex path uses, and render the URL on
-// /pull-requests — closing the always-unavailable Claude cell #158 shipped.
-test('promotes a Claude tool-span PR URL to an observed pr_link on the live daemon', async ({
-  page,
-}) => {
-  await unlockDashboard(page);
-  await page.goto('/pull-requests');
-  await expect(page.getByRole('link', { name: /github\.com/ })).toHaveCount(0);
+// #183 / #251: a verbatim pull-request URL on any retained Claude tool surface —
+// a tool span's raw full_command, a tool_decision's tool_parameters, or only the
+// JSONL tool_result output — must promote pr_link to observed through the same
+// provider-agnostic aggregation the Codex path uses, and render on /pull-requests.
+const claudePRLinkSurfaces = [
+  {
+    surface: 'tool-span full_command',
+    sessionId: 'tiq-live-e2e-session-pr-link',
+    ingest: () => ingestOTLPTraces(claudePRLinkOTLPTraces()),
+  },
+  {
+    surface: 'tool_decision tool_parameters',
+    sessionId: claudePRLinkLogsSessionID,
+    ingest: () => ingestOTLPLogs(claudePRLinkOTLPLogs()),
+  },
+  {
+    surface: 'transcript tool output',
+    sessionId: claudePRLinkTranscriptSessionID,
+    ingest: () => ingestClaudeTranscript(claudePRLinkTranscriptNDJSON()),
+  },
+];
 
-  await ingestOTLPTraces(claudePRLinkOTLPTraces());
+for (const { surface, sessionId, ingest } of claudePRLinkSurfaces) {
+  test(`promotes a Claude ${surface} PR URL to an observed pr_link on the live daemon`, async ({
+    page,
+  }) => {
+    await unlockDashboard(page);
+    await page.goto('/pull-requests');
+    await expect(page.getByRole('link', { name: /github\.com/ })).toHaveCount(0);
 
-  const sessions = await fetchLiveSessions();
-  const prSession = sessions.find(
-    (session) =>
-      session.session_id === 'claude-code:tiq-live-e2e-session-pr-link',
-  );
-  expect(prSession?.tool).toBe('claude-code');
-  expect(prSession?.attributes?.pr_link).toBe(claudeLivePRLinkURL);
-  expect(prSession?.availability?.pr_link).toBe('observed');
+    await ingest();
 
-  await page.goto('/pull-requests');
-  await expect(
-    page.getByRole('link', { name: claudeLivePRLinkURL }),
-  ).toBeVisible();
-});
+    const sessions = await fetchLiveSessions();
+    const prSession = sessions.find(
+      (session) => session.session_id === `claude-code:${sessionId}`,
+    );
+    expect(prSession?.tool).toBe('claude-code');
+    expect(prSession?.attributes?.pr_link).toBe(claudeLivePRLinkURL);
+    expect(prSession?.availability?.pr_link).toBe('observed');
+
+    await page.goto('/pull-requests');
+    await expect(
+      page.getByRole('link', { name: claudeLivePRLinkURL }),
+    ).toBeVisible();
+  });
+}
 
 // J17 (#104): an MCP tool call reconstructed from the JSONL transcript must
 // surface as an MCP-call operation and mark its server used with an invocation
