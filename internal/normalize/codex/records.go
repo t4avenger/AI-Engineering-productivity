@@ -19,13 +19,6 @@ var modelInteractionEvents = map[string]struct{}{
 	"codex.sse_event": {},
 }
 
-// extractedLogFields are the attribute keys promoted onto a ModelInteraction.
-// They are excluded from provider_extensions.log_attributes so evidence is not
-// duplicated between the typed record and its extensions. event.name is NOT
-// listed: it drives eligibility but has no typed field, so it is preserved as
-// evidence under provider_extensions.log_attributes rather than dropped.
-var extractedLogFields = []string{"model", "input_token_count", "output_token_count", codexConversationIDKey}
-
 // ExtractLogModelInteractions maps the reviewed Codex OTLP log shape into
 // stable-primitive canonical.ModelInteraction records. It is the honest,
 // capability-bounded counterpart to NormalizeLogs: only signals the P0 Codex
@@ -125,10 +118,10 @@ func logRecordOperation(resource map[string]any, record logRecord, receivedAt ti
 	switch stringValue(fields[codexEventNameKey], "") {
 	case codexToolResultEvent:
 		toolCall, _ := codexToolCall(fields, id, sessionID)
-		return codexOperation(operationInput{resource: resource, fields: fields, severity: record.SeverityText, id: id, sessionID: sessionID, orderingTime: started.value, signal: toolCall, category: codexOperationCategory(fields), taskBoundaryReason: "Codex tool-result telemetry has no reviewed task-boundary signal"}), true, nil
+		return codexOperation(operationInput{resource: resource, fields: fields, record: record, severity: record.SeverityText, id: id, sessionID: sessionID, orderingTime: started.value, signal: toolCall, category: codexOperationCategory(fields), taskBoundaryReason: "Codex tool-result telemetry has no reviewed task-boundary signal"}), true, nil
 	case codexSandboxOutcomeEvent:
 		sandboxOutcome, _ := codexSandboxOutcome(fields, id, sessionID)
-		return codexOperation(operationInput{resource: resource, fields: fields, severity: record.SeverityText, id: id, sessionID: sessionID, orderingTime: started.value, signal: sandboxOutcome, category: canonical.OperationCategoryShellCommand, taskBoundaryReason: "Codex sandbox-outcome telemetry has no reviewed task-boundary signal"}), true, nil
+		return codexOperation(operationInput{resource: resource, fields: fields, record: record, severity: record.SeverityText, id: id, sessionID: sessionID, orderingTime: started.value, signal: sandboxOutcome, category: canonical.OperationCategoryShellCommand, taskBoundaryReason: "Codex sandbox-outcome telemetry has no reviewed task-boundary signal"}), true, nil
 	default:
 		return canonical.Operation{}, false, nil
 	}
@@ -137,6 +130,7 @@ func logRecordOperation(resource map[string]any, record logRecord, receivedAt ti
 type operationInput struct {
 	resource           map[string]any
 	fields             map[string]any
+	record             logRecord
 	severity           string
 	id                 string
 	sessionID          string
@@ -170,8 +164,8 @@ func operationProviderExtensions(input operationInput) map[string]any {
 				"reason":     input.taskBoundaryReason,
 			},
 		},
-		"resource_attributes": operationResourceAttributes(input),
-		"log_attributes":      operationLogAttributes(input.fields),
+		"resource_attributes": rawCodexAttributes(input.resource),
+		"log_attributes":      rawCodexAttributes(input.fields),
 		"severity":            input.severity,
 	}
 	switch stringValue(input.fields[codexEventNameKey], "") {
@@ -183,23 +177,12 @@ func operationProviderExtensions(input operationInput) map[string]any {
 	if mcpCall, ok := codexMCPCall(input.fields); ok {
 		extensions["mcp_call"] = mcpCall
 	}
+	attachCodexLogBody(extensions, input.record.Body)
+	extensions["log_record"] = codexLogRecordEvidence(input.record)
+	if environment := codexEnvironment(input.fields, input.resource); environment != nil {
+		extensions["environment"] = environment
+	}
 	return extensions
-}
-
-func operationResourceAttributes(input operationInput) map[string]any {
-	return allowedCodexAttributes(input.resource, "service.name", "service.version")
-}
-
-func operationLogAttributes(fields map[string]any) map[string]any {
-	if stringValue(fields[codexEventNameKey], "") == codexSandboxOutcomeEvent {
-		return allowedCodexAttributes(fields, codexEventNameKey)
-	}
-	known := []string{codexConversationIDKey, "mcp_server"}
-	switch stringValue(fields[codexEventNameKey], "") {
-	case codexToolResultEvent:
-		known = append(known, codexToolResultFieldKeys()...)
-	}
-	return safeCodexLogAttributes(normalize.UnknownFields(fields, known...))
 }
 
 // logRecordModelInteraction builds one ModelInteraction from a log record,
@@ -240,7 +223,7 @@ func logRecordModelInteraction(resource map[string]any, record logRecord, receiv
 		Result:             "unknown",
 		ErrorCode:          nil,
 		Provenance:         normalize.InteractionProvenance(modelObserved, inputTokens, outputTokens),
-		ProviderExtensions: logProviderExtensions(resource, fields, record.SeverityText, id, started.value),
+		ProviderExtensions: logProviderExtensions(resource, fields, record, id, started.value),
 	}
 	return interaction, true, nil
 }
@@ -295,8 +278,8 @@ func durationMs(started, completed nanoTimestamp) *int64 {
 // logProviderExtensions preserves the non-extracted evidence verbatim, mirroring
 // the Event path in normalizeLogRecord: full resource attributes, the log
 // attributes not already promoted onto the typed record, and the severity.
-func logProviderExtensions(resource, fields map[string]any, severity, id string, startedAt time.Time) map[string]any {
-	return map[string]any{
+func logProviderExtensions(resource, fields map[string]any, record logRecord, id string, startedAt time.Time) map[string]any {
+	extensions := map[string]any{
 		"correlation": map[string]any{
 			"dedup_key":    id,
 			"ordering_key": fmt.Sprintf("%020d:%s", startedAt.UnixNano(), id),
@@ -305,8 +288,14 @@ func logProviderExtensions(resource, fields map[string]any, severity, id string,
 				"reason":     "Codex log telemetry has no reviewed task-boundary signal",
 			},
 		},
-		"resource_attributes": resource,
-		"log_attributes":      normalize.UnknownFields(fields, extractedLogFields...),
-		"severity":            severity,
+		"resource_attributes": rawCodexAttributes(resource),
+		"log_attributes":      rawCodexAttributes(fields),
+		"log_record":          codexLogRecordEvidence(record),
+		"severity":            record.SeverityText,
 	}
+	attachCodexLogBody(extensions, record.Body)
+	if environment := codexEnvironment(fields, resource); environment != nil {
+		extensions["environment"] = environment
+	}
+	return extensions
 }

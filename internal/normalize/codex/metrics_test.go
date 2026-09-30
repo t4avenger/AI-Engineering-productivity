@@ -136,7 +136,7 @@ func TestNormalizeMetricsUnknownInstrumentIsIgnored(t *testing.T) {
 	}
 }
 
-func TestNormalizeMetricsTokenUsageFiltersSensitiveAttributes(t *testing.T) {
+func TestNormalizeMetricsTokenUsageRetainsAllAttributes(t *testing.T) {
 	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"api_key","value":{"stringValue":"tiq-canary-resource-key"}},{"key":"user.email","value":{"stringValue":"resource@example.test"}},{"key":"deployment.environment","value":{"stringValue":"telemetryiq-synthetic"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.turn.token_usage","histogram":{"dataPoints":[{"attributes":[{"key":"token_type","value":{"stringValue":"input"}},{"key":"api_key","value":{"stringValue":"tiq-canary-api-key"}},{"key":"authorization","value":{"stringValue":"Bearer tiq-canary-token"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"originator","value":{"stringValue":"codex_exec"}}],"count":"1","sum":"12","timeUnixNano":"1789042160000000000"}]}}]}]}]}`)
 	events, err := NormalizeMetrics(payload, time.Date(2026, 9, 10, 20, 9, 21, 0, time.UTC))
 	if err != nil {
@@ -146,9 +146,9 @@ func TestNormalizeMetricsTokenUsageFiltersSensitiveAttributes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal events: %v", err)
 	}
-	for _, leaked := range []string{"tiq-canary-resource-key", "resource@example.test", "tiq-canary-api-key", "Bearer tiq-canary-token", "synthetic@example.test"} {
-		if strings.Contains(string(encoded), leaked) {
-			t.Fatalf("sensitive value %q leaked in %s", leaked, encoded)
+	for _, retained := range []string{"tiq-canary-resource-key", "resource@example.test", "tiq-canary-api-key", "Bearer tiq-canary-token", "synthetic@example.test"} {
+		if !strings.Contains(string(encoded), retained) {
+			t.Fatalf("raw value %q missing from %s", retained, encoded)
 		}
 	}
 	metricAttributes := events[0].ProviderExtensions["metric_attributes"].(map[string]any)
@@ -173,6 +173,35 @@ func TestNormalizeMetricsTokenUsageIdentityIncludesSeries(t *testing.T) {
 	if events[0].EventID == events[1].EventID {
 		t.Fatalf("event IDs must include resource/series identity: %#v", events)
 	}
+}
+
+func TestNormalizeMetricsRawRetentionDoesNotChangeHistoricalID(t *testing.T) {
+	payload := func(extra string) []byte {
+		return []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}` + extra + `]},"scopeMetrics":[{"metrics":[{"name":"codex.turn.token_usage","histogram":{"dataPoints":[{"attributes":[{"key":"token_type","value":{"stringValue":"input"}}` + extra + `],"count":"1","sum":"12","timeUnixNano":"1789042160000000000"}]}}]}]}]}`)
+	}
+	base, err := NormalizeMetrics(payload(""), time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := NormalizeMetrics(payload(`,{"key":"api_key","value":{"stringValue":"synthetic-secret"}}`), time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if base[0].EventID != raw[0].EventID {
+		t.Fatalf("raw-only attribute changed historical event ID: %q != %q", base[0].EventID, raw[0].EventID)
+	}
+	encoded, _ := json.Marshal(raw)
+	if !strings.Contains(string(encoded), "synthetic-secret") {
+		t.Fatalf("raw metric attribute missing: %s", encoded)
+	}
+}
+
+func FuzzNormalizeMetrics(f *testing.F) {
+	f.Add([]byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.turn.token_usage","histogram":{"dataPoints":[{"attributes":[{"key":"token_type","value":{"stringValue":"input"}}],"count":"1","sum":"12"}]}}]}]}]}`))
+	f.Add([]byte("not json"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		_, _ = NormalizeMetrics(data, time.Unix(1, 0))
+	})
 }
 
 func TestNormalizeMetricsSkillTurnDurationIsInferred(t *testing.T) {

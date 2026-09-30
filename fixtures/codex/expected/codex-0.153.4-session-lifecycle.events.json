@@ -1,6 +1,6 @@
 [
   {
-    "actor_id": "unavailable",
+    "actor_id": "codex:lifecycle-account-123",
     "attributes": {
       "entrypoint": "codex exec",
       "lifecycle_kind": "session_start",
@@ -26,12 +26,38 @@
     "privacy_level": "operational",
     "provider": "openai",
     "provider_extensions": {
+      "body": {
+        "stringValue": "tiq-canary-lifecycle-body"
+      },
+      "environment": {
+        "host_name": "lifecycle-host.example.test",
+        "terminal_type": "pty",
+        "user_account_id": "lifecycle-account-123",
+        "user_email": "lifecycle-user@example.test"
+      },
       "log_attributes": {
-        "event.name": "codex.conversation_starts"
+        "approval_policy": "on-request",
+        "auth_mode": "api-key",
+        "conversation.id": "lifecycle-session",
+        "event.name": "codex.conversation_starts",
+        "model": "gpt-6-astra",
+        "reasoning_summary": "tiq-canary-lifecycle-reasoning",
+        "sandbox_policy": "workspace-write",
+        "slug": "tiq-canary-lifecycle-slug",
+        "terminal.type": "pty",
+        "user.email": "lifecycle-user@example.test"
+      },
+      "log_record": {
+        "body": {
+          "stringValue": "tiq-canary-lifecycle-body"
+        },
+        "severity_text": "INFO"
       },
       "resource_attributes": {
+        "host.name": "lifecycle-host.example.test",
         "service.name": "codex_exec",
-        "service.version": "0.153.4"
+        "service.version": "0.153.4",
+        "user.account_id": "lifecycle-account-123"
       },
       "session_lifecycle": {
         "approval_policy": "on-request",
@@ -55,7 +81,7 @@
     "tool": "codex"
   },
   {
-    "actor_id": "unavailable",
+    "actor_id": "codex:lifecycle-account-123",
     "attributes": {
       "duration_ms": 17,
       "entrypoint": "codex exec",
@@ -83,12 +109,25 @@
     "privacy_level": "operational",
     "provider": "openai",
     "provider_extensions": {
+      "environment": {
+        "host_name": "lifecycle-host.example.test",
+        "user_account_id": "lifecycle-account-123"
+      },
       "log_attributes": {
-        "event.name": "codex.startup_phase"
+        "conversation.id": "lifecycle-session",
+        "duration_ms": "17",
+        "event.name": "codex.startup_phase",
+        "startup.phase": "init",
+        "startup.status": "ok"
+      },
+      "log_record": {
+        "severity_text": "INFO"
       },
       "resource_attributes": {
+        "host.name": "lifecycle-host.example.test",
         "service.name": "codex_exec",
-        "service.version": "0.153.4"
+        "service.version": "0.153.4",
+        "user.account_id": "lifecycle-account-123"
       },
       "session_lifecycle": {
         "duration_ms": "17",
@@ -113,7 +152,7 @@
     "tool": "codex"
   },
   {
-    "actor_id": "unavailable",
+    "actor_id": "codex:lifecycle-account-123",
     "attributes": {
       "duration_ms": 23,
       "entrypoint": "codex exec",
@@ -140,12 +179,26 @@
     "privacy_level": "operational",
     "provider": "openai",
     "provider_extensions": {
+      "environment": {
+        "host_name": "lifecycle-host.example.test",
+        "user_account_id": "lifecycle-account-123"
+      },
       "log_attributes": {
-        "event.name": "codex.websocket_connect"
+        "conversation.id": "lifecycle-session",
+        "duration_ms": "23",
+        "endpoint": "wss://tiq-canary-lifecycle-endpoint.example.test/ws",
+        "event.name": "codex.websocket_connect",
+        "success": true
+      },
+      "log_record": {
+        "severity_text": "INFO",
+        "time_unix_nano": "1788717763000000002"
       },
       "resource_attributes": {
+        "host.name": "lifecycle-host.example.test",
         "service.name": "codex_exec",
-        "service.version": "0.153.4"
+        "service.version": "0.153.4",
+        "user.account_id": "lifecycle-account-123"
       },
       "session_lifecycle": {
         "duration_ms": "23",

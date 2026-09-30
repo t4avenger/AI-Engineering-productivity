@@ -93,7 +93,25 @@ func TestNormalizeLogsMapsCodexSessionLifecycle(t *testing.T) {
 	assertCodexWebsocketLifecycleEvent(t, events[2])
 
 	encoded, _ := json.Marshal(events)
-	assertNoStringCanaries(t, string(encoded), []string{"tiq-canary-lifecycle-slug", "lifecycle-user@example.test", "tiq-canary-lifecycle-body", "lifecycle-host.example.test", "lifecycle-account-123", "tiq-canary-lifecycle-reasoning", "tiq-canary-lifecycle-endpoint.example.test"})
+	assertStringCanariesPresent(t, string(encoded), []string{"tiq-canary-lifecycle-slug", "lifecycle-user@example.test", "tiq-canary-lifecycle-body", "lifecycle-host.example.test", "lifecycle-account-123", "tiq-canary-lifecycle-reasoning", "tiq-canary-lifecycle-endpoint.example.test"})
+}
+
+func TestNormalizeLogsRetainsAllProviderFieldsAndBody(t *testing.T) {
+	data := []byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"authorization","value":{"stringValue":"Bearer synthetic-resource-token"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}},{"key":"conversation.id","value":{"stringValue":"raw-session"}},{"key":"cwd","value":{"stringValue":"/tmp/synthetic-workspace"}},{"key":"file_path","value":{"stringValue":"src/main.go"}},{"key":"files","value":{"arrayValue":{"values":[{"stringValue":"a.go"},{"stringValue":"b.go"}]}}},{"key":"input","value":{"stringValue":"synthetic-input"}},{"key":"command","value":{"stringValue":"go test ./..."}},{"key":"arguments","value":{"stringValue":"-count=1"}},{"key":"output","value":{"stringValue":"synthetic-output"}},{"key":"prompt","value":{"stringValue":"synthetic-prompt"}},{"key":"response","value":{"stringValue":"synthetic-response"}},{"key":"source_code","value":{"stringValue":"package main"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"api_key","value":{"stringValue":"synthetic-api-key"}},{"key":"codex.future.field","value":{"stringValue":"future-value"}}],"body":{"kvlistValue":{"values":[{"key":"content","value":{"stringValue":"synthetic-body"}}]}}}]}]}]}`)
+	events, err := NormalizeLogs(data, time.Unix(1, 0))
+	if err != nil || len(events) != 1 {
+		t.Fatalf("events = %#v, %v", events, err)
+	}
+	encoded, err := json.Marshal(events[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertStringCanariesPresent(t, string(encoded), []string{
+		"synthetic-resource-token", "/tmp/synthetic-workspace", "src/main.go", "a.go", "b.go",
+		"synthetic-input", "go test ./...", "-count=1", "synthetic-output", "synthetic-prompt",
+		"synthetic-response", "package main", "synthetic@example.test", "synthetic-api-key",
+		"future-value", "synthetic-body",
+	})
 }
 
 func assertCodexSessionStartEvent(t *testing.T, event canonical.Event) {
@@ -165,8 +183,8 @@ func TestNormalizeLogsMapsCodexMCPToolResult(t *testing.T) {
 		t.Fatalf("mcp_call = %#v", mcpCall)
 	}
 	logAttributes := events[0].ProviderExtensions["log_attributes"].(map[string]any)
-	if _, promoted := logAttributes["mcp_server"]; promoted {
-		t.Fatalf("mcp_server should be promoted to mcp_call, not duplicated in log attributes: %#v", logAttributes)
+	if logAttributes["mcp_server"] != "synthetic-filesystem-server" {
+		t.Fatalf("mcp_server raw evidence missing from log attributes: %#v", logAttributes)
 	}
 }
 
@@ -233,7 +251,7 @@ func TestNormalizeLogsMapsCodexToolDecisionSignal(t *testing.T) {
 	assertApprovedToolDecisionEvent(t, events[0])
 	assertDeniedToolDecisionEvent(t, events[1])
 	encoded, _ := json.Marshal(events)
-	assertNoStringCanaries(t, string(encoded), []string{"tiq-canary-decision-argument", "tiq-canary-decision-output", "tiq-canary-decision-api-key", "decision-user@example.test", "tiq-canary-decision-body", "decision-host.example.test", "decision-account-123", "tiq-canary-decision-resource-token", "tiq-canary-decision-slug", "tiq-canary-decision-token", "tiq-canary-decision-command", "tiq-canary-decision-command-args", "tiq-canary-decision-command-line", "tiq-canary-decision-cwd", "tiq-canary-decision-path", "tiq-canary-decision-file-path"})
+	assertStringCanariesPresent(t, string(encoded), []string{"tiq-canary-decision-argument", "tiq-canary-decision-output", "tiq-canary-decision-api-key", "decision-user@example.test", "tiq-canary-decision-body", "decision-host.example.test", "decision-account-123", "tiq-canary-decision-resource-token", "tiq-canary-decision-slug", "tiq-canary-decision-token", "tiq-canary-decision-command", "tiq-canary-decision-command-args", "tiq-canary-decision-command-line", "tiq-canary-decision-cwd", "tiq-canary-decision-path", "tiq-canary-decision-file-path"})
 }
 
 func assertApprovedToolDecisionEvent(t *testing.T, event canonical.Event) {
@@ -301,7 +319,7 @@ func TestNormalizeLogsMapsCodexSandboxOutcomeSignal(t *testing.T) {
 		t.Fatalf("sandbox_outcome extension = %#v", event.ProviderExtensions["sandbox_outcome"])
 	}
 	encoded, _ := json.Marshal(event)
-	assertNoStringCanaries(t, string(encoded), []string{"tiq-canary-sandbox-argument", "tiq-canary-sandbox-output", "sandbox-user@example.test", "tiq-canary-sandbox-body", "sandbox-host.example.test", "sandbox-account-123", "tiq-canary-resource-token", "tiq-canary-sandbox-slug", "tiq-canary-sandbox-command", "tiq-canary-sandbox-command-args", "tiq-canary-sandbox-cwd", "tiq-canary-sandbox-path"})
+	assertStringCanariesPresent(t, string(encoded), []string{"tiq-canary-sandbox-argument", "tiq-canary-sandbox-output", "sandbox-user@example.test", "tiq-canary-sandbox-body", "sandbox-host.example.test", "sandbox-account-123", "tiq-canary-resource-token", "tiq-canary-sandbox-slug", "tiq-canary-sandbox-command", "tiq-canary-sandbox-command-args", "tiq-canary-sandbox-cwd", "tiq-canary-sandbox-path"})
 }
 
 func assertSandboxUnavailableFields(t *testing.T, unavailable []string) {
@@ -316,13 +334,21 @@ func assertSandboxUnavailableFields(t *testing.T, unavailable []string) {
 	}
 }
 
-func assertNoStringCanaries(t *testing.T, haystack string, canaries []string) {
+func assertStringCanariesPresent(t *testing.T, haystack string, canaries []string) {
 	t.Helper()
 	for _, canary := range canaries {
-		if strings.Contains(haystack, canary) {
-			t.Fatalf("leaked canary %q: %s", canary, haystack)
+		if !strings.Contains(haystack, canary) {
+			t.Fatalf("missing retained canary %q: %s", canary, haystack)
 		}
 	}
+}
+
+func FuzzNormalizeLogs(f *testing.F) {
+	f.Add([]byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"codex.sse_event"}}]}]}]}]}`))
+	f.Add([]byte("not json"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		_, _ = NormalizeLogs(data, time.Unix(1, 0))
+	})
 }
 
 func TestNormalizeLogsSandboxOutcomeUnknownDurationIsAbsent(t *testing.T) {

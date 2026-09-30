@@ -2,11 +2,16 @@
 
 The live synthetic run confirmed Codex 0.145.0 exports OTLP JSON logs to the
 loopback receiver. It exposed operational attributes for model and token usage,
-plus account, email, host, and provider conversation identifiers. Account, email, and host identifiers remain protected; provider conversation IDs are retained only as local provider-prefixed session correlation keys after the #73 privacy revision.
+plus account, email, host, and provider conversation identifiers. The current
+local-only policy retains every emitted field raw. Recognized operator and
+environment identity is also projected into a present-only environment block;
+provider conversation identifiers use a stable `codex:` prefix for correlation.
 
-The development inspector sanitizes OTLP attribute-pair values before
-in-memory inspection. Regression tests cover the observed sensitive categories.
-Raw payloads are never persisted, and the checked-in observed fixture replaces
-all retained values with synthetic equivalents.
+The opt-in development inspector is a raw local troubleshooting view. The
+authenticated diagnostic preview/export is a separate metadata-only boundary
+that never reads retained event values. Checked-in observed fixtures replace
+all real values with reviewed synthetic equivalents.
 
-The Codex log normaliser retains only model, input-token, and output-token metadata from the reviewed log shape. Other telemetry remains explicitly unavailable until fixture-backed.
+The Codex normaliser retains complete raw log/resource/metric/span evidence and
+projects only fixture-backed stable semantics. Absence of a canonical projection
+does not authorize dropping provider evidence.

@@ -97,6 +97,44 @@ func (r *Repository) applyConnectionPragmas(ctx context.Context, path string) er
 
 func (r *Repository) Close() error { return r.db.Close() }
 
+// DiagnosticSummary returns aggregate-only support metadata. The query never
+// selects raw event/session JSON values into Go; JSON extraction is limited to
+// the canonical provider/tool labels used for grouped counts.
+func (r *Repository) DiagnosticSummary(ctx context.Context) (storage.DiagnosticSummary, error) {
+	var summary storage.DiagnosticSummary
+	if err := r.db.QueryRowContext(ctx, `SELECT
+		(SELECT COUNT(*) FROM sessions),
+		(SELECT COUNT(*) FROM events),
+		(SELECT COUNT(*) FROM operations)`).Scan(&summary.SessionCount, &summary.EventCount, &summary.OperationCount); err != nil {
+		return storage.DiagnosticSummary{}, fmt.Errorf("read diagnostic counts: %w", err)
+	}
+	rows, err := r.db.QueryContext(ctx, `SELECT
+		json_extract(event_json, '$.provider'),
+		json_extract(event_json, '$.tool'),
+		COUNT(*)
+		FROM events
+		GROUP BY 1, 2
+		ORDER BY 1, 2`)
+	if err != nil {
+		return storage.DiagnosticSummary{}, fmt.Errorf("read diagnostic provider counts: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var item storage.DiagnosticProviderToolCount
+		if err := rows.Scan(&item.Provider, &item.Tool, &item.EventCount); err != nil {
+			return storage.DiagnosticSummary{}, fmt.Errorf("scan diagnostic provider counts: %w", err)
+		}
+		summary.ProviderTools = append(summary.ProviderTools, item)
+	}
+	if err := rows.Err(); err != nil {
+		return storage.DiagnosticSummary{}, fmt.Errorf("iterate diagnostic provider counts: %w", err)
+	}
+	if summary.ProviderTools == nil {
+		summary.ProviderTools = []storage.DiagnosticProviderToolCount{}
+	}
+	return summary, nil
+}
+
 func (r *Repository) migrate(ctx context.Context) error {
 	// Fresh databases get the current events shape directly (no provenance_json);
 	// existing v2 databases keep their provenance-bearing table here and have it

@@ -55,10 +55,12 @@ raw values it receives under epic #87.
 
 Codex CLI 0.145.0 was observed exporting OTLP JSON logs with `service.name`
 `codex_cli_rs` (interactive TUI) and `codex_exec` (the non-interactive `codex
-exec` subcommand); the log adapter accepts both. The log adapter retains reviewed operational attributes (`event.name`,
-`model`, `input_token_count`, `output_token_count`, cached-input tokens from
-the observed `cached_token_count` log key, and `reasoning_token_count`) plus
-sanitised provider extensions. Cached and reasoning counts are promoted only
+exec` subcommand); the log adapter accepts both. The log adapter retains every
+resource attribute, log attribute, body and unknown field raw under provider
+extensions. Stable operational attributes (`event.name`, `model`, token counts,
+lifecycle and operation evidence) are additionally projected into canonical
+fields; this projection never removes their raw representation. Cached and
+reasoning counts are promoted only
 when they parse as non-negative integer token counts; absent or malformed values
 stay absent rather than becoming `0`. Local Codex 0.153.4 metadata also shows tool telemetry such as
 `codex.tool_decision`, `codex.tool_result`, `codex.sandbox_outcome`,
@@ -70,11 +72,11 @@ first-class tool-call signal: event attributes expose `operation_id`,
 namespace, call ID, status, sequence, truncation flag, and observed provenance.
 `codex.tool_decision` becomes an approval/permission decision signal: event
 attributes expose `approval_id`, `approval_decision`, optional
-`approval_reason_class`, and safe provider-reported tool identity, while
+`approval_reason_class`, and provider-reported tool identity, while
 `provider_extensions.tool_decision` preserves the provider-specific decision
 fields. `approvals` is removed from `attributes.unavailable_fields` only for
 `codex.tool_decision`. `codex.sandbox_outcome` becomes a command-execution signal with the same public
-timeline operation fields; safe provider details are kept under
+timeline operation fields; provider details are kept raw under
 `provider_extensions.sandbox_outcome`, using `initial_duration_ms` as the
 operation duration when present. Operation IDs include the session identity plus
 provider call ID when present, so replay deduplication cannot collapse reused
@@ -83,7 +85,7 @@ call IDs from different sessions. `tool_calls` is removed from
 `command_execution` is removed only for `codex.sandbox_outcome`. Codex
 `codex.conversation_starts` is normalised to canonical `session.active` and
 stamps `lifecycle_kind=session_start`, while `codex.startup_phase` and
-`codex.websocket_connect` retain safe lifecycle/governance evidence such as
+`codex.websocket_connect` retain lifecycle/governance evidence such as
 phase, status, duration, entrypoint, auth mode, approval policy, sandbox policy,
 and terminal type. These lifecycle-backed events remove `session_lifecycle` from
 `attributes.unavailable_fields`; session end remains unknown because no reviewed
@@ -93,9 +95,9 @@ those fields unavailable.
 When a `codex.tool_result` carries a non-empty `mcp_server`, the event normaliser
 also keeps the existing explicit MCP-use signal under
 `provider_extensions.mcp_call` with the provider-reported raw `server_name` (the
-correlation identity, `identity_state: provider_reported`) and safe invocation
-metadata; the server name is promoted out of generic log attributes to avoid
-duplicate evidence but retained in the MCP-specific record for display. Empty
+correlation identity, `identity_state: provider_reported`) and invocation
+metadata. The complete log-attribute echo also keeps the original server field;
+typed promotion never substitutes for raw retention. Empty
 `mcp_server` means the provider did not report that tool result as an MCP server
 call, so it remains an internal Codex/tool invocation rather than MCP inventory
 evidence. When a `conversation.id` or `thread.id` is present, logs use the raw
@@ -122,8 +124,9 @@ under session `provider_extensions.resource_attributes`, while session attribute
 (`codex_cli_rs` -> `interactive`, `codex_exec` -> `codex exec`) for the sessions
 evidence browser. Log-derived sessions and Codex CLI 0.155.1 traces carrying the observed resource-level `conversation.id` get `session_id_source=conversation.id`; reviewed `session_task.turn` spans carrying `thread.id` retain `session_id_source=thread.id`. Content-derived metrics and traces without an exact provider key do not.
 The OTLP adapter captures only fields present on OTLP. Raw rollout ingestion is
-the complementary local-only content surface and retains provider-emitted
-prompt/response/source/path/command/identity fields under the rollout extension.
+the complementary local-only content surface. Both paths retain any emitted
+prompt/response/source/path/command/identity/credential fields; committed
+fixtures and diagnostic outputs never contain genuine secret values.
 
 ## Model-interaction records
 
@@ -142,12 +145,12 @@ Codex log shape into stable-primitive `canonical.ModelInteraction` records
   distinguishable from a real zero.
 - **Cached and reasoning tokens, task outcome** (`unknown` for typed model records) are left
   `nil`/`"unknown"`; no typed model field is fabricated from provider-extension evidence.
-- **Tool-call operations** (`supported` for `codex.tool_result`) and **command-execution operations** (`supported` for `codex.sandbox_outcome`) are extracted into `canonical.Operation` by `ExtractLogOperations`, persisted by the live `/v1/logs` path, and exposed in operation stats on the Insights page. Timeline events still carry operation ID, category, outcome, and duration for the evidence browser. Operation ordering uses observed log timestamps when present, falling back to receive time only when absent. Known observed Codex tool names map conservatively (`exec_command` -> shell command, `apply_patch` -> filesystem write); sandbox outcomes are categorised as shell commands. Provider-emitted command, argument, and output fields are retained verbatim as local raw tool evidence; credentials, account identifiers, prompt/response fields, and diagnostics remain excluded. Unknown tool-result names stay `unknown`.
+- **Tool-call operations** (`supported` for `codex.tool_result`) and **command-execution operations** (`supported` for `codex.sandbox_outcome`) are extracted into `canonical.Operation` by `ExtractLogOperations`, persisted by the live `/v1/logs` path, and exposed in operation stats on the Insights page. Timeline events still carry operation ID, category, outcome, and duration for the evidence browser. Operation ordering uses observed log timestamps when present, falling back to receive time only when absent. Known observed Codex tool names map conservatively (`exec_command` -> shell command, `apply_patch` -> filesystem write); sandbox outcomes are categorised as shell commands. Every provider-emitted command, argument, output, credential, identity, and content field is retained verbatim as local raw evidence. Diagnostics remain metadata-only. Unknown tool-result names stay `unknown`.
 - **Pull-request / merge-request URLs** (`supported` for 0.155.1 `codex.tool_result`) are recognised only when a provider-emitted field contains an exact HTTP(S) URL with a GitHub/GitLab/Bitbucket/Azure DevOps-compatible pull or merge-request path. The raw URL and source field remain in provider extensions; one distinct session candidate becomes `attributes.pr_link`, while conflicts are `partial`. The normaliser never derives a link from repository metadata or calls the host.
-- **Approval/permission decisions** (`supported` for `codex.tool_decision`) are retained as event-level approval signals rather than `canonical.Operation` records, because they describe permission decisions before/around a tool call, not execution itself. Missing decisions are labelled `unknown`; approved/denied variants retain local raw command/argument/output evidence when Codex emits it, but exclude credentials, account identifiers, emails, prompt/response fields, and slug values.
+- **Approval/permission decisions** (`supported` for `codex.tool_decision`) are retained as event-level approval signals rather than `canonical.Operation` records, because they describe permission decisions before/around a tool call, not execution itself. Missing decisions are labelled `unknown`; approved/denied variants retain every emitted field in the raw log-attribute echo, including credentials, account/email identity, content, command evidence and slug values.
 - **MCP-backed tool results** (`partial` for MCP inventory) are represented only when Codex reports a non-empty `mcp_server`; the provider-reported raw server name is retained under `provider_extensions.mcp_call` and is itself the correlation identity.
 - **Session lifecycle/governance** (`partial`) maps `codex.conversation_starts`
-  to canonical `session.active` and keeps safe startup/websocket governance
+  to canonical `session.active` and keeps startup/websocket governance
   metadata on the timeline. Session end is still `unknown` pending fixture-backed
   evidence.
 - **Session/request identity** uses the raw `codex:<conversation.id>` or
@@ -162,7 +165,7 @@ Codex log shape into stable-primitive `canonical.ModelInteraction` records
 A record is emitted only when the log `event.name` is a whitelisted
 model-interaction event (`codex.sse_event`) and it carries at least a model or a
 token count, so a bare event never becomes an all-unknown record. Non-extracted
-resource and log attributes plus the severity are preserved verbatim under
+resource and log attributes, record body and severity are preserved verbatim under
 `provider_extensions`. `fixtures/codex/expected/codex-0.145.0-logs.records.json`
 is the golden output for the checked-in observed-sanitised input.
 
@@ -209,12 +212,13 @@ The token count comes from the histogram datapoint `sum`. Missing, malformed, or
 negative sums produce no event rather than a fabricated zero. Token metric event
 IDs include service/resource, scope, token type, model, timestamp, series
 attributes, and token sum so distinct resource or series datapoints do not
-collapse during replay deduplication. The datapoint `count` is preserved only as
-metric evidence under `provider_extensions.metric`. Non-promoted metric and
-resource attributes are retained only from a reviewed allowlist
+collapse during replay deduplication. The datapoint `count` is preserved as
+metric evidence under `provider_extensions.metric`. Complete resource, scope and
+datapoint attributes are retained raw. The historical scalar allowlist
 (`app.version`, `auth_mode`, `deployment.environment`, `originator`,
-`session_source`, `tmp_mem_enabled`); other fields are discarded before
-persistence rather than filtered by denylist.
+`session_source`, `tmp_mem_enabled`) is used only as part of the deterministic
+event-ID input so newly emitted raw fields cannot change replay deduplication
+keys.
 
 Metric token events are deliberately non-priceable in the cost calculator to
 avoid double-counting normal Codex exports where `codex.sse_event` logs and
@@ -224,6 +228,14 @@ source/dedup policy will be chosen.
 
 Golden: `fixtures/codex/expected/codex-0.153.4-turn-token-usage-metrics.events.json`
 for `fixtures/codex/observed-sanitised/codex-0.153.4-turn-token-usage-metrics.json`.
+
+## Diagnostics boundary
+
+`GET /api/v1/diagnostics/preview` and `POST /api/v1/diagnostics/export` are
+authenticated management endpoints. They expose only schema/service metadata,
+ingest counters, aggregate storage counts, and provider/tool event counts. They
+never read or serialize event/session JSON, identifiers, provider extensions,
+paths, commands, identity, content, or credential values.
 
 The static-analysis gate enforces cyclomatic complexity of 15 or lower for
 each Go function. The normaliser separates fixture, resource, scope, and span

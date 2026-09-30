@@ -1,6 +1,6 @@
 [
   {
-    "actor_id": "unavailable",
+    "actor_id": "codex:synthetic@example.test",
     "attributes": {
       "cached_input_token_count": 300,
       "input_token_count": 1200,
@@ -27,13 +27,22 @@
     "privacy_level": "operational",
     "provider": "openai",
     "provider_extensions": {
+      "environment": {
+        "user_email": "synthetic@example.test"
+      },
       "log_attributes": {
+        "api_key": "tiq-canary-codex-token",
         "cached_token_count": "300",
+        "conversation.id": "synthetic-cached-reasoning-session",
         "event.name": "codex.sse_event",
         "input_token_count": "1200",
         "model": "gpt-5-codex-synthetic",
         "output_token_count": "144",
-        "reasoning_token_count": "55"
+        "reasoning_token_count": "55",
+        "user.email": "synthetic@example.test"
+      },
+      "log_record": {
+        "severity_text": "INFO"
       },
       "resource_attributes": {
         "service.name": "codex_exec",

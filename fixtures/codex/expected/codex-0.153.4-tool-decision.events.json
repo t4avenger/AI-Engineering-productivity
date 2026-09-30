@@ -30,10 +30,22 @@
     "provider": "openai",
     "provider_extensions": {
       "log_attributes": {
+        "call_id": "synthetic-decision-approved",
+        "conversation.id": "synthetic-decision-session",
+        "decision": "allow",
         "event.name": "codex.tool_decision",
-        "model": "gpt-6-astra"
+        "model": "gpt-6-astra",
+        "source": "policy",
+        "tool_name": "exec_command",
+        "tool_namespace": "functions"
+      },
+      "log_record": {
+        "observed_time_unix_nano": "1788717763628000000",
+        "severity_text": "INFO",
+        "time_unix_nano": "1788717763628000000"
       },
       "resource_attributes": {
+        "env": "telemetryiq-synthetic",
         "service.name": "codex_exec",
         "service.version": "0.153.4"
       },
@@ -88,9 +100,21 @@
     "provider": "openai",
     "provider_extensions": {
       "log_attributes": {
-        "event.name": "codex.tool_decision"
+        "call_id": "synthetic-decision-denied",
+        "conversation.id": "synthetic-decision-session",
+        "decision": "deny",
+        "event.name": "codex.tool_decision",
+        "source": "sandbox",
+        "tool_name": "apply_patch",
+        "tool_namespace": "functions"
+      },
+      "log_record": {
+        "observed_time_unix_nano": "1788717763629000000",
+        "severity_text": "INFO",
+        "time_unix_nano": "1788717763629000000"
       },
       "resource_attributes": {
+        "env": "telemetryiq-synthetic",
         "service.name": "codex_exec",
         "service.version": "0.153.4"
       },

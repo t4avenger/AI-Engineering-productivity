@@ -114,8 +114,8 @@ and cost statuses, and never represents an unknown price as zero.
 
 The local-only product contract retains raw observed prompts, responses, source
 content, provider-native IDs, paths and commands (epic #87; #94 content logs).
-Account identifiers/email remain excluded at the wire boundary, diagnostics are
-sanitised, and cloud/team sharing requires a separate field review. Historical
+Account identifiers/email remain raw in the local store, diagnostics are
+metadata-only, and cloud/team sharing requires a separate field review. Historical
 Privacy-page/default copy claiming all content is disabled must be corrected
 under #188; it is not a reason to hide already retained evidence. JSONL/prior
 adapter gaps remain #173, #104 and #105, not a claim of universal capture.

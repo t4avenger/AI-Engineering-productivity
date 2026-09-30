@@ -202,6 +202,19 @@ func TestNormalizeTracesRoutingAndMalformedSupportedData(t *testing.T) {
 	})
 }
 
+func TestNormalizeTracesRetainsIdentityCredentialsAndBehaviour(t *testing.T) {
+	payload := []byte(`{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"user.email","value":{"stringValue":"trace@example.test"}},{"key":"authorization","value":{"stringValue":"Bearer synthetic-trace-token"}}]},"scopeSpans":[{"spans":[{"traceId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","spanId":"1111111111111111","name":"session_task.turn","startTimeUnixNano":"1789671946326852067","attributes":[{"key":"cwd","value":{"stringValue":"/tmp/trace-workspace"}},{"key":"file_path","value":{"stringValue":".env"}},{"key":"command","value":{"stringValue":"cat .env"}},{"key":"api_key","value":{"stringValue":"synthetic-trace-key"}}]}]}]}]}`)
+	events, err := NormalizeTraces(payload, time.Unix(1, 0))
+	if err != nil || len(events) != 1 {
+		t.Fatalf("events = %#v, %v", events, err)
+	}
+	if events[0].ActorID != "codex:trace@example.test" {
+		t.Fatalf("actor id = %q", events[0].ActorID)
+	}
+	encoded, _ := json.Marshal(events[0])
+	assertStringCanariesPresent(t, string(encoded), []string{"trace@example.test", "synthetic-trace-token", "/tmp/trace-workspace", ".env", "cat .env", "synthetic-trace-key"})
+}
+
 func FuzzCodexTraces(f *testing.F) {
 	f.Add(observedTracePayload(f))
 	f.Add([]byte(`{"resourceSpans":[]}`))

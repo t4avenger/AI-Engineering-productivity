@@ -3,7 +3,7 @@
 P0 gate artifact. The behaviour-observability reorientation widens what we ingest (tool
 calls, MCP/skill invocations, file operations, command categories). Epic #87 (issue #88)
 reversed the earlier ingest-time-hiding stance: for the local-only individual edition, raw
-provider-native identifiers, file paths, and command lines are **persisted verbatim and shown
+provider-native identifiers, identity, content, file paths, commands, credentials, and unknown fields are **persisted verbatim and shown
 to the local user**, because the product now needs real session/request/MCP identity and real
 paths to be useful, and the operator running on their own machine must see the actual data —
 never a hashed or tokenised placeholder.
@@ -20,10 +20,9 @@ cross-device sharing is a different trust boundary and MUST re-evaluate every fi
 upload or aggregation; nothing in this document authorises off-machine transmission.
 
 ## Assets and how they are handled
-- **Prompt / response / source-code content** — still not captured by default. The normalisers
-  declare these fields unavailable and refuse content at the ingest boundary (e.g. Cursor
-  rejects message-content fields). Configurable capture of this content is tracked separately in
-  #94 and remains gated by `collection.prompts` / `collection.responses` / `collection.source_code`.
+- **Prompt / response / source-code content** — retained raw whenever emitted. Provider-side
+  exporter configuration may make a field absent; absence remains unavailable rather than a
+  fabricated empty value.
 - **Provider-native identifiers** (session/conversation/request IDs, MCP server names) — retained
   raw with a stable provider prefix (`codex:`, `claude-code:`, `cursor-agent:`) so session lists,
   detail pages, and insights expose real correlation keys. No HMAC fingerprint is emitted; when a
@@ -34,6 +33,8 @@ upload or aggregation; nothing in this document authorises off-machine transmiss
 - **Sensitive paths** (`.env`, `~/.ssh/id_rsa`, `*.pem`, `credentials`) — retained raw *and*
   classified. `privacy.ClassifyPath` / `privacy.ClassifyCommandAccess` run over the raw stored
   value to add a governance signal (class + project boundary); they no longer replace the value.
+- **Diagnostics** — authenticated preview/export contains aggregate metadata only and never
+  reads event/session JSON, so retained content, identity and credentials cannot cross it.
 
 ## Governance over raw values
 `privacy.ClassifyPath` maps a raw path to a coarse class (`dotenv`, `ssh_key`, `cert`,
@@ -50,6 +51,7 @@ shell-command intent is classified alongside direct file operations.
 - Raw-survival tests: a seeded raw identifier, file path, and command line survive ingest →
   storage → read verbatim, with no HMAC/`path-class:`/`command-access:` placeholder anywhere.
 - Governance evidence tests: risky-access findings carry the raw path/command as evidence.
-- Content-gating tests: prompt/response/source-code content is not captured by default (refused
-  at the ingest boundary), pending the configurable-capture work in #94.
+- Content-survival tests: emitted prompt/response/source-code content survives ingest and read.
+- Diagnostic canary tests: retained content, identity and credential values never appear in
+  application logs, diagnostic preview, or diagnostic export.
 - `indeterminate` is returned when visibility is absent — no fabricated certainty.

@@ -65,6 +65,29 @@ type InsightSourceReader interface {
 	ListInsightSourceEvents(context.Context) ([]canonical.Event, error)
 }
 
+// DiagnosticProviderToolCount is aggregate-only diagnostic metadata. It never
+// carries session identifiers or retained provider values.
+type DiagnosticProviderToolCount struct {
+	Provider   string `json:"provider"`
+	Tool       string `json:"tool"`
+	EventCount int64  `json:"event_count"`
+}
+
+// DiagnosticSummary is the storage contribution to a support bundle. Raw
+// event/session JSON is deliberately absent from this contract.
+type DiagnosticSummary struct {
+	SessionCount   int64                         `json:"session_count"`
+	EventCount     int64                         `json:"event_count"`
+	OperationCount int64                         `json:"operation_count"`
+	ProviderTools  []DiagnosticProviderToolCount `json:"provider_tools"`
+}
+
+// DiagnosticSummaryReader exposes aggregate storage health without returning
+// any locally retained telemetry values.
+type DiagnosticSummaryReader interface {
+	DiagnosticSummary(context.Context) (DiagnosticSummary, error)
+}
+
 // SessionReader is the read-only session contract used by the local API.
 type SessionReader interface {
 	Session(context.Context, string) (canonical.Session, bool, error)
@@ -145,5 +168,6 @@ type Repository interface {
 	AgentRelationReader
 	CostReader
 	InsightSourceReader
+	DiagnosticSummaryReader
 	Close() error
 }

@@ -128,7 +128,13 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 	if !hasCodexOutcomeContract(eventName) {
 		attributes["unavailable_fields"] = append(attributes["unavailable_fields"].([]string), "task_outcome")
 	}
-	extensions := map[string]any{"resource_attributes": codexLogResourceAttributes(eventName, resource), "log_attributes": codexLogAttributes(fields), "severity": record.SeverityText}
+	extensions := map[string]any{
+		"resource_attributes": rawCodexAttributes(resource),
+		"log_attributes":      rawCodexAttributes(fields),
+		"log_record":          codexLogRecordEvidence(record),
+		"severity":            record.SeverityText,
+	}
+	attachCodexLogBody(extensions, record.Body)
 	attachCodexLifecycleSignal(attributes, extensions, resource, fields, eventName)
 	attachCodexLogSignals(attributes, extensions, fields, id, sessionID)
 	normalize.AttachPRLinkEvidence(attributes, extensions, fields, codexPRLinkScanFields)
@@ -137,7 +143,26 @@ func normalizeLogRecord(resource map[string]any, record logRecord, receivedAt ti
 		extensions["mcp_call"] = mcpCall
 	}
 	attachCodexOutcomeContract(extensions, fields, eventName)
-	return canonical.Event{SchemaVersion: canonicalSchemaVersion, EventID: id, EventType: canonicalEventType, OccurredAt: occurredAt.UTC(), ReceivedAt: receivedAt.UTC(), Provider: "openai", Tool: "codex", SourceSchema: sourceSchema, SourceVersion: stringValue(resource["service.version"], unavailable), ActorID: unavailable, DeviceID: unavailable, SessionID: sessionID, PrivacyLevel: "operational", Attributes: attributes, ProviderExtensions: extensions}, nil
+	event := canonical.Event{SchemaVersion: canonicalSchemaVersion, EventID: id, EventType: canonicalEventType, OccurredAt: occurredAt.UTC(), ReceivedAt: receivedAt.UTC(), Provider: "openai", Tool: "codex", SourceSchema: sourceSchema, SourceVersion: stringValue(resource["service.version"], unavailable), ActorID: unavailable, DeviceID: unavailable, SessionID: sessionID, PrivacyLevel: "operational", Attributes: attributes, ProviderExtensions: extensions}
+	applyCodexEnvironment(&event, fields, resource)
+	return event, nil
+}
+
+func codexLogRecordEvidence(record logRecord) map[string]any {
+	evidence := map[string]any{}
+	if len(record.Body) > 0 && string(record.Body) != "null" {
+		evidence["body"] = append(json.RawMessage(nil), record.Body...)
+	}
+	if record.ObservedTimeUnixNano != "" {
+		evidence["observed_time_unix_nano"] = record.ObservedTimeUnixNano
+	}
+	if record.SeverityText != "" {
+		evidence["severity_text"] = record.SeverityText
+	}
+	if record.TimeUnixNano != "" {
+		evidence["time_unix_nano"] = record.TimeUnixNano
+	}
+	return evidence
 }
 
 func codexCanonicalEventType(eventName string) string {
@@ -353,29 +378,6 @@ func codexErrorCode(fields map[string]any, status string) string {
 	return ""
 }
 
-func codexLogAttributes(fields map[string]any) map[string]any {
-	eventName := stringValue(fields[codexEventNameKey], "")
-	switch eventName {
-	case codexSandboxOutcomeEvent:
-		return allowedCodexAttributes(fields, codexEventNameKey)
-	case codexToolDecisionEvent:
-		return allowedCodexAttributes(fields, codexEventNameKey, "model")
-	}
-	if codexLifecycleEvent(eventName) {
-		return allowedCodexAttributes(fields, codexEventNameKey)
-	}
-	known := []string{"mcp_server", codexConversationIDKey}
-	switch eventName {
-	case codexToolResultEvent:
-		known = append(known, codexToolResultFieldKeys()...)
-	}
-	return safeCodexLogAttributes(normalize.UnknownFields(fields, known...))
-}
-
-func codexLogResourceAttributes(_ string, resource map[string]any) map[string]any {
-	return allowedCodexAttributes(resource, codexServiceNameKey, "service.version")
-}
-
 func codexLifecycleEvent(eventName string) bool {
 	switch eventName {
 	case codexConversationStarts, codexStartupPhaseEvent, codexWebsocketConnect:
@@ -495,10 +497,6 @@ func codexOperationCategory(fields map[string]any) canonical.OperationCategory {
 	}
 }
 
-func codexToolResultFieldKeys() []string {
-	return []string{"tool_name", "tool_namespace", "call_id", "duration_ms", "success", "output_truncated", "tool_result_seq", "decision"}
-}
-
 func codexSandboxOutcome(fields map[string]any, fallbackID, sessionID string) (codexToolCallSignal, bool) {
 	if stringValue(fields[codexEventNameKey], "") != codexSandboxOutcomeEvent {
 		return codexToolCallSignal{}, false
@@ -613,36 +611,6 @@ func codexApprovalDecisionStatus(value any) string {
 
 func codexToolDecisionFieldKeys() []string {
 	return []string{"call_id", "decision", "source", "tool_name", "tool_namespace"}
-}
-
-func allowedCodexAttributes(fields map[string]any, keys ...string) map[string]any {
-	allowed := make(map[string]any, len(keys))
-	for _, key := range keys {
-		if value, ok := fields[key]; ok {
-			allowed[key] = value
-		}
-	}
-	return allowed
-}
-
-func safeCodexLogAttributes(fields map[string]any) map[string]any {
-	safe := make(map[string]any, len(fields))
-	for key, value := range fields {
-		if sensitiveCodexLogAttribute(key) {
-			continue
-		}
-		safe[key] = value
-	}
-	return safe
-}
-
-func sensitiveCodexLogAttribute(key string) bool {
-	switch strings.ToLower(strings.TrimSpace(key)) {
-	case "api_key", "authorization", "custom_metadata", "cwd", "file", "file_path", "filename", "files", "host.name", "hostname", "input", "path", "prompt", "response", "slug", "source_code", "user.account_id", "user.email":
-		return true
-	default:
-		return false
-	}
 }
 
 // codexPRLinkScanFields are the reviewed Codex log fields that can carry a
