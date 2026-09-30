@@ -282,6 +282,9 @@ func FuzzNormalizeLogs(f *testing.F) {
 	f.Add([]byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"user_prompt"}},{"key":"prompt.id","value":{"intValue":"5"}}]}]}]}]}`))
 	f.Add([]byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"user_prompt"}},{"key":"prompt.id","value":{"stringValue":""}},{"key":"message.uuid","value":{"stringValue":"  "}}]}]}]}]}`))
 	f.Add([]byte(`{"resourceLogs":[{"scopeLogs":[{"logRecords":[{}]}]}]}`))
+	// A tool_result whose tool_parameters/tool_input carry a PR URL, a printf
+	// template, and a non-string value — the #251 PR-link scan surfaces.
+	f.Add([]byte(`{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}}]},"scopeLogs":[{"logRecords":[{"attributes":[{"key":"event.name","value":{"stringValue":"tool_result"}},{"key":"session.id","value":{"stringValue":"s1"}},{"key":"event.timestamp","value":{"stringValue":"2026-09-30T20:01:34.884Z"}},{"key":"tool_parameters","value":{"stringValue":"{\"full_command\":\"echo https://github.com/o/r/pull/1 https://h/pull/%s\"}"}},{"key":"tool_input","value":{"intValue":"7"}}]}]}]}]}`))
 	f.Add([]byte("not json"))
 	f.Add([]byte(""))
 	f.Fuzz(func(t *testing.T, data []byte) {

@@ -1,6 +1,8 @@
 package normalize
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/url"
 	"regexp"
 	"sort"
@@ -63,6 +65,27 @@ func AttachPRLinkEvidence(attributes, extensions, fields map[string]any, scanFie
 	}
 	attributes["pr_link_candidates"] = candidates
 	extensions["pr_link_evidence"] = evidence
+}
+
+// PRLinkScanText renders a retained provider value as the text
+// AttachPRLinkEvidence scans. A string passes through when observed; a
+// structured value (a decoded tool input or result object/array) is rendered as
+// compact JSON with HTML escaping off, so a URL's `&` survives verbatim. Any
+// other value (number, bool, nil) carries no URL and reports false. It lets a
+// provider scan structured tool I/O without a second copy of the URL grammar.
+func PRLinkScanText(value any) (string, bool) {
+	switch value.(type) {
+	case map[string]any, []any:
+	default:
+		return ObservedString(value)
+	}
+	var buffer bytes.Buffer
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(value); err != nil {
+		return "", false
+	}
+	return strings.TrimSpace(buffer.String()), true
 }
 
 // PRLinkURLs returns the distinct pull/merge-request URLs present verbatim in

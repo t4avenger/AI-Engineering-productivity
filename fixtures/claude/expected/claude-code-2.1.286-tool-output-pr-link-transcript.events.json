@@ -1,0 +1,230 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:25125125-1251-4251-8251-251251251251:00000001-0000-4000-8000-000000000251",
+    "event_type": "user_message",
+    "occurred_at": "2026-09-30T20:02:18.787Z",
+    "received_at": "1970-01-01T00:00:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.286",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:25125125-1251-4251-8251-251251251251",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "response_content",
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:25125125-1251-4251-8251-251251251251:00000001-0000-4000-8000-000000000251",
+        "ordering_key": "01790798538787000000:claude-code:25125125-1251-4251-8251-251251251251:00000001-0000-4000-8000-000000000251",
+        "parent_uuid": null,
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "00000001-0000-4000-8000-000000000251"
+      },
+      "transcript": {
+        "cwd": "/home/synthetic/project",
+        "entrypoint": "sdk-cli",
+        "git_branch": "feature/tiq-251",
+        "is_sidechain": false,
+        "prompt_content": "Run this single Bash command exactly as written and nothing else: printf 'https://github.com/acme-synthetic/telemetryiq/pull/%s\\n' 251 . Then reply done.",
+        "user_type": "external"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:25125125-1251-4251-8251-251251251251:00000002-0000-4000-8000-000000000251",
+    "event_type": "assistant_message",
+    "occurred_at": "2026-09-30T20:02:23.69Z",
+    "received_at": "1970-01-01T00:00:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.286",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:25125125-1251-4251-8251-251251251251",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cache_write_input_token_count": 4849,
+      "cached_input_token_count": 18183,
+      "input_token_count": 3048,
+      "model": "claude-haiku-4-5-20251001",
+      "output_token_count": 344,
+      "reasoning_token_count": 185,
+      "unavailable_fields": [
+        "prompt_content",
+        "response_content",
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "cache_usage_extra": {
+        "cache_creation.ephemeral_1h_input_tokens": 0,
+        "cache_creation.ephemeral_5m_input_tokens": 4849
+      },
+      "correlation": {
+        "dedup_key": "claude-code:25125125-1251-4251-8251-251251251251:00000002-0000-4000-8000-000000000251",
+        "ordering_key": "01790798543690000000:claude-code:25125125-1251-4251-8251-251251251251:00000002-0000-4000-8000-000000000251",
+        "parent_uuid": "00000001-0000-4000-8000-000000000251",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "00000002-0000-4000-8000-000000000251"
+      },
+      "transcript": {
+        "api_block_index": 4,
+        "cwd": "/home/synthetic/project",
+        "entrypoint": "sdk-cli",
+        "git_branch": "feature/tiq-251",
+        "is_sidechain": false,
+        "request_id": "claude-code:req_synthetic_pr_link_2",
+        "user_type": "external"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:25125125-1251-4251-8251-251251251251:toolcall:toolu_synthetic_pr_link_output",
+    "event_type": "tool_call",
+    "occurred_at": "2026-09-30T20:02:23.69Z",
+    "received_at": "1970-01-01T00:00:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.286",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:25125125-1251-4251-8251-251251251251",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "category": "shell command",
+      "pr_link_candidates": [
+        "https://github.com/acme-synthetic/telemetryiq/pull/251"
+      ],
+      "tool": {
+        "full_command": "printf 'https://github.com/acme-synthetic/telemetryiq/pull/%s\\n' 251",
+        "tool_name": "Bash",
+        "tool_use_id": "toolu_synthetic_pr_link_output"
+      },
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "task_outcome",
+        "reasoning_tokens",
+        "repository_context",
+        "prompt_content",
+        "response_content",
+        "provider_cost",
+        "trace_span_correlation",
+        "approvals"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:25125125-1251-4251-8251-251251251251:toolcall:toolu_synthetic_pr_link_output",
+        "ordering_key": "01790798543690000000:claude-code:25125125-1251-4251-8251-251251251251:toolcall:toolu_synthetic_pr_link_output",
+        "parent_uuid": "00000001-0000-4000-8000-000000000251",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "00000002-0000-4000-8000-000000000251"
+      },
+      "pr_link_evidence": [
+        {
+          "field": "tool_output",
+          "url": "https://github.com/acme-synthetic/telemetryiq/pull/251"
+        },
+        {
+          "field": "tool_use_result",
+          "url": "https://github.com/acme-synthetic/telemetryiq/pull/251"
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:25125125-1251-4251-8251-251251251251:00000004-0000-4000-8000-000000000251",
+    "event_type": "assistant_message",
+    "occurred_at": "2026-09-30T20:02:26.322Z",
+    "received_at": "1970-01-01T00:00:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.286",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:25125125-1251-4251-8251-251251251251",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cache_write_input_token_count": 8034,
+      "cached_input_token_count": 15611,
+      "input_token_count": 8,
+      "model": "claude-haiku-4-5-20251001",
+      "output_token_count": 32,
+      "reasoning_token_count": 26,
+      "unavailable_fields": [
+        "prompt_content",
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "cache_usage_extra": {
+        "cache_creation.ephemeral_1h_input_tokens": 0,
+        "cache_creation.ephemeral_5m_input_tokens": 8034
+      },
+      "correlation": {
+        "dedup_key": "claude-code:25125125-1251-4251-8251-251251251251:00000004-0000-4000-8000-000000000251",
+        "ordering_key": "01790798546322000000:claude-code:25125125-1251-4251-8251-251251251251:00000004-0000-4000-8000-000000000251",
+        "parent_uuid": "00000003-0000-4000-8000-000000000251",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "00000004-0000-4000-8000-000000000251"
+      },
+      "transcript": {
+        "api_block_index": 1,
+        "cwd": "/home/synthetic/project",
+        "entrypoint": "sdk-cli",
+        "git_branch": "feature/tiq-251",
+        "is_sidechain": false,
+        "request_id": "claude-code:req_synthetic_pr_link_4",
+        "response_content": "done",
+        "user_type": "external"
+      }
+    }
+  }
+]

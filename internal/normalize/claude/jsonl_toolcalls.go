@@ -327,28 +327,57 @@ func (c transcriptToolCall) toolCorrelationEvent(receivedAt time.Time) canonical
 	if c.isSidechain {
 		extensions["transcript"] = map[string]any{"is_sidechain": true}
 	}
+	attributes := map[string]any{
+		"category":           string(c.category),
+		"tool":               c.toolEventAttributes(),
+		"unavailable_fields": toolCallUnavailableFields(),
+	}
+	c.attachPRLinkEvidence(attributes, extensions)
+	return c.correlationEventShape(eventID, eventTypeToolCall, receivedAt, attributes, extensions)
+}
+
+// correlationEventShape builds the canonical envelope shared by the tool_call and
+// mcp_call correlation events, so the two shapers differ only in their event type,
+// attributes, and extensions (SonarCloud duplication is a hard merge blocker).
+func (c transcriptToolCall) correlationEventShape(eventID, eventType string, receivedAt time.Time, attributes, extensions map[string]any) canonical.Event {
 	return canonical.Event{
-		SchemaVersion: canonicalSchemaVersion,
-		EventID:       eventID,
-		EventType:     eventTypeToolCall,
-		OccurredAt:    c.occurredAt,
-		ReceivedAt:    receivedAt.UTC(),
-		Provider:      provider,
-		Tool:          tool,
-		SourceSchema:  sourceSchemaTranscript,
-		SourceVersion: fallbackString(c.version, unavailable),
-		ActorID:       unavailable,
-		DeviceID:      unavailable,
-		SessionID:     c.sessionID,
-		PrivacyLevel:  "operational",
-		Attributes: map[string]any{
-			"category":           string(c.category),
-			"tool":               c.toolEventAttributes(),
-			"unavailable_fields": toolCallUnavailableFields(),
-		},
+		SchemaVersion:      canonicalSchemaVersion,
+		EventID:            eventID,
+		EventType:          eventType,
+		OccurredAt:         c.occurredAt,
+		ReceivedAt:         receivedAt.UTC(),
+		Provider:           provider,
+		Tool:               tool,
+		SourceSchema:       sourceSchemaTranscript,
+		SourceVersion:      fallbackString(c.version, unavailable),
+		ActorID:            unavailable,
+		DeviceID:           unavailable,
+		SessionID:          c.sessionID,
+		PrivacyLevel:       "operational",
+		Attributes:         attributes,
 		ProviderExtensions: extensions,
 	}
 }
+
+// attachPRLinkEvidence scans the call's retained raw tool I/O — the tool_use
+// input, the paired tool_result body, and the record-scoped toolUseResult — for
+// a verbatim pull/merge-request URL (#251) and stamps any candidates on the
+// correlation event, since session pr_link aggregation reads events, not
+// Operations. Structured values are rendered by normalize.PRLinkScanText so the
+// shared extractor owns the URL grammar; nothing is written when no URL exists.
+func (c transcriptToolCall) attachPRLinkEvidence(attributes, extensions map[string]any) {
+	fields := map[string]any{}
+	for key, value := range map[string]any{"tool_input": c.input, "tool_output": c.result, "tool_use_result": c.resultMeta} {
+		if text, ok := normalize.PRLinkScanText(value); ok {
+			fields[key] = text
+		}
+	}
+	normalize.AttachPRLinkEvidence(attributes, extensions, fields, transcriptPRLinkScanFields)
+}
+
+// transcriptPRLinkScanFields fixes the scan order of the transcript tool I/O
+// fields so pr_link_evidence is deterministic.
+var transcriptPRLinkScanFields = []string{"tool_input", "tool_output", "tool_use_result"}
 
 // toolEventAttributes builds the content-free attributes.tool block: the tool
 // identity plus, when the input carries them, the raw file_path/full_command/

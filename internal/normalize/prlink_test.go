@@ -55,3 +55,42 @@ func TestPRLinkURLsAcceptsHostsAndRejectsNonPRURLs(t *testing.T) {
 		t.Fatalf("PRLinkURLs = %#v, want %#v", got, want)
 	}
 }
+
+func TestPRLinkScanTextRendersRetainedValues(t *testing.T) {
+	cases := []struct {
+		name   string
+		value  any
+		want   string
+		wantOK bool
+	}{
+		{name: "string", value: "  gh pr view https://github.com/acme/repo/pull/7 ", want: "gh pr view https://github.com/acme/repo/pull/7", wantOK: true},
+		{name: "object keeps ampersand verbatim", value: map[string]any{"url": "https://github.com/acme/repo/pull/7?a=1&b=2"}, want: `{"url":"https://github.com/acme/repo/pull/7?a=1&b=2"}`, wantOK: true},
+		{name: "array", value: []any{map[string]any{"type": "text", "text": "https://github.com/acme/repo/pull/8"}}, want: `[{"text":"https://github.com/acme/repo/pull/8","type":"text"}]`, wantOK: true},
+		{name: "blank string", value: "  ", wantOK: false},
+		{name: "number", value: 7, wantOK: false},
+		{name: "nil", value: nil, wantOK: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := PRLinkScanText(tc.value)
+			if ok != tc.wantOK || (ok && got != tc.want) {
+				t.Fatalf("PRLinkScanText(%#v) = %q, %v; want %q, %v", tc.value, got, ok, tc.want, tc.wantOK)
+			}
+		})
+	}
+}
+
+// A JSON-rendered structured value must still yield exactly the verbatim URL:
+// the token pattern stops at the closing quote, and a branch name or a printf
+// template (`/pull/%s`) never parses as a pull-request permalink (#251).
+func TestPRLinkURLsOverRenderedToolIO(t *testing.T) {
+	text, _ := PRLinkScanText(map[string]any{
+		"command":    `printf 'https://github.com/acme/repo/pull/%s\n' 251`,
+		"git_branch": "feature/pull/251",
+		"stdout":     "https://github.com/acme/repo/pull/251",
+	})
+	want := []string{"https://github.com/acme/repo/pull/251"}
+	if got := PRLinkURLs(text); !reflect.DeepEqual(got, want) {
+		t.Fatalf("PRLinkURLs(%q) = %#v, want %#v", text, got, want)
+	}
+}

@@ -118,11 +118,16 @@ var safeSpanAttributeKeys = map[string]struct{}{
 // raw command line on tool spans (#101), so a `gh pr create` / `gh pr view <url>`
 // invocation surfaces a PR URL here. The URL grammar and extraction live in
 // normalize.AttachPRLinkEvidence, shared with Codex (no CPD-duplicated block).
-// tool_decision tool_parameters (#173) and JSONL tool input/output (#94/#105) are
-// now retained raw on their own surfaces, but PR-link scanning still covers only
-// full_command; extending the scan to those retained surfaces is future work, not
-// a capture gap.
+// The retained log and transcript tool surfaces are scanned too (#251): see
+// claudeLogPRLinkScanFields and transcriptToolCall.attachPRLinkEvidence.
 var claudePRLinkScanFields = []string{"full_command"}
+
+// claudeLogPRLinkScanFields are the OTEL_LOG_TOOL_DETAILS-gated log attributes
+// scanned for a verbatim pull/merge-request URL (#251): tool_parameters on
+// tool_decision and tool_result, and tool_input on tool_result. Observed on
+// Claude Code 2.1.286 (fixtures/claude/observed-sanitised/
+// claude-code-2.1.286-tool-params-pr-link-otlp.json).
+var claudeLogPRLinkScanFields = []string{"tool_parameters", "tool_input"}
 
 type tracesPayload struct {
 	ResourceSpans []resourceSpan `json:"resourceSpans"`

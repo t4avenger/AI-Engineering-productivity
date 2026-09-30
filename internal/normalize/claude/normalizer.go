@@ -140,6 +140,7 @@ func normaliseSampleEvent(document fixtureDocument, capturedAt time.Time, index 
 	attachGovernanceContext(extensions, raw, name)
 	attachToolDecision(extensions, attributes, raw, name, nativeSessionID, eventID)
 	attachMCPCorrelation(attributes, extensions, raw, name)
+	attachToolPRLinkEvidence(attributes, extensions, raw, name)
 	event := canonical.Event{
 		SchemaVersion: canonicalSchemaVersion, EventID: eventID, EventType: name,
 		OccurredAt: occurredAt, ReceivedAt: capturedAt, Provider: provider, Tool: tool,
@@ -249,6 +250,19 @@ func attachMCPCorrelation(attributes, extensions, raw map[string]any, eventName 
 		return
 	}
 	stampMCPCorrelation(attributes, extensions, server, toolName)
+}
+
+// attachToolPRLinkEvidence scans the retained OTEL_LOG_TOOL_DETAILS payloads of a
+// tool_decision / tool_result event for a verbatim pull/merge-request URL (#251).
+// Both events carry tool_parameters (a JSON string whose full_command is the raw
+// command line) and tool_result also carries tool_input (the JSON-serialised tool
+// arguments). The shared extractor records only URLs present on the wire; a
+// git_branch / git_commit_id in tool_parameters is never turned into a link.
+func attachToolPRLinkEvidence(attributes, extensions, raw map[string]any, eventName string) {
+	if eventName != eventToolResult && eventName != eventToolDecision {
+		return
+	}
+	normalize.AttachPRLinkEvidence(attributes, extensions, raw, claudeLogPRLinkScanFields)
 }
 
 // claudeApprovalDecisionStatus normalises the wire decision onto the
