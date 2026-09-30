@@ -288,7 +288,7 @@ export function codexRawRetentionOTLPLogs(): string {
                   ['call_id', 'tiq-live-codex-call'],
                   ['path', '.env'],
                   ['command', 'cat .env'],
-                  ['cwd', '/tmp/tiq-live-codex-workspace'],
+                  ['cwd', '/workspace/tiq-live-codex-workspace'],
                   ['input', 'tiq-live-codex-input'],
                   ['output', 'tiq-live-codex-output'],
                   ['prompt', 'tiq-live-codex-prompt'],

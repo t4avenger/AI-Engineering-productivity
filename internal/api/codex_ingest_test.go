@@ -162,7 +162,11 @@ func fetchCodexEventDetail(t *testing.T, serverURL string, event canonical.Event
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeBody(t, response)
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			t.Errorf("close event detail response: %v", err)
+		}
+	}()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("event detail status = %d", response.StatusCode)
 	}

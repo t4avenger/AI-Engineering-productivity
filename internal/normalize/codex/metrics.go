@@ -210,7 +210,7 @@ func metricScopeIdentity(scope scopeMetric) string {
 	})
 }
 
-func metricResourceIdentity(resource map[string]any, identityResource map[string]any) string {
+func metricResourceIdentity(resource, identityResource map[string]any) string {
 	return stableJSON(map[string]any{
 		"service.name":    stringValue(resource[serviceNameAttribute], ""),
 		"service.version": stringValue(resource[serviceVersionAttribute], ""),
