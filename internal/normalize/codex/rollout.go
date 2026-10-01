@@ -45,15 +45,32 @@ type rolloutMetadata struct {
 // event types; all other records retain the provider's discriminator verbatim in
 // provider_extensions and use a generic rollout event type.
 func NormalizeRollout(data []byte, receivedAt time.Time) ([]canonical.Event, error) {
+	events, _, err := NormalizeRolloutEvidence(data, receivedAt)
+	return events, err
+}
+
+// NormalizeRolloutEvidence retains the raw rollout stream and reconstructs
+// fixture-proven operations from it in one decode pass. The operation records
+// use only provider-native identifiers; no timestamp or ordering join is used.
+func NormalizeRolloutEvidence(data []byte, receivedAt time.Time) ([]canonical.Event, []canonical.Operation, error) {
 	records, metadata, err := decodeRollout(data)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	events := make([]canonical.Event, 0, len(records))
+	events := make([]canonical.Event, 0, len(records)+len(records)/2)
 	for _, record := range records {
 		events = append(events, rolloutEvent(record, metadata, receivedAt))
 	}
-	return normalize.CorrelateEvents(events), nil
+	operations, correlationEvents := rolloutOperations(records, metadata, receivedAt)
+	events = append(events, correlationEvents...)
+	return normalize.CorrelateEvents(events), normalize.CorrelateOperations(operations), nil
+}
+
+// ExtractRolloutOperations exposes the operation-only projection for adapter
+// conformance and golden tests while sharing the same decoder as live ingest.
+func ExtractRolloutOperations(data []byte, receivedAt time.Time) ([]canonical.Operation, error) {
+	_, operations, err := NormalizeRolloutEvidence(data, receivedAt)
+	return operations, err
 }
 
 func decodeRollout(data []byte) ([]rolloutRecord, rolloutMetadata, error) {

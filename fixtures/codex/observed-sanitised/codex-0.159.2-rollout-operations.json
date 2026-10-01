@@ -1,0 +1,14 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "openai",
+  "tool": "codex",
+  "tool_version": "0.159.2",
+  "captured_at": "2026-10-01T18:20:14Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "capture_id": "codex-0.159.2-rollout-operations",
+    "rollout_file": "codex-0.159.2-rollout-operations.jsonl",
+    "notes": "Two isolated synthetic runs exercised completed/failed commands, a multi-file patch, and completed/failed MCP calls. Provider IDs, account identity, paths, commands, arguments, results, output, and timestamps were replaced with synthetic values while preserving field names, types, nesting, and status semantics. The 20000-byte command output was retained in full by the provider and exposed no truncation flag."
+  }
+}

@@ -43,6 +43,15 @@ func TestOperationStatsIgnoresMalformedDurations(t *testing.T) {
 	}
 }
 
+func TestOperationStatsReadsMCPDuration(t *testing.T) {
+	stats := OperationStatsFromOperations([]canonical.Operation{
+		testOperation("mcp", canonical.OperationCategoryMCPCall, "success", map[string]any{"mcp_call": map[string]any{"duration_ms": int64(37)}}),
+	})
+	if stats.Totals.DurationObservedCount != 1 || stats.Totals.AverageDurationMs == nil || *stats.Totals.AverageDurationMs != 37 {
+		t.Fatalf("MCP duration = %#v", stats.Totals)
+	}
+}
+
 func testOperation(id string, category canonical.OperationCategory, outcome string, extensions map[string]any) canonical.Operation {
 	return canonical.Operation{SchemaVersion: canonical.RecordSchemaVersion, OperationID: id, SessionID: "session", Provider: "openai", Tool: "codex", Category: category, Outcome: outcome, Provenance: canonical.ProvenanceObserved, ProviderExtensions: extensions}
 }

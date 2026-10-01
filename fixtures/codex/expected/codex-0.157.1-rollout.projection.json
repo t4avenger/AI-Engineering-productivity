@@ -1,5 +1,5 @@
 {
-  "event_count": 11,
+  "event_count": 12,
   "session_id": "codex:synthetic-codex-0.157.1-session",
   "source_version": "0.157.1",
   "event_types": [
@@ -10,6 +10,7 @@
     "codex.rollout.turn_context",
     "assistant_response",
     "codex.rollout.response_item",
+    "tool_call",
     "codex.rollout.response_item",
     "codex.rollout.token_usage_record",
     "codex.rollout.event_msg",

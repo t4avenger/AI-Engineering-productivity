@@ -5,6 +5,7 @@ import {
   codexRolloutOTLPLogs,
   codexRolloutSessionID,
   expectSessionDetailHeading,
+  expectSessionTraceLanes,
   fetchLiveSessions,
   ingestCodexRollout,
   ingestOTLPLogs,
@@ -38,4 +39,7 @@ test('renders an authenticated Codex rollout merged with exact-ID OTLP evidence'
   const conversation = page.locator('#conversation');
   await expect(conversation).toContainText('tiq-live retained Codex prompt');
   await expect(conversation).toContainText('tiq-live retained Codex response');
+  await expectSessionTraceLanes(page);
+  await expect(page.getByLabel('Tools & MCP lane')).toContainText('mcp call');
+  await expect(page.getByLabel('Files lane')).toContainText('txt');
 });

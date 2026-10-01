@@ -186,7 +186,11 @@ raw request body itself is never echoed (no dev ingest inspector on this route).
 media types and 32 MiB cap. It persists every record under
 `provider_extensions.rollout`, correlates through the exact 0.157.1-observed
 `session_meta.payload.id`, and projects observed user/assistant message roles
-through the existing conversation response. Replay is idempotent. The route is
+through the existing conversation response. CLI 0.159.2 completed command,
+file-change, and MCP items also persist atomically as `canonical.Operation`
+records and content-free correlation events, feeding the existing Operations,
+Files, MCP inventory, governance, event-detail, and Session Trace reads. Older
+custom tool call/output pairs are joined only by exact `call_id`. Replay is idempotent. The route is
 excluded from development intake inspection and error responses never include
 rollout values. `telemetryiq import-codex-rollout --file <path>` is the supported
 loopback-only one-shot importer.

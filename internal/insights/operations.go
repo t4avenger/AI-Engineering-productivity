@@ -78,7 +78,7 @@ func OperationStatsFromOperations(operations []canonical.Operation) OperationSta
 }
 
 func operationDurationMs(operation canonical.Operation) (int64, bool) {
-	for _, path := range [][]string{{"tool_call", "duration_ms"}, {"sandbox_outcome", "duration_ms"}, {"sandbox_outcome", "initial_duration_ms"}, {"event", "duration_ms"}} {
+	for _, path := range [][]string{{"tool_call", "duration_ms"}, {"mcp_call", "duration_ms"}, {"sandbox_outcome", "duration_ms"}, {"sandbox_outcome", "initial_duration_ms"}, {"event", "duration_ms"}} {
 		if duration, ok := nestedDuration(operation.ProviderExtensions, path...); ok {
 			return duration, true
 		}
