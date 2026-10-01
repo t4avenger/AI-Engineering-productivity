@@ -1,6 +1,7 @@
 package insights
 
 import (
+	"encoding/json"
 	"sort"
 	"strconv"
 	"strings"
@@ -78,7 +79,7 @@ func OperationStatsFromOperations(operations []canonical.Operation) OperationSta
 }
 
 func operationDurationMs(operation canonical.Operation) (int64, bool) {
-	for _, path := range [][]string{{"tool_call", "duration_ms"}, {"sandbox_outcome", "duration_ms"}, {"sandbox_outcome", "initial_duration_ms"}, {"event", "duration_ms"}} {
+	for _, path := range [][]string{{"tool_call", "duration_ms"}, {"mcp_call", "duration_ms"}, {"sandbox_outcome", "duration_ms"}, {"sandbox_outcome", "initial_duration_ms"}, {"event", "duration_ms"}} {
 		if duration, ok := nestedDuration(operation.ProviderExtensions, path...); ok {
 			return duration, true
 		}
@@ -114,6 +115,12 @@ func durationValue(value any) (int64, bool) {
 		return int64(v), true
 	case string:
 		parsed, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		return nonNegativeDuration(parsed)
+	case json.Number:
+		parsed, err := v.Int64()
 		if err != nil {
 			return 0, false
 		}

@@ -2,13 +2,38 @@
 
 ## Rollout JSONL
 
-`codex.NormalizeRollout` ingests the observed Codex CLI 0.157.1 on-disk JSONL
+`codex.NormalizeRolloutEvidence` ingests the observed Codex CLI 0.157.1 and
+0.159.2 on-disk JSONL
 surface through authenticated `POST /v1/codex/rollout`. Every valid record is
 retained verbatim under `provider_extensions.rollout.record`, including unknown
 record types and fields. The adapter maps only observed `response_item` message
 roles to `user_prompt` and `assistant_response`; other records keep the
-provider's type as `codex.rollout.<type>` without inferred lifecycle, tool, plan,
+provider's type as `codex.rollout.<type>` without inferred lifecycle, plan,
 reasoning, or governance semantics.
+
+CLI 0.159.2 additionally emits `event_msg/item_completed` records whose item is
+`CommandExecution`, `FileChange`, or `McpToolCall`. These records carry an exact
+provider item ID plus explicit status and raw command/output, file change/diff,
+or MCP server/tool/argument/result evidence. The adapter creates one
+`canonical.Operation` per item using `codex:<session>:tool:<item.id>`, maps only
+explicit completed/failed/cancelled statuses, and emits content-free
+`tool_call`/`mcp_call` correlation events for existing Operations, Files, MCP,
+governance, and trace views. Those events carry correlation plus tool or server
+identity only; command output, MCP arguments/results/errors, and file diffs stay
+on the retained rollout record and the Operation. `attributes.unavailable_fields`
+includes `file_operations` except on a file-change event and `command_execution`
+except on a command event. Multi-file changes get one file correlation event
+per sorted raw path while remaining one provider invocation. Every original
+rollout record remains retained verbatim.
+
+The older 0.157.1 `custom_tool_call`/`custom_tool_call_output` pair is supported
+by exact `call_id`; unmatched calls remain outcome `unknown`. When the richer
+0.159.2 completed-item surface is present, those wrapper records are retained
+raw but not double-counted as operations. The 0.159.2 probe retained a
+20,000-byte output in full and emitted no truncation field, so the adapter does
+not fabricate truncation. Golden evidence is
+`fixtures/codex/observed-sanitised/codex-0.159.2-rollout-operations.jsonl` →
+`fixtures/codex/expected/codex-0.159.2-rollout-operations.operations.json`.
 
 The exact `session_meta.payload.id` is normalized to `codex:<id>`. A synchronized
 0.157.1 capture proves that identifier equals OTLP `conversation.id` and

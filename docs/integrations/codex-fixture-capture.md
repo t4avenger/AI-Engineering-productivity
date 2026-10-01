@@ -147,3 +147,24 @@ The run covered `codex_exec` and a PTY-backed `codex_cli_rs` session. The nested
 - Confirm prompt, response, source, path, command, and identity field names and shapes remain represented when observed.
 - Confirm unknown fields have not been silently discarded.
 - Run go test ./internal/fixture and the repository security scan before commit.
+
+## Rollout operation capture
+
+Issue #234 captured Codex CLI 0.159.2 in an isolated temporary `CODEX_HOME` and
+synthetic Git repository on 2026-10-01. Two runs exercised successful and failed
+shell commands, a multi-file patch, a read command, 20,000 bytes of stdout, and
+successful/approval-denied calls to a deterministic local stdio MCP server.
+The synchronized raw OTLP capture and unsanitised rollouts remained in `/tmp`.
+
+The provider's `event_msg/item_completed` surface carried complete
+`CommandExecution`, `FileChange`, and `McpToolCall` items with exact item IDs.
+The large stdout value remained complete; no provider truncation flag was
+observed. A separate cancellation probe failed before command execution and
+therefore supplied no operation evidence. Neither condition is invented in the
+fixture.
+
+Committed evidence:
+
+- `fixtures/codex/observed-sanitised/codex-0.159.2-rollout-operations.json`
+- `fixtures/codex/observed-sanitised/codex-0.159.2-rollout-operations.jsonl`
+- `fixtures/codex/expected/codex-0.159.2-rollout-operations.operations.json`

@@ -42,7 +42,7 @@ func (i *codexRolloutIngest) handler(w http.ResponseWriter, r *http.Request) {
 		i.counters.reject(w, http.StatusBadRequest, "malformed_payload", "request body could not be read")
 		return
 	}
-	events, err := codex.NormalizeRollout(body, time.Now().UTC())
+	events, operations, err := codex.NormalizeRolloutEvidence(body, time.Now().UTC())
 	if err != nil {
 		if errors.Is(err, codex.ErrMalformedRollout) {
 			i.counters.reject(w, http.StatusBadRequest, "malformed_payload", "request body must be valid newline-delimited JSON")
@@ -52,7 +52,7 @@ func (i *codexRolloutIngest) handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if i.repository != nil {
-		if err := i.repository.SaveEvents(r.Context(), events); err != nil {
+		if err := i.repository.SaveEventsAndOperations(r.Context(), events, operations); err != nil {
 			i.counters.reject(w, http.StatusInternalServerError, "persistence_failed", "supported telemetry could not be stored")
 			return
 		}

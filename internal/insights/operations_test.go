@@ -1,6 +1,7 @@
 package insights
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
@@ -40,6 +41,16 @@ func TestOperationStatsIgnoresMalformedDurations(t *testing.T) {
 	}
 	if len(stats.ByCategory) != 1 || stats.ByCategory[0].DurationObservedCount != 0 || stats.ByCategory[0].AverageDurationMs != nil {
 		t.Fatalf("category durations = %#v", stats.ByCategory)
+	}
+}
+
+func TestOperationStatsReadsMCPDuration(t *testing.T) {
+	stats := OperationStatsFromOperations([]canonical.Operation{
+		testOperation("mcp", canonical.OperationCategoryMCPCall, "success", map[string]any{"mcp_call": map[string]any{"duration_ms": int64(37)}}),
+		testOperation("mcp-number", canonical.OperationCategoryMCPCall, "success", map[string]any{"mcp_call": map[string]any{"duration_ms": json.Number("41")}}),
+	})
+	if stats.Totals.DurationObservedCount != 2 || stats.Totals.AverageDurationMs == nil || *stats.Totals.AverageDurationMs != 39 {
+		t.Fatalf("MCP duration = %#v", stats.Totals)
 	}
 }
 

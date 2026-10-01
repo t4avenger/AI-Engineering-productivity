@@ -25,6 +25,13 @@ rollout record ID is preferred for deduplication; otherwise its original line
 position plus raw-record digest provides a deterministic replay key. Metrics
 without that exact provider key remain observation-only.
 
+CLI 0.159.2 rollout completed-item operations use the exact provider `item.id`
+as `codex:<session>:tool:<item.id>`. Legacy custom tool invocations use exact
+`call_id` and pair only to an output with the same value; absent outputs retain
+outcome `unknown`. No timestamp, sequence, command text, tool name, or content
+join is permitted. When completed-item evidence is present, legacy wrapper
+records remain raw observations but are not separately counted as operations.
+
 For Claude Code, the single join key across all three surfaces is the raw
 `session.id`: OTLP trace spans, OTLP content logs, and the on-disk session JSONL
 transcript each normalise to `claude-code:<session.id>` via

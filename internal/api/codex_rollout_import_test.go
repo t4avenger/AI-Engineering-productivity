@@ -55,6 +55,134 @@ func TestCodexRolloutImportMergesIdempotentlyAndProjectsConversation(t *testing.
 	assertRolloutConversation(t, conversation)
 }
 
+func TestCodexRolloutOperationsIngestToRead(t *testing.T) {
+	repository, server := authenticatedRolloutTestServer(t)
+	fixture, err := os.ReadFile(filepath.Join("..", "..", "fixtures", "codex", "observed-sanitised", "codex-0.159.2-rollout-operations.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := injectRolloutPrecisionNumber(t, fixture)
+	postAcceptedRollout(t, server.URL, body)
+	postAcceptedRollout(t, server.URL, body)
+
+	operations, err := repository.ListOperations(context.Background(), storage.OperationFilter{SessionID: "codex:synthetic-codex-0.159.2-operations"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(operations) != 5 {
+		t.Fatalf("persisted rollout operations = %d, want 5", len(operations))
+	}
+	assertPersistedRolloutOperationEvidence(t, operations)
+
+	stats := getAuthenticatedJSON[operationStatsResponse](t, server.URL+"/api/v1/insights/operations")
+	if stats.Data.Totals.TotalOperations != 5 || stats.Data.Totals.DurationObservedCount != 4 {
+		t.Fatalf("operation totals = %#v", stats.Data.Totals)
+	}
+	inventory := getAuthenticatedJSON[mcpInventoryResponse](t, server.URL+"/api/v1/insights/mcp-inventory")
+	if len(inventory.Data.Servers) != 1 || inventory.Data.Servers[0].ServerName != "tiq_probe" || inventory.Data.Servers[0].InvocationCount != 2 {
+		t.Fatalf("MCP inventory = %#v", inventory.Data)
+	}
+	files := getAuthenticatedJSON[fileListResponse](t, server.URL+"/api/v1/sessions/codex:synthetic-codex-0.159.2-operations/files")
+	if len(files.Data) != 2 {
+		t.Fatalf("files = %#v", files.Data)
+	}
+	paths := map[string]bool{}
+	for _, file := range files.Data {
+		if file.Path != nil {
+			paths[*file.Path] = true
+		}
+	}
+	if !paths["/tmp/synthetic-codex-workspace/probe.txt"] || !paths["/tmp/synthetic-codex-workspace/deleted.txt"] {
+		t.Fatalf("file paths = %#v", paths)
+	}
+}
+
+func injectRolloutPrecisionNumber(t *testing.T, fixture []byte) []byte {
+	t.Helper()
+	old := []byte(`"arguments":{"value":"synthetic-mcp-success"}`)
+	next := []byte(`"arguments":{"offset":9007199254740993,"value":"synthetic-mcp-success"}`)
+	if !bytes.Contains(fixture, old) {
+		t.Fatal("rollout fixture has no MCP success arguments to extend")
+	}
+	return bytes.Replace(fixture, old, next, 1)
+}
+
+func assertPersistedRolloutOperationEvidence(t *testing.T, operations []canonical.Operation) {
+	t.Helper()
+	byID := map[string]canonical.Operation{}
+	for _, operation := range operations {
+		byID[operation.OperationID] = operation
+	}
+	shell := operationExtension(t, byID, "shell-success", "tool_call")
+	command, _ := shell["command"].([]any)
+	if len(command) != 3 || command[2] != "printf synthetic-shell-success" ||
+		shell["cwd"] != "file:///tmp/synthetic-codex-workspace" ||
+		shell["stdout"] != "synthetic-shell-success" {
+		t.Fatalf("persisted command evidence = %#v", shell)
+	}
+	file := operationExtension(t, byID, "file-change", "tool_call")
+	changes, _ := file["changes"].(map[string]any)
+	probe, _ := changes["/tmp/synthetic-codex-workspace/probe.txt"].(map[string]any)
+	diff, _ := probe["unified_diff"].(string)
+	if !strings.Contains(diff, "synthetic updated") {
+		t.Fatalf("persisted file diff = %#v", probe)
+	}
+	failed := operationExtension(t, byID, "mcp-failed", "mcp_call")
+	mcpError, _ := failed["error"].(map[string]any)
+	if failed["arguments"] == nil || mcpError["message"] == nil {
+		t.Fatalf("persisted MCP failure = %#v", failed)
+	}
+	success := operationExtension(t, byID, "mcp-success", "mcp_call")
+	arguments, _ := success["arguments"].(map[string]any)
+	if jsonNumberText(arguments["offset"]) != "9007199254740993" || success["result"] == nil {
+		t.Fatalf("persisted MCP success = %#v", success)
+	}
+}
+
+func operationExtension(t *testing.T, byID map[string]canonical.Operation, id, key string) map[string]any {
+	t.Helper()
+	operation, ok := byID["codex:synthetic-codex-0.159.2-operations:tool:"+id]
+	if !ok {
+		t.Fatalf("persisted operation %s missing: %v", id, byID)
+	}
+	extension, ok := operation.ProviderExtensions[key].(map[string]any)
+	if !ok {
+		t.Fatalf("persisted %s extension missing on %s: %#v", key, id, operation.ProviderExtensions)
+	}
+	return extension
+}
+
+func jsonNumberText(value any) string {
+	switch number := value.(type) {
+	case json.Number:
+		return number.String()
+	default:
+		return ""
+	}
+}
+
+func getAuthenticatedJSON[T any](t *testing.T, address string) T {
+	t.Helper()
+	request, err := http.NewRequest(http.MethodGet, address, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+rolloutTestToken)
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeBody(t, response)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("GET %s status = %d", address, response.StatusCode)
+	}
+	var result T
+	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
 func assertRolloutMerged(t *testing.T, repository *sqlite.Repository) {
 	t.Helper()
 	sessions, err := repository.ListSessions(context.Background(), storage.SessionFilter{Limit: 10})
@@ -68,10 +196,17 @@ func assertRolloutMerged(t *testing.T, repository *sqlite.Repository) {
 	if err != nil {
 		t.Fatalf("list events: %v", err)
 	}
-	if len(events) != 7 {
-		t.Fatalf("event count after replay = %d, want 7 (5 rollout + 2 OTLP)", len(events))
+	if len(events) != 8 {
+		t.Fatalf("event count after replay = %d, want 8 (5 rollout + one derived tool call + 2 OTLP)", len(events))
 	}
 	assertPersistedRolloutEvidence(t, events)
+	operations, err := repository.ListOperations(context.Background(), storage.OperationFilter{SessionID: sessions[0].SessionID})
+	if err != nil {
+		t.Fatalf("list rollout operations: %v", err)
+	}
+	if len(operations) != 1 || operations[0].OperationID != "codex:"+rolloutTestSession+":tool:api-call" || operations[0].Outcome != "unknown" {
+		t.Fatalf("rollout operations = %#v", operations)
+	}
 }
 
 func assertPersistedRolloutEvidence(t *testing.T, events []canonical.Event) {
@@ -107,7 +242,7 @@ func persistedRolloutRecords(t *testing.T, events []canonical.Event) []map[strin
 		}
 		rollout, ok := event.ProviderExtensions["rollout"].(map[string]any)
 		if !ok {
-			t.Fatalf("persisted rollout extension missing: %#v", event.ProviderExtensions)
+			continue
 		}
 		record, ok := rollout["record"].(map[string]any)
 		if !ok {

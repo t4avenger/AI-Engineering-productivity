@@ -109,12 +109,7 @@ func assertRolloutContentAndUnknownFields(t *testing.T, events []canonical.Event
 	t.Helper()
 	var user, assistant, future *canonical.Event
 	for index := range events {
-		if events[index].ActorID != "codex:synthetic-user" {
-			t.Fatalf("actor id = %q, want namespaced provider identity", events[index].ActorID)
-		}
-		if events[index].PrivacyLevel != "governed-content" {
-			t.Fatalf("privacy level = %q, want governed-content", events[index].PrivacyLevel)
-		}
+		assertRolloutEnvelope(t, events[index])
 		switch events[index].EventType {
 		case "user_prompt":
 			user = &events[index]
@@ -138,11 +133,34 @@ func assertRolloutContentAndUnknownFields(t *testing.T, events []canonical.Event
 	if payload["unknown_flag"] != true || payload["future_shape"] == nil {
 		t.Fatalf("unknown provider fields were not retained: %#v", payload)
 	}
-	usageRecord := events[8].ProviderExtensions["rollout"].(map[string]any)["record"].(map[string]any)
+	tokenUsage := rolloutEventByType(events, "codex.rollout.token_usage_record")
+	if tokenUsage == nil {
+		t.Fatal("missing token usage rollout record")
+	}
+	usageRecord := tokenUsage.ProviderExtensions["rollout"].(map[string]any)["record"].(map[string]any)
 	usage := usageRecord["payload"].(map[string]any)
 	if got := usage["input_tokens"].(json.Number).String(); got != "9007199254740993" {
 		t.Fatalf("large number = %q", got)
 	}
+}
+
+func assertRolloutEnvelope(t *testing.T, event canonical.Event) {
+	t.Helper()
+	if event.ActorID != "codex:synthetic-user" {
+		t.Fatalf("actor id = %q, want namespaced provider identity", event.ActorID)
+	}
+	if event.PrivacyLevel != "governed-content" {
+		t.Fatalf("privacy level = %q, want governed-content", event.PrivacyLevel)
+	}
+}
+
+func rolloutEventByType(events []canonical.Event, eventType string) *canonical.Event {
+	for index := range events {
+		if events[index].EventType == eventType {
+			return &events[index]
+		}
+	}
+	return nil
 }
 
 func eventIDs(events []canonical.Event) []string {

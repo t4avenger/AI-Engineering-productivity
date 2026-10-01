@@ -1237,9 +1237,9 @@ export function codexRolloutOTLPLogs(): string {
   ]);
 }
 
-// Minimal observed Codex 0.157.1 rollout shapes for the live daemon gate. The
-// parser retains every record raw; only the two provider message roles are
-// projected into the shared conversation model.
+// Minimal observed Codex 0.159.2 rollout shapes for the live daemon gate. The
+// parser retains every record raw and projects conversation, MCP and file
+// operations through the same authenticated ingest path.
 export function codexRolloutNDJSON(): string {
   return [
     {
@@ -1248,7 +1248,7 @@ export function codexRolloutNDJSON(): string {
       type: 'session_meta',
       payload: {
         id: codexRolloutSessionID,
-        cli_version: '0.157.1',
+        cli_version: '0.159.2',
         creator_user_id: 'tiq-live-synthetic-user',
         unknown_session_field: { retained: true },
       },
@@ -1277,6 +1277,50 @@ export function codexRolloutNDJSON(): string {
     },
     {
       ordinal: 3,
+      timestamp: '2026-09-29T07:01:47.000Z',
+      type: 'event_msg',
+      payload: {
+        type: 'item_completed',
+        thread_id: codexRolloutSessionID,
+        turn_id: 'tiq-live-rollout-turn',
+        item: {
+          type: 'McpToolCall',
+          id: 'tiq-live-mcp-call',
+          server: 'tiq_live_server',
+          tool: 'echo_probe',
+          arguments: { value: 'tiq-live-mcp-input' },
+          status: 'completed',
+          result: { content: [{ type: 'text', text: 'tiq-live-mcp-output' }] },
+          duration: { secs: 0, nanos: 3000000 },
+        },
+      },
+    },
+    {
+      ordinal: 4,
+      timestamp: '2026-09-29T07:01:48.000Z',
+      type: 'event_msg',
+      payload: {
+        type: 'item_completed',
+        thread_id: codexRolloutSessionID,
+        turn_id: 'tiq-live-rollout-turn',
+        item: {
+          type: 'FileChange',
+          id: 'tiq-live-file-change',
+          changes: {
+            '/workspace/tiq-live-rollout/probe.txt': {
+              type: 'update',
+              unified_diff: '@@ -1 +1 @@\n-before\n+after\n',
+              move_path: null,
+            },
+          },
+          status: 'completed',
+          stdout: 'Success. Updated synthetic file.',
+          stderr: '',
+        },
+      },
+    },
+    {
+      ordinal: 5,
       timestamp: '2026-09-29T07:02:32.300Z',
       type: 'future_provider_record',
       payload: { unknown_flag: true, nested: { retained: 'verbatim' } },

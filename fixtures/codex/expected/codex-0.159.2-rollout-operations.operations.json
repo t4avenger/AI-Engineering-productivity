@@ -1,0 +1,259 @@
+[
+  {
+    "category": "filesystem write",
+    "operation_id": "codex:synthetic-codex-0.159.2-operations:tool:file-change",
+    "outcome": "success",
+    "provenance": "observed",
+    "provider": "openai",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:synthetic-codex-0.159.2-operations:tool:file-change",
+        "ordering_key": "01790878779120000000:codex:synthetic-codex-0.159.2-operations:tool:file-change",
+        "source_event_id": "codex-rollout:synthetic-codex-0.159.2-operations:5:695a04d55f519c1c4ca6960b6251cb17f3dc18c8da1cf3faa61b3f82ef9746a9",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex rollout operation records have no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "tool_name": "apply_patch",
+        "tool_use_id": "file-change"
+      },
+      "tool_call": {
+        "changes": {
+          "/tmp/synthetic-codex-workspace/deleted.txt": {
+            "move_path": null,
+            "type": "delete",
+            "unified_diff": "@@ -1 +0,0 @@\n-synthetic deleted\n"
+          },
+          "/tmp/synthetic-codex-workspace/probe.txt": {
+            "move_path": null,
+            "type": "update",
+            "unified_diff": "@@ -1 +1 @@\n-synthetic baseline\n+synthetic updated\n"
+          }
+        },
+        "id": "file-change",
+        "operation_id": "codex:synthetic-codex-0.159.2-operations:tool:file-change",
+        "provenance": "observed",
+        "status": "completed",
+        "stderr": "",
+        "stdout": "Success. Updated synthetic files.",
+        "type": "FileChange"
+      }
+    },
+    "schema_version": "0.1.0",
+    "session_id": "codex:synthetic-codex-0.159.2-operations",
+    "tool": "codex"
+  },
+  {
+    "category": "MCP call",
+    "operation_id": "codex:synthetic-codex-0.159.2-operations:tool:mcp-failed",
+    "outcome": "failed",
+    "provenance": "observed",
+    "provider": "openai",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:synthetic-codex-0.159.2-operations:tool:mcp-failed",
+        "ordering_key": "01790878779096000000:codex:synthetic-codex-0.159.2-operations:tool:mcp-failed",
+        "source_event_id": "codex-rollout:synthetic-codex-0.159.2-operations:2:89ebb57c753a5eeb9af39f74cc5b95696dc1b85617aba23bc90e9cb751e1b76c",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex rollout operation records have no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "tool_name": "echo_probe",
+        "tool_use_id": "mcp-failed"
+      },
+      "mcp_call": {
+        "arguments": {
+          "value": "synthetic-mcp-failed"
+        },
+        "duration": {
+          "nanos": 0,
+          "secs": 0
+        },
+        "duration_ms": 0,
+        "error": {
+          "message": "MCP tool call requires approval, but approval policy is never"
+        },
+        "id": "mcp-failed",
+        "operation_id": "codex:synthetic-codex-0.159.2-operations:tool:mcp-failed",
+        "provenance": "observed",
+        "server": "tiq_probe",
+        "server_name": "tiq_probe",
+        "status": "failed",
+        "tool": "echo_probe",
+        "tool_name": "echo_probe",
+        "type": "McpToolCall"
+      }
+    },
+    "schema_version": "0.1.0",
+    "session_id": "codex:synthetic-codex-0.159.2-operations",
+    "tool": "codex"
+  },
+  {
+    "category": "MCP call",
+    "operation_id": "codex:synthetic-codex-0.159.2-operations:tool:mcp-success",
+    "outcome": "success",
+    "provenance": "observed",
+    "provider": "openai",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:synthetic-codex-0.159.2-operations:tool:mcp-success",
+        "ordering_key": "01790878811410000000:codex:synthetic-codex-0.159.2-operations:tool:mcp-success",
+        "source_event_id": "codex-rollout:synthetic-codex-0.159.2-operations:6:42885e0443bd73f10cb8ac4f84008d2d183523f4d2ef263fbf1d4d0ce2ae5d3c",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex rollout operation records have no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "tool_name": "echo_probe",
+        "tool_use_id": "mcp-success"
+      },
+      "mcp_call": {
+        "arguments": {
+          "value": "synthetic-mcp-success"
+        },
+        "duration": {
+          "nanos": 3930714,
+          "secs": 0
+        },
+        "duration_ms": 3,
+        "id": "mcp-success",
+        "operation_id": "codex:synthetic-codex-0.159.2-operations:tool:mcp-success",
+        "provenance": "observed",
+        "result": {
+          "content": [
+            {
+              "text": "tiq-mcp-result:synthetic-mcp-success",
+              "type": "text"
+            }
+          ]
+        },
+        "server": "tiq_probe",
+        "server_name": "tiq_probe",
+        "status": "completed",
+        "tool": "echo_probe",
+        "tool_name": "echo_probe",
+        "type": "McpToolCall"
+      }
+    },
+    "schema_version": "0.1.0",
+    "session_id": "codex:synthetic-codex-0.159.2-operations",
+    "tool": "codex"
+  },
+  {
+    "category": "shell command",
+    "operation_id": "codex:synthetic-codex-0.159.2-operations:tool:shell-failed",
+    "outcome": "failed",
+    "provenance": "observed",
+    "provider": "openai",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:synthetic-codex-0.159.2-operations:tool:shell-failed",
+        "ordering_key": "01790878779110000000:codex:synthetic-codex-0.159.2-operations:tool:shell-failed",
+        "source_event_id": "codex-rollout:synthetic-codex-0.159.2-operations:4:97f814c04520fda5e45189aa9fe5d38f6879af5a81aa8e9a9c390ab033f104ee",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex rollout operation records have no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "tool_name": "exec_command",
+        "tool_use_id": "shell-failed"
+      },
+      "tool_call": {
+        "aggregated_output": "",
+        "command": [
+          "/bin/bash",
+          "-c",
+          "exit 7"
+        ],
+        "cwd": "file:///tmp/synthetic-codex-workspace",
+        "duration": {
+          "nanos": 8123,
+          "secs": 0
+        },
+        "duration_ms": 0,
+        "exit_code": 7,
+        "formatted_output": "",
+        "id": "shell-failed",
+        "operation_id": "codex:synthetic-codex-0.159.2-operations:tool:shell-failed",
+        "parsed_cmd": [
+          {
+            "cmd": "exit 7",
+            "type": "unknown"
+          }
+        ],
+        "process_id": "synthetic-process-2",
+        "provenance": "observed",
+        "source": "unified_exec_startup",
+        "status": "failed",
+        "stderr": "",
+        "stdout": "",
+        "type": "CommandExecution"
+      }
+    },
+    "schema_version": "0.1.0",
+    "session_id": "codex:synthetic-codex-0.159.2-operations",
+    "tool": "codex"
+  },
+  {
+    "category": "shell command",
+    "operation_id": "codex:synthetic-codex-0.159.2-operations:tool:shell-success",
+    "outcome": "success",
+    "provenance": "observed",
+    "provider": "openai",
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:synthetic-codex-0.159.2-operations:tool:shell-success",
+        "ordering_key": "01790878779100000000:codex:synthetic-codex-0.159.2-operations:tool:shell-success",
+        "source_event_id": "codex-rollout:synthetic-codex-0.159.2-operations:3:69407a9947de036bb7303c8d78c5192c0082a873ea834b5f8a8c0292b1eac371",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex rollout operation records have no reviewed task-boundary signal"
+        }
+      },
+      "event": {
+        "tool_name": "exec_command",
+        "tool_use_id": "shell-success"
+      },
+      "tool_call": {
+        "aggregated_output": "synthetic-shell-success",
+        "command": [
+          "/bin/bash",
+          "-c",
+          "printf synthetic-shell-success"
+        ],
+        "cwd": "file:///tmp/synthetic-codex-workspace",
+        "duration": {
+          "nanos": 1000000,
+          "secs": 0
+        },
+        "duration_ms": 1,
+        "exit_code": 0,
+        "formatted_output": "synthetic-shell-success",
+        "id": "shell-success",
+        "operation_id": "codex:synthetic-codex-0.159.2-operations:tool:shell-success",
+        "parsed_cmd": [
+          {
+            "cmd": "printf synthetic-shell-success",
+            "type": "unknown"
+          }
+        ],
+        "process_id": "synthetic-process-1",
+        "provenance": "observed",
+        "source": "unified_exec_startup",
+        "status": "completed",
+        "stderr": "",
+        "stdout": "synthetic-shell-success",
+        "type": "CommandExecution"
+      }
+    },
+    "schema_version": "0.1.0",
+    "session_id": "codex:synthetic-codex-0.159.2-operations",
+    "tool": "codex"
+  }
+]
