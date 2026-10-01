@@ -158,7 +158,40 @@ func rolloutOperationExtensions(item rolloutOperationEvidence, operationID, sess
 			call["tool_name"] = tool
 		}
 	}
-	extensions := map[string]any{
+	extensions := rolloutCorrelationExtensions(item, operationID, sessionID)
+	if item.category == canonical.OperationCategoryMCPCall {
+		extensions["mcp_call"] = call
+	} else {
+		extensions["tool_call"] = call
+	}
+	return extensions
+}
+
+// rolloutEventExtensions is the content-free sibling of rolloutOperationExtensions.
+// Correlation events carry identity only; raw command output, MCP bodies, and file
+// diffs stay on the retained rollout record and the Operation.
+func rolloutEventExtensions(item rolloutOperationEvidence, operationID, sessionID string) map[string]any {
+	extensions := rolloutCorrelationExtensions(item, operationID, sessionID)
+	identity := map[string]any{
+		"id": item.id, "type": item.kind, "operation_id": operationID,
+		"provenance": string(canonical.ProvenanceObserved),
+	}
+	if item.category == canonical.OperationCategoryMCPCall {
+		if server := rolloutString(item.item["server"]); server != "" {
+			identity["server_name"] = server
+		}
+		if tool := rolloutString(item.item["tool"]); tool != "" {
+			identity["tool_name"] = tool
+		}
+		extensions["mcp_call"] = identity
+		return extensions
+	}
+	extensions["tool_call"] = identity
+	return extensions
+}
+
+func rolloutCorrelationExtensions(item rolloutOperationEvidence, operationID, sessionID string) map[string]any {
+	return map[string]any{
 		"correlation": map[string]any{
 			"dedup_key":       operationID,
 			"ordering_key":    fmt.Sprintf("%020d:%s", item.record.timestamp.UTC().UnixNano(), operationID),
@@ -167,12 +200,6 @@ func rolloutOperationExtensions(item rolloutOperationEvidence, operationID, sess
 		},
 		"event": map[string]any{"tool_name": rolloutToolName(item), "tool_use_id": item.id},
 	}
-	if item.category == canonical.OperationCategoryMCPCall {
-		extensions["mcp_call"] = call
-	} else {
-		extensions["tool_call"] = call
-	}
-	return extensions
 }
 
 func rolloutToolName(item rolloutOperationEvidence) string {
@@ -193,13 +220,10 @@ func rolloutOperationEvents(item rolloutOperationEvidence, metadata rolloutMetad
 		return rolloutFileEvents(item, metadata, receivedAt, operationID)
 	}
 	eventType := "tool_call"
-	attributes := map[string]any{"category": string(item.category), "operation_id": operationID, "unavailable_fields": rolloutOperationUnavailableFields()}
-	extensions := rolloutOperationExtensions(item, operationID, metadata.sessionID)
+	attributes := map[string]any{"category": string(item.category), "operation_id": operationID, "unavailable_fields": rolloutOperationUnavailableFields(item.category)}
+	extensions := rolloutEventExtensions(item, operationID, metadata.sessionID)
 	if item.category == canonical.OperationCategoryMCPCall {
 		eventType = "mcp_call"
-		mcp := extensions["mcp_call"].(map[string]any)
-		mcp["server_name"] = rolloutString(item.item["server"])
-		mcp["tool_name"] = rolloutString(item.item["tool"])
 	} else {
 		attributes["tool"] = rolloutToolAttributes(item)
 	}
@@ -218,28 +242,36 @@ func rolloutFileEvents(item rolloutOperationEvidence, metadata rolloutMetadata, 
 	sort.Strings(paths)
 	if len(paths) == 0 {
 		return []canonical.Event{rolloutDerivedEvent(item, metadata, receivedAt, "tool_call", map[string]any{
-			"category": string(item.category), "operation_id": operationID, "unavailable_fields": rolloutOperationUnavailableFields(),
+			"category": string(item.category), "operation_id": operationID, "unavailable_fields": rolloutOperationUnavailableFields(item.category),
 			"tool": rolloutToolAttributes(item),
-		}, rolloutOperationExtensions(item, operationID, metadata.sessionID), "")}
+		}, rolloutEventExtensions(item, operationID, metadata.sessionID), "")}
 	}
 	events := make([]canonical.Event, 0, len(paths))
 	for _, path := range paths {
 		change := rolloutMap(changes[path])
 		category := fileChangeCategory(rolloutString(change["type"]))
 		attributes := map[string]any{
-			"category": string(category), "operation_id": operationID, "unavailable_fields": rolloutOperationUnavailableFields(),
+			"category": string(category), "operation_id": operationID, "unavailable_fields": rolloutOperationUnavailableFields(category),
 			"tool": map[string]any{"tool_name": "apply_patch", "tool_use_id": item.id, "file_path": path},
 		}
-		events = append(events, rolloutDerivedEvent(item, metadata, receivedAt, "tool_call", attributes, rolloutOperationExtensions(item, operationID, metadata.sessionID), path))
+		events = append(events, rolloutDerivedEvent(item, metadata, receivedAt, "tool_call", attributes, rolloutEventExtensions(item, operationID, metadata.sessionID), path))
 	}
 	return events
 }
 
-func rolloutOperationUnavailableFields() []string {
-	return []string{
+func rolloutOperationUnavailableFields(category canonical.OperationCategory) []string {
+	fields := []string{
 		"model", "token_usage", "cache_usage", "task_outcome", "reasoning_tokens",
 		"repository_context", "prompt_content", "response_content", "provider_cost",
-		"trace_span_correlation", "approvals",
+		"trace_span_correlation", "approvals", "command_execution", "file_operations",
+	}
+	switch category {
+	case canonical.OperationCategoryShellCommand:
+		return removeUnavailableField(fields, "command_execution")
+	case canonical.OperationCategoryFilesystemWrite, canonical.OperationCategoryFilesystemDelete:
+		return removeUnavailableField(fields, "file_operations")
+	default:
+		return fields
 	}
 }
 

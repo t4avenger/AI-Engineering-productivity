@@ -315,6 +315,7 @@ test('keeps the reference shell keyboard-accessible at zoom and reduced motion',
   await expect(page.getByRole('tab', { name: 'Skills' })).toBeFocused();
   await page.keyboard.press('End');
   await expect(page).toHaveURL(/\/governance\?rules=prompts$/);
+  await expect(page.getByRole('tab', { name: 'Prompt Keywords' })).toBeFocused();
   await page.keyboard.press('Home');
   await expect(page).toHaveURL(/\/governance$/);
   await expect(mcpTab).toBeFocused();

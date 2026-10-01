@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,7 +58,7 @@ func TestNormalizeRolloutEvidenceProjectsOperations(t *testing.T) {
 			t.Errorf("operation %q = %q/%q", operation.OperationID, operation.Category, operation.Outcome)
 		}
 	}
-	assertRolloutDerivedEvents(t, events)
+	assertRolloutDerivedEvents(t, events, operations)
 
 	replayedEvents, replayedOperations, err := NormalizeRolloutEvidence(data, fixtureReceivedAt.Add(time.Hour))
 	if err != nil {
@@ -92,19 +94,23 @@ func TestExtractRolloutOperationsLegacyPairsExactCallID(t *testing.T) {
 	}
 }
 
-func assertRolloutDerivedEvents(t *testing.T, events []canonical.Event) {
+func assertRolloutDerivedEvents(t *testing.T, events []canonical.Event, operations []canonical.Operation) {
 	t.Helper()
 	var mcpCalls, fileChanges int
 	paths := map[string]string{}
 	for _, event := range events {
 		switch event.EventType {
 		case "mcp_call":
+			assertContentFreeRolloutEvent(t, event)
+			assertRolloutUnavailableFields(t, event)
 			mcpCalls++
 			call := event.ProviderExtensions["mcp_call"].(map[string]any)
 			if call["server_name"] != "tiq_probe" || call["tool_name"] != "echo_probe" {
 				t.Errorf("MCP identity = %#v", call)
 			}
 		case "tool_call":
+			assertContentFreeRolloutEvent(t, event)
+			assertRolloutUnavailableFields(t, event)
 			tool, _ := event.Attributes["tool"].(map[string]any)
 			if path, _ := tool["file_path"].(string); path != "" {
 				fileChanges++
@@ -119,6 +125,54 @@ func assertRolloutDerivedEvents(t *testing.T, events []canonical.Event) {
 		paths["/tmp/synthetic-codex-workspace/probe.txt"] != string(canonical.OperationCategoryFilesystemWrite) {
 		t.Fatalf("file categories = %#v", paths)
 	}
+	assertRawBodiesStayOnOperations(t, operations)
+}
+
+func assertContentFreeRolloutEvent(t *testing.T, event canonical.Event) {
+	t.Helper()
+	for _, key := range []string{"mcp_call", "tool_call"} {
+		body, _ := event.ProviderExtensions[key].(map[string]any)
+		for _, raw := range []string{"arguments", "result", "error", "stdout", "stderr", "aggregated_output", "changes", "command"} {
+			if _, present := body[raw]; present {
+				t.Errorf("%s correlation event %s kept raw %s", event.EventType, event.EventID, raw)
+			}
+		}
+	}
+}
+
+func assertRolloutUnavailableFields(t *testing.T, event canonical.Event) {
+	t.Helper()
+	fields, _ := event.Attributes["unavailable_fields"].([]string)
+	category, _ := event.Attributes["category"].(string)
+	switch category {
+	case string(canonical.OperationCategoryShellCommand):
+		if slices.Contains(fields, "command_execution") || !slices.Contains(fields, "file_operations") {
+			t.Errorf("command unavailable_fields = %#v", fields)
+		}
+	case string(canonical.OperationCategoryFilesystemWrite), string(canonical.OperationCategoryFilesystemDelete):
+		if slices.Contains(fields, "file_operations") || !slices.Contains(fields, "command_execution") {
+			t.Errorf("file unavailable_fields = %#v", fields)
+		}
+	default:
+		if !slices.Contains(fields, "command_execution") || !slices.Contains(fields, "file_operations") {
+			t.Errorf("MCP unavailable_fields = %#v", fields)
+		}
+	}
+}
+
+func assertRawBodiesStayOnOperations(t *testing.T, operations []canonical.Operation) {
+	t.Helper()
+	for _, operation := range operations {
+		if !strings.HasSuffix(operation.OperationID, ":shell-success") {
+			continue
+		}
+		call, _ := operation.ProviderExtensions["tool_call"].(map[string]any)
+		if call["stdout"] != "synthetic-shell-success" {
+			t.Fatalf("operation dropped command output: %#v", call["stdout"])
+		}
+		return
+	}
+	t.Fatal("shell-success operation missing")
 }
 
 func rolloutOperationsFixture(t testing.TB) []byte {

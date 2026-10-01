@@ -585,7 +585,7 @@ func saveOperationTx(ctx context.Context, tx *sql.Tx, operation canonical.Operat
 		return fmt.Errorf("load stored operation: %w", err)
 	}
 	var stored canonical.Operation
-	if err := json.Unmarshal(storedJSON, &stored); err != nil {
+	if err := decodeStoredJSON(storedJSON, &stored); err != nil {
 		return fmt.Errorf("decode stored operation: %w", err)
 	}
 	mergedJSON, err := json.Marshal(mergeOperationEvidence(stored, operation))
@@ -1202,6 +1202,15 @@ func hydrateLastEventAt(session *canonical.Session, lastEventAt sql.NullString) 
 	session.Attributes["last_event_at"] = lastEventAt.String
 }
 
+// decodeStoredJSON reads a stored document with UseNumber so a replay merge or
+// read cannot round integers past the float64 mantissa (for example
+// 9007199254740993). json.Number still marshals back to the original digits.
+func decodeStoredJSON(data []byte, target any) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	return decoder.Decode(target)
+}
+
 // ListOperations returns retained stable-primitive operation records.
 func (r *Repository) ListOperations(ctx context.Context, filter storage.OperationFilter) ([]canonical.Operation, error) {
 	query := "SELECT operation_json FROM operations"
@@ -1223,7 +1232,7 @@ func (r *Repository) ListOperations(ctx context.Context, filter storage.Operatio
 			return nil, err
 		}
 		var operation canonical.Operation
-		if err := json.Unmarshal(data, &operation); err != nil {
+		if err := decodeStoredJSON(data, &operation); err != nil {
 			return nil, err
 		}
 		operations = append(operations, operation)

@@ -1,6 +1,7 @@
 package insights
 
 import (
+	"encoding/json"
 	"sort"
 	"strconv"
 	"strings"
@@ -114,6 +115,12 @@ func durationValue(value any) (int64, bool) {
 		return int64(v), true
 	case string:
 		parsed, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		return nonNegativeDuration(parsed)
+	case json.Number:
+		parsed, err := v.Int64()
 		if err != nil {
 			return 0, false
 		}

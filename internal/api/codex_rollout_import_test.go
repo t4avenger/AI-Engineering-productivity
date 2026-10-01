@@ -61,8 +61,9 @@ func TestCodexRolloutOperationsIngestToRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	postAcceptedRollout(t, server.URL, fixture)
-	postAcceptedRollout(t, server.URL, fixture)
+	body := injectRolloutPrecisionNumber(t, fixture)
+	postAcceptedRollout(t, server.URL, body)
+	postAcceptedRollout(t, server.URL, body)
 
 	operations, err := repository.ListOperations(context.Background(), storage.OperationFilter{SessionID: "codex:synthetic-codex-0.159.2-operations"})
 	if err != nil {
@@ -71,6 +72,7 @@ func TestCodexRolloutOperationsIngestToRead(t *testing.T) {
 	if len(operations) != 5 {
 		t.Fatalf("persisted rollout operations = %d, want 5", len(operations))
 	}
+	assertPersistedRolloutOperationEvidence(t, operations)
 
 	stats := getAuthenticatedJSON[operationStatsResponse](t, server.URL+"/api/v1/insights/operations")
 	if stats.Data.Totals.TotalOperations != 5 || stats.Data.Totals.DurationObservedCount != 4 {
@@ -92,6 +94,70 @@ func TestCodexRolloutOperationsIngestToRead(t *testing.T) {
 	}
 	if !paths["/tmp/synthetic-codex-workspace/probe.txt"] || !paths["/tmp/synthetic-codex-workspace/deleted.txt"] {
 		t.Fatalf("file paths = %#v", paths)
+	}
+}
+
+func injectRolloutPrecisionNumber(t *testing.T, fixture []byte) []byte {
+	t.Helper()
+	old := []byte(`"arguments":{"value":"synthetic-mcp-success"}`)
+	next := []byte(`"arguments":{"offset":9007199254740993,"value":"synthetic-mcp-success"}`)
+	if !bytes.Contains(fixture, old) {
+		t.Fatal("rollout fixture has no MCP success arguments to extend")
+	}
+	return bytes.Replace(fixture, old, next, 1)
+}
+
+func assertPersistedRolloutOperationEvidence(t *testing.T, operations []canonical.Operation) {
+	t.Helper()
+	byID := map[string]canonical.Operation{}
+	for _, operation := range operations {
+		byID[operation.OperationID] = operation
+	}
+	shell := operationExtension(t, byID, "shell-success", "tool_call")
+	command, _ := shell["command"].([]any)
+	if len(command) != 3 || command[2] != "printf synthetic-shell-success" ||
+		shell["cwd"] != "file:///tmp/synthetic-codex-workspace" ||
+		shell["stdout"] != "synthetic-shell-success" {
+		t.Fatalf("persisted command evidence = %#v", shell)
+	}
+	file := operationExtension(t, byID, "file-change", "tool_call")
+	changes, _ := file["changes"].(map[string]any)
+	probe, _ := changes["/tmp/synthetic-codex-workspace/probe.txt"].(map[string]any)
+	diff, _ := probe["unified_diff"].(string)
+	if !strings.Contains(diff, "synthetic updated") {
+		t.Fatalf("persisted file diff = %#v", probe)
+	}
+	failed := operationExtension(t, byID, "mcp-failed", "mcp_call")
+	mcpError, _ := failed["error"].(map[string]any)
+	if failed["arguments"] == nil || mcpError["message"] == nil {
+		t.Fatalf("persisted MCP failure = %#v", failed)
+	}
+	success := operationExtension(t, byID, "mcp-success", "mcp_call")
+	arguments, _ := success["arguments"].(map[string]any)
+	if jsonNumberText(arguments["offset"]) != "9007199254740993" || success["result"] == nil {
+		t.Fatalf("persisted MCP success = %#v", success)
+	}
+}
+
+func operationExtension(t *testing.T, byID map[string]canonical.Operation, id, key string) map[string]any {
+	t.Helper()
+	operation, ok := byID["codex:synthetic-codex-0.159.2-operations:tool:"+id]
+	if !ok {
+		t.Fatalf("persisted operation %s missing: %v", id, byID)
+	}
+	extension, ok := operation.ProviderExtensions[key].(map[string]any)
+	if !ok {
+		t.Fatalf("persisted %s extension missing on %s: %#v", key, id, operation.ProviderExtensions)
+	}
+	return extension
+}
+
+func jsonNumberText(value any) string {
+	switch number := value.(type) {
+	case json.Number:
+		return number.String()
+	default:
+		return ""
 	}
 }
 

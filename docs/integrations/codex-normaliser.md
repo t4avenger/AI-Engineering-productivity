@@ -18,7 +18,11 @@ or MCP server/tool/argument/result evidence. The adapter creates one
 `canonical.Operation` per item using `codex:<session>:tool:<item.id>`, maps only
 explicit completed/failed/cancelled statuses, and emits content-free
 `tool_call`/`mcp_call` correlation events for existing Operations, Files, MCP,
-governance, and trace views. Multi-file changes get one file correlation event
+governance, and trace views. Those events carry correlation plus tool or server
+identity only; command output, MCP arguments/results/errors, and file diffs stay
+on the retained rollout record and the Operation. `attributes.unavailable_fields`
+includes `file_operations` except on a file-change event and `command_execution`
+except on a command event. Multi-file changes get one file correlation event
 per sorted raw path while remaining one provider invocation. Every original
 rollout record remains retained verbatim.
 
