@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -907,7 +908,7 @@ func TestNormalizeTracesRetainsToolContentSurfaces(t *testing.T) {
 	wantEvents := []map[string]any{{
 		"name":                     "tool.output",
 		"time_unix_nano":           "1790886003967308954",
-		"dropped_attributes_count": 0,
+		"dropped_attributes_count": int64(0),
 		"attributes": map[string]any{
 			"bash_command": "printf 'https://github.com/%s/pull/%s\\n' acme-synthetic/telemetryiq 253",
 			"output":       liveSpanPRLinkURL,
@@ -934,6 +935,54 @@ func TestNormalizeTracesRetainsToolContentSurfaces(t *testing.T) {
 	links, _ := bySpanID["0000000000002532"].ProviderExtensions["span_links"].([]map[string]any)
 	if len(links) != 1 || !reflect.DeepEqual(links[0]["attributes"], map[string]any{"link.type": "parent_of"}) {
 		t.Fatalf("llm_request span link not retained: %#v", links)
+	}
+}
+
+// TestNormalizeTracesEchoDecodesEveryAnyValueShape proves the raw span_attributes
+// echo is lossless (#253): bytesValue, kvlistValue, non-string and whitespace-
+// bearing array members, and an empty AnyValue all survive verbatim rather than
+// being dropped by a scalar-only decoder.
+func TestNormalizeTracesEchoDecodesEveryAnyValueShape(t *testing.T) {
+	event := singleSpanEvent(t, toolSpanPayload("hook", `,{"key":"blob","value":{"bytesValue":"dGlx"}},{"key":"nested","value":{"kvlistValue":{"values":[{"key":"k","value":{"intValue":"7"}},{"key":"inner","value":{"arrayValue":{"values":[{"boolValue":true}]}}}]}}},{"key":"mixed","value":{"arrayValue":{"values":[{"stringValue":" padded "},{"intValue":"2"},{"stringValue":""}]}}},{"key":"null_value","value":{}}`))
+	want := map[string]any{
+		"blob":       "dGlx",
+		"nested":     map[string]any{"k": float64(7), "inner": []any{true}},
+		"mixed":      []any{" padded ", float64(2), ""},
+		"null_value": nil,
+	}
+	attrs, _ := event.ProviderExtensions["span_attributes"].(map[string]any)
+	for key, value := range want {
+		if got, present := attrs[key]; !present || !reflect.DeepEqual(got, value) {
+			t.Fatalf("span_attributes[%q] = %#v (present %v), want %#v", key, got, present, value)
+		}
+	}
+}
+
+// TestNormalizeTracesContentAvailabilityFollowsObservedContent proves prompt and
+// response content are declared unavailable only when a span does not carry them:
+// the gate-off "<REDACTED>" user_prompt is not content, while an un-redacted
+// prompt or new_context (interaction/llm_request) and response.model_output
+// (llm_request) make the surface available (#253).
+func TestNormalizeTracesContentAvailabilityFollowsObservedContent(t *testing.T) {
+	cases := []struct {
+		name, spanType, attrs string
+		wantPrompt, wantResp  bool
+	}{
+		{"redacted prompt", "interaction", `,{"key":"user_prompt","value":{"stringValue":"<REDACTED>"}}`, false, false},
+		{"observed prompt", "interaction", `,{"key":"user_prompt","value":{"stringValue":"synthetic prompt"}}`, true, false},
+		{"llm_request context and output", "llm_request", `,{"key":"new_context","value":{"stringValue":"[USER]\nsynthetic"}},{"key":"response.model_output","value":{"stringValue":"done"}}`, true, true},
+		{"tool result is not prompt content", "tool", `,{"key":"new_context","value":{"stringValue":"[TOOL RESULT: Bash]"}}`, false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fields, _ := singleSpanEvent(t, toolSpanPayload(tc.spanType, tc.attrs)).Attributes["unavailable_fields"].([]string)
+			if gotPrompt := !slices.Contains(fields, "prompt_content"); gotPrompt != tc.wantPrompt {
+				t.Fatalf("prompt_content available = %v, want %v: %#v", gotPrompt, tc.wantPrompt, fields)
+			}
+			if gotResp := !slices.Contains(fields, "response_content"); gotResp != tc.wantResp {
+				t.Fatalf("response_content available = %v, want %v: %#v", gotResp, tc.wantResp, fields)
+			}
+		})
 	}
 }
 

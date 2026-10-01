@@ -30,7 +30,6 @@
         "mcp_calls",
         "file_operations",
         "command_execution",
-        "prompt_content",
         "response_content",
         "repository_context",
         "provider_cost"
@@ -135,7 +134,6 @@
         "mcp_calls",
         "file_operations",
         "command_execution",
-        "prompt_content",
         "response_content",
         "repository_context",
         "provider_cost"
@@ -230,8 +228,7 @@
           "dropped_attributes_count": 0,
           "flags": 769,
           "span_id": "0000000000002538",
-          "trace_id": "00000000000000000000000000002532",
-          "trace_state": ""
+          "trace_id": "00000000000000000000000000002532"
         }
       ]
     }
@@ -648,8 +645,6 @@
         "mcp_calls",
         "file_operations",
         "command_execution",
-        "prompt_content",
-        "response_content",
         "repository_context",
         "provider_cost"
       ]

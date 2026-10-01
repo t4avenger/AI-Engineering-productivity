@@ -681,7 +681,16 @@ below) and, per span type (`spanHomedKeys`), the raw `file_path`/`full_command`/
 excluded only on the span types that home it, so it can never fall through to a
 drop. (Before #253 an allow-list, `safeSpanAttributeKeys`, dropped every
 unlisted attribute — an ingest-time amputation the raw-capture invariant
-forbids.)
+forbids.) Echoed values are decoded losslessly by `rawAttributeValues` /
+`rawAnyValue`: scalars as before, plus `bytesValue` (base64 wire string),
+`kvlistValue` (map), every `arrayValue` member untrimmed and unfiltered, and an
+empty AnyValue as `null`.
+
+Because content now rides on spans, `unavailable_fields` is computed from what a
+span observably carries (`spanContentObserved`): `prompt_content` is available on
+an `interaction` with an un-redacted `user_prompt` or `new_context`, and on an
+`llm_request` with `new_context`; `response_content` on an `llm_request` with
+`response.model_output`. The gate-off `<REDACTED>` placeholder is not content.
 
 `new_context` (detailed beta tracing — `ENABLE_BETA_TRACING_DETAILED=1` plus
 `BETA_TRACING_ENDPOINT`) is homed verbatim (`putSpanRaw`) in the `tool` block
@@ -694,8 +703,9 @@ results, `OTEL_LOG_USER_PROMPTS`). OTLP **span events** are retained raw as
 `bash_command` and any `<attr>_truncated` / `<attr>_original_length`) and the
 `gen_ai.request.attempt` retry event on `claude_code.llm_request` — and **span
 links** as `provider_extensions.span_links` (`trace_id`, `span_id`,
-`trace_state`, `flags`, `attributes`, e.g. `link.type=parent_of`). Both are
-present-only. Evidence: `fixtures/claude/observed-sanitised/
+`trace_state`, `flags`, `attributes`, e.g. `link.type=parent_of`). Both lists
+and every member within them are present-only: an omitted `traceState`, `flags`
+or count is left absent, never fabricated as `""` or `0`. Evidence: `fixtures/claude/observed-sanitised/
 claude-code-2.1.287-tool-content-spans-otlp.json` →
 `fixtures/claude/expected/claude-code-2.1.287-tool-content-spans.events.json`.
 

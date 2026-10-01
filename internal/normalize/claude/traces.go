@@ -22,6 +22,10 @@ var ErrUnsupportedTraces = errors.New("unsupported Claude Code traces payload")
 // Span-type values from Claude Code's span.type attribute (#100/#101). Shared
 // across the dispatch switch, task-boundary mapping, and unavailable_fields so
 // Sonar S1192 does not fire on the repeated literals.
+// redactedContent is the value Claude Code emits for gated span content when its
+// gate is off (e.g. user_prompt without OTEL_LOG_USER_PROMPTS).
+const redactedContent = "<REDACTED>"
+
 const (
 	spanTypeInteraction     = "interaction"
 	spanTypeLLMRequest      = "llm_request"
@@ -125,22 +129,24 @@ type otlpSpan struct {
 // otlpSpanEvent decodes an OTLP span event: the documented tool.output event on a
 // claude_code.tool span (OTEL_LOG_TOOL_CONTENT, #253) and the
 // gen_ai.request.attempt retry event on claude_code.llm_request.
+// Optional members are pointers so an omitted wire field stays absent rather than
+// becoming a fabricated zero value.
 type otlpSpanEvent struct {
 	Name                   string          `json:"name"`
-	TimeUnixNano           string          `json:"timeUnixNano"`
+	TimeUnixNano           *string         `json:"timeUnixNano"`
 	Attributes             []otlpAttribute `json:"attributes"`
-	DroppedAttributesCount int             `json:"droppedAttributesCount"`
+	DroppedAttributesCount *int64          `json:"droppedAttributesCount"`
 }
 
 // otlpSpanLink decodes an OTLP span link (observed on claude_code.llm_request
 // with link.type=parent_of under detailed beta tracing, #253).
 type otlpSpanLink struct {
-	TraceID                string          `json:"traceId"`
-	SpanID                 string          `json:"spanId"`
-	TraceState             string          `json:"traceState"`
-	Flags                  int64           `json:"flags"`
+	TraceID                *string         `json:"traceId"`
+	SpanID                 *string         `json:"spanId"`
+	TraceState             *string         `json:"traceState"`
+	Flags                  *int64          `json:"flags"`
 	Attributes             []otlpAttribute `json:"attributes"`
-	DroppedAttributesCount int             `json:"droppedAttributesCount"`
+	DroppedAttributesCount *int64          `json:"droppedAttributesCount"`
 }
 
 // spanContext carries resource- and scope-derived values shared by every span
@@ -261,7 +267,7 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 	eventID := contentID("claude-code:span:", []byte(identity))
 
 	attributes := map[string]any{
-		"unavailable_fields": spanUnavailableFields(spanType),
+		"unavailable_fields": spanUnavailableFields(spanType, fields),
 		"span_type":          spanType,
 	}
 	if modelObserved {
@@ -499,15 +505,49 @@ func llmRequestAttributes(fields map[string]any, attributes []otlpAttribute) map
 // carry, per span type. Tool spans carry tool/file/command evidence (#101), so
 // those surfaces are removed from their list rather than falsely declared
 // unavailable (the provider rule forbids marking a signal unavailable merely
-// because capturing it elsewhere is possible). prompt/response content and
-// provider cost never ride on a span.
-func spanUnavailableFields(spanType string) []string {
+// because capturing it elsewhere is possible). Prompt and response content are
+// gated (OTEL_LOG_USER_PROMPTS, detailed beta tracing), so they are declared
+// unavailable unless this span observably carries them (spanContentObserved,
+// #253). Provider cost never rides on a span.
+func spanUnavailableFields(spanType string, fields map[string]any) []string {
+	var candidates []string
 	switch spanType {
 	case spanTypeTool, spanTypeToolExecution, spanTypeToolBlockedUser:
-		return []string{"mcp_calls", "prompt_content", "response_content", "repository_context", "provider_cost"}
+		candidates = []string{"mcp_calls", "prompt_content", "response_content", "repository_context", "provider_cost"}
 	default:
-		return []string{"tool_io", "mcp_calls", "file_operations", "command_execution", "prompt_content", "response_content", "repository_context", "provider_cost"}
+		candidates = []string{"tool_io", "mcp_calls", "file_operations", "command_execution", "prompt_content", "response_content", "repository_context", "provider_cost"}
 	}
+	prompt, response := spanContentObserved(spanType, fields)
+	unavailableFields := make([]string, 0, len(candidates))
+	for _, field := range candidates {
+		if (field == "prompt_content" && prompt) || (field == "response_content" && response) {
+			continue
+		}
+		unavailableFields = append(unavailableFields, field)
+	}
+	return unavailableFields
+}
+
+// spanContentObserved reports whether a span carries prompt or response content.
+// Prompt content: an interaction's un-redacted user_prompt, or new_context on an
+// interaction (the prompt) or llm_request (the request's new user messages and
+// tool results). Response content: an llm_request's response.model_output. The
+// tool span's new_context is the tool result (tool_io), not prompt content. A
+// redacted value ("<REDACTED>", the gate-off default) is not content.
+func spanContentObserved(spanType string, fields map[string]any) (prompt, response bool) {
+	switch spanType {
+	case spanTypeInteraction:
+		prompt = spanContentPresent(fields, "user_prompt") || spanContentPresent(fields, attrNewContext)
+	case spanTypeLLMRequest:
+		prompt = spanContentPresent(fields, attrNewContext)
+		response = spanContentPresent(fields, "response.model_output")
+	}
+	return prompt, response
+}
+
+func spanContentPresent(fields map[string]any, key string) bool {
+	text, ok := normalize.ObservedString(fields[key])
+	return ok && text != redactedContent
 }
 
 // toolAttributes maps a claude_code.tool span into a present-only block. Per the
@@ -625,11 +665,11 @@ func putSpanInt(block, fields map[string]any, dst, src string) {
 
 // spanAttributesEcho returns every span attribute raw except those with a typed
 // home for this span type (spanHomedKeys) or in provider_extensions.environment.
-// It decodes arrayValue members too (resourceAttributeValues), so a list-valued
-// attribute is not lost to the scalar decoder.
+// It decodes every OTLP AnyValue shape losslessly (rawAttributeValues), so a
+// list-, map- or bytes-valued attribute is not lost to the scalar decoder.
 func spanAttributesEcho(attributes []otlpAttribute, spanType string) map[string]any {
 	homed := append(environmentEventFields(), spanHomedKeys[spanType]...)
-	return normalize.UnknownFields(resourceAttributeValues(attributes), homed...)
+	return normalize.UnknownFields(rawAttributeValues(attributes), homed...)
 }
 
 // attachSpanEventsAndLinks retains a span's OTLP events (tool.output under
@@ -647,40 +687,114 @@ func attachSpanEventsAndLinks(extensions map[string]any, span otlpSpan) {
 
 // spanEventsRaw retains OTLP span events verbatim — name, timestamp, decoded
 // attributes, dropped-attribute count — returning nil when the span has none so a
-// genuine absence stays an absent key.
+// genuine absence stays an absent key. Each optional member is present-only.
 func spanEventsRaw(events []otlpSpanEvent) []map[string]any {
 	if len(events) == 0 {
 		return nil
 	}
 	raw := make([]map[string]any, 0, len(events))
 	for _, event := range events {
-		raw = append(raw, map[string]any{
-			"name":                     event.Name,
-			"time_unix_nano":           event.TimeUnixNano,
-			"attributes":               resourceAttributeValues(event.Attributes),
-			"dropped_attributes_count": event.DroppedAttributesCount,
-		})
+		entry := map[string]any{"name": event.Name}
+		putPresent(entry, "time_unix_nano", event.TimeUnixNano)
+		putPresentAttributes(entry, event.Attributes)
+		putPresent(entry, "dropped_attributes_count", event.DroppedAttributesCount)
+		raw = append(raw, entry)
 	}
 	return raw
 }
 
-// spanLinksRaw retains OTLP span links verbatim, returning nil when absent.
+// spanLinksRaw retains OTLP span links verbatim, returning nil when absent. Each
+// member is present-only: an omitted traceState/flags/count is never fabricated
+// as an empty string or zero.
 func spanLinksRaw(links []otlpSpanLink) []map[string]any {
 	if len(links) == 0 {
 		return nil
 	}
 	raw := make([]map[string]any, 0, len(links))
 	for _, link := range links {
-		raw = append(raw, map[string]any{
-			"trace_id":                 link.TraceID,
-			"span_id":                  link.SpanID,
-			"trace_state":              link.TraceState,
-			"flags":                    link.Flags,
-			"attributes":               resourceAttributeValues(link.Attributes),
-			"dropped_attributes_count": link.DroppedAttributesCount,
-		})
+		entry := map[string]any{}
+		putPresent(entry, "trace_id", link.TraceID)
+		putPresent(entry, "span_id", link.SpanID)
+		putPresent(entry, "trace_state", link.TraceState)
+		putPresent(entry, "flags", link.Flags)
+		putPresentAttributes(entry, link.Attributes)
+		putPresent(entry, "dropped_attributes_count", link.DroppedAttributesCount)
+		raw = append(raw, entry)
 	}
 	return raw
+}
+
+// putPresent sets key only when the wire member was present.
+func putPresent[T any](entry map[string]any, key string, value *T) {
+	if value != nil {
+		entry[key] = *value
+	}
+}
+
+// putPresentAttributes sets the losslessly decoded attributes only when the wire
+// carried an attributes member (an explicit empty list stays an empty map).
+func putPresentAttributes(entry map[string]any, attributes []otlpAttribute) {
+	if attributes != nil {
+		entry["attributes"] = rawAttributeValues(attributes)
+	}
+}
+
+// rawAttributeValues decodes OTLP attributes losslessly for the raw echoes
+// (span_attributes, span_events, span_links): every AnyValue shape is retained
+// verbatim via rawAnyValue, so an unforeseen attribute is never amputated by a
+// decoder that only understands scalars (#253).
+func rawAttributeValues(attributes []otlpAttribute) map[string]any {
+	values := make(map[string]any, len(attributes))
+	for _, attribute := range attributes {
+		values[attribute.Key] = rawAnyValue(attribute.Value)
+	}
+	return values
+}
+
+// rawAnyValue decodes one OTLP AnyValue recursively and verbatim. Scalars reuse
+// attributeValue (so existing scalar shapes are unchanged); an intValue that does
+// not parse and a base64 bytesValue are kept as their wire strings; arrayValue
+// keeps every member (no trimming or filtering) and kvlistValue becomes a map. An
+// empty AnyValue (OTLP's null) is retained as nil rather than dropped.
+func rawAnyValue(value map[string]any) any {
+	if scalar, ok := attributeValue(value); ok {
+		return scalar
+	}
+	if text, ok := value["intValue"].(string); ok {
+		return text
+	}
+	if bytes, ok := value["bytesValue"].(string); ok {
+		return bytes
+	}
+	if array, ok := value["arrayValue"].(map[string]any); ok {
+		return rawArrayValue(array)
+	}
+	if kvlist, ok := value["kvlistValue"].(map[string]any); ok {
+		return rawKVListValue(kvlist)
+	}
+	return nil
+}
+
+func rawArrayValue(array map[string]any) []any {
+	members, _ := array["values"].([]any)
+	values := make([]any, 0, len(members))
+	for _, member := range members {
+		decoded, _ := member.(map[string]any)
+		values = append(values, rawAnyValue(decoded))
+	}
+	return values
+}
+
+func rawKVListValue(kvlist map[string]any) map[string]any {
+	entries, _ := kvlist["values"].([]any)
+	values := make(map[string]any, len(entries))
+	for _, item := range entries {
+		entry, _ := item.(map[string]any)
+		key, _ := entry["key"].(string)
+		decoded, _ := entry["value"].(map[string]any)
+		values[key] = rawAnyValue(decoded)
+	}
+	return values
 }
 
 // toolSpanPRLinkFields assembles the span surfaces claudePRLinkScanFields names.

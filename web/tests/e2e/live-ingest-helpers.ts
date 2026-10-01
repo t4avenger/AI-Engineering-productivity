@@ -811,7 +811,7 @@ export function claudePRLinkOTLPTraces(): string {
 export const claudePRLinkToolOutputSessionID =
   'tiq-live-e2e-session-pr-link-tool-output';
 export function claudePRLinkToolOutputOTLPTraces(): string {
-  const command = `printf 'https://github.com/%s/pull/%s\\n' acme-synthetic/telemetryiq 183`;
+  const command = String.raw`printf 'https://github.com/%s/pull/%s\n' acme-synthetic/telemetryiq 183`;
   return claudeToolSpanOTLPTraces({
     traceId: '00000000000000000000000000000253',
     spanId: '0000000000000b53',
