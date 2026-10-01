@@ -78,7 +78,9 @@
         "interaction.sequence": 1,
         "parent.source": "none",
         "queued_sends": 0,
+        "session.id": "00000000-0000-4000-8000-000000000001",
         "span.type": "interaction",
+        "user_prompt": "\u003cREDACTED\u003e",
         "user_prompt_length": 33
       }
     }
@@ -185,15 +187,27 @@
         "gen_ai.system": "anthropic",
         "input_tokens": 10,
         "llm_request.context": "interaction",
+        "model": "claude-haiku-4-5-20251001",
         "output_tokens": 46,
         "query_source_safe": "sdk",
         "request_id": "req_synthetic00000000000001",
+        "session.id": "00000000-0000-4000-8000-000000000001",
         "span.type": "llm_request",
         "speed": "normal",
         "stop_reason": "end_turn",
         "success": true,
         "ttft_ms": 1918
-      }
+      },
+      "span_events": [
+        {
+          "attributes": {
+            "attempt": 1
+          },
+          "dropped_attributes_count": 0,
+          "name": "gen_ai.request.attempt",
+          "time_unix_nano": "1789117549994996128"
+        }
+      ]
     }
   }
 ]

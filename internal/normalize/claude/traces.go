@@ -23,94 +23,44 @@ var ErrUnsupportedTraces = errors.New("unsupported Claude Code traces payload")
 // across the dispatch switch, task-boundary mapping, and unavailable_fields so
 // Sonar S1192 does not fire on the repeated literals.
 const (
+	spanTypeInteraction     = "interaction"
+	spanTypeLLMRequest      = "llm_request"
 	spanTypeTool            = "tool"
 	spanTypeToolExecution   = "tool.execution"
 	spanTypeToolBlockedUser = "tool.blocked_on_user"
 	spanTypeHook            = "hook"
 )
 
-// Span attribute keys shared between the allow-list and the typed attribute
+// Span attribute keys shared between spanHomedKeys and the typed attribute
 // mappers (llm_request / tool / tool.execution). Kept as named constants so the
 // wire key is defined once (go:S1192).
 const (
 	attrWorkflowRunID   = "workflow.run_id"
 	attrWorkflowName    = "workflow.name"
 	attrGenAIToolCallID = "gen_ai.tool.call.id"
+	attrNewContext      = "new_context"
+	attrFinishReasons   = "gen_ai.response.finish_reasons"
 )
 
-// safeSpanAttributeKeys is the allow-list of span attributes carried verbatim
-// into provider_extensions.span_attributes, alongside the typed per-span-type
-// blocks in attributes.interaction / attributes.llm_request (#100). Ingest-time
-// storage sanitising was removed in #88, so this adapter is the sole guard: an
-// allow-list (not a deny-list) drops an unforeseen secret-bearing attribute from
-// this passthrough by default. session.id becomes the canonical session identity
-// and model is promoted onto the event, so neither is repeated here. Operator/
-// machine identity (user.*, organization.*, terminal.*) is not in this allow-list
-// because it has its own typed home — provider_extensions.environment (#107 X20),
-// where it is retained raw per the owner directive — so it is not duplicated into
-// span_attributes; the redacted user_prompt is absent. The free-text `error` message is
-// captured raw (epic #87) but lives in the typed llm_request/tool_execution block
-// (its canonical home, which governance walks), not in this allow-list, so it is
-// not duplicated into span_attributes.
-// agent_id/parent_agent_id/workflow.* are sub-agent workflow correlation, not
-// operator identity, so they are safe. gen_ai.response.finish_reasons is not
-// listed here because Claude Code emits it as an OTLP arrayValue the scalar
-// attributeValue decoder cannot read; it is decoded and surfaced in the typed
-// llm_request block instead (arrayAttributeValues in logs.go). Bounded tool-span
-// identifiers (tool_name, tool_use_id, gen_ai.tool.call.id, result_tokens, …) are
-// allow-listed for verbatim passthrough (#101); the raw file_path/full_command/error
-// content lives only in the typed tool block (its canonical home, which governance
-// walks), so it is not duplicated here. The gated hook_definitions (#103) is
-// likewise kept only in its typed hook block, not duplicated in this allow-list.
-var safeSpanAttributeKeys = map[string]struct{}{
-	"span.type":               {},
-	"gen_ai.system":           {},
-	"gen_ai.request.model":    {},
-	"gen_ai.response.id":      {},
-	"llm_request.context":     {},
-	"query_source_safe":       {},
-	"speed":                   {},
-	"success":                 {},
-	"attempt":                 {},
-	"stop_reason":             {},
-	"duration_ms":             {},
-	"ttft_ms":                 {},
-	"first_content_ms":        {},
-	"input_tokens":            {},
-	"output_tokens":           {},
-	"cache_read_tokens":       {},
-	"cache_creation_tokens":   {},
-	"request_id":              {},
-	"status_code":             {},
-	"error_class":             {},
-	"response.has_tool_call":  {},
-	"agent_id":                {},
-	"parent_agent_id":         {},
-	attrWorkflowRunID:         {},
-	attrWorkflowName:          {},
-	"tool_name":               {},
-	"tool_name_safe":          {},
-	"bash_command_class":      {},
-	"bash_argv0":              {},
-	"tool_use_id":             {},
-	attrGenAIToolCallID:       {},
-	"result_tokens":           {},
-	"skill_name":              {},
-	"subagent_type":           {},
-	"decision":                {},
-	"source":                  {},
-	"interaction.sequence":    {},
-	"interaction.duration_ms": {},
-	"parent.source":           {},
-	"queued_sends":            {},
-	"user_prompt_length":      {},
-	"hook_event":              {},
-	"hook_name":               {},
-	"num_hooks":               {},
-	"num_success":             {},
-	"num_blocking":            {},
-	"num_non_blocking_error":  {},
-	"num_cancelled":           {},
+// spanHomedKeys lists, per span type, the raw content attributes that already
+// have a canonical typed home (attributes.<span type>), so the
+// provider_extensions.span_attributes echo excludes them rather than carrying a
+// second copy: the gated file_path/full_command (#101) and new_context (#253) in
+// the tool block, the free-text error in the llm_request/tool_execution blocks
+// (epic #87), the gated hook_definitions in the hook block (#103), and
+// new_context plus the arrayValue finish_reasons in the llm_request block. A key
+// is excluded only on the span types that home it, so it can never fall through
+// to being dropped elsewhere. Operator/machine identity is homed in
+// provider_extensions.environment (#107 X20) and excluded via
+// environmentEventFields. Every other attribute — including unforeseen ones —
+// is echoed raw (owner directive: nothing dropped at the local-only ingest
+// boundary), mirroring the logs path's provider_extensions.event echo.
+var spanHomedKeys = map[string][]string{
+	spanTypeInteraction:   {attrNewContext},
+	spanTypeLLMRequest:    {"error", attrNewContext, attrFinishReasons},
+	spanTypeTool:          {"file_path", "full_command", attrNewContext},
+	spanTypeToolExecution: {"error"},
+	spanTypeHook:          {"hook_definitions"},
 }
 
 // claudePRLinkScanFields are the reviewed Claude span fields that can carry a
@@ -118,9 +68,14 @@ var safeSpanAttributeKeys = map[string]struct{}{
 // raw command line on tool spans (#101), so a `gh pr create` / `gh pr view <url>`
 // invocation surfaces a PR URL here. The URL grammar and extraction live in
 // normalize.AttachPRLinkEvidence, shared with Codex (no CPD-duplicated block).
-// The retained log and transcript tool surfaces are scanned too (#251): see
-// claudeLogPRLinkScanFields and transcriptToolCall.attachPRLinkEvidence.
-var claudePRLinkScanFields = []string{"full_command"}
+// OTEL_LOG_TOOL_CONTENT adds the tool span's new_context (the tool call's
+// result) and the tool.output span event's output (#253), assembled as
+// tool_output by toolSpanPRLinkFields; both were observed carrying a printf'd
+// URL on Claude Code 2.1.287 (fixtures/claude/observed-sanitised/
+// claude-code-2.1.287-tool-content-spans-otlp.json). The retained log and
+// transcript tool surfaces are scanned too (#251): see claudeLogPRLinkScanFields
+// and transcriptToolCall.attachPRLinkEvidence.
+var claudePRLinkScanFields = []string{"full_command", attrNewContext, "tool_output"}
 
 // claudeLogPRLinkScanFields are the OTEL_LOG_TOOL_DETAILS-gated log attributes
 // scanned for a verbatim pull/merge-request URL (#251): tool_parameters on
@@ -160,9 +115,32 @@ type otlpSpan struct {
 	StartTimeUnixNano string          `json:"startTimeUnixNano"`
 	EndTimeUnixNano   string          `json:"endTimeUnixNano"`
 	Attributes        []otlpAttribute `json:"attributes"`
+	Events            []otlpSpanEvent `json:"events"`
+	Links             []otlpSpanLink  `json:"links"`
 	Status            struct {
 		Code int `json:"code"`
 	} `json:"status"`
+}
+
+// otlpSpanEvent decodes an OTLP span event: the documented tool.output event on a
+// claude_code.tool span (OTEL_LOG_TOOL_CONTENT, #253) and the
+// gen_ai.request.attempt retry event on claude_code.llm_request.
+type otlpSpanEvent struct {
+	Name                   string          `json:"name"`
+	TimeUnixNano           string          `json:"timeUnixNano"`
+	Attributes             []otlpAttribute `json:"attributes"`
+	DroppedAttributesCount int             `json:"droppedAttributesCount"`
+}
+
+// otlpSpanLink decodes an OTLP span link (observed on claude_code.llm_request
+// with link.type=parent_of under detailed beta tracing, #253).
+type otlpSpanLink struct {
+	TraceID                string          `json:"traceId"`
+	SpanID                 string          `json:"spanId"`
+	TraceState             string          `json:"traceState"`
+	Flags                  int64           `json:"flags"`
+	Attributes             []otlpAttribute `json:"attributes"`
+	DroppedAttributesCount int             `json:"droppedAttributesCount"`
 }
 
 // spanContext carries resource- and scope-derived values shared by every span
@@ -190,7 +168,8 @@ type spanContext struct {
 //
 // Raw span identity (traceId/spanId/parentSpanId) and the raw session id are
 // retained verbatim; no ingest-time hiding is applied (epic #87). Span
-// attributes are reduced to safeSpanAttributeKeys. Per-span-type field mapping
+// attributes are echoed raw minus keys with a typed home (spanHomedKeys), and span
+// events and links are retained raw (#253). Per-span-type field mapping
 // covers interaction/llm_request (#100), tool spans (#101), and hook spans
 // (#103); the sub-agent span tree is reconstructed by a separate post-pass (#102).
 func NormalizeTraces(data []byte, receivedAt time.Time) ([]canonical.Event, error) {
@@ -300,10 +279,10 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 	// separate post-pass (claude.ReconstructSubAgentRelations, #102), not a
 	// span.type case here.
 	switch spanType {
-	case "interaction":
-		attributes["interaction"] = interactionAttributes(fields)
-	case "llm_request":
-		attributes["llm_request"] = llmRequestAttributes(fields, span.Attributes)
+	case spanTypeInteraction:
+		attributes[spanTypeInteraction] = interactionAttributes(fields)
+	case spanTypeLLMRequest:
+		attributes[spanTypeLLMRequest] = llmRequestAttributes(fields, span.Attributes)
 	case spanTypeTool:
 		attributes["tool"] = toolAttributes(fields)
 	case spanTypeToolExecution:
@@ -327,8 +306,9 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 			"status_code":     span.Status.Code,
 		},
 		"resource":        ctx.safeResource,
-		"span_attributes": safeSpanAttributes(fields),
+		"span_attributes": spanAttributesEcho(span.Attributes, spanType),
 	}
+	attachSpanEventsAndLinks(extensions, span)
 	// Session environment and identity (#107 X20): identity keys (user.*/
 	// organization.id/terminal.type) ride on the span attributes, the machine/app
 	// keys (os.*/host.arch/app.*/workspace.host_paths) on the resource; both are
@@ -340,11 +320,12 @@ func spanEvent(span otlpSpan, ctx spanContext) (canonical.Event, error) {
 	}
 	// A tool span's raw full_command carries the exact command line (#101), so a
 	// `gh pr create` / `gh pr view <url>` invocation surfaces a pull-request URL
-	// verbatim here. The shared extractor promotes only URLs present in the wire
+	// verbatim here; its new_context and tool.output output carry the tool's
+	// result (#253). The shared extractor promotes only URLs present in the wire
 	// value; it never derives one from repo metadata (honesty invariant). Claude
 	// events carrying pr_link_candidates flow through the provider-agnostic
 	// session aggregation (attachSessionPRLink) into session.Attributes["pr_link"].
-	normalize.AttachPRLinkEvidence(attributes, extensions, fields, claudePRLinkScanFields)
+	normalize.AttachPRLinkEvidence(attributes, extensions, toolSpanPRLinkFields(fields, spanType, span.Events), claudePRLinkScanFields)
 	event := canonical.Event{
 		SchemaVersion:      canonicalSchemaVersion,
 		EventID:            eventID,
@@ -382,7 +363,7 @@ func spanCorrelation(fields map[string]any, eventID string, occurredAt time.Time
 		"reason":     "Claude Code trace spans: per-span task-boundary mapping deferred to T-phase",
 	}
 	switch spanType {
-	case "interaction":
+	case spanTypeInteraction:
 		boundary = map[string]any{
 			"confidence": "observed",
 			"reason":     "Claude Code interaction span is the per-user-prompt root, a genuine task boundary",
@@ -448,8 +429,9 @@ func spanSessionID(fields map[string]any, traceID string) string {
 // root) into structured, present-only fields. The interaction span carries no
 // tokens or latency of its own — those live on its llm_request children — only
 // prompt-shape and queueing metadata. Every field is present-only: a genuinely
-// absent attribute is omitted, never fabricated. user_prompt_length is a length
-// only; the prompt text is never emitted here (and is dropped regardless, #87).
+// absent attribute is omitted, never fabricated. The gated user_prompt text rides
+// raw in the span_attributes echo; new_context (the prompt as context, under
+// detailed beta tracing + OTEL_LOG_USER_PROMPTS) is homed here verbatim (#253).
 func interactionAttributes(fields map[string]any) map[string]any {
 	block := map[string]any{}
 	putSpanInt(block, fields, "sequence", "interaction.sequence")
@@ -457,6 +439,7 @@ func interactionAttributes(fields map[string]any) map[string]any {
 	putSpanInt(block, fields, "user_prompt_length", "user_prompt_length")
 	putSpanInt(block, fields, "queued_sends", "queued_sends")
 	putSpanString(block, fields, "parent_source", "parent.source")
+	putSpanRaw(block, fields, attrNewContext, attrNewContext)
 	return block
 }
 
@@ -468,9 +451,11 @@ func interactionAttributes(fields map[string]any) map[string]any {
 // per-field hide decision is deferred downstream; this now matches tool.execution
 // rather than dropping it "for consistency" with the pre-#87 default), alongside
 // the bounded error_class, status_code, and success flag. context comes from
-// llm_request.context (query_source is a metrics-only dimension, not a span
-// attribute, so it is never invented here). finish_reasons is decoded from the
-// OTLP arrayValue that the scalar attribute decoder cannot read.
+// llm_request.context (the raw query_source, observed on 2.1.287 spans, rides in
+// the span_attributes echo). finish_reasons is decoded from the OTLP arrayValue
+// that the scalar attribute decoder cannot read. new_context — the request's new
+// user messages and tool results under detailed beta tracing — is homed here
+// verbatim (#253).
 func llmRequestAttributes(fields map[string]any, attributes []otlpAttribute) map[string]any {
 	block := map[string]any{}
 	putSpanString(block, fields, "model", "model")
@@ -503,9 +488,10 @@ func llmRequestAttributes(fields map[string]any, attributes []otlpAttribute) map
 	if value, ok := optionalBool(fields, "response.has_tool_call"); ok {
 		block["response_has_tool_call"] = value
 	}
-	if reasons := arrayAttributeValues(attributes, "gen_ai.response.finish_reasons"); reasons != nil {
+	if reasons := arrayAttributeValues(attributes, attrFinishReasons); reasons != nil {
 		block["finish_reasons"] = reasons
 	}
+	putSpanRaw(block, fields, attrNewContext, attrNewContext)
 	return block
 }
 
@@ -547,6 +533,7 @@ func toolAttributes(fields map[string]any) map[string]any {
 	putSpanString(block, fields, "workflow_name", attrWorkflowName)
 	putSpanInt(block, fields, "duration_ms", "duration_ms")
 	putSpanInt(block, fields, "result_tokens", "result_tokens")
+	putSpanRaw(block, fields, attrNewContext, attrNewContext)
 	return block
 }
 
@@ -586,7 +573,7 @@ func toolBlockedOnUserAttributes(fields map[string]any) map[string]any {
 // outcome breakdown, and duration_ms is the wall-clock cost of all matching hooks.
 // hook_definitions is the OTEL_LOG_TOOL_DETAILS-gated JSON-serialized hook
 // configuration; per the raw-capture stance (epic #87) it is retained verbatim
-// here — its canonical home is this typed block (not the allow-listed passthrough,
+// here — its canonical home is this typed block (not the span_attributes echo,
 // mirroring the gated tool file_path/full_command), and the per-field hide
 // decision is deferred downstream. Every field is present-only: a genuinely
 // absent attribute is omitted, never fabricated.
@@ -636,15 +623,89 @@ func putSpanInt(block, fields map[string]any, dst, src string) {
 	}
 }
 
-// safeSpanAttributes reduces span attributes to the allow-listed safe keys,
-// dropping operator/identity and unforeseen attributes by default (#88 removed
-// storage-side sanitising, so the adapter is the sole guard).
-func safeSpanAttributes(fields map[string]any) map[string]any {
-	safe := make(map[string]any)
-	for key, value := range fields {
-		if _, ok := safeSpanAttributeKeys[strings.ToLower(strings.TrimSpace(key))]; ok {
-			safe[key] = value
+// spanAttributesEcho returns every span attribute raw except those with a typed
+// home for this span type (spanHomedKeys) or in provider_extensions.environment.
+// It decodes arrayValue members too (resourceAttributeValues), so a list-valued
+// attribute is not lost to the scalar decoder.
+func spanAttributesEcho(attributes []otlpAttribute, spanType string) map[string]any {
+	homed := append(environmentEventFields(), spanHomedKeys[spanType]...)
+	return normalize.UnknownFields(resourceAttributeValues(attributes), homed...)
+}
+
+// attachSpanEventsAndLinks retains a span's OTLP events (tool.output under
+// OTEL_LOG_TOOL_CONTENT, gen_ai.request.attempt) and links raw and present-only
+// (#253): the tool.output output/content/diff is the tool call's actual result,
+// captured verbatim.
+func attachSpanEventsAndLinks(extensions map[string]any, span otlpSpan) {
+	if events := spanEventsRaw(span.Events); events != nil {
+		extensions["span_events"] = events
+	}
+	if links := spanLinksRaw(span.Links); links != nil {
+		extensions["span_links"] = links
+	}
+}
+
+// spanEventsRaw retains OTLP span events verbatim — name, timestamp, decoded
+// attributes, dropped-attribute count — returning nil when the span has none so a
+// genuine absence stays an absent key.
+func spanEventsRaw(events []otlpSpanEvent) []map[string]any {
+	if len(events) == 0 {
+		return nil
+	}
+	raw := make([]map[string]any, 0, len(events))
+	for _, event := range events {
+		raw = append(raw, map[string]any{
+			"name":                     event.Name,
+			"time_unix_nano":           event.TimeUnixNano,
+			"attributes":               resourceAttributeValues(event.Attributes),
+			"dropped_attributes_count": event.DroppedAttributesCount,
+		})
+	}
+	return raw
+}
+
+// spanLinksRaw retains OTLP span links verbatim, returning nil when absent.
+func spanLinksRaw(links []otlpSpanLink) []map[string]any {
+	if len(links) == 0 {
+		return nil
+	}
+	raw := make([]map[string]any, 0, len(links))
+	for _, link := range links {
+		raw = append(raw, map[string]any{
+			"trace_id":                 link.TraceID,
+			"span_id":                  link.SpanID,
+			"trace_state":              link.TraceState,
+			"flags":                    link.Flags,
+			"attributes":               resourceAttributeValues(link.Attributes),
+			"dropped_attributes_count": link.DroppedAttributesCount,
+		})
+	}
+	return raw
+}
+
+// toolSpanPRLinkFields assembles the span surfaces claudePRLinkScanFields names.
+// full_command is scanned on every span (it only occurs on tool spans). The
+// tool-result surfaces — new_context and the tool.output events' output, joined
+// as tool_output — are scanned only on a claude_code.tool span: on
+// interaction/llm_request spans new_context is conversation context, where a URL
+// is a mention rather than the tool's own result, so it is never promoted (#253).
+func toolSpanPRLinkFields(fields map[string]any, spanType string, events []otlpSpanEvent) map[string]any {
+	scan := map[string]any{"full_command": fields["full_command"]}
+	if spanType != spanTypeTool {
+		return scan
+	}
+	scan[attrNewContext] = fields[attrNewContext]
+	outputs := make([]string, 0, len(events))
+	for _, event := range events {
+		if event.Name != "tool.output" {
+			continue
+		}
+		if output, ok := normalize.ObservedString(attributeValues(event.Attributes)["output"]); ok {
+			outputs = append(outputs, output)
 		}
 	}
-	return safe
+	if len(outputs) > 0 {
+		scan["tool_output"] = strings.Join(outputs, "\n")
+	}
+	return scan
 }

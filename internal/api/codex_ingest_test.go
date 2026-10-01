@@ -153,10 +153,10 @@ func TestCodexLogsIngestEndToEnd(t *testing.T) {
 	}
 	retained := append(canaries, "tiq-canary-argument-token", "tiq-canary-output")
 	assertContainsAll(t, retained, marshalJSON(t, stored))
-	assertContainsAll(t, retained, marshalJSON(t, fetchCodexEventDetail(t, server.URL, stored[0])))
+	assertContainsAll(t, retained, marshalJSON(t, fetchStoredEventDetail(t, server.URL, stored[0])))
 }
 
-func fetchCodexEventDetail(t *testing.T, serverURL string, event canonical.Event) eventDetailResponse {
+func fetchStoredEventDetail(t *testing.T, serverURL string, event canonical.Event) eventDetailResponse {
 	t.Helper()
 	response, err := http.Get(serverURL + "/api/v1/sessions/" + event.SessionID + "/events/" + event.EventID + "?expand=1")
 	if err != nil {

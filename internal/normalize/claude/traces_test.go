@@ -13,7 +13,7 @@ import (
 
 // tracesFixturePayload extracts the OTLP payload from the fixture wrapper so it
 // is replayed exactly as the /v1/traces route would hand it to the adapter.
-func tracesFixturePayload(t *testing.T, name string) []byte {
+func tracesFixturePayload(t testing.TB, name string) []byte {
 	t.Helper()
 	var document map[string]any
 	if err := json.Unmarshal(readFixture(t, name), &document); err != nil {
@@ -368,42 +368,26 @@ func assertAllEventsShareSession(t *testing.T, surface string, events []canonica
 	}
 }
 
-// TestNormalizeTracesRetainsIdentityAndFiltersSecrets proves the #107 X20 stance
-// on an llm_request span: the known identity attribute (user.email) rides raw into
-// its typed home provider_extensions.environment (nothing dropped at the local-only
-// ingest boundary — owner directive / epic #87), while genuine secrets/credentials
-// and prompt content that are neither mapped identity keys nor on the span
-// allow-list (api_key, authorization, user_prompt) stay out of canonical output —
-// the adapter is the sole guard after #88 removed storage-side sanitising. Safe
-// behaviour metadata is preserved.
-func TestNormalizeTracesRetainsIdentityAndFiltersSecrets(t *testing.T) {
+// TestNormalizeTracesRetainsIdentityAndUnforeseenAttributes proves the raw-capture
+// stance on an llm_request span (#107 X20, #253): the known identity attribute
+// (user.email) rides raw into its typed home provider_extensions.environment and is
+// not duplicated into span_attributes, while attributes with no typed home —
+// including unforeseen ones (api_key, authorization) and the gated user_prompt — are
+// echoed verbatim into span_attributes rather than dropped at the local-only ingest
+// boundary (owner directive / epic #87), mirroring the logs path.
+func TestNormalizeTracesRetainsIdentityAndUnforeseenAttributes(t *testing.T) {
 	payload := []byte(`{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"claude-code"}},{"key":"service.version","value":{"stringValue":"2.1.268"}}]},"scopeSpans":[{"scope":{"name":"com.anthropic.claude_code.tracing"},"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","name":"claude_code.llm_request","startTimeUnixNano":"1789117549650000000","attributes":[{"key":"span.type","value":{"stringValue":"llm_request"}},{"key":"stop_reason","value":{"stringValue":"end_turn"}},{"key":"session.id","value":{"stringValue":"synthetic-session"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"user_prompt","value":{"stringValue":"tiq-canary-prompt"}},{"key":"api_key","value":{"stringValue":"tiq-canary-api-key"}},{"key":"authorization","value":{"stringValue":"Bearer tiq-canary-token"}}]}]}]}]}`)
 	events, err := NormalizeTraces(payload, time.Now().UTC())
 	if err != nil {
 		t.Fatalf("NormalizeTraces: %v", err)
 	}
-	// The known identity key is retained raw in its typed home (#107 X20).
-	environment, ok := events[0].ProviderExtensions["environment"].(map[string]any)
-	if !ok || environment["user_email"] != "synthetic@example.test" {
-		t.Fatalf("user.email must ride raw into provider_extensions.environment: %#v", events[0].ProviderExtensions["environment"])
-	}
-	// Secrets/credentials and prompt content on no allow-list stay out entirely.
-	encoded, err := json.Marshal(events)
-	if err != nil {
-		t.Fatalf("marshal events: %v", err)
-	}
-	for _, leaked := range []string{"tiq-canary-api-key", "Bearer tiq-canary-token", "tiq-canary-prompt"} {
-		if strings.Contains(string(encoded), leaked) {
-			t.Fatalf("sensitive value %q leaked in %s", leaked, encoded)
-		}
-	}
-	spanAttributes := events[0].ProviderExtensions["span_attributes"].(map[string]any)
-	if spanAttributes["stop_reason"] != "end_turn" {
-		t.Fatalf("safe span attribute stop_reason not preserved: %#v", spanAttributes)
-	}
-	if _, present := spanAttributes["user.email"]; present {
-		t.Fatalf("identity attribute user.email home is environment, not span_attributes: %#v", spanAttributes)
-	}
+	assertIdentityHomedUnforeseenRaw(t, events[0], map[string]any{
+		"stop_reason":   "end_turn",
+		"session.id":    "synthetic-session",
+		"user_prompt":   "tiq-canary-prompt",
+		"api_key":       "tiq-canary-api-key",
+		"authorization": "Bearer tiq-canary-token",
+	})
 }
 
 // llmRequestBlock extracts the typed llm_request block from the single event a
@@ -646,8 +630,8 @@ func assertUnavailableExcludes(t *testing.T, event canonical.Event, names ...str
 	}
 }
 
-// assertAbsentFromSpanAttributes proves a raw content key never leaked into the
-// allow-listed span_attributes passthrough (its only home is the typed block).
+// assertAbsentFromSpanAttributes proves a raw content key with a typed home is not
+// duplicated into the span_attributes echo (its only home is the typed block).
 func assertAbsentFromSpanAttributes(t *testing.T, event canonical.Event, key string) {
 	t.Helper()
 	attrs, _ := event.ProviderExtensions["span_attributes"].(map[string]any)
@@ -722,40 +706,38 @@ func TestNormalizeTracesToolSpanUnavailableFields(t *testing.T) {
 	}
 }
 
-// TestNormalizeTracesToolSpanRetainsIdentityAndDropsUnknownAttribute proves the
-// #107 X20 stance on a tool span: a known identity attribute (user.email) rides raw
-// into its typed home provider_extensions.environment (nothing dropped at the
-// local-only ingest boundary — owner directive / epic #87), while an unforeseen,
-// non-identity attribute on no allow-list (api_key) is not surfaced anywhere. The
-// raw full_command is captured in the typed block (its canonical home) and never
-// leaks into span_attributes.
-func TestNormalizeTracesToolSpanRetainsIdentityAndDropsUnknownAttribute(t *testing.T) {
+// TestNormalizeTracesToolSpanRetainsIdentityAndUnknownAttribute proves the #107
+// X20 / #253 stance on a tool span: a known identity attribute (user.email) rides
+// raw into provider_extensions.environment, an unforeseen attribute (api_key) is
+// echoed raw into span_attributes (nothing dropped at the local-only ingest
+// boundary — owner directive / epic #87), and the raw full_command is captured in
+// the typed block (its canonical home) without a second copy in span_attributes.
+func TestNormalizeTracesToolSpanRetainsIdentityAndUnknownAttribute(t *testing.T) {
 	event := singleSpanEvent(t, toolSpanPayload("tool", `,{"key":"tool_name","value":{"stringValue":"Bash"}},{"key":"full_command","value":{"stringValue":"cat config/app.yaml"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"api_key","value":{"stringValue":"tiq-canary-tool-key"}}`))
-	assertRetainsIdentityDropsSecret(t, event, "tiq-canary-tool-key")
+	assertIdentityHomedUnforeseenRaw(t, event, map[string]any{"api_key": "tiq-canary-tool-key"})
 	if block := toolBlock(t, event, "tool"); block["full_command"] != "cat config/app.yaml" {
 		t.Fatalf("raw full_command must be captured in the typed block: %#v", block)
 	}
 	assertAbsentFromSpanAttributes(t, event, "full_command")
 }
 
-// assertRetainsIdentityDropsSecret proves the #107 X20 stance shared by the tool
-// and hook span identity tests: a known identity attribute (user.email) rides raw
-// into its typed home provider_extensions.environment (nothing dropped at the
-// local-only ingest boundary — owner directive / epic #87), while an unforeseen,
-// non-identity attribute on no allow-list (secretCanary) is not surfaced anywhere
-// in the encoded event.
-func assertRetainsIdentityDropsSecret(t *testing.T, event canonical.Event, secretCanary string) {
+// assertIdentityHomedUnforeseenRaw proves the stance shared by the span identity
+// tests: a known identity attribute (user.email) rides raw into its typed home
+// provider_extensions.environment and is not duplicated into span_attributes,
+// while each wantRaw attribute — with no typed home — is echoed verbatim into
+// span_attributes rather than dropped (owner directive / epic #87, #253).
+func assertIdentityHomedUnforeseenRaw(t *testing.T, event canonical.Event, wantRaw map[string]any) {
 	t.Helper()
 	environment, ok := event.ProviderExtensions["environment"].(map[string]any)
 	if !ok || environment["user_email"] != "synthetic@example.test" {
 		t.Fatalf("user.email must ride raw into provider_extensions.environment: %#v", event.ProviderExtensions["environment"])
 	}
-	encoded, err := json.Marshal(event)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	if strings.Contains(string(encoded), secretCanary) {
-		t.Fatalf("unknown non-identity attribute must not be surfaced: %s", encoded)
+	assertAbsentFromSpanAttributes(t, event, "user.email")
+	attrs, _ := event.ProviderExtensions["span_attributes"].(map[string]any)
+	for key, want := range wantRaw {
+		if attrs[key] != want {
+			t.Fatalf("span_attributes[%q] = %#v, want raw %#v: %#v", key, attrs[key], want, attrs)
+		}
 	}
 }
 
@@ -882,17 +864,14 @@ func TestNormalizeTracesHookSpanUnavailableFields(t *testing.T) {
 	}
 }
 
-// TestNormalizeTracesHookSpanRetainsIdentityAndDropsUnknownAttribute proves the
-// #107 X20 stance on a hook span: a known identity attribute (user.email) rides
-// raw into its typed home provider_extensions.environment (nothing dropped at the
-// local-only ingest boundary — owner directive / epic #87), while an unforeseen,
-// non-identity attribute that is on no allow-list (api_key) is not surfaced
-// anywhere — it is neither a mapped environment key nor a safe span attribute, so
-// it never reaches a canonical block. The gated hook_definitions stays raw in the
-// typed block (its canonical home) and never leaks into span_attributes.
-func TestNormalizeTracesHookSpanRetainsIdentityAndDropsUnknownAttribute(t *testing.T) {
+// TestNormalizeTracesHookSpanRetainsIdentityAndUnknownAttribute proves the #107
+// X20 / #253 stance on a hook span: a known identity attribute (user.email) rides
+// raw into provider_extensions.environment, an unforeseen attribute (api_key) is
+// echoed raw into span_attributes, and the gated hook_definitions stays raw in the
+// typed block (its canonical home) without a second copy in span_attributes.
+func TestNormalizeTracesHookSpanRetainsIdentityAndUnknownAttribute(t *testing.T) {
 	event := singleSpanEvent(t, toolSpanPayload("hook", `,{"key":"hook_event","value":{"stringValue":"PreToolUse"}},{"key":"hook_definitions","value":{"stringValue":"[{\"type\":\"command\",\"command\":\"./scripts/guard.sh\"}]"}},{"key":"user.email","value":{"stringValue":"synthetic@example.test"}},{"key":"api_key","value":{"stringValue":"tiq-canary-hook-key"}}`))
-	assertRetainsIdentityDropsSecret(t, event, "tiq-canary-hook-key")
+	assertIdentityHomedUnforeseenRaw(t, event, map[string]any{"api_key": "tiq-canary-hook-key"})
 	if block := toolBlock(t, event, "hook"); block["hook_definitions"] != "[{\"type\":\"command\",\"command\":\"./scripts/guard.sh\"}]" {
 		t.Fatalf("raw hook_definitions must be captured in the typed block: %#v", block)
 	}
@@ -911,6 +890,53 @@ func TestNormalizeTracesHookSpanPreservesRawDefinitions(t *testing.T) {
 	}
 }
 
+// TestNormalizeTracesRetainsToolContentSurfaces proves the #253 contract over the
+// live 2.1.287 capture (OTEL_LOG_TOOL_CONTENT + detailed beta tracing): the
+// claude_code.tool span's tool.output span event is retained raw with its
+// output, new_context is homed verbatim in the tool, interaction, and llm_request
+// typed blocks (never duplicated into span_attributes), the previously dropped
+// content attributes (tool_input, system_prompt_preview, response.model_output)
+// ride raw in span_attributes, and the llm_request span link survives.
+func TestNormalizeTracesRetainsToolContentSurfaces(t *testing.T) {
+	events := normalizeTraceFixture(t, tracesFixturePayload(t, liveToolContentSpans))
+	bySpanID := make(map[string]canonical.Event, len(events))
+	for _, event := range events {
+		bySpanID[spanField(t, event, "span_id")] = event
+	}
+	tool := bySpanID["0000000000002536"]
+	wantEvents := []map[string]any{{
+		"name":                     "tool.output",
+		"time_unix_nano":           "1790886003967308954",
+		"dropped_attributes_count": 0,
+		"attributes": map[string]any{
+			"bash_command": "printf 'https://github.com/%s/pull/%s\\n' acme-synthetic/telemetryiq 253",
+			"output":       liveSpanPRLinkURL,
+		},
+	}}
+	if got := tool.ProviderExtensions["span_events"]; !reflect.DeepEqual(got, wantEvents) {
+		t.Fatalf("tool span_events = %#v, want %#v", got, wantEvents)
+	}
+	for spanID, block := range map[string]string{"0000000000002536": "tool", "0000000000002531": "interaction", "0000000000002537": "llm_request"} {
+		event := bySpanID[spanID]
+		if context, _ := toolBlock(t, event, block)["new_context"].(string); !strings.Contains(context, "pull/") {
+			t.Fatalf("%s new_context not retained raw: %q", block, context)
+		}
+		assertAbsentFromSpanAttributes(t, event, "new_context")
+	}
+	attrs, _ := tool.ProviderExtensions["span_attributes"].(map[string]any)
+	if input, _ := attrs["tool_input"].(string); !strings.HasPrefix(input, "[TOOL INPUT: Bash]") {
+		t.Fatalf("tool_input not retained raw in span_attributes: %#v", attrs)
+	}
+	final, _ := bySpanID["0000000000002537"].ProviderExtensions["span_attributes"].(map[string]any)
+	if final["response.model_output"] == nil || final["system_prompt_preview"] == nil {
+		t.Fatalf("llm_request content attributes dropped: %#v", final)
+	}
+	links, _ := bySpanID["0000000000002532"].ProviderExtensions["span_links"].([]map[string]any)
+	if len(links) != 1 || !reflect.DeepEqual(links[0]["attributes"], map[string]any{"link.type": "parent_of"}) {
+		t.Fatalf("llm_request span link not retained: %#v", links)
+	}
+}
+
 // FuzzNormalizeTraces keeps the OTLP trace/span normaliser boundary from
 // panicking on arbitrary input (QUALITY_GATES: fuzz smoke when a normalisation
 // boundary changes). Seeds cover a well-formed hook span, the interaction root,
@@ -918,6 +944,7 @@ func TestNormalizeTracesHookSpanPreservesRawDefinitions(t *testing.T) {
 func FuzzNormalizeTraces(f *testing.F) {
 	f.Add([]byte(toolSpanPayload("hook", `,{"key":"hook_event","value":{"stringValue":"PreToolUse"}},{"key":"hook_definitions","value":{"stringValue":"[]"}},{"key":"num_blocking","value":{"intValue":1}}`)))
 	f.Add([]byte(toolSpanPayload("tool", `,{"key":"tool_name","value":{"stringValue":"Bash"}},{"key":"full_command","value":{"stringValue":"echo hi"}}`)))
+	f.Add(tracesFixturePayload(f, liveToolContentSpans))
 	f.Add([]byte(`{"resourceSpans":[{"scopeSpans":[{"spans":[{}]}]}]}`))
 	f.Add([]byte("not json"))
 	f.Add([]byte(""))

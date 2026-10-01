@@ -29,9 +29,42 @@ func TestClaudeTraceIngestProjectsSpanEvidence(t *testing.T) {
 	assertSecondClaudeSpanPage(t, second)
 }
 
+const claudeToolContentSpansFixture = "claude-code-2.1.287-tool-content-spans-otlp.json"
+
+// TestClaudeToolContentSpanIngestServesRawEvidence is the #253 live daemon
+// ingest→read gate: the 2.1.287 capture (OTEL_LOG_TOOL_CONTENT + detailed beta
+// tracing) is POSTed to /v1/traces and the event-detail read API serves the
+// claude_code.tool span's raw tool.output span event, its new_context tool result,
+// the previously dropped tool_input attribute, and the operator identity raw.
+func TestClaudeToolContentSpanIngestServesRawEvidence(t *testing.T) {
+	server, repository := newPersistentTestServer(t)
+	response := postOTLPToPath(t, server.URL, "/v1/traces", metricsFixturePayloadBytes(t, claudeToolContentSpansFixture), otlpContentTypeJSON)
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("trace ingest status = %d", response.StatusCode)
+	}
+	closeBody(t, response)
+	stored, err := repository.ListEvents(context.Background(), storage.EventFilter{SessionID: "claude-code:25325325-3253-4253-8253-253253253253", Limit: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := slices.IndexFunc(stored, func(event canonical.Event) bool { return event.EventType == "claude_code.tool" })
+	if len(stored) != 7 || index < 0 {
+		t.Fatalf("stored span events = %d (tool index %d), want 7 with a tool span", len(stored), index)
+	}
+	assertContainsAll(t, []string{
+		`"span_events":[`,
+		`"name":"tool.output"`,
+		`"output":"https://github.com/acme-synthetic/telemetryiq/pull/253"`,
+		`"new_context":"[TOOL RESULT: Bash]`,
+		`"tool_input":"[TOOL INPUT: Bash]`,
+		"synthetic-253@example.test",
+	}, marshalJSON(t, fetchStoredEventDetail(t, server.URL, stored[index])))
+}
+
 // TestClaudeToolIngestPromotesObservedPRLink is the #183 / #251 live daemon
 // ingest→read gate. Each retained Claude tool surface — a tool span's raw
-// full_command (/v1/traces), the tool_decision/tool_result tool_parameters and
+// full_command or (#253) its new_context and tool.output span event captured live
+// from 2.1.287 (/v1/traces), the tool_decision/tool_result tool_parameters and
 // tool_input captured live from 2.1.286 (/v1/logs), and a JSONL tool_result
 // output captured live from 2.1.286 (/v1/claude/transcript) — is POSTed on its
 // own route, and the session read API reports pr_link through the same
@@ -50,6 +83,7 @@ func TestClaudeToolIngestPromotesObservedPRLink(t *testing.T) {
 		wantState   string
 	}{
 		{name: "tool span full_command", path: "/v1/traces", contentType: otlpContentTypeJSON, body: metricsFixturePayloadBytes(t, "claude-code-2.1.273-tool-pr-link-otlp.json"), wantLink: "https://github.com/acme-synthetic/telemetryiq/pull/183", wantState: "observed"},
+		{name: "tool span new_context and tool.output", path: "/v1/traces", contentType: otlpContentTypeJSON, body: metricsFixturePayloadBytes(t, claudeToolContentSpansFixture), wantLink: "https://github.com/acme-synthetic/telemetryiq/pull/253", wantState: "observed"},
 		{name: "log tool_parameters and tool_input", path: "/v1/logs", contentType: otlpContentTypeJSON, body: logs, wantLink: liveURL, wantState: "observed"},
 		{name: "transcript tool output", path: "/v1/claude/transcript", contentType: "application/x-ndjson", body: transcriptFixturePayloadNDJSON(t, "claude-code-2.1.286-tool-output-pr-link-transcript.json"), wantLink: liveURL, wantState: "observed"},
 		// The first URL occurrence is the tool_decision tool_parameters; rewriting
@@ -107,14 +141,13 @@ func transcriptFixturePayloadNDJSON(t *testing.T, name string) []byte {
 	return body.Bytes()
 }
 
-// hookSpanSecretCanary is the synthetic secret withHookSpanCanaries injects into
-// the hook fixture; being neither a mapped identity key nor an allow-listed span
-// attribute, it must not survive into the persisted event or the read API. (The
-// identity canary it injects alongside is, by contrast, retained raw under
-// provider_extensions.environment per #107 X20 — asserted separately.)
-func hookSpanSecretCanary() []string {
-	return []string{"tiq-canary-api-key"}
-}
+// hookSpanUnforeseenCanary is the synthetic value withHookSpanCanaries injects
+// under an unforeseen attribute key (api_key); having no typed home, it is echoed
+// raw into the persisted span_attributes (#253 — nothing dropped at the local-only
+// ingest boundary, owner directive / epic #87, mirroring the logs path). The
+// identity canary injected alongside is homed raw under
+// provider_extensions.environment per #107 X20.
+const hookSpanUnforeseenCanary = "tiq-canary-api-key"
 
 // hookSpanIdentityCanary is the synthetic operator email withHookSpanCanaries
 // injects; per #107 X20 it is retained raw under provider_extensions.environment
@@ -125,10 +158,10 @@ const hookSpanIdentityCanary = "tiq-canary@example.test"
 // gate: the synthetic claude_code.hook spans fixture — augmented with a canary
 // identity attribute and a canary secret — is POSTed to /v1/traces, and the HTTP
 // read API serves the two hook events (typed hook block, duration, honest
-// unavailable_fields). The injected secret never survives the allow-list into the
-// persisted span_attributes or the response, while the identity attribute is
-// retained raw under provider_extensions.environment (#107 X20 — nothing dropped at
-// the local-only boundary). The gated hook_definitions is retained raw in the typed
+// unavailable_fields). The unforeseen attribute is retained raw in the persisted
+// span_attributes echo (#253) and the identity attribute raw under
+// provider_extensions.environment (#107 X20 — nothing dropped at the local-only
+// boundary). The gated hook_definitions is retained raw in the typed
 // block only (epic #87), proving TelemetryIQ carries the hook intervention surface
 // rather than dropping it.
 func TestClaudeHookSpansIngestEndToEnd(t *testing.T) {
@@ -145,10 +178,10 @@ func TestClaudeHookSpansIngestEndToEnd(t *testing.T) {
 	assertHookSpanStorage(t, repository, sessionID)
 }
 
-// withHookSpanCanaries appends a synthetic identity attribute and a synthetic
-// secret to the first claude_code.hook span so the live gate proves both #107 X20
-// stances end to end: the secret (on no allow-list) is dropped, while the identity
-// key rides raw into provider_extensions.environment.
+// withHookSpanCanaries appends a synthetic identity attribute and an unforeseen
+// attribute to the first claude_code.hook span so the live gate proves both homes
+// end to end: the unforeseen key rides raw in span_attributes (#253), and the
+// identity key raw in provider_extensions.environment (#107 X20).
 func withHookSpanCanaries(t *testing.T, payload []byte) []byte {
 	t.Helper()
 	var envelope map[string]any
@@ -166,7 +199,7 @@ func withHookSpanCanaries(t *testing.T, payload []byte) []byte {
 	}
 	hookSpan["attributes"] = append(attributes,
 		otlpStringAttribute("user.email", "tiq-canary@example.test"),
-		otlpStringAttribute("api_key", "tiq-canary-api-key"),
+		otlpStringAttribute("api_key", hookSpanUnforeseenCanary),
 	)
 	return marshalJSON(t, envelope)
 }
@@ -204,9 +237,9 @@ func otlpStringAttribute(key, value string) map[string]any {
 }
 
 // assertHookSpanTimeline reads the session timeline through the live HTTP read
-// API and asserts both hook events surface with their honest unavailable_fields
-// and that no injected canary reaches the response; the span envelopes (interval
-// and status) are proven through the /spans projection.
+// API and asserts both hook events surface with their honest unavailable_fields;
+// the span envelopes (interval and status) are proven through the /spans
+// projection.
 func assertHookSpanTimeline(t *testing.T, server *httptest.Server, sessionID string) {
 	t.Helper()
 	timeline := timelinePage(t, server.URL+"/api/v1/sessions/"+url.PathEscape(sessionID)+"/events?limit=10")
@@ -223,7 +256,6 @@ func assertHookSpanTimeline(t *testing.T, server *httptest.Server, sessionID str
 	if hooks != 2 {
 		t.Fatalf("hook timeline events = %d, want 2: %#v", hooks, timeline.Data)
 	}
-	assertNoRawIdentifiers(t, hookSpanSecretCanary(), marshalJSON(t, timeline))
 	assertHookSpanEnvelopes(t, server, sessionID)
 }
 
@@ -250,10 +282,10 @@ func assertHookSpanEnvelopes(t *testing.T, server *httptest.Server, sessionID st
 }
 
 // assertHookSpanStorage proves the persisted hook events carry the typed hook
-// block with the gated hook_definitions retained raw; that the injected secret was
-// dropped from the allow-listed span_attributes passthrough; and that the injected
-// identity attribute is retained raw under provider_extensions.environment (#107
-// X20), reading back on the span that carried it.
+// block with the gated hook_definitions retained raw; that the injected unforeseen
+// attribute is retained raw in the span_attributes echo (#253); and that the
+// injected identity attribute is retained raw under provider_extensions.environment
+// (#107 X20), reading back on the span that carried it.
 func assertHookSpanStorage(t *testing.T, repository storage.Repository, sessionID string) {
 	t.Helper()
 	stored, err := repository.ListEvents(context.Background(), storage.EventFilter{SessionID: sessionID, Limit: 10})
@@ -272,16 +304,15 @@ func assertHookSpanStorage(t *testing.T, repository storage.Repository, sessionI
 		t.Fatalf("stored hook events = %d, want 2", hooks)
 	}
 	encoded := marshalJSON(t, stored)
-	assertNoRawIdentifiers(t, hookSpanSecretCanary(), encoded)
+	assertRawToolEvidence(t, encoded, `"api_key":"`+hookSpanUnforeseenCanary+`"`)
 	assertEnvironmentIdentity(t, stored, map[string]string{"user_email": hookSpanIdentityCanary})
 	assertRawToolEvidence(t, encoded, "./scripts/format-guard.sh", "./scripts/deny-network.sh")
 }
 
 // assertHookBlock checks one persisted hook event exposes the typed hook block
-// (including gated hook_definitions) and that neither the injected canaries nor the
-// gated field leaked into the allow-listed span_attributes passthrough — user.email
-// has its own typed home (provider_extensions.environment, #107), so it is likewise
-// absent here.
+// (including gated hook_definitions) and that neither the identity canary nor the
+// gated field is duplicated into the span_attributes echo — each has its own typed
+// home (provider_extensions.environment, #107; the hook block, #103).
 func assertHookBlock(t *testing.T, event canonical.Event) {
 	t.Helper()
 	block, ok := event.Attributes["hook"].(map[string]any)
@@ -298,9 +329,9 @@ func assertHookBlock(t *testing.T, event canonical.Event) {
 	if !ok {
 		t.Fatalf("hook event missing span_attributes passthrough: %#v", event.ProviderExtensions)
 	}
-	for _, key := range []string{"user.email", "api_key", "hook_definitions"} {
+	for _, key := range []string{"user.email", "hook_definitions"} {
 		if _, present := extensions[key]; present {
-			t.Fatalf("span_attributes leaked %q: %#v", key, extensions)
+			t.Fatalf("span_attributes duplicated homed key %q: %#v", key, extensions)
 		}
 	}
 }

@@ -71,6 +71,7 @@
         "interaction.sequence": 1,
         "parent.source": "none",
         "queued_sends": 0,
+        "session.id": "00000000-0000-4000-8000-000000000183",
         "span.type": "interaction",
         "user_prompt_length": 37
       }
@@ -159,6 +160,7 @@
         "duration_ms": 2000,
         "gen_ai.tool.call.id": "toolu_synthetic_bash_0183",
         "result_tokens": 64,
+        "session.id": "00000000-0000-4000-8000-000000000183",
         "span.type": "tool",
         "tool_name": "Bash",
         "tool_name_safe": "Bash",

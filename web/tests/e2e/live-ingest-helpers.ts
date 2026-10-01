@@ -627,7 +627,8 @@ export function claudeToolResultOTLPLogs(): string {
 // Builds a single Claude enhanced-telemetry tool span, parameterised so the
 // file-path (#156) and PR-link (#183) live gates share one OTLP shape instead
 // of pasting two near-identical span builders (SonarCloud CPD hard rule).
-// extraAttributes carries the surface under test (file_path / full_command).
+// extraAttributes carries the surface under test (file_path / full_command);
+// events carries OTLP span events such as tool.output (#253).
 function claudeToolSpanOTLPTraces(opts: {
   traceId: string;
   spanId: string;
@@ -635,6 +636,11 @@ function claudeToolSpanOTLPTraces(opts: {
   toolName: string;
   toolUseId: string;
   extraAttributes: Array<{ key: string; value: { stringValue: string } }>;
+  events?: Array<{
+    name: string;
+    timeUnixNano: string;
+    attributes: Array<{ key: string; value: { stringValue: string } }>;
+  }>;
 }): string {
   return JSON.stringify({
     resourceSpans: [
@@ -684,6 +690,7 @@ function claudeToolSpanOTLPTraces(opts: {
                   { key: 'duration_ms', value: { intValue: '200' } },
                   { key: 'result_tokens', value: { intValue: '64' } },
                 ],
+                events: opts.events ?? [],
                 status: { code: 0 },
               },
             ],
@@ -792,6 +799,34 @@ export function claudePRLinkOTLPTraces(): string {
         value: {
           stringValue: `gh pr view ${claudeLivePRLinkURL} --json state`,
         },
+      },
+    ],
+  });
+}
+
+// Claude Bash tool span whose PR URL appears only in the tool.output span event
+// output (#253, OTEL_LOG_TOOL_CONTENT) — the full_command is a printf template,
+// as in the live 2.1.287 capture
+// (fixtures/claude/observed-sanitised/claude-code-2.1.287-tool-content-spans-otlp.json).
+export const claudePRLinkToolOutputSessionID =
+  'tiq-live-e2e-session-pr-link-tool-output';
+export function claudePRLinkToolOutputOTLPTraces(): string {
+  const command = `printf 'https://github.com/%s/pull/%s\\n' acme-synthetic/telemetryiq 183`;
+  return claudeToolSpanOTLPTraces({
+    traceId: '00000000000000000000000000000253',
+    spanId: '0000000000000b53',
+    sessionId: claudePRLinkToolOutputSessionID,
+    toolName: 'Bash',
+    toolUseId: 'toolu_live_session_pr_link_tool_output',
+    extraAttributes: [{ key: 'full_command', value: { stringValue: command } }],
+    events: [
+      {
+        name: 'tool.output',
+        timeUnixNano: '1789117600690000000',
+        attributes: [
+          { key: 'bash_command', value: { stringValue: command } },
+          { key: 'output', value: { stringValue: claudeLivePRLinkURL } },
+        ],
       },
     ],
   });
