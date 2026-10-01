@@ -180,7 +180,7 @@ func writeGolden(t *testing.T, name string, value any) {
 	}
 }
 
-func readFixture(t *testing.T, name string) []byte {
+func readFixture(t testing.TB, name string) []byte {
 	t.Helper()
 	return readFixtureFrom(t, "observed-sanitised", name)
 }
@@ -188,7 +188,7 @@ func readFixture(t *testing.T, name string) []byte {
 // readFixtureFrom reads a wrapped fixture from a named fixtures/claude subdir
 // (e.g. "observed-sanitised" for real captures, "synthetic" for constructed
 // inputs), keeping a single path-resolution site for both.
-func readFixtureFrom(t *testing.T, subdir, name string) []byte {
+func readFixtureFrom(t testing.TB, subdir, name string) []byte {
 	t.Helper()
 	return readFile(t, filepath.Join(repositoryRoot(t), "fixtures", "claude", subdir, name))
 }
@@ -227,7 +227,7 @@ func expectedDir(t *testing.T) string {
 	return filepath.Join(repositoryRoot(t), "fixtures", "claude", "expected")
 }
 
-func readFile(t *testing.T, path string) []byte {
+func readFile(t testing.TB, path string) []byte {
 	t.Helper()
 	contents, err := os.ReadFile(path)
 	if err != nil {
@@ -236,7 +236,7 @@ func readFile(t *testing.T, path string) []byte {
 	return contents
 }
 
-func repositoryRoot(t *testing.T) string {
+func repositoryRoot(t testing.TB) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {

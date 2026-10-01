@@ -71,6 +71,7 @@
         "interaction.sequence": 1,
         "parent.source": "none",
         "queued_sends": 0,
+        "session.id": "00000000-0000-4000-8000-000000000103",
         "span.type": "interaction",
         "user_prompt_length": 58
       }
@@ -156,6 +157,7 @@
         "num_hooks": 2,
         "num_non_blocking_error": 0,
         "num_success": 2,
+        "session.id": "00000000-0000-4000-8000-000000000103",
         "span.type": "hook"
       }
     }
@@ -240,6 +242,7 @@
         "num_hooks": 1,
         "num_non_blocking_error": 0,
         "num_success": 0,
+        "session.id": "00000000-0000-4000-8000-000000000103",
         "span.type": "hook"
       }
     }

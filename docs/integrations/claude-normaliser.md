@@ -581,9 +581,8 @@ hooks intervened in the turn: `hook_event`, `hook_name` (strings); `num_hooks`,
 `OTEL_LOG_TOOL_DETAILS`-gated `hook_definitions` retained raw. Absent fields are
 omitted, never fabricated as zero. Following the tool-span `file_path`/
 `full_command` precedent, the gated `hook_definitions` lives in the typed block
-only and is deliberately excluded from `safeSpanAttributeKeys`, so it never
-duplicates into the allow-listed `provider_extensions.span_attributes`
-passthrough. Hook spans genuinely carry none of the tool/file/command/content/
+only and is listed in `spanHomedKeys` for hook spans, so it never duplicates
+into the raw `provider_extensions.span_attributes` echo. Hook spans genuinely carry none of the tool/file/command/content/
 cost surfaces, so `spanUnavailableFields` leaves the default `unavailable_fields`
 in place (no false widening). A hook is an intra-interaction intervention, not a
 task boundary, so its `task_boundary.confidence` is `observed` with `TaskID` nil.
@@ -591,7 +590,9 @@ task boundary, so its `task_boundary.confidence` is `observed` with `TaskID` nil
 Because the raw `full_command` can carry a verbatim pull-request URL (e.g. a
 `gh pr view https://github.com/<org>/<repo>/pull/<n>` invocation), each span is
 run through the provider-neutral `normalize.AttachPRLinkEvidence` over
-`claudePRLinkScanFields` (`full_command`). A recognised HTTP(S)
+`claudePRLinkScanFields` (`full_command`, plus on `claude_code.tool` spans only
+the `new_context` tool result and `tool_output` — the joined `output` of the
+span's `tool.output` events, #253). A recognised HTTP(S)
 pull/merge-request URL is recorded as `attributes.pr_link_candidates` plus
 `provider_extensions.pr_link_evidence` (field + url provenance); a span with no
 such URL stays silent (no empty slice, no fabricated value). The storage layer's
@@ -621,10 +622,13 @@ so a URL that never reaches a span still promotes:
 
 Evidence: `claude-code-2.1.286-tool-params-pr-link-otlp.json` and
 `claude-code-2.1.286-tool-output-pr-link-transcript.json` (both captured live on
-2.1.286; in the transcript the URL exists only in the tool output). Not scanned:
-the `claude_code.tool` span's `tool.output` span event and `new_context`
-attribute (`OTEL_LOG_TOOL_CONTENT`), which the span adapter does not yet capture
-(tracked as a follow-up capture issue), and assistant response prose.
+2.1.286; in the transcript the URL exists only in the tool output), and
+`claude-code-2.1.287-tool-content-spans-otlp.json` (captured live on 2.1.287 with
+`OTEL_LOG_TOOL_CONTENT=1`; the URL exists only in the tool span's `new_context`
+and `tool.output` `output`, never in `full_command`). Not scanned: `new_context`
+on `interaction` / `llm_request` spans (conversation context, where a URL is a
+mention rather than the tool's own result) and assistant response prose
+(`response.model_output`).
 
 Issue #102 (T15) reconstructs the **sub-agent tree** from those span attributes.
 The per-span sub-agent correlation `agent_id`/`parent_agent_id`/`subagent_type`/
@@ -662,16 +666,48 @@ them back; HTTP/UI exposure of the tree is downstream (#157/#159). See
 2.1.268; `fixture_origin: synthetic` — the non-interactive sub-agent tool execution
 could not be captured live in this environment).
 
-As with metrics, #88 removed storage-side sanitising, so the adapter is the sole
-guard: span attributes are also reduced to an **allow-list**
-(`safeSpanAttributeKeys`, e.g. `span.type`, `gen_ai.*`, `stop_reason`, token
-counts, `duration_ms`, `error_class`, `tool_name`, `tool_use_id`, `result_tokens`,
-`decision`/`source`, `agent_id`/`workflow.*`). An unforeseen or secret-bearing
-attribute (`authorization`, `api_key`, the redacted `user_prompt`) not on the
-allow-list is not carried into `provider_extensions.span_attributes`. The raw
-`file_path`/`full_command`/`error` are **not** in the allow-list either — they live
-only in their typed block (their canonical home, which governance walks), so they
-are never duplicated into `provider_extensions.span_attributes`.
+Span attributes are **echoed raw** into `provider_extensions.span_attributes`
+(`spanAttributesEcho`, #253), mirroring the logs path's
+`provider_extensions.event` echo: every attribute — including unforeseen ones and
+the content-bearing detailed-beta attributes (`user_prompt`, `tool_input`,
+`system_prompt_preview`, `system_reminders`, `tools`, `response.model_output`,
+`query_source`, `effort`, …) — is retained verbatim, with arrayValue members
+decoded. The only exclusions are keys that already have a typed home, so each
+value has exactly one: identity/environment keys (`environmentEventFields`, see
+below) and, per span type (`spanHomedKeys`), the raw `file_path`/`full_command`/
+`new_context` on `tool`, `error` on `tool.execution`/`llm_request`,
+`new_context` and `gen_ai.response.finish_reasons` on `llm_request`,
+`new_context` on `interaction`, and `hook_definitions` on `hook`. A key is
+excluded only on the span types that home it, so it can never fall through to a
+drop. (Before #253 an allow-list, `safeSpanAttributeKeys`, dropped every
+unlisted attribute — an ingest-time amputation the raw-capture invariant
+forbids.) Echoed values are decoded losslessly by `rawAttributeValues` /
+`rawAnyValue`: scalars as before, plus `bytesValue` (base64 wire string),
+`kvlistValue` (map), every `arrayValue` member untrimmed and unfiltered, and an
+empty AnyValue as `null`.
+
+Because content now rides on spans, `unavailable_fields` is computed from what a
+span observably carries (`spanContentObserved`): `prompt_content` is available on
+an `interaction` with an un-redacted `user_prompt` or `new_context`, and on an
+`llm_request` with `new_context`; `response_content` on an `llm_request` with
+`response.model_output`. The gate-off `<REDACTED>` placeholder is not content.
+
+`new_context` (detailed beta tracing — `ENABLE_BETA_TRACING_DETAILED=1` plus
+`BETA_TRACING_ENDPOINT`) is homed verbatim (`putSpanRaw`) in the `tool` block
+(the tool call's result, `OTEL_LOG_TOOL_CONTENT`), the `interaction` block (the
+prompt) and the `llm_request` block (the request's new user messages and tool
+results, `OTEL_LOG_USER_PROMPTS`). OTLP **span events** are retained raw as
+`provider_extensions.span_events` (`name`, `time_unix_nano`, decoded
+`attributes`, `dropped_attributes_count`) — the `tool.output` event on a
+`claude_code.tool` span (`output` / `content` / `diff` / `file_path` /
+`bash_command` and any `<attr>_truncated` / `<attr>_original_length`) and the
+`gen_ai.request.attempt` retry event on `claude_code.llm_request` — and **span
+links** as `provider_extensions.span_links` (`trace_id`, `span_id`,
+`trace_state`, `flags`, `attributes`, e.g. `link.type=parent_of`). Both lists
+and every member within them are present-only: an omitted `traceState`, `flags`
+or count is left absent, never fabricated as `""` or `0`. Evidence: `fixtures/claude/observed-sanitised/
+claude-code-2.1.287-tool-content-spans-otlp.json` →
+`fixtures/claude/expected/claude-code-2.1.287-tool-content-spans.events.json`.
 
 Session/environment identity is the exception carved out by #107 (X20): the identity
 keys on the span (`user.*`, `organization.id`, `terminal.type`, `identity.source`)

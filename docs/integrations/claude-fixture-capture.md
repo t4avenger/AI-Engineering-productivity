@@ -465,13 +465,54 @@ commit`, `git_commit_id`/`git_branch` in `tool_parameters` plus `vcs.ref.head.*`
 attributes. The session JSONL (`~/.claude/projects/<workspace>/<session>.jsonl`)
 records the tool_use input, the tool_result content, and the record-scoped
 `toolUseResult`. With `OTEL_LOG_TOOL_CONTENT=1` the `claude_code.tool` span also
-carries a `tool.output` span event (`bash_command`, `output`), which the span
-adapter does not yet capture.
+carries a `tool.output` span event (`bash_command`, `output`) — captured by #253,
+below.
 
 Committed evidence:
 
 - `fixtures/claude/observed-sanitised/claude-code-2.1.286-tool-params-pr-link-otlp.json`
 - `fixtures/claude/observed-sanitised/claude-code-2.1.286-tool-output-pr-link-transcript.json`
+
+## Tool-content span capture (`tool.output` / `new_context`, #253)
+
+`OTEL_LOG_TOOL_CONTENT=1` adds the `tool.output` span event to `claude_code.tool`
+spans, but `new_context` and the other content-bearing span attributes
+(`system_prompt_preview`, `system_reminders`, `tool_input`,
+`response.model_output`) appear **only under detailed beta tracing**, which needs
+`ENABLE_BETA_TRACING_DETAILED=1` and `BETA_TRACING_ENDPOINT`. Claude Code ignores
+that pair in project/local settings, so export it in the shell (it also routes
+logs, so point it at the same loopback sink); `-p` runs need no organisation
+allowlisting. Use a `printf` template so the URL appears only in the tool's
+output, never in `full_command`:
+
+```bash
+# capture-settings.json env: CLAUDE_CODE_ENABLE_TELEMETRY, CLAUDE_CODE_ENHANCED_TELEMETRY_BETA,
+#   OTEL_TRACES_EXPORTER=otlp, OTEL_EXPORTER_OTLP_PROTOCOL=http/json,
+#   OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4399, OTEL_TRACES_EXPORT_INTERVAL=1000,
+#   OTEL_LOG_TOOL_DETAILS=1, OTEL_LOG_TOOL_CONTENT=1, OTEL_LOG_USER_PROMPTS=1
+ENABLE_BETA_TRACING_DETAILED=1 BETA_TRACING_ENDPOINT=http://127.0.0.1:4399 \
+  claude -p "Run exactly this shell command with the Bash tool and nothing else, then reply done: printf 'https://github.com/%s/pull/%s\n' acme-synthetic/telemetryiq 253" \
+  --settings capture-settings.json --allowedTools='Bash(printf:*)' < /dev/null
+```
+
+The OTLP/HTTP exporter sends chunked request bodies, so the loopback sink must
+decode `Transfer-Encoding: chunked` (a sink reading only `Content-Length`
+records empty bodies). Observed on 2.1.287 in one run: the `tool.output` event
+(`bash_command`, `output`) on the tool span; `new_context` on the tool
+(`[TOOL RESULT: Bash]` + the result JSON), interaction (`[USER PROMPT]`) and
+llm_request (`[USER]` / `[TOOL RESULT: <id>]`) spans; `tool_input` on the tool
+span; `system_prompt_preview`, `system_prompt_hash`, `system_reminders`,
+`tools`, `query_source`, `effort` and `response.model_output` on llm_request
+spans; a `link.type=parent_of` span link on the first llm_request; and the
+`gen_ai.request.attempt` retry event. Sanitise as above, and additionally replace
+`system_reminders` (it embeds the operator's `~/.claude/CLAUDE.md`),
+`system_prompt_preview` and any operator `hook_definitions` paths with synthetic
+text of the same shape.
+
+Committed evidence:
+
+- `fixtures/claude/observed-sanitised/claude-code-2.1.287-tool-content-spans-otlp.json`
+- `fixtures/claude/expected/claude-code-2.1.287-tool-content-spans.events.json`
 
 ## Validation
 

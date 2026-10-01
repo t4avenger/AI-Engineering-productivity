@@ -71,6 +71,7 @@
         "interaction.sequence": 1,
         "parent.source": "none",
         "queued_sends": 0,
+        "session.id": "00000000-0000-4000-8000-000000000101",
         "span.type": "interaction",
         "user_prompt_length": 42
       }
@@ -146,6 +147,7 @@
         "duration_ms": 200,
         "gen_ai.tool.call.id": "toolu_synthetic_read_0001",
         "result_tokens": 512,
+        "session.id": "00000000-0000-4000-8000-000000000101",
         "span.type": "tool",
         "tool_name": "Read",
         "tool_name_safe": "Read",
@@ -219,6 +221,7 @@
       "span_attributes": {
         "duration_ms": 140,
         "gen_ai.tool.call.id": "toolu_synthetic_read_0001",
+        "session.id": "00000000-0000-4000-8000-000000000101",
         "span.type": "tool.execution",
         "success": true,
         "tool_use_id": "toolu_synthetic_read_0001"
@@ -299,6 +302,7 @@
         "duration_ms": 3000,
         "gen_ai.tool.call.id": "toolu_synthetic_bash_0002",
         "result_tokens": 8,
+        "session.id": "00000000-0000-4000-8000-000000000101",
         "span.type": "tool",
         "tool_name": "Bash",
         "tool_name_safe": "Bash",
@@ -371,6 +375,7 @@
       "span_attributes": {
         "decision": "accept",
         "duration_ms": 2000,
+        "session.id": "00000000-0000-4000-8000-000000000101",
         "source": "user_permanent",
         "span.type": "tool.blocked_on_user"
       }
@@ -445,6 +450,7 @@
         "duration_ms": 900,
         "error_class": "ShellError",
         "gen_ai.tool.call.id": "toolu_synthetic_bash_0002",
+        "session.id": "00000000-0000-4000-8000-000000000101",
         "span.type": "tool.execution",
         "success": false,
         "tool_use_id": "toolu_synthetic_bash_0002"

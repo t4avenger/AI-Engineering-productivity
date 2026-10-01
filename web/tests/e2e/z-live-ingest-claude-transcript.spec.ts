@@ -8,6 +8,8 @@ import {
   claudePRLinkLogsSessionID,
   claudePRLinkOTLPLogs,
   claudePRLinkOTLPTraces,
+  claudePRLinkToolOutputOTLPTraces,
+  claudePRLinkToolOutputSessionID,
   claudePRLinkTranscriptNDJSON,
   claudePRLinkTranscriptSessionID,
   claudeTranscriptNDJSON,
@@ -106,15 +108,20 @@ test('surfaces generic tool calls and sub-agent file paths from a transcript', a
   expect(paths).toContain('/repo/tiq-live-generic-write.go');
 });
 
-// #183 / #251: a verbatim pull-request URL on any retained Claude tool surface —
-// a tool span's raw full_command, a tool_decision's tool_parameters, or only the
-// JSONL tool_result output — must promote pr_link to observed through the same
+// #183 / #251 / #253: a verbatim pull-request URL on any retained Claude tool
+// surface — a tool span's raw full_command or only its tool.output span event, a
+// tool_decision's tool_parameters, or only the JSONL tool_result output — must promote pr_link to observed through the same
 // provider-agnostic aggregation the Codex path uses, and render on /pull-requests.
 const claudePRLinkSurfaces = [
   {
     surface: 'tool-span full_command',
     sessionId: 'tiq-live-e2e-session-pr-link',
     ingest: () => ingestOTLPTraces(claudePRLinkOTLPTraces()),
+  },
+  {
+    surface: 'tool-span tool.output event',
+    sessionId: claudePRLinkToolOutputSessionID,
+    ingest: () => ingestOTLPTraces(claudePRLinkToolOutputOTLPTraces()),
   },
   {
     surface: 'tool_decision tool_parameters',

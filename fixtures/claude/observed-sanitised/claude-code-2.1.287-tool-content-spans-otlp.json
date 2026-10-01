@@ -1,0 +1,1175 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.287",
+  "captured_at": "2026-10-01T20:20:03Z",
+  "sanitisation_reviewed": true,
+  "capture_note": "Single synthetic `claude -p` run (v2.1.287) against a loopback OTLP/HTTP sink with OTEL_LOG_TOOL_CONTENT=1, OTEL_LOG_TOOL_DETAILS=1, OTEL_LOG_USER_PROMPTS=1 (via --settings) and ENABLE_BETA_TRACING_DETAILED=1 + BETA_TRACING_ENDPOINT exported in the shell; --allowedTools='Bash(printf:*)', no permission bypass (#253). The Bash command is a printf template, so the pull-request URL appears in the tool.output span event `output` and the tool span `new_context`, never in full_command. Identity, session, request, tool-use, trace and span ids are synthetic with parent and link linkage preserved; system_reminders (operator CLAUDE.md), system_prompt_preview and hook_definitions (operator paths) are replaced by synthetic text of the same shape. Every other attribute, span event and span link is verbatim as emitted.",
+  "payload": {
+    "resourceSpans": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "host.arch",
+              "value": {
+                "stringValue": "amd64"
+              }
+            },
+            {
+              "key": "os.type",
+              "value": {
+                "stringValue": "linux"
+              }
+            },
+            {
+              "key": "os.version",
+              "value": {
+                "stringValue": "7.0.0-34-generic"
+              }
+            },
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "claude-code"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "2.1.287"
+              }
+            }
+          ],
+          "droppedAttributesCount": 0
+        },
+        "scopeSpans": [
+          {
+            "scope": {
+              "name": "com.anthropic.claude_code.tracing",
+              "version": "1.0.0"
+            },
+            "spans": [
+              {
+                "traceId": "00000000000000000000000000002531",
+                "spanId": "0000000000002532",
+                "parentSpanId": "0000000000002531",
+                "name": "claude_code.llm_request",
+                "kind": 1,
+                "startTimeUnixNano": "1790885998766000000",
+                "endTimeUnixNano": "1790886003149836380",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "25325325-3253-4253-8253-253253253253"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000253"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic-253@example.test"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000002a5"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic253"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "llm_request"
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "claude-opus-5-5"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.system",
+                    "value": {
+                      "stringValue": "anthropic"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.request.model",
+                    "value": {
+                      "stringValue": "claude-opus-5-5"
+                    }
+                  },
+                  {
+                    "key": "llm_request.context",
+                    "value": {
+                      "stringValue": "interaction"
+                    }
+                  },
+                  {
+                    "key": "speed",
+                    "value": {
+                      "stringValue": "normal"
+                    }
+                  },
+                  {
+                    "key": "query_source",
+                    "value": {
+                      "stringValue": "sdk"
+                    }
+                  },
+                  {
+                    "key": "query_source_safe",
+                    "value": {
+                      "stringValue": "sdk"
+                    }
+                  },
+                  {
+                    "key": "system_prompt_hash",
+                    "value": {
+                      "stringValue": "sp_23f535b8f310"
+                    }
+                  },
+                  {
+                    "key": "system_prompt_preview",
+                    "value": {
+                      "stringValue": "x-anthropic-billing-header: cc_version=2.1.287.fc6; cc_entrypoint=sdk-cli;\n\nYou are a synthetic Claude agent. [synthetic system prompt preview; live text replaced for git hygiene]"
+                    }
+                  },
+                  {
+                    "key": "system_prompt_length",
+                    "value": {
+                      "intValue": 6227
+                    }
+                  },
+                  {
+                    "key": "tools",
+                    "value": {
+                      "stringValue": "[{\"name\":\"Agent\",\"hash\":\"cd0e9c9a1529\"},{\"name\":\"Bash\",\"hash\":\"974ac54d1465\"},{\"name\":\"Edit\",\"hash\":\"6430d0c60f48\"},{\"name\":\"ListAgents\",\"hash\":\"0a3591a577c6\"},{\"name\":\"Read\",\"hash\":\"680529a1e735\"},{\"name\":\"ReportFindings\",\"hash\":\"d742f97bb17e\"},{\"name\":\"ScheduleWakeup\",\"hash\":\"92cf22a75c5f\"},{\"name\":\"Skill\",\"hash\":\"c3282cbcede5\"},{\"name\":\"ToolSearch\",\"hash\":\"59c6a9f11182\"},{\"name\":\"Write\",\"hash\":\"416c9b17ff1f\"},{\"name\":\"mcp__claude_ai_Claude_Docs__batch\",\"hash\":\"c2f090337087\"},{\"name\":\"mcp__claude_ai_Claude_Docs__guide\",\"hash\":\"3c88cb7f45c7\"},{\"name\":\"DeferredToolPlaceholder\",\"hash\":\"8a1d4180a3eb\"},{\"name\":\"mcp__claude_ai_Claude_Docs__update\",\"hash\":\"c20d5c073967\"}]"
+                    }
+                  },
+                  {
+                    "key": "tools_count",
+                    "value": {
+                      "intValue": 14
+                    }
+                  },
+                  {
+                    "key": "new_context_message_count",
+                    "value": {
+                      "intValue": 2
+                    }
+                  },
+                  {
+                    "key": "system_reminders_count",
+                    "value": {
+                      "intValue": 4
+                    }
+                  },
+                  {
+                    "key": "new_context",
+                    "value": {
+                      "stringValue": "[USER]\nRun exactly this shell command with the Bash tool and nothing else, then reply done: printf 'https://github.com/%s/pull/%s\\n' acme-synthetic/telemetryiq 253"
+                    }
+                  },
+                  {
+                    "key": "system_reminders",
+                    "value": {
+                      "stringValue": "[synthetic system reminders: the live value embedded the operator's private global CLAUDE.md and is replaced for git hygiene]"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 4382
+                    }
+                  },
+                  {
+                    "key": "input_tokens",
+                    "value": {
+                      "intValue": 1220
+                    }
+                  },
+                  {
+                    "key": "output_tokens",
+                    "value": {
+                      "intValue": 212
+                    }
+                  },
+                  {
+                    "key": "cache_read_tokens",
+                    "value": {
+                      "intValue": 22010
+                    }
+                  },
+                  {
+                    "key": "cache_creation_tokens",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  },
+                  {
+                    "key": "attempt",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "response.has_tool_call",
+                    "value": {
+                      "boolValue": true
+                    }
+                  },
+                  {
+                    "key": "request_id",
+                    "value": {
+                      "stringValue": "req_synthetic_253_1"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.id",
+                    "value": {
+                      "stringValue": "req_synthetic_253_1"
+                    }
+                  },
+                  {
+                    "key": "ttft_ms",
+                    "value": {
+                      "intValue": 4354
+                    }
+                  },
+                  {
+                    "key": "first_content_ms",
+                    "value": {
+                      "intValue": 4355
+                    }
+                  },
+                  {
+                    "key": "effort",
+                    "value": {
+                      "stringValue": "medium"
+                    }
+                  },
+                  {
+                    "key": "stop_reason",
+                    "value": {
+                      "stringValue": "tool_use"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.finish_reasons",
+                    "value": {
+                      "arrayValue": {
+                        "values": [
+                          {
+                            "stringValue": "tool_use"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "attempt",
+                        "value": {
+                          "intValue": 1
+                        }
+                      }
+                    ],
+                    "name": "gen_ai.request.attempt",
+                    "timeUnixNano": "1790885998777500759",
+                    "droppedAttributesCount": 0
+                  }
+                ],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "link.type",
+                        "value": {
+                          "stringValue": "parent_of"
+                        }
+                      }
+                    ],
+                    "spanId": "0000000000002538",
+                    "traceId": "00000000000000000000000000002532",
+                    "droppedAttributesCount": 0,
+                    "flags": 769
+                  }
+                ],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000002531",
+                "spanId": "0000000000002533",
+                "parentSpanId": "0000000000002531",
+                "name": "claude_code.hook",
+                "kind": 1,
+                "startTimeUnixNano": "1790886003144000000",
+                "endTimeUnixNano": "1790886003839115125",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "25325325-3253-4253-8253-253253253253"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000253"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic-253@example.test"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000002a5"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic253"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "hook"
+                    }
+                  },
+                  {
+                    "key": "hook_event",
+                    "value": {
+                      "stringValue": "PreToolUse"
+                    }
+                  },
+                  {
+                    "key": "hook_name",
+                    "value": {
+                      "stringValue": "PreToolUse:Bash"
+                    }
+                  },
+                  {
+                    "key": "num_hooks",
+                    "value": {
+                      "intValue": 2
+                    }
+                  },
+                  {
+                    "key": "hook_definitions",
+                    "value": {
+                      "stringValue": "[{\"type\":\"command\",\"command\":\"./scripts/synthetic-pre-tool-hook.sh\"},{\"type\":\"command\",\"command\":\"./scripts/synthetic-pre-tool-guard.sh\"}]"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 695
+                    }
+                  },
+                  {
+                    "key": "num_success",
+                    "value": {
+                      "intValue": 2
+                    }
+                  },
+                  {
+                    "key": "num_blocking",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "num_non_blocking_error",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "num_cancelled",
+                    "value": {
+                      "intValue": 0
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000002531",
+                "spanId": "0000000000002534",
+                "parentSpanId": "0000000000002536",
+                "name": "claude_code.tool.blocked_on_user",
+                "kind": 1,
+                "startTimeUnixNano": "1790886003843000000",
+                "endTimeUnixNano": "1790886003849412806",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "25325325-3253-4253-8253-253253253253"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000253"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic-253@example.test"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000002a5"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic253"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.blocked_on_user"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 6
+                    }
+                  },
+                  {
+                    "key": "decision",
+                    "value": {
+                      "stringValue": "unknown"
+                    }
+                  },
+                  {
+                    "key": "source",
+                    "value": {
+                      "stringValue": "unknown"
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000002531",
+                "spanId": "0000000000002535",
+                "parentSpanId": "0000000000002536",
+                "name": "claude_code.tool.execution",
+                "kind": 1,
+                "startTimeUnixNano": "1790886003849000000",
+                "endTimeUnixNano": "1790886003967601213",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "25325325-3253-4253-8253-253253253253"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000253"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic-253@example.test"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000002a5"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic253"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.execution"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_253_tool_output"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_253_tool_output"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 119
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000002531",
+                "spanId": "0000000000002536",
+                "parentSpanId": "0000000000002531",
+                "name": "claude_code.tool",
+                "kind": 1,
+                "startTimeUnixNano": "1790886003842000000",
+                "endTimeUnixNano": "1790886003967473995",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "25325325-3253-4253-8253-253253253253"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000253"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic-253@example.test"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000002a5"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic253"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Bash"
+                    }
+                  },
+                  {
+                    "key": "tool_name_safe",
+                    "value": {
+                      "stringValue": "Bash"
+                    }
+                  },
+                  {
+                    "key": "full_command",
+                    "value": {
+                      "stringValue": "printf 'https://github.com/%s/pull/%s\\n' acme-synthetic/telemetryiq 253"
+                    }
+                  },
+                  {
+                    "key": "bash_command_class",
+                    "value": {
+                      "stringValue": "shell_builtin"
+                    }
+                  },
+                  {
+                    "key": "bash_argv0",
+                    "value": {
+                      "stringValue": "printf"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_253_tool_output"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_253_tool_output"
+                    }
+                  },
+                  {
+                    "key": "tool_input",
+                    "value": {
+                      "stringValue": "[TOOL INPUT: Bash]\n{\"command\":\"printf 'https://github.com/%s/pull/%s\\\\n' acme-synthetic/telemetryiq 253\",\"description\":\"Print a GitHub pull request URL\"}"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 125
+                    }
+                  },
+                  {
+                    "key": "new_context",
+                    "value": {
+                      "stringValue": "[TOOL RESULT: Bash]\n{\"stdout\":\"https://github.com/acme-synthetic/telemetryiq/pull/253\",\"stderr\":\"\",\"interrupted\":false,\"isImage\":false,\"noOutputExpected\":false}"
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "bash_command",
+                        "value": {
+                          "stringValue": "printf 'https://github.com/%s/pull/%s\\n' acme-synthetic/telemetryiq 253"
+                        }
+                      },
+                      {
+                        "key": "output",
+                        "value": {
+                          "stringValue": "https://github.com/acme-synthetic/telemetryiq/pull/253"
+                        }
+                      }
+                    ],
+                    "name": "tool.output",
+                    "timeUnixNano": "1790886003967308954",
+                    "droppedAttributesCount": 0
+                  }
+                ],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000002531",
+                "spanId": "0000000000002537",
+                "parentSpanId": "0000000000002531",
+                "name": "claude_code.llm_request",
+                "kind": 1,
+                "startTimeUnixNano": "1790886003988000000",
+                "endTimeUnixNano": "1790886005828103132",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "25325325-3253-4253-8253-253253253253"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000253"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic-253@example.test"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000002a5"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic253"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "llm_request"
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "claude-opus-5-5"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.system",
+                    "value": {
+                      "stringValue": "anthropic"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.request.model",
+                    "value": {
+                      "stringValue": "claude-opus-5-5"
+                    }
+                  },
+                  {
+                    "key": "llm_request.context",
+                    "value": {
+                      "stringValue": "interaction"
+                    }
+                  },
+                  {
+                    "key": "speed",
+                    "value": {
+                      "stringValue": "normal"
+                    }
+                  },
+                  {
+                    "key": "query_source",
+                    "value": {
+                      "stringValue": "sdk"
+                    }
+                  },
+                  {
+                    "key": "query_source_safe",
+                    "value": {
+                      "stringValue": "sdk"
+                    }
+                  },
+                  {
+                    "key": "system_prompt_hash",
+                    "value": {
+                      "stringValue": "sp_23f535b8f310"
+                    }
+                  },
+                  {
+                    "key": "system_prompt_preview",
+                    "value": {
+                      "stringValue": "x-anthropic-billing-header: cc_version=2.1.287.fc6; cc_entrypoint=sdk-cli;\n\nYou are a synthetic Claude agent. [synthetic system prompt preview; live text replaced for git hygiene]"
+                    }
+                  },
+                  {
+                    "key": "system_prompt_length",
+                    "value": {
+                      "intValue": 6227
+                    }
+                  },
+                  {
+                    "key": "tools",
+                    "value": {
+                      "stringValue": "[{\"name\":\"Agent\",\"hash\":\"cd0e9c9a1529\"},{\"name\":\"Bash\",\"hash\":\"974ac54d1465\"},{\"name\":\"Edit\",\"hash\":\"6430d0c60f48\"},{\"name\":\"ListAgents\",\"hash\":\"0a3591a577c6\"},{\"name\":\"Read\",\"hash\":\"680529a1e735\"},{\"name\":\"ReportFindings\",\"hash\":\"d742f97bb17e\"},{\"name\":\"ScheduleWakeup\",\"hash\":\"92cf22a75c5f\"},{\"name\":\"Skill\",\"hash\":\"c3282cbcede5\"},{\"name\":\"ToolSearch\",\"hash\":\"59c6a9f11182\"},{\"name\":\"Write\",\"hash\":\"416c9b17ff1f\"},{\"name\":\"mcp__claude_ai_Claude_Docs__batch\",\"hash\":\"c2f090337087\"},{\"name\":\"mcp__claude_ai_Claude_Docs__guide\",\"hash\":\"3c88cb7f45c7\"},{\"name\":\"DeferredToolPlaceholder\",\"hash\":\"8a1d4180a3eb\"},{\"name\":\"mcp__claude_ai_Claude_Docs__update\",\"hash\":\"c20d5c073967\"}]"
+                    }
+                  },
+                  {
+                    "key": "tools_count",
+                    "value": {
+                      "intValue": 14
+                    }
+                  },
+                  {
+                    "key": "new_context_message_count",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "new_context",
+                    "value": {
+                      "stringValue": "[TOOL RESULT: toolu_synthetic_253_tool_output]\nhttps://github.com/acme-synthetic/telemetryiq/pull/253"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 1839
+                    }
+                  },
+                  {
+                    "key": "input_tokens",
+                    "value": {
+                      "intValue": 2
+                    }
+                  },
+                  {
+                    "key": "output_tokens",
+                    "value": {
+                      "intValue": 37
+                    }
+                  },
+                  {
+                    "key": "cache_read_tokens",
+                    "value": {
+                      "intValue": 11005
+                    }
+                  },
+                  {
+                    "key": "cache_creation_tokens",
+                    "value": {
+                      "intValue": 1334
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  },
+                  {
+                    "key": "attempt",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "response.has_tool_call",
+                    "value": {
+                      "boolValue": false
+                    }
+                  },
+                  {
+                    "key": "request_id",
+                    "value": {
+                      "stringValue": "req_synthetic_253_2"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.id",
+                    "value": {
+                      "stringValue": "req_synthetic_253_2"
+                    }
+                  },
+                  {
+                    "key": "ttft_ms",
+                    "value": {
+                      "intValue": 1775
+                    }
+                  },
+                  {
+                    "key": "first_content_ms",
+                    "value": {
+                      "intValue": 1776
+                    }
+                  },
+                  {
+                    "key": "effort",
+                    "value": {
+                      "stringValue": "medium"
+                    }
+                  },
+                  {
+                    "key": "response.model_output",
+                    "value": {
+                      "stringValue": "Done. The command printed `https://github.com/acme-synthetic/telemetryiq/pull/253`."
+                    }
+                  },
+                  {
+                    "key": "stop_reason",
+                    "value": {
+                      "stringValue": "end_turn"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.finish_reasons",
+                    "value": {
+                      "arrayValue": {
+                        "values": [
+                          {
+                            "stringValue": "end_turn"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "attempt",
+                        "value": {
+                          "intValue": 1
+                        }
+                      }
+                    ],
+                    "name": "gen_ai.request.attempt",
+                    "timeUnixNano": "1790886003991632728",
+                    "droppedAttributesCount": 0
+                  }
+                ],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000002531",
+                "spanId": "0000000000002531",
+                "name": "claude_code.interaction",
+                "kind": 1,
+                "startTimeUnixNano": "1790885998699000000",
+                "endTimeUnixNano": "1790886005835266394",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "25325325-3253-4253-8253-253253253253"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000253"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic-253@example.test"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000002a5"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic253"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "interaction"
+                    }
+                  },
+                  {
+                    "key": "user_prompt",
+                    "value": {
+                      "stringValue": "Run exactly this shell command with the Bash tool and nothing else, then reply done: printf 'https://github.com/%s/pull/%s\\n' acme-synthetic/telemetryiq 253"
+                    }
+                  },
+                  {
+                    "key": "user_prompt_length",
+                    "value": {
+                      "intValue": 156
+                    }
+                  },
+                  {
+                    "key": "interaction.sequence",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "parent.source",
+                    "value": {
+                      "stringValue": "none"
+                    }
+                  },
+                  {
+                    "key": "queued_sends",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "new_context",
+                    "value": {
+                      "stringValue": "[USER PROMPT]\nRun exactly this shell command with the Bash tool and nothing else, then reply done: printf 'https://github.com/%s/pull/%s\\n' acme-synthetic/telemetryiq 253"
+                    }
+                  },
+                  {
+                    "key": "interaction.duration_ms",
+                    "value": {
+                      "intValue": 7136
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

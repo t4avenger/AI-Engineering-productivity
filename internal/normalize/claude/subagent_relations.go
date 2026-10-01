@@ -11,7 +11,7 @@ import (
 
 // Raw span-attribute and span-envelope keys the sub-agent reconstruction reads.
 // They are the provider-native wire keys carried verbatim into
-// provider_extensions.span_attributes (safeSpanAttributeKeys) and
+// provider_extensions.span_attributes (the raw echo, spanAttributesEcho) and
 // provider_extensions.span by the trace normaliser (#100/#101), so the tree is
 // rebuilt from what those issues already capture — no new per-span mapping.
 const (
@@ -123,7 +123,7 @@ func collectSubAgentSpans(events []canonical.Event) []subAgentSpan {
 }
 
 // subAgentSpanFromEvent extracts a span view from one event's
-// provider_extensions.span (envelope) and .span_attributes (raw allow-listed
+// provider_extensions.span (envelope) and .span_attributes (raw echoed
 // attributes). It returns false for a non-span event so log/metric events for the
 // same session are ignored.
 func subAgentSpanFromEvent(event canonical.Event) (subAgentSpan, bool) {
