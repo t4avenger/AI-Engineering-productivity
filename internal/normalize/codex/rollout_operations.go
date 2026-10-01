@@ -206,7 +206,7 @@ func rolloutOperationEvents(item rolloutOperationEvidence, metadata rolloutMetad
 	if item.durationMs != nil {
 		attributes["duration_ms"] = *item.durationMs
 	}
-	return []canonical.Event{rolloutDerivedEvent(item, metadata, receivedAt, operationID, eventType, attributes, extensions, "")}
+	return []canonical.Event{rolloutDerivedEvent(item, metadata, receivedAt, eventType, attributes, extensions, "")}
 }
 
 func rolloutFileEvents(item rolloutOperationEvidence, metadata rolloutMetadata, receivedAt time.Time, operationID string) []canonical.Event {
@@ -217,7 +217,7 @@ func rolloutFileEvents(item rolloutOperationEvidence, metadata rolloutMetadata, 
 	}
 	sort.Strings(paths)
 	if len(paths) == 0 {
-		return []canonical.Event{rolloutDerivedEvent(item, metadata, receivedAt, operationID, "tool_call", map[string]any{
+		return []canonical.Event{rolloutDerivedEvent(item, metadata, receivedAt, "tool_call", map[string]any{
 			"category": string(item.category), "operation_id": operationID, "unavailable_fields": rolloutOperationUnavailableFields(),
 			"tool": rolloutToolAttributes(item),
 		}, rolloutOperationExtensions(item, operationID, metadata.sessionID), "")}
@@ -230,7 +230,7 @@ func rolloutFileEvents(item rolloutOperationEvidence, metadata rolloutMetadata, 
 			"category": string(category), "operation_id": operationID, "unavailable_fields": rolloutOperationUnavailableFields(),
 			"tool": map[string]any{"tool_name": "apply_patch", "tool_use_id": item.id, "file_path": path},
 		}
-		events = append(events, rolloutDerivedEvent(item, metadata, receivedAt, operationID, "tool_call", attributes, rolloutOperationExtensions(item, operationID, metadata.sessionID), path))
+		events = append(events, rolloutDerivedEvent(item, metadata, receivedAt, "tool_call", attributes, rolloutOperationExtensions(item, operationID, metadata.sessionID), path))
 	}
 	return events
 }
@@ -273,7 +273,7 @@ func rolloutToolAttributes(item rolloutOperationEvidence) map[string]any {
 	return tool
 }
 
-func rolloutDerivedEvent(item rolloutOperationEvidence, metadata rolloutMetadata, receivedAt time.Time, operationID, eventType string, attributes, extensions map[string]any, suffix string) canonical.Event {
+func rolloutDerivedEvent(item rolloutOperationEvidence, metadata rolloutMetadata, receivedAt time.Time, eventType string, attributes, extensions map[string]any, suffix string) canonical.Event {
 	eventID := normalize.ProviderNativeSessionID(codexSessionPrefix, metadata.sessionID) + ":toolcall:" + item.id
 	if suffix != "" {
 		digest := sha256.Sum256([]byte(suffix))
