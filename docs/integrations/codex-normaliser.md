@@ -43,6 +43,20 @@ deterministic session/line/raw-record digest only for replay identity while the
 raw record remains unchanged. The parser uses `json.Number`, so large provider
 numbers do not pass through `float64`.
 
+CLI 0.160.0 multi-agent rollouts are reconstructed across all retained Codex
+rollout sessions because every child has its own provider session and can arrive
+before its parent. `session_meta.payload.source.subagent.thread_spawn` supplies
+the only parent edge. Relations are stored on the exact root
+`codex:<root-thread-id>` session; the child thread id is the raw `agent_id`, and
+direct root children have a null `parent_agent_id`. Explicit `task_started`
+trace/turn IDs, `SubAgentActivity` lifecycle, final `token_count`,
+`task_complete.duration_ms`, and completed operation item IDs supply provenance
+and rollups. A failed child command remains a failed operation when the provider
+separately reports the agent completed. Missing counts and outcomes stay null,
+and an unretained parent remains `parent_agent_not_retained`; lineage is never
+inferred from time, order, path, name, model, or content. Replay, shuffled
+arrival, deletion, and retention rebuild the same relation set.
+
 `codex.NormalizeTraces` ingests the observed Codex CLI 0.154.0 OTLP trace
 surface from `codex_exec` and `codex_cli_rs`. Both OTLP/HTTP JSON and binary
 protobuf feed the same adapter. Recognized resources are hard-fail normalized:

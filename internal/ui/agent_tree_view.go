@@ -22,17 +22,19 @@ type agentTreeView struct {
 }
 
 type agentNodeView struct {
-	AgentID         string
-	Type            string
-	ParentState     string
-	ParentLabel     string
-	Workflow        string
-	Counts          string
-	Stats           []agentStatView
-	EvidencePath    string
-	EvidenceSpanID  string
-	UnresolvedSpans []string
-	Children        []agentNodeView
+	AgentID            string
+	Type               string
+	ParentState        string
+	ParentLabel        string
+	Workflow           string
+	Counts             string
+	Stats              []agentStatView
+	EvidencePath       string
+	EvidenceLabel      string
+	EvidenceAriaLabel  string
+	EvidenceID         string
+	UnresolvedEvidence []string
+	Children           []agentNodeView
 }
 
 type agentStatView struct {
@@ -64,33 +66,66 @@ func agentNodeFromTree(node agenttree.Node, sessionID string, r *http.Request) a
 		Type:        optionalAgentText(node.SubagentType),
 		ParentState: string(node.ParentState),
 		ParentLabel: agentParentLabel(node),
-		Counts:      fmt.Sprintf("%d spans · %d LLM requests · %d tools", node.SpanCount, node.LLMRequestCount, node.ToolCount),
-		Stats: []agentStatView{
-			{"Input tokens", optionalAgentInt(node.InputTokens, "")},
-			{"Output tokens", optionalAgentInt(node.OutputTokens, "")},
-			{"Cache read tokens", optionalAgentInt(node.CacheReadTokens, "")},
-			{"Cache creation tokens", optionalAgentInt(node.CacheCreationTokens, "")},
-			{"LLM time (summed)", optionalAgentInt(node.LLMDurationMsTotal, "ms")},
-			{"Tool time (summed)", optionalAgentInt(node.ToolDurationMsTotal, "ms")},
-			{"Wall clock (elapsed)", optionalAgentInt(node.WallClockMs, "ms")},
-		},
+		Counts:      agentCounts(node),
+		Stats:       agentStats(node),
 	}
 	if node.WorkflowName != nil || node.WorkflowRunID != nil {
 		view.Workflow = optionalAgentText(node.WorkflowName) + " · run " + optionalAgentText(node.WorkflowRunID)
 	}
-	for _, evidence := range node.Evidence {
-		switch {
-		case evidence.EventID == nil:
-			view.UnresolvedSpans = append(view.UnresolvedSpans, evidence.SpanID)
-		case view.EvidencePath == "":
-			view.EvidencePath = sessionInspectorPath(sessionID, *evidence.EventID, inspectorTabDetails, inspectorSourceTrace, r, false)
-			view.EvidenceSpanID = evidence.SpanID
-		}
-	}
+	attachAgentEvidence(&view, node, sessionID, r)
 	for _, child := range node.Children {
 		view.Children = append(view.Children, agentNodeFromTree(child, sessionID, r))
 	}
 	return view
+}
+
+func agentStats(node agenttree.Node) []agentStatView {
+	return []agentStatView{
+		{"Input tokens", optionalAgentInt(node.InputTokens, "")},
+		{"Output tokens", optionalAgentInt(node.OutputTokens, "")},
+		{"Cache read tokens", optionalAgentInt(node.CacheReadTokens, "")},
+		{"Cache creation tokens", optionalAgentInt(node.CacheCreationTokens, "")},
+		{"Reasoning tokens", optionalAgentInt(node.ReasoningTokens, "")},
+		{"Outcome", optionalAgentText(node.Outcome)},
+		{"LLM time (summed)", optionalAgentInt(node.LLMDurationMsTotal, "ms")},
+		{"Tool time (summed)", optionalAgentInt(node.ToolDurationMsTotal, "ms")},
+		{"Wall clock (elapsed)", optionalAgentInt(node.WallClockMs, "ms")},
+	}
+}
+
+func attachAgentEvidence(view *agentNodeView, node agenttree.Node, sessionID string, r *http.Request) {
+	for _, evidence := range node.Evidence {
+		if evidence.EventID == nil {
+			if evidence.SpanID != nil {
+				view.UnresolvedEvidence = append(view.UnresolvedEvidence, *evidence.SpanID)
+			}
+			continue
+		}
+		if view.EvidencePath != "" {
+			continue
+		}
+		evidenceSessionID := sessionID
+		if evidence.SessionID != nil {
+			evidenceSessionID = *evidence.SessionID
+		}
+		view.EvidencePath = sessionInspectorPath(evidenceSessionID, *evidence.EventID, inspectorTabDetails, inspectorSourceTrace, r, false)
+		view.EvidenceLabel = "Event evidence"
+		view.EvidenceAriaLabel = "Open event evidence for " + node.AgentID
+		view.EvidenceID = *evidence.EventID
+		if evidence.SpanID != nil {
+			view.EvidenceLabel = "Span evidence"
+			view.EvidenceAriaLabel = "Open span evidence for " + node.AgentID
+			view.EvidenceID = *evidence.SpanID
+		}
+	}
+}
+
+func agentCounts(node agenttree.Node) string {
+	if node.Tool == "codex" {
+		return optionalAgentInt(node.OperationCount, " operations")
+	}
+	return fmt.Sprintf("%s spans · %s LLM requests · %s tools",
+		optionalAgentInt(node.SpanCount, ""), optionalAgentInt(node.LLMRequestCount, ""), optionalAgentInt(node.ToolCount, ""))
 }
 
 func agentParentLabel(node agenttree.Node) string {

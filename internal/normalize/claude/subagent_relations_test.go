@@ -102,8 +102,8 @@ func assertAgentA(t *testing.T, agentA canonical.AgentRelation) {
 	assertStringPtr(t, "agent_a.subagent_type", agentA.SubagentType, "code-reviewer")
 	assertStringPtr(t, "agent_a.workflow_run_id", agentA.WorkflowRunID, "wf_synthetic0001")
 	assertStringPtr(t, "agent_a.workflow_name", agentA.WorkflowName, "custom")
-	if agentA.SpanCount != 3 || agentA.LLMRequestCount != 1 || agentA.ToolCount != 2 {
-		t.Fatalf("agent_a counts span/llm/tool = %d/%d/%d, want 3/1/2", agentA.SpanCount, agentA.LLMRequestCount, agentA.ToolCount)
+	if optionalRelationCount(agentA.SpanCount) != 3 || optionalRelationCount(agentA.LLMRequestCount) != 1 || optionalRelationCount(agentA.ToolCount) != 2 {
+		t.Fatalf("agent_a counts span/llm/tool = %v/%v/%v, want 3/1/2", agentA.SpanCount, agentA.LLMRequestCount, agentA.ToolCount)
 	}
 	assertInt64Ptr(t, "agent_a.input_tokens", agentA.InputTokens, 100)
 	assertInt64Ptr(t, "agent_a.output_tokens", agentA.OutputTokens, 200)
@@ -129,8 +129,8 @@ func assertAgentB(t *testing.T, agentB canonical.AgentRelation) {
 	if agentB.SubagentType != nil {
 		t.Fatalf("agent_b subagent_type = %q, want nil (never observed)", *agentB.SubagentType)
 	}
-	if agentB.SpanCount != 1 || agentB.LLMRequestCount != 1 || agentB.ToolCount != 0 {
-		t.Fatalf("agent_b counts span/llm/tool = %d/%d/%d, want 1/1/0", agentB.SpanCount, agentB.LLMRequestCount, agentB.ToolCount)
+	if optionalRelationCount(agentB.SpanCount) != 1 || optionalRelationCount(agentB.LLMRequestCount) != 1 || optionalRelationCount(agentB.ToolCount) != 0 {
+		t.Fatalf("agent_b counts span/llm/tool = %v/%v/%v, want 1/1/0", agentB.SpanCount, agentB.LLMRequestCount, agentB.ToolCount)
 	}
 	assertInt64Ptr(t, "agent_b.input_tokens", agentB.InputTokens, 50)
 	assertInt64Ptr(t, "agent_b.output_tokens", agentB.OutputTokens, 80)
@@ -293,4 +293,11 @@ func assertInt64Ptr(t *testing.T, name string, got *int64, want int64) {
 	if *got != want {
 		t.Fatalf("%s = %d, want %d", name, *got, want)
 	}
+}
+
+func optionalRelationCount(value *int64) int64 {
+	if value == nil {
+		return 0
+	}
+	return *value
 }

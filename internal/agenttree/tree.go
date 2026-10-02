@@ -32,8 +32,10 @@ const (
 // Evidence links one of the agent's raw span ids to the retained span event
 // carrying it. EventID is nil when no retained event carries that span.
 type Evidence struct {
-	SpanID  string  `json:"span_id"`
-	EventID *string `json:"event_id"`
+	SpanID    *string `json:"span_id"`
+	EventID   *string `json:"event_id"`
+	SessionID *string `json:"session_id"`
+	Kind      string  `json:"kind"`
 }
 
 // Node is one stored relation, unchanged, plus its read-time tree position.
@@ -181,13 +183,43 @@ func evidenceFor(relation canonical.AgentRelation, spanEvents map[string]string)
 	spanIDs := stringList(relation.ProviderExtensions["span_ids"])
 	evidence := make([]Evidence, 0, len(spanIDs))
 	for _, spanID := range spanIDs {
-		item := Evidence{SpanID: spanID}
+		spanIDCopy := spanID
+		item := Evidence{SpanID: &spanIDCopy, Kind: "span"}
 		if eventID, ok := spanEvents[relationKey(relation.TraceID, spanID)]; ok {
 			item.EventID = &eventID
 		}
 		evidence = append(evidence, item)
 	}
+	for _, raw := range mapList(relation.ProviderExtensions["evidence_events"]) {
+		eventID, _ := raw["event_id"].(string)
+		if eventID == "" {
+			continue
+		}
+		eventIDCopy := eventID
+		item := Evidence{EventID: &eventIDCopy, Kind: "event"}
+		if sessionID, _ := raw["session_id"].(string); sessionID != "" {
+			item.SessionID = &sessionID
+		}
+		evidence = append(evidence, item)
+	}
 	return evidence
+}
+
+func mapList(value any) []map[string]any {
+	switch typed := value.(type) {
+	case []map[string]any:
+		return typed
+	case []any:
+		result := make([]map[string]any, 0, len(typed))
+		for _, item := range typed {
+			if mapped, ok := item.(map[string]any); ok {
+				result = append(result, mapped)
+			}
+		}
+		return result
+	default:
+		return nil
+	}
 }
 
 // spanEventIndex maps (trace_id, span_id) to the first retained event carrying

@@ -134,10 +134,10 @@ func TestBuildResolvesEvidenceWithinTrace(t *testing.T) {
 		relation("t1", "a", nil, map[string]any{"span_ids": []any{"s1", 7, "missing"}}),
 	}, events)
 	evidence := tree[0].Evidence
-	if len(evidence) != 2 || evidence[0].SpanID != "s1" || evidence[0].EventID == nil || *evidence[0].EventID != "first" {
+	if len(evidence) != 2 || evidence[0].SpanID == nil || *evidence[0].SpanID != "s1" || evidence[0].EventID == nil || *evidence[0].EventID != "first" {
 		t.Fatalf("evidence = %#v, want s1 resolved to the first same-trace event", evidence)
 	}
-	if evidence[1].SpanID != "missing" || evidence[1].EventID != nil {
+	if evidence[1].SpanID == nil || *evidence[1].SpanID != "missing" || evidence[1].EventID != nil {
 		t.Fatalf("evidence[1] = %#v, want unresolved raw span id", evidence[1])
 	}
 }

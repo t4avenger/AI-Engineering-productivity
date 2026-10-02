@@ -110,10 +110,18 @@ Session detail HTML shares the same `insights.SessionFilesFromEvidence` reader.
 
 - `parent_state`: `main_session_observed` (no `parent_agent_id`, and the observed spawning span carries no `agent_id`), `parent_agent_observed` (`parent_agent_id` names a relation retained in the same trace), `parent_agent_not_retained` (rendered as a root with the raw id), `parent_conflict` (spans report more than one parent, or the spawning span's owner disagrees with `parent_agent_id`), `cycle` (rendered as a flagged root), or `unknown`.
 - `parent_candidates`: the raw conflicting or spawning-span parent ids, otherwise `[]`.
-- `evidence`: one `{span_id, event_id}` per raw span id, with `event_id` resolved only within the same trace and `null` when no retained event carries the span.
+- `evidence`: Claude relations expose one `{kind: "span", span_id, event_id, session_id}` per raw span id, with `event_id` resolved only within the same trace. Codex relations expose `{kind: "event", span_id: null, event_id, session_id}` using exact child-session rollout evidence, so the inspector link can cross to that retained child session.
 - `children`: nested nodes in stored `(trace_id, agent_id)` order.
 
 Lineage comes only from provider ids and observed span parentage, never from timestamps, proximity, or model names. A session with no relations returns `{"data": []}`; an unknown session returns 404; a store without the relation reader returns 503; a relation or event query failure returns 500.
+
+Codex CLI 0.160.0 relations are owned by the exact root
+`codex:<root-thread-id>` session even though child evidence lives in separate
+provider sessions. Nodes retain raw child/parent/thread/turn/trace/path fields,
+explicit lifecycle outcome, nullable input/output/cached/reasoning tokens,
+operation count, summed operation duration, and elapsed task duration. Global
+reconstruction is arrival-order independent and replay-idempotent. An unretained
+parent is exposed as `parent_agent_not_retained`; absent rollups stay null.
 
 `GET /api/v1/sessions/{id}/conversation` is the additive retained-conversation
 projection (#188 / T03). It cursor-pages chronological `data` records keyed by

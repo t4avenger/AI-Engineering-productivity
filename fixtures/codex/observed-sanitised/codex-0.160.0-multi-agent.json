@@ -1,0 +1,57 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "openai",
+  "tool": "codex",
+  "tool_version": "0.160.0",
+  "captured_at": "2026-10-02T19:25:27Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "capture_id": "codex-0.160.0-multi-agent",
+    "root_rollout": "codex-0.160.0-multi-agent-root.jsonl",
+    "child_rollouts": [
+      "codex-0.160.0-multi-agent-alpha.jsonl",
+      "codex-0.160.0-multi-agent-beta.jsonl",
+      "codex-0.160.0-multi-agent-cancel.jsonl",
+      "codex-0.160.0-multi-agent-gamma.jsonl"
+    ],
+    "trace_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa235",
+    "synchronized_telemetry": {
+      "otlp_trace_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa235",
+      "metrics_session_dimension_observed": false,
+      "thread_turn_joins": [
+        {
+          "session_meta_id": "00000000-0000-4000-8000-000000000235",
+          "conversation_id": "00000000-0000-4000-8000-000000000235",
+          "thread_id": "00000000-0000-4000-8000-000000000235",
+          "turn_id": "10000000-0000-4000-8000-000000000235"
+        },
+        {
+          "session_meta_id": "00000000-0000-4000-8000-000000000236",
+          "conversation_id": "00000000-0000-4000-8000-000000000236",
+          "thread_id": "00000000-0000-4000-8000-000000000236",
+          "turn_id": "10000000-0000-4000-8000-000000000236"
+        },
+        {
+          "session_meta_id": "00000000-0000-4000-8000-000000000237",
+          "conversation_id": "00000000-0000-4000-8000-000000000237",
+          "thread_id": "00000000-0000-4000-8000-000000000237",
+          "turn_id": "10000000-0000-4000-8000-000000000237"
+        },
+        {
+          "session_meta_id": "00000000-0000-4000-8000-000000000238",
+          "conversation_id": "00000000-0000-4000-8000-000000000238",
+          "thread_id": "00000000-0000-4000-8000-000000000238",
+          "turn_id": "10000000-0000-4000-8000-000000000238"
+        },
+        {
+          "session_meta_id": "00000000-0000-4000-8000-000000000239",
+          "conversation_id": "00000000-0000-4000-8000-000000000239",
+          "thread_id": "00000000-0000-4000-8000-000000000239",
+          "turn_id": "10000000-0000-4000-8000-000000000239"
+        }
+      ]
+    },
+    "notes": "Reduced from one isolated synthetic Codex CLI 0.160.0 run. Five rollout files and synchronized OTLP logs, metrics, and traces were captured together. Child session_meta records carried exact parent_thread_id, depth, agent_path, nickname, and role; parent event_msg/item_completed records carried exact child thread ids and started/completed/interrupted states; task records carried a shared trace id and per-thread turn ids. Identifiers, content, paths, commands, counts, and timestamps are synthetic replacements preserving provider field names, types, nesting, and relationship semantics. Raw captures and copied authentication remained outside the repository."
+  }
+}

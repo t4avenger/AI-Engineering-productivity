@@ -32,6 +32,29 @@ export async function expectSessionDetailHeading(page: Page): Promise<void> {
   await openSessionTraceDisclosures(page);
 }
 
+/** Opens one persisted session with the shared unlock/detail/lane assertions. */
+export async function openLiveSessionTrace(
+  page: Page,
+  sessionId: string,
+): Promise<void> {
+  await unlockDashboard(page, authToken);
+  await page.goto(`/sessions/${encodeURIComponent(sessionId)}`);
+  await expectSessionDetailHeading(page);
+  await expectSessionTraceLanes(page);
+}
+
+/** Reads the unpaged persisted agent tree through the real authenticated API. */
+export async function fetchSessionAgents(
+  sessionId: string,
+): Promise<Record<string, unknown>[]> {
+  const response = await fetch(
+    `${daemonBase}/api/v1/sessions/${encodeURIComponent(sessionId)}/agents`,
+    { headers: { Authorization: `Bearer ${authToken}` } },
+  );
+  if (response.status !== 200) return [];
+  return ((await response.json()) as { data: Record<string, unknown>[] }).data;
+}
+
 /** Chronological lists under the Session Trace (T10 accessible alternative). */
 export function chronologicalLists(page: Page) {
   return page.locator("#chronological-list");
@@ -1468,6 +1491,158 @@ export function codexRolloutNDJSON(): string {
   ]
     .map((record) => JSON.stringify(record))
     .join("\n");
+}
+
+export const codexAgentRootSessionID =
+  'codex:tiq-live-e2e-codex-agent-root';
+export const codexAgentBetaID = 'tiq-live-e2e-codex-agent-beta';
+export const codexAgentGammaID = 'tiq-live-e2e-codex-agent-gamma';
+export const codexAgentCancelledID = 'tiq-live-e2e-codex-agent-cancelled';
+
+/** Reduced observed Codex 0.160.0 root/child rollout shapes for #235. */
+export function codexMultiAgentRollouts(): string[] {
+  const root = 'tiq-live-e2e-codex-agent-root';
+  const alpha = 'tiq-live-e2e-codex-agent-alpha';
+  const trace = '23523523523523523523523523523500';
+  const meta = (id: string, parent?: string, path?: string) => ({
+    timestamp: '2026-10-02T19:24:28.000Z',
+    type: 'session_meta',
+    payload: {
+      id,
+      cli_version: "0.160.0",
+      source: parent
+        ? {
+            subagent: {
+              thread_spawn: {
+                parent_thread_id: parent,
+                depth: path === '/root/beta/gamma' ? 2 : 1,
+                agent_path: path,
+                agent_nickname: `Synthetic ${id}`,
+                agent_role: null,
+              },
+            },
+          }
+        : 'exec',
+    },
+  });
+  const task = (id: string) => ({
+    timestamp: '2026-10-02T19:24:29.000Z',
+    type: 'event_msg',
+    payload: {
+      type: 'task_started',
+      turn_id: `${id}-turn`,
+      root_turn_id: `${root}-turn`,
+      trace_id: trace,
+    },
+  });
+  const activity = (owner: string, child: string, path: string, kind: string) => ({
+    timestamp: '2026-10-02T19:24:30.000Z',
+    type: 'event_msg',
+    payload: {
+      type: 'item_completed',
+      thread_id: owner,
+      turn_id: `${owner}-turn`,
+      item: {
+        type: 'SubAgentActivity',
+        id: `${child}-${kind}`,
+        kind,
+        agent_thread_id: child,
+        agent_path: path,
+      },
+    },
+  });
+  const command = (id: string, status: string, exitCode: number) => ({
+    timestamp: '2026-10-02T19:24:31.000Z',
+    type: 'event_msg',
+    payload: {
+      type: 'item_completed',
+      thread_id: id,
+      turn_id: `${id}-turn`,
+      item: {
+        type: 'CommandExecution',
+        id: `${id}-command`,
+        command: ['/bin/bash', '-c', 'printf synthetic'],
+        cwd: 'file:///tmp/tiq-live-e2e-codex-agents',
+        status,
+        stdout: 'synthetic',
+        stderr: '',
+        exit_code: exitCode,
+        duration: { secs: 1, nanos: 0 },
+      },
+    },
+  });
+  const complete = (id: string, duration: number) => ({
+    timestamp: '2026-10-02T19:24:34.000Z',
+    type: 'event_msg',
+    payload: {
+      type: 'task_complete',
+      turn_id: `${id}-turn`,
+      duration_ms: duration,
+    },
+  });
+  const tokens = (
+    input: number,
+    output: number,
+    cached: number,
+    reasoning: number,
+  ) => ({
+    timestamp: '2026-10-02T19:24:33.000Z',
+    type: 'event_msg',
+    payload: {
+      type: 'token_count',
+      info: {
+        total_token_usage: {
+          input_tokens: input,
+          output_tokens: output,
+          cached_input_tokens: cached,
+          reasoning_output_tokens: reasoning,
+        },
+      },
+    },
+  });
+  const ndjson = (records: object[]) =>
+    records.map((record) => JSON.stringify(record)).join('\n');
+  return [
+    ndjson([
+      meta(root),
+      task(root),
+      activity(root, alpha, '/root/alpha', 'started'),
+      activity(root, codexAgentBetaID, '/root/beta', 'started'),
+      activity(root, codexAgentCancelledID, '/root/cancelled', 'started'),
+      activity(root, alpha, '/root/alpha', 'completed'),
+      activity(root, codexAgentBetaID, '/root/beta', 'completed'),
+      activity(root, codexAgentCancelledID, '/root/cancelled', 'interrupted'),
+    ]),
+    ndjson([meta(alpha, root, '/root/alpha'), task(alpha), complete(alpha, 1200)]),
+    ndjson([
+      meta(codexAgentBetaID, root, '/root/beta'),
+      task(codexAgentBetaID),
+      command(codexAgentBetaID, 'completed', 0),
+      activity(codexAgentBetaID, codexAgentGammaID, '/root/beta/gamma', 'started'),
+      activity(codexAgentBetaID, codexAgentGammaID, '/root/beta/gamma', 'completed'),
+      complete(codexAgentBetaID, 3200),
+    ]),
+    ndjson([
+      meta(codexAgentCancelledID, root, '/root/cancelled'),
+      task(codexAgentCancelledID),
+      {
+        timestamp: '2026-10-02T19:24:32.000Z',
+        type: 'event_msg',
+        payload: {
+          type: 'turn_aborted',
+          turn_id: `${codexAgentCancelledID}-turn`,
+          reason: 'interrupted',
+        },
+      },
+    ]),
+    ndjson([
+      meta(codexAgentGammaID, codexAgentBetaID, '/root/beta/gamma'),
+      task(codexAgentGammaID),
+      command(codexAgentGammaID, 'failed', 7),
+      tokens(160, 16, 80, 4),
+      complete(codexAgentGammaID, 1600),
+    ]),
+  ];
 }
 
 /**

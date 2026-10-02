@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
@@ -21,7 +23,12 @@ type agentTreeJSON struct {
 
 func getAgentTree(t *testing.T, serverURL, sessionID string, wantStatus int) agentTreeJSON {
 	t.Helper()
-	response, err := http.Get(serverURL + "/api/v1/sessions/" + url.PathEscape(sessionID) + "/agents")
+	request, err := http.NewRequest(http.MethodGet, serverURL+"/api/v1/sessions/"+url.PathEscape(sessionID)+"/agents", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+rolloutTestToken)
+	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,6 +43,65 @@ func getAgentTree(t *testing.T, serverURL, sessionID string, wantStatus int) age
 		}
 	}
 	return tree
+}
+
+func TestCodexSessionAgentsAPIFromLiveRolloutIngest(t *testing.T) {
+	_, server := authenticatedRolloutTestServer(t)
+	names := []string{
+		"codex-0.160.0-multi-agent-gamma.jsonl",
+		"codex-0.160.0-multi-agent-cancel.jsonl",
+		"codex-0.160.0-multi-agent-beta.jsonl",
+		"codex-0.160.0-multi-agent-alpha.jsonl",
+		"codex-0.160.0-multi-agent-root.jsonl",
+	}
+	for _, name := range names {
+		postAcceptedRollout(t, server.URL, codexMultiAgentFixture(t, name))
+	}
+	// Replay a child after the full graph exists: relations and rollups remain
+	// idempotent and independent of arrival order.
+	postAcceptedRollout(t, server.URL, codexMultiAgentFixture(t, names[0]))
+
+	tree := getAgentTree(t, server.URL, "codex:00000000-0000-4000-8000-000000000235", http.StatusOK)
+	if len(tree.Data) != 3 {
+		t.Fatalf("Codex roots = %d, want alpha/beta/cancel: %#v", len(tree.Data), tree.Data)
+	}
+	beta := agentNodeByID(t, tree.Data, "00000000-0000-4000-8000-000000000237")
+	children, _ := beta["children"].([]any)
+	if len(children) != 1 || children[0].(map[string]any)["agent_id"] != "00000000-0000-4000-8000-000000000239" {
+		t.Fatalf("beta children = %#v, want nested gamma", children)
+	}
+	gamma := children[0].(map[string]any)
+	if gamma["parent_state"] != "parent_agent_observed" || gamma["operation_count"] != float64(1) || gamma["outcome"] != "completed" {
+		t.Fatalf("gamma = %#v", gamma)
+	}
+	cancelled := agentNodeByID(t, tree.Data, "00000000-0000-4000-8000-000000000238")
+	if cancelled["outcome"] != "interrupted" || cancelled["operation_count"] != nil || cancelled["wall_clock_ms"] != nil {
+		t.Fatalf("cancelled = %#v", cancelled)
+	}
+	evidence := gamma["evidence"].([]any)
+	if len(evidence) == 0 || evidence[0].(map[string]any)["session_id"] != "codex:00000000-0000-4000-8000-000000000239" {
+		t.Fatalf("gamma evidence = %#v", evidence)
+	}
+}
+
+func codexMultiAgentFixture(t *testing.T, name string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "..", "fixtures", "codex", "observed-sanitised", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+func agentNodeByID(t *testing.T, roots []map[string]any, id string) map[string]any {
+	t.Helper()
+	for _, root := range roots {
+		if root["agent_id"] == id {
+			return root
+		}
+	}
+	t.Fatalf("agent %s not found in %#v", id, roots)
+	return nil
 }
 
 func ingestTracesFixture(t *testing.T, serverURL, name string) {

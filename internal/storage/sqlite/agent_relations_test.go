@@ -38,8 +38,8 @@ func TestAgentRelationsCompleteAcrossBatches(t *testing.T) {
 		t.Fatal(err)
 	}
 	afterFirst := singleRelation(t, ctx, repo)
-	if afterFirst.LLMRequestCount != 1 || derefInt64(t, afterFirst.InputTokens) != 100 {
-		t.Fatalf("after first batch: llm_count=%d input=%v, want 1/100", afterFirst.LLMRequestCount, afterFirst.InputTokens)
+	if derefInt64(t, afterFirst.LLMRequestCount) != 1 || derefInt64(t, afterFirst.InputTokens) != 100 {
+		t.Fatalf("after first batch: llm_count=%v input=%v, want 1/100", afterFirst.LLMRequestCount, afterFirst.InputTokens)
 	}
 
 	// Second batch: the remaining span. The rollup must now be complete, summing
@@ -54,8 +54,8 @@ func TestAgentRelationsCompleteAcrossBatches(t *testing.T) {
 		t.Fatal(err)
 	}
 	replay := singleRelation(t, ctx, repo)
-	if replay.LLMRequestCount != 2 || derefInt64(t, replay.InputTokens) != 150 {
-		t.Fatalf("after replay: llm_count=%d input=%v, want 2/150 (idempotent)", replay.LLMRequestCount, replay.InputTokens)
+	if derefInt64(t, replay.LLMRequestCount) != 2 || derefInt64(t, replay.InputTokens) != 150 {
+		t.Fatalf("after replay: llm_count=%v input=%v, want 2/150 (idempotent)", replay.LLMRequestCount, replay.InputTokens)
 	}
 
 	assertDeleteRemovesRelations(t, ctx, repo)
@@ -66,8 +66,8 @@ func TestAgentRelationsCompleteAcrossBatches(t *testing.T) {
 // WallClockMs the true elapsed span rather than the summed duration.
 func assertCompleteRollup(t *testing.T, complete canonical.AgentRelation) {
 	t.Helper()
-	if complete.LLMRequestCount != 2 {
-		t.Fatalf("llm_request_count = %d, want 2 (both batches summed)", complete.LLMRequestCount)
+	if derefInt64(t, complete.LLMRequestCount) != 2 {
+		t.Fatalf("llm_request_count = %v, want 2 (both batches summed)", complete.LLMRequestCount)
 	}
 	if got := derefInt64(t, complete.InputTokens); got != 150 {
 		t.Fatalf("input_tokens = %d, want 150 (100+50 across batches)", got)

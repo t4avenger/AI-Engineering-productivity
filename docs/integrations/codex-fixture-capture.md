@@ -168,3 +168,28 @@ Committed evidence:
 - `fixtures/codex/observed-sanitised/codex-0.159.2-rollout-operations.json`
 - `fixtures/codex/observed-sanitised/codex-0.159.2-rollout-operations.jsonl`
 - `fixtures/codex/expected/codex-0.159.2-rollout-operations.operations.json`
+
+## Multi-agent rollout capture
+
+Issue #235 captured Codex CLI 0.160.0 on 2026-10-02 with an isolated temporary
+`CODEX_HOME`, a synthetic Git repository, and synchronized raw loopback capture
+of logs, metrics, and traces. One root spawned two sibling agents, an interrupted
+child, and a nested grandchild. The probes exercised a synthetic file read, a
+successful command, a failed command whose agent still reported completion, and
+child-to-parent reports. Raw capture and copied authentication material remained
+outside the repository.
+
+Each child rollout's `session_meta.payload.source.subagent.thread_spawn` carries
+the exact `parent_thread_id`, `depth`, `agent_path`, `agent_nickname`, and
+`agent_role`. Parent `event_msg/item_completed` `SubAgentActivity` records carry
+the child thread id, path, and explicit `started`, `completed`, or `interrupted`
+lifecycle. `task_started`, `task_complete`, `token_count`, and `turn_aborted`
+provide exact trace, turn, duration, token, and outcome evidence. Synchronized
+OTLP confirms the provider trace/thread/turn identifiers; reconstruction never
+uses timestamps, names, models, or content as joins.
+
+Committed evidence:
+
+- `fixtures/codex/observed-sanitised/codex-0.160.0-multi-agent-{root,alpha,beta,cancel,gamma}.jsonl`
+- `fixtures/codex/observed-sanitised/codex-0.160.0-multi-agent.json`
+- `fixtures/codex/expected/codex-0.160.0-multi-agent.relations.json`

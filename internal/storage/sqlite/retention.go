@@ -30,6 +30,9 @@ func (r *Repository) ApplyRetention(ctx context.Context, retentionDays int, now 
 			return 0, err
 		}
 	}
+	if err := rebuildCodexAgentRelations(ctx, tx); err != nil {
+		return 0, err
+	}
 	if err := tx.Commit(); err != nil {
 		return 0, err
 	}

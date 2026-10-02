@@ -32,6 +32,20 @@ outcome `unknown`. No timestamp, sequence, command text, tool name, or content
 join is permitted. When completed-item evidence is present, legacy wrapper
 records remain raw observations but are not separately counted as operations.
 
+CLI 0.160.0 multi-agent lineage uses only the child rollout's exact
+`session_meta.payload.source.subagent.thread_spawn.parent_thread_id`. Following
+that provider-id chain identifies the root session and nested parent; direct
+children are stored with a null canonical parent. Parent-side
+`SubAgentActivity.agent_thread_id` records contribute lifecycle and conflict
+evidence but cannot replace an absent child-reported edge. Each child relation
+keeps cross-session event evidence with the raw child `session_id` and
+`event_id`. The explicit `task_started.trace_id` is the relation trace; when it
+is absent the exact root thread id is used only as the storage grouping key and
+labelled `trace_id_source=root_thread_id`. All Codex rollout sessions are rebuilt
+together so child-before-parent arrival and replay are deterministic. No
+timestamp, event proximity, path, nickname, role, model, or content joins are
+permitted.
+
 For Claude Code, the single join key across all three surfaces is the raw
 `session.id`: OTLP trace spans, OTLP content logs, and the on-disk session JSONL
 transcript each normalise to `claude-code:<session.id>` via

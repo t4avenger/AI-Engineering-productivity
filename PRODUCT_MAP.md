@@ -50,6 +50,8 @@ semantically equivalent data. Separate immutable **observations** from versioned
   boundaries) first-class. Codex CLI 0.157.1 rollout JSONL is accepted by authenticated
   `POST /v1/codex/rollout`: every record is retained, user/assistant messages project into
   conversation views, and exact `session_meta.payload.id` joins matching OTLP evidence (#232).
+  CLI 0.160.0 child rollouts additionally reconstruct exact provider-reported
+  sibling/nested agent lineage and nullable per-agent rollups on the root session (#235).
   Diagnostic sanitisation is proven by canary-string leakage tests.
 - **P2 — Claude Code adapter + capability-driven conformance suite.** OTLP + session JSONL
   (the JSONL half is now implemented: `claude.NormalizeTranscript` via `POST /v1/claude/transcript`
