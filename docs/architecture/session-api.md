@@ -9,6 +9,7 @@ The Phase 2 local management API provides authenticated session endpoints:
 - `GET /api/v1/sessions/{id}/files`
 - `GET /api/v1/sessions/{id}/conversation`
 - `GET /api/v1/sessions/{id}/spans`
+- `GET /api/v1/sessions/{id}/agents`
 - `DELETE /api/v1/sessions/{id}`
 - `GET /api/v1/costs/summary`, `GET /api/v1/sessions/{id}/costs`, `GET /api/v1/insights/mcp-inventory`, `GET /api/v1/insights/skill-usage`, `GET /api/v1/insights/model-performance`, `GET /api/v1/insights/context-waste`, `DELETE /api/v1/sessions`
 
@@ -104,6 +105,15 @@ proves write category without path; filesystem delete remains unavailable.
 Session detail HTML shares the same `insights.SessionFilesFromEvidence` reader.
 
 `GET /api/v1/sessions/{id}/spans` is the additive flat retained-span projection (#157). It returns opaque-cursor-paged trace/span nodes with raw provider identities, nullable parent, original interval/status evidence, provenance, and source-event links. Parent availability distinguishes roots, loaded parents, parents outside the page, and absent retained parents; cycles remain flat. Codex trace-only observations are never joined; Codex traces with the observed resource-level `conversation.id` are projected through that exact provider conversation session. See `docs/architecture/session-spans.md` for the complete record contract.
+
+`GET /api/v1/sessions/{id}/agents` returns the session's stored sub-agent relations (#246) nested into a parent/child tree by `agenttree.Build`. It is deliberately **unpaged**: `data` is the full list of roots, because a row page could split a subtree and orphan its children. Each node carries every raw `canonical.AgentRelation` field unchanged (nullable rollups stay `null`, never `0`; `provider_extensions.spawn` / `span_ids` raw) plus:
+
+- `parent_state`: `main_session_observed` (no `parent_agent_id`, and the observed spawning span carries no `agent_id`), `parent_agent_observed` (`parent_agent_id` names a relation retained in the same trace), `parent_agent_not_retained` (rendered as a root with the raw id), `parent_conflict` (spans report more than one parent, or the spawning span's owner disagrees with `parent_agent_id`), `cycle` (rendered as a flagged root), or `unknown`.
+- `parent_candidates`: the raw conflicting or spawning-span parent ids, otherwise `[]`.
+- `evidence`: one `{span_id, event_id}` per raw span id, with `event_id` resolved only within the same trace and `null` when no retained event carries the span.
+- `children`: nested nodes in stored `(trace_id, agent_id)` order.
+
+Lineage comes only from provider ids and observed span parentage, never from timestamps, proximity, or model names. A session with no relations returns `{"data": []}`; an unknown session returns 404; a store without the relation reader returns 503; a relation or event query failure returns 500.
 
 `GET /api/v1/sessions/{id}/conversation` is the additive retained-conversation
 projection (#188 / T03). It cursor-pages chronological `data` records keyed by

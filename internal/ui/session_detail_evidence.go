@@ -18,6 +18,7 @@ func (s *Server) populateSessionDetailEvidence(r *http.Request, id string, data 
 		data.ConversationError = "Retained conversation evidence is unavailable because session events could not be loaded."
 		data.SpansError = "Span evidence is unavailable because retained events could not be loaded."
 		data.BreakdownError = "Session duration breakdown is unavailable because retained events could not be loaded."
+		data.Trace.Agents = s.loadAgentTree(r, id, nil, false)
 		return
 	}
 	data.inspectorSessionEvents = events
@@ -28,6 +29,22 @@ func (s *Server) populateSessionDetailEvidence(r *http.Request, id string, data 
 	operations := s.populateFileEvidence(r, id, events, data)
 	data.Breakdown = populateBreakdownView(calculateSessionBreakdown(events, data.Session), id)
 	data.Trace = buildSessionTrace(data.Session, events, operations, id, r)
+	data.Trace.Agents = s.loadAgentTree(r, id, events, true)
+	suppressAgentLaneEmpty(&data.Trace)
+}
+
+// suppressAgentLaneEmpty drops the "no observed agent turns" copy when stored
+// sub-agent relations exist; planning availability is left untouched because a
+// sub-agent tree is not planning telemetry.
+func suppressAgentLaneEmpty(trace *sessionTraceView) {
+	if len(trace.Agents.Roots) == 0 {
+		return
+	}
+	for i := range trace.Lanes {
+		if trace.Lanes[i].ID == traceLaneAgent {
+			trace.Lanes[i].EmptyMessage = ""
+		}
+	}
 }
 
 func (s *Server) populateConversationEvidence(r *http.Request, events []canonical.Event, data *sessionDetailData) {

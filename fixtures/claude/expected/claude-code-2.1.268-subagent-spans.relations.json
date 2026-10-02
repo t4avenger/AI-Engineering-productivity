@@ -28,7 +28,12 @@
         "0000000000000a03",
         "0000000000000a04",
         "0000000000000a05"
-      ]
+      ],
+      "spawn": {
+        "span_id": "0000000000000a02",
+        "tool_name": "Agent",
+        "tool_use_id": "toolu_synthetic_agent_a"
+      }
     }
   },
   {
@@ -58,7 +63,13 @@
     "provider_extensions": {
       "span_ids": [
         "0000000000000a06"
-      ]
+      ],
+      "spawn": {
+        "agent_id": "agent_a",
+        "span_id": "0000000000000a05",
+        "tool_name": "Agent",
+        "tool_use_id": "toolu_synthetic_agent_b"
+      }
     }
   }
 ]

@@ -40,6 +40,7 @@ type sessionTraceView struct {
 	Unplaced             []traceMarkerView
 	Chronological        []traceMarkerView
 	Header               sessionTraceHeader
+	Agents               agentTreeView
 }
 
 type sessionTraceHeader struct {

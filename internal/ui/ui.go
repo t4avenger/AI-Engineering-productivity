@@ -93,6 +93,7 @@ type Server struct {
 	deleter                   storage.SessionDeleter
 	events                    storage.EventReader
 	operations                storage.OperationReader
+	agentRelations            storage.AgentRelationReader
 	costs                     storage.CostReader
 	insightSources            storage.InsightSourceReader
 	contextWasteThresholds    insights.ContextWasteThresholds
@@ -154,6 +155,7 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 	deleter, _ := sessions.(storage.SessionDeleter)
 	events, _ := sessions.(storage.EventReader)
 	operations, _ := sessions.(storage.OperationReader)
+	agentRelations, _ := sessions.(storage.AgentRelationReader)
 	costs, _ := sessions.(storage.CostReader)
 	insightSources, _ := sessions.(storage.InsightSourceReader)
 	var controller MCPAllowlistController
@@ -173,6 +175,7 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 		deleter:                   deleter,
 		events:                    events,
 		operations:                operations,
+		agentRelations:            agentRelations,
 		costs:                     costs,
 		insightSources:            insightSources,
 		contextWasteThresholds:    contextWasteThresholds,

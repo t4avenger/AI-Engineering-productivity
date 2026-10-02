@@ -132,16 +132,8 @@ func publicConversationRecord(record conversation.Record) conversationRecord {
 // requireSessionSubresource authenticates session existence and list query params
 // for cursor-paged session sub-resources (/events, /files).
 func (a sessionAPI) requireSessionSubresource(w http.ResponseWriter, r *http.Request) (string, int, *eventCursor, bool) {
-	if a.sessions == nil || a.eventReader == nil {
-		writeSessionError(w, http.StatusServiceUnavailable, "sessions_unavailable", sessionUnavailable)
-		return "", 0, nil, false
-	}
-	id := r.PathValue("id")
-	if _, found, err := a.sessions.Session(r.Context(), id); err != nil {
-		writeSessionError(w, http.StatusInternalServerError, "session_query_failed", "unable to query session")
-		return "", 0, nil, false
-	} else if !found {
-		writeSessionError(w, http.StatusNotFound, "session_not_found", sessionNotFound)
+	id, ok := a.requireSession(w, r, a.eventReader != nil)
+	if !ok {
 		return "", 0, nil, false
 	}
 	limit, cursor, err := parseEventListQuery(r)
@@ -150,6 +142,25 @@ func (a sessionAPI) requireSessionSubresource(w http.ResponseWriter, r *http.Req
 		return "", 0, nil, false
 	}
 	return id, limit, cursor, true
+}
+
+// requireSession resolves the {id} path session, writing 503 when the session
+// store or the subresource's reader (readerAvailable) is missing and 404 when
+// the session is not retained.
+func (a sessionAPI) requireSession(w http.ResponseWriter, r *http.Request, readerAvailable bool) (string, bool) {
+	if a.sessions == nil || !readerAvailable {
+		writeSessionError(w, http.StatusServiceUnavailable, "sessions_unavailable", sessionUnavailable)
+		return "", false
+	}
+	id := r.PathValue("id")
+	if _, found, err := a.sessions.Session(r.Context(), id); err != nil {
+		writeSessionError(w, http.StatusInternalServerError, "session_query_failed", "unable to query session")
+		return "", false
+	} else if !found {
+		writeSessionError(w, http.StatusNotFound, "session_not_found", sessionNotFound)
+		return "", false
+	}
+	return id, true
 }
 
 func parseEventListQuery(r *http.Request) (int, *eventCursor, error) {

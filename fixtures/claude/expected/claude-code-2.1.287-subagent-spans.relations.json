@@ -1,0 +1,81 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "relation_id": "00000000000000000000000000000287:a0000000000287001",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000287",
+    "trace_id": "00000000000000000000000000000287",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "agent_id": "a0000000000287001",
+    "parent_agent_id": null,
+    "parent_kind": "main_session",
+    "subagent_type": "tiq-delegator",
+    "workflow_run_id": null,
+    "workflow_name": null,
+    "span_count": 3,
+    "llm_request_count": 2,
+    "tool_count": 1,
+    "input_tokens": 4,
+    "output_tokens": 857,
+    "cache_read_tokens": 4258,
+    "cache_creation_tokens": 6346,
+    "llm_duration_ms_total": 9095,
+    "tool_duration_ms_total": 13240,
+    "wall_clock_ms": 22320,
+    "provenance": "observed",
+    "provider_extensions": {
+      "span_ids": [
+        "0000000000002876",
+        "0000000000002878",
+        "0000000000002889"
+      ],
+      "spawn": {
+        "span_id": "0000000000002874",
+        "tool_name": "Agent",
+        "tool_use_id": "toolu_synthetic_287_01"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "relation_id": "00000000000000000000000000000287:a0000000000287002",
+    "session_id": "claude-code:00000000-0000-4000-8000-000000000287",
+    "trace_id": "00000000000000000000000000000287",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "agent_id": "a0000000000287002",
+    "parent_agent_id": "a0000000000287001",
+    "parent_kind": "sub_agent",
+    "subagent_type": "Explore",
+    "workflow_run_id": null,
+    "workflow_name": null,
+    "span_count": 7,
+    "llm_request_count": 3,
+    "tool_count": 4,
+    "input_tokens": 3364,
+    "output_tokens": 1046,
+    "cache_read_tokens": 33452,
+    "cache_creation_tokens": 14215,
+    "llm_duration_ms_total": 12526,
+    "tool_duration_ms_total": 445,
+    "wall_clock_ms": 13115,
+    "provenance": "observed",
+    "provider_extensions": {
+      "span_ids": [
+        "000000000000287a",
+        "000000000000287b",
+        "000000000000287f",
+        "0000000000002881",
+        "0000000000002884",
+        "0000000000002885",
+        "0000000000002888"
+      ],
+      "spawn": {
+        "agent_id": "a0000000000287001",
+        "span_id": "0000000000002878",
+        "tool_name": "Agent",
+        "tool_use_id": "toolu_synthetic_287_02"
+      }
+    }
+  }
+]

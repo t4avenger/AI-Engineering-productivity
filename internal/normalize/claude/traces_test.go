@@ -994,10 +994,16 @@ func FuzzNormalizeTraces(f *testing.F) {
 	f.Add([]byte(toolSpanPayload("hook", `,{"key":"hook_event","value":{"stringValue":"PreToolUse"}},{"key":"hook_definitions","value":{"stringValue":"[]"}},{"key":"num_blocking","value":{"intValue":1}}`)))
 	f.Add([]byte(toolSpanPayload("tool", `,{"key":"tool_name","value":{"stringValue":"Bash"}},{"key":"full_command","value":{"stringValue":"echo hi"}}`)))
 	f.Add(tracesFixturePayload(f, liveToolContentSpans))
+	f.Add(tracesFixturePayload(f, "claude-code-2.1.287-subagent-spans-otlp.json"))
 	f.Add([]byte(`{"resourceSpans":[{"scopeSpans":[{"spans":[{}]}]}]}`))
 	f.Add([]byte("not json"))
 	f.Add([]byte(""))
 	f.Fuzz(func(t *testing.T, data []byte) {
-		_, _ = NormalizeTraces(data, time.Unix(0, 0).UTC())
+		events, err := NormalizeTraces(data, time.Unix(0, 0).UTC())
+		if err == nil {
+			// The sub-agent reconstruction walks span parent chains, so arbitrary
+			// (including cyclic) parentage must terminate without panicking.
+			_ = ReconstructSubAgentRelations(events)
+		}
 	})
 }

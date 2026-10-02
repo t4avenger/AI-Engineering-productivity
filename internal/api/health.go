@@ -69,6 +69,7 @@ func newHandler(logger *slog.Logger, inspector *ingestInspector, repository stor
 	mux.HandleFunc("GET /api/v1/sessions/{id}/files", sessionAPI.files)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/conversation", sessionAPI.conversation)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/spans", sessionAPI.spans)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/agents", sessionAPI.agents)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/breakdown", sessionAPI.breakdown)
 	mux.HandleFunc("DELETE /api/v1/sessions/{id}", sessionAPI.delete)
 	mux.HandleFunc("POST /v1/traces", ingest.tracesHandler)

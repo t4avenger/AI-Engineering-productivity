@@ -50,10 +50,12 @@
           {{if .EmptyMessage}}<p class="muted trace-lane-empty">{{.EmptyMessage}}</p>{{end}}
           {{end}}
         </div>
+        {{if eq .ID "agent"}}{{template "agent-tree" $.Trace.Agents}}{{end}}
       </div>
       {{end}}
     </div>
   </div>
+  {{if not .Trace.Lanes}}{{template "agent-tree" .Trace.Agents}}{{end}}
   {{if .Trace.Unplaced}}
   <section class="trace-unplaced" aria-labelledby="trace-unplaced-heading">
     <h3 id="trace-unplaced-heading">Unplaced events</h3>
@@ -69,4 +71,34 @@
   </section>
   {{end}}
 </section>
+{{end}}
+
+{{define "agent-tree"}}
+<section class="agent-tree" aria-labelledby="agent-tree-heading">
+  <h4 id="agent-tree-heading">Sub-agents</h4>
+  {{if .Error}}<p class="error" role="alert">{{.Error}}</p>
+  {{else if not .Roots}}<p class="muted">No sub-agent relations retained for this session.</p>
+  {{else}}
+  {{if .EvidenceMissing}}<p class="muted">Span evidence links are unavailable because retained events could not be loaded.</p>{{end}}
+  {{template "agent-tree-nodes" .Roots}}
+  {{end}}
+</section>
+{{end}}
+
+{{define "agent-tree-nodes"}}
+<ul class="agent-tree-list">
+  {{range .}}
+  <li class="agent-tree-node" data-agent-id="{{.AgentID}}" data-parent-state="{{.ParentState}}">
+    <p class="agent-tree-title"><code>{{.AgentID}}</code> <span>{{.Type}}</span></p>
+    <p class="muted">{{.ParentLabel}}{{if .Workflow}} · Workflow {{.Workflow}}{{end}}</p>
+    <p class="muted">{{.Counts}}</p>
+    <dl class="agent-tree-stats">
+      {{range .Stats}}<div><dt>{{.Label}}</dt><dd>{{.Value}}</dd></div>{{end}}
+    </dl>
+    {{if .EvidencePath}}<a class="event-select" href="{{.EvidencePath}}" aria-label="Open span evidence for {{.AgentID}}">Span evidence <code>{{.EvidenceSpanID}}</code></a>{{end}}
+    {{if .UnresolvedSpans}}<p class="muted">Spans not retained: {{range $i, $span := .UnresolvedSpans}}{{if $i}}, {{end}}<code>{{$span}}</code>{{end}}</p>{{end}}
+    {{if .Children}}{{template "agent-tree-nodes" .Children}}{{end}}
+  </li>
+  {{end}}
+</ul>
 {{end}}

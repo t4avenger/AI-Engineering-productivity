@@ -660,11 +660,29 @@ rollup is complete and idempotent no matter how a trace's spans were split acros
 OTLP batches — an `INSERT OR IGNORE` keyed on a first partial row would undercount.
 Only `claude-code` sessions carry sub-agent spans, but every tool's rebuild clears
 any stale rows. `ListAgentRelations(storage.AgentRelationFilter{SessionID})` reads
-them back; HTTP/UI exposure of the tree is downstream (#157/#159). See
+them back. `GET /api/v1/sessions/{id}/agents` and the Session Trace Agent lane
+nest them read-time with `agenttree.Build` (#246, see
+`docs/architecture/session-api.md`). See
 `fixtures/claude/observed-sanitised/claude-code-2.1.268-subagent-spans-otlp.json` →
 `fixtures/claude/expected/claude-code-2.1.268-subagent-spans.relations.json` (tool
 2.1.268; `fixture_origin: synthetic` — the non-interactive sub-agent tool execution
 could not be captured live in this environment).
+
+#246 re-captured the tree **live** on 2.1.287
+(`fixtures/claude/observed-sanitised/claude-code-2.1.287-subagent-spans-otlp.json` →
+`fixtures/claude/expected/claude-code-2.1.287-subagent-spans.relations.json`) and
+found that `subagent_type` rides **only** on the spawning `claude_code.tool` span
+(`tool_name=Agent`), which carries the *spawner's* `agent_id` (absent when the main
+session spawns); the child's spans nest under that span's `tool.execution` child.
+Taking the type from any span in the group therefore labelled a delegating agent
+with its child's type. The reconstruction now walks each agent's observed
+`parent_span_id` chain (same trace only) to the first ancestor `tool` span owned by
+a different agent — the spawning span — takes `subagent_type` from it, and records
+it present-only in `provider_extensions.spawn` (`span_id`, `tool_use_id`,
+`tool_name`, and the spawner's `agent_id`). An agent's own `tool` spans never set
+its type; a non-tool span's `subagent_type` remains a fallback. When an agent's
+spans report more than one `parent_agent_id`, every raw candidate is kept in
+`provider_extensions.parent_agent_ids` instead of trusting the earliest edge.
 
 Span attributes are **echoed raw** into `provider_extensions.span_attributes`
 (`spanAttributesEcho`, #253), mirroring the logs path's

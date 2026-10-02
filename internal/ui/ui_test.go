@@ -127,6 +127,8 @@ type fullStub struct {
 	events          map[string][]canonical.Event
 	eventErr        error
 	operations      []canonical.Operation
+	relations       []canonical.AgentRelation
+	relationErr     error
 	costs           []cost.Record
 	deleted         []string
 	cleared         bool
@@ -250,6 +252,10 @@ func (s *fullStub) ListInsightSourceEvents(context.Context) ([]canonical.Event, 
 
 func (s *fullStub) ListOperations(context.Context, storage.OperationFilter) ([]canonical.Operation, error) {
 	return append([]canonical.Operation(nil), s.operations...), nil
+}
+
+func (s *fullStub) ListAgentRelations(context.Context, storage.AgentRelationFilter) ([]canonical.AgentRelation, error) {
+	return append([]canonical.AgentRelation(nil), s.relations...), s.relationErr
 }
 
 func (s *fullStub) ListCostRecords(context.Context, string) ([]cost.Record, error) {

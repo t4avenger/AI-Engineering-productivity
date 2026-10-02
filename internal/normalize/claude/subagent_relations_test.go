@@ -144,6 +144,67 @@ func assertAgentB(t *testing.T, agentB canonical.AgentRelation) {
 	assertInt64Ptr(t, "agent_b.wall_clock_ms", agentB.WallClockMs, 800)
 }
 
+// TestReconstructSubAgentRelationsLiveNestedSpawn pins the live 2.1.287 nested
+// spawn (#246): main session -> tiq-delegator -> Explore. subagent_type rides on
+// the spawning Agent tool span, which carries the spawner's agent_id, so each
+// agent must take its type from its own spawn span — the delegator's Agent tool
+// span (type Explore) must never relabel the delegator itself.
+func TestReconstructSubAgentRelationsLiveNestedSpawn(t *testing.T) {
+	relations := relationsFromFixture(t, "claude-code-2.1.287-subagent-spans-otlp.json")
+	if len(relations) != 2 {
+		t.Fatalf("relation count = %d, want 2 (delegator, explore)", len(relations))
+	}
+	delegator, explore := relations[0], relations[1]
+	if delegator.ParentAgentID != nil {
+		delegator, explore = explore, delegator
+	}
+	assertStringPtr(t, "delegator.subagent_type", delegator.SubagentType, "tiq-delegator")
+	assertStringPtr(t, "explore.subagent_type", explore.SubagentType, "Explore")
+	assertStringPtr(t, "explore.parent_agent_id", explore.ParentAgentID, delegator.AgentID)
+	if spawn := nestedMap(delegator.ProviderExtensions, "spawn"); spawn == nil || spawn["agent_id"] != nil {
+		t.Fatalf("delegator spawn = %#v, want main-session spawn span without agent_id", spawn)
+	}
+	if spawn := nestedMap(explore.ProviderExtensions, "spawn"); spawn == nil || spawn["agent_id"] != delegator.AgentID {
+		t.Fatalf("explore spawn = %#v, want spawn span owned by %s", spawn, delegator.AgentID)
+	}
+	assertMatchesGolden(t, "claude-code-2.1.287-subagent-spans.relations.json", relations)
+}
+
+// TestReconstructSubAgentRelationsKeepsConflictingParents proves an agent whose
+// spans report two different parent_agent_id values keeps every raw candidate in
+// provider_extensions.parent_agent_ids rather than silently trusting one.
+func TestReconstructSubAgentRelationsKeepsConflictingParents(t *testing.T) {
+	events := []canonical.Event{
+		subAgentSpanEvent("s1", "agent_c", "agent_a"),
+		subAgentSpanEvent("s2", "agent_c", "agent_b"),
+	}
+	relations := ReconstructSubAgentRelations(events)
+	if len(relations) != 1 {
+		t.Fatalf("relation count = %d, want 1", len(relations))
+	}
+	got := relations[0].ProviderExtensions["parent_agent_ids"]
+	if !reflect.DeepEqual(got, []string{"agent_a", "agent_b"}) {
+		t.Fatalf("parent_agent_ids = %#v, want both raw candidates", got)
+	}
+	if _, ok := relations[0].ProviderExtensions["spawn"]; ok {
+		t.Fatal("spawn must stay absent when no spawning span is retained")
+	}
+}
+
+// subAgentSpanEvent builds a minimal canonical llm_request span event for one
+// agent, shaped like the trace normaliser's provider_extensions output.
+func subAgentSpanEvent(spanID, agentID, parentAgentID string) canonical.Event {
+	return canonical.Event{
+		EventID: "claude-code:span:" + spanID, SessionID: "claude-code:synthetic", Provider: provider, Tool: tool,
+		ProviderExtensions: map[string]any{
+			"span": map[string]any{"trace_id": "t1", "span_id": spanID, "parent_span_id": "missing"},
+			"span_attributes": map[string]any{
+				"span.type": "llm_request", subAgentKeyAgentID: agentID, subAgentKeyParentAgentID: parentAgentID,
+			},
+		},
+	}
+}
+
 // TestReconstructSubAgentRelationsMultiTracePerSession proves the (trace_id,
 // agent_id) key: two traces in one session that reuse the same agent_id yield two
 // distinct relations, never a collision that would fold one agent's rollup into
