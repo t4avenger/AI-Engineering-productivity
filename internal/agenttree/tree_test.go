@@ -2,6 +2,7 @@ package agenttree
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -81,6 +82,39 @@ func TestBuildKeepsCandidatesAndRawParent(t *testing.T) {
 	}, nil)
 	if !reflect.DeepEqual(tree[0].ParentCandidates, []string{"a", "b"}) || *tree[0].ParentAgentID != "a" {
 		t.Fatalf("candidates = %v parent = %v, want both raw candidates and raw parent kept", tree[0].ParentCandidates, *tree[0].ParentAgentID)
+	}
+	withSpawner := Build([]canonical.AgentRelation{relation("t", "c", ptr("a"), map[string]any{
+		"parent_agent_ids": []any{"a", "b"}, "spawn": map[string]any{"span_id": "s", "agent_id": "x"},
+	})}, nil)
+	if !reflect.DeepEqual(withSpawner[0].ParentCandidates, []string{"a", "b", "x"}) {
+		t.Fatalf("candidates = %v, want the spawning span's owner merged into the conflict", withSpawner[0].ParentCandidates)
+	}
+}
+
+// TestBuildDeepChainIsLinear guards the single-pass cycle check: a long valid
+// chain nests fully with no node flagged, and a chain feeding into a loop flags
+// only the loop members.
+func TestBuildDeepChainIsLinear(t *testing.T) {
+	const depth = 5000
+	relations := []canonical.AgentRelation{relation("t", "n0", nil, mainSpawn)}
+	for i := 1; i < depth; i++ {
+		relations = append(relations, relation("t", fmt.Sprintf("n%d", i), ptr(fmt.Sprintf("n%d", i-1)), nil))
+	}
+	node, levels := Build(relations, nil)[0], 1
+	for len(node.Children) == 1 {
+		if node.Children[0].ParentState != ParentAgentObserved {
+			t.Fatalf("level %d state = %s", levels, node.Children[0].ParentState)
+		}
+		node, levels = node.Children[0], levels+1
+	}
+	if levels != depth {
+		t.Fatalf("nested levels = %d, want %d", levels, depth)
+	}
+	tail := shape(Build([]canonical.AgentRelation{
+		relation("t", "x", ptr("y"), nil), relation("t", "y", ptr("z"), nil), relation("t", "z", ptr("y"), nil),
+	}, nil), 0)
+	if want := []string{"y:cycle:0", "x:parent_agent_observed:1", "z:cycle:0"}; !reflect.DeepEqual(tail, want) {
+		t.Fatalf("tree = %v, want %v", tail, want)
 	}
 }
 

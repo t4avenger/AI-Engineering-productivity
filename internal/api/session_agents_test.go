@@ -25,7 +25,7 @@ func getAgentTree(t *testing.T, serverURL, sessionID string, wantStatus int) age
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeBody(t, response)
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != wantStatus {
 		t.Fatalf("agents status = %d, want %d", response.StatusCode, wantStatus)
 	}

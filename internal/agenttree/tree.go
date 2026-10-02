@@ -4,7 +4,11 @@
 // never infers lineage from timestamps, proximity, or model names.
 package agenttree
 
-import "github.com/wayne/telemetryiq/internal/normalize/canonical"
+import (
+	"slices"
+
+	"github.com/wayne/telemetryiq/internal/normalize/canonical"
+)
 
 // ParentState says how much of an agent's parent is proven by retained data.
 type ParentState string
@@ -71,7 +75,7 @@ func classify(node *Node, byKey map[string]int) int {
 	spawn, hasSpawn := node.ProviderExtensions["spawn"].(map[string]any)
 	spawner, _ := spawn["agent_id"].(string)
 	if candidates := stringList(node.ProviderExtensions["parent_agent_ids"]); len(candidates) > 1 {
-		node.ParentState, node.ParentCandidates = ParentConflict, candidates
+		node.ParentState, node.ParentCandidates = ParentConflict, withCandidate(candidates, spawner)
 		return -1
 	}
 	if node.ParentAgentID == nil {
@@ -100,18 +104,25 @@ func classify(node *Node, byKey map[string]int) int {
 }
 
 // markCycles turns every node on a parent loop into a flagged root, keeping its
-// raw parent_agent_id but drawing no edge.
+// raw parent_agent_id but drawing no edge. Each parent edge is walked once:
+// a walk stops at any node an earlier walk already settled, and only nodes on
+// the loop itself (not the ones leading into it) are flagged.
 func markCycles(nodes []Node, parents []int) {
+	const unvisited, onPath, settled = 0, 1, 2
+	state := make([]int, len(nodes))
 	for start := range nodes {
-		seen := map[int]bool{}
-		for current := start; current >= 0; current = parents[current] {
-			if seen[current] {
-				if current == start {
-					nodes[start].ParentState = ParentCycle
-				}
-				break
-			}
-			seen[current] = true
+		path := []int{}
+		current := start
+		for current >= 0 && state[current] == unvisited {
+			state[current] = onPath
+			path = append(path, current)
+			current = parents[current]
+		}
+		if current >= 0 && state[current] == onPath {
+			flagLoop(nodes, path, current)
+		}
+		for _, index := range path {
+			state[index] = settled
 		}
 	}
 	for i := range nodes {
@@ -119,6 +130,26 @@ func markCycles(nodes []Node, parents []int) {
 			parents[i] = -1
 		}
 	}
+}
+
+// flagLoop marks the tail of path from the re-entered node onward: exactly the
+// loop members, never the nodes that merely lead into the loop.
+func flagLoop(nodes []Node, path []int, reentered int) {
+	for i := len(path) - 1; i >= 0; i-- {
+		nodes[path[i]].ParentState = ParentCycle
+		if path[i] == reentered {
+			return
+		}
+	}
+}
+
+// withCandidate adds the spawning span's owner to the conflict candidates when
+// it is present and not already listed.
+func withCandidate(candidates []string, spawner string) []string {
+	if spawner == "" || slices.Contains(candidates, spawner) {
+		return candidates
+	}
+	return append(candidates, spawner)
 }
 
 func nest(nodes []Node, parents []int) []Node {
