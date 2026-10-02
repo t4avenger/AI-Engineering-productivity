@@ -35,7 +35,7 @@ test-integration:
 	go test ./internal/api
 
 test-contract:
-	go test ./internal/api -run '^Test(Session(API|FilesAPI|ConversationAPI|EventAPI)|PromptKeywordsAPI|DiagnosticAPI)Contract$$'
+	go test ./internal/api -run '^Test(Session(API|FilesAPI|ConversationAPI|EventAPI|AgentsAPI)|PromptKeywordsAPI|DiagnosticAPI)Contract$$'
 
 test-e2e:
 	npm run test:e2e --prefix $(WEB_DIR)

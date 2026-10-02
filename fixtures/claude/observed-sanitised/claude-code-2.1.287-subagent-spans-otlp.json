@@ -1,0 +1,3471 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "anthropic",
+  "tool": "claude-code",
+  "tool_version": "2.1.287",
+  "captured_at": "2026-10-02T09:47:00Z",
+  "sanitisation_reviewed": true,
+  "capture_note": "Live nested sub-agent span tree (#246), captured on 2.1.287 with the enhanced-telemetry beta against a loopback sink: `claude -p` with --allowedTools='Agent,Task,Read,Glob,Grep' asked the main session to use a project sub-agent (tiq-delegator, tools: Agent/Read/Glob) which in turn spawned a built-in Explore sub-agent. Observed shape: subagent_type rides only on the spawning claude_code.tool span (tool_name=Agent), which carries the SPAWNER's agent_id (absent when the main session spawns); the child's spans nest under that tool span's claude_code.tool.execution span; parent_agent_id is present on the grandchild's llm_request/tool spans only. The exporter's separate batches are merged into one payload in start-time order. Session/agent/tool/request/trace/span ids, organisation and user identity, file paths and the command line are replaced with synthetic values of the same shape; every attribute key, span parentage and numeric value is kept.",
+  "payload": {
+    "resourceSpans": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "host.arch",
+              "value": {
+                "stringValue": "amd64"
+              }
+            },
+            {
+              "key": "os.type",
+              "value": {
+                "stringValue": "linux"
+              }
+            },
+            {
+              "key": "os.version",
+              "value": {
+                "stringValue": "6.0.0-synthetic"
+              }
+            },
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "claude-code"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "2.1.287"
+              }
+            }
+          ],
+          "droppedAttributesCount": 0
+        },
+        "scopeSpans": [
+          {
+            "scope": {
+              "name": "com.anthropic.claude_code.tracing",
+              "version": "1.0.0"
+            },
+            "spans": [
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002871",
+                "name": "claude_code.interaction",
+                "kind": 1,
+                "startTimeUnixNano": "1790927312650000000",
+                "endTimeUnixNano": "1790927349588548318",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "interaction"
+                    }
+                  },
+                  {
+                    "key": "user_prompt",
+                    "value": {
+                      "stringValue": "<REDACTED>"
+                    }
+                  },
+                  {
+                    "key": "user_prompt_length",
+                    "value": {
+                      "intValue": 69
+                    }
+                  },
+                  {
+                    "key": "interaction.sequence",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "parent.source",
+                    "value": {
+                      "stringValue": "none"
+                    }
+                  },
+                  {
+                    "key": "queued_sends",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "interaction.duration_ms",
+                    "value": {
+                      "intValue": 36938
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002872",
+                "parentSpanId": "0000000000002871",
+                "name": "claude_code.llm_request",
+                "kind": 1,
+                "startTimeUnixNano": "1790927312752000000",
+                "endTimeUnixNano": "1790927323988225388",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "llm_request"
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "claude-opus-5-5"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.system",
+                    "value": {
+                      "stringValue": "anthropic"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.request.model",
+                    "value": {
+                      "stringValue": "claude-opus-5-5"
+                    }
+                  },
+                  {
+                    "key": "llm_request.context",
+                    "value": {
+                      "stringValue": "interaction"
+                    }
+                  },
+                  {
+                    "key": "speed",
+                    "value": {
+                      "stringValue": "normal"
+                    }
+                  },
+                  {
+                    "key": "query_source_safe",
+                    "value": {
+                      "stringValue": "sdk"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 11236
+                    }
+                  },
+                  {
+                    "key": "input_tokens",
+                    "value": {
+                      "intValue": 2196
+                    }
+                  },
+                  {
+                    "key": "output_tokens",
+                    "value": {
+                      "intValue": 856
+                    }
+                  },
+                  {
+                    "key": "cache_read_tokens",
+                    "value": {
+                      "intValue": 13681
+                    }
+                  },
+                  {
+                    "key": "cache_creation_tokens",
+                    "value": {
+                      "intValue": 8367
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  },
+                  {
+                    "key": "attempt",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "request_id",
+                    "value": {
+                      "stringValue": "req_synthetic_287_01"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.id",
+                    "value": {
+                      "stringValue": "req_synthetic_287_01"
+                    }
+                  },
+                  {
+                    "key": "ttft_ms",
+                    "value": {
+                      "intValue": 11157
+                    }
+                  },
+                  {
+                    "key": "first_content_ms",
+                    "value": {
+                      "intValue": 11159
+                    }
+                  },
+                  {
+                    "key": "effort",
+                    "value": {
+                      "stringValue": "medium"
+                    }
+                  },
+                  {
+                    "key": "stop_reason",
+                    "value": {
+                      "stringValue": "tool_use"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.finish_reasons",
+                    "value": {
+                      "arrayValue": {
+                        "values": [
+                          {
+                            "stringValue": "tool_use"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "attempt",
+                        "value": {
+                          "intValue": 1
+                        }
+                      }
+                    ],
+                    "name": "gen_ai.request.attempt",
+                    "timeUnixNano": "1790927312760501010",
+                    "droppedAttributesCount": 0
+                  }
+                ],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "link.type",
+                        "value": {
+                          "stringValue": "parent_of"
+                        }
+                      }
+                    ],
+                    "spanId": "44ab0fe36759e2ac",
+                    "traceId": "213cdb7cf5931cdffb3e9f21ec668b04",
+                    "droppedAttributesCount": 0,
+                    "flags": 769
+                  }
+                ],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002873",
+                "parentSpanId": "0000000000002874",
+                "name": "claude_code.tool.blocked_on_user",
+                "kind": 1,
+                "startTimeUnixNano": "1790927323937000000",
+                "endTimeUnixNano": "1790927323940286753",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.blocked_on_user"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 3
+                    }
+                  },
+                  {
+                    "key": "decision",
+                    "value": {
+                      "stringValue": "unknown"
+                    }
+                  },
+                  {
+                    "key": "source",
+                    "value": {
+                      "stringValue": "unknown"
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002874",
+                "parentSpanId": "0000000000002871",
+                "name": "claude_code.tool",
+                "kind": 1,
+                "startTimeUnixNano": "1790927323937000000",
+                "endTimeUnixNano": "1790927346343406446",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Agent"
+                    }
+                  },
+                  {
+                    "key": "tool_name_safe",
+                    "value": {
+                      "stringValue": "Agent"
+                    }
+                  },
+                  {
+                    "key": "subagent_type",
+                    "value": {
+                      "stringValue": "tiq-delegator"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_01"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_01"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 22406
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002875",
+                "parentSpanId": "0000000000002874",
+                "name": "claude_code.tool.execution",
+                "kind": 1,
+                "startTimeUnixNano": "1790927323940000000",
+                "endTimeUnixNano": "1790927346342503063",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.execution"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_01"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_01"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 22402
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002876",
+                "parentSpanId": "0000000000002875",
+                "name": "claude_code.llm_request",
+                "kind": 1,
+                "startTimeUnixNano": "1790927324017000000",
+                "endTimeUnixNano": "1790927327567629123",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "llm_request"
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "claude-sonnet-5-5"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.system",
+                    "value": {
+                      "stringValue": "anthropic"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.request.model",
+                    "value": {
+                      "stringValue": "claude-sonnet-5-5"
+                    }
+                  },
+                  {
+                    "key": "llm_request.context",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "speed",
+                    "value": {
+                      "stringValue": "normal"
+                    }
+                  },
+                  {
+                    "key": "query_source_safe",
+                    "value": {
+                      "stringValue": "agent.custom"
+                    }
+                  },
+                  {
+                    "key": "agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287001"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 3550
+                    }
+                  },
+                  {
+                    "key": "input_tokens",
+                    "value": {
+                      "intValue": 2
+                    }
+                  },
+                  {
+                    "key": "output_tokens",
+                    "value": {
+                      "intValue": 292
+                    }
+                  },
+                  {
+                    "key": "cache_read_tokens",
+                    "value": {
+                      "intValue": 0
+                    }
+                  },
+                  {
+                    "key": "cache_creation_tokens",
+                    "value": {
+                      "intValue": 4258
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  },
+                  {
+                    "key": "attempt",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "request_id",
+                    "value": {
+                      "stringValue": "req_synthetic_287_02"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.id",
+                    "value": {
+                      "stringValue": "req_synthetic_287_02"
+                    }
+                  },
+                  {
+                    "key": "ttft_ms",
+                    "value": {
+                      "intValue": 3497
+                    }
+                  },
+                  {
+                    "key": "first_content_ms",
+                    "value": {
+                      "intValue": 3498
+                    }
+                  },
+                  {
+                    "key": "effort",
+                    "value": {
+                      "stringValue": "medium"
+                    }
+                  },
+                  {
+                    "key": "stop_reason",
+                    "value": {
+                      "stringValue": "tool_use"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.finish_reasons",
+                    "value": {
+                      "arrayValue": {
+                        "values": [
+                          {
+                            "stringValue": "tool_use"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "attempt",
+                        "value": {
+                          "intValue": 1
+                        }
+                      }
+                    ],
+                    "name": "gen_ai.request.attempt",
+                    "timeUnixNano": "1790927324023220981",
+                    "droppedAttributesCount": 0
+                  }
+                ],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "link.type",
+                        "value": {
+                          "stringValue": "parent_of"
+                        }
+                      }
+                    ],
+                    "spanId": "ed4120480124c446",
+                    "traceId": "a3aa6eda0d57cd3197e7ff7341986d0e",
+                    "droppedAttributesCount": 0,
+                    "flags": 769
+                  }
+                ],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002877",
+                "parentSpanId": "0000000000002878",
+                "name": "claude_code.tool.blocked_on_user",
+                "kind": 1,
+                "startTimeUnixNano": "1790927327527000000",
+                "endTimeUnixNano": "1790927327528289621",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.blocked_on_user"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "decision",
+                    "value": {
+                      "stringValue": "unknown"
+                    }
+                  },
+                  {
+                    "key": "source",
+                    "value": {
+                      "stringValue": "unknown"
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002878",
+                "parentSpanId": "0000000000002875",
+                "name": "claude_code.tool",
+                "kind": 1,
+                "startTimeUnixNano": "1790927327527000000",
+                "endTimeUnixNano": "1790927340767364102",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Agent"
+                    }
+                  },
+                  {
+                    "key": "tool_name_safe",
+                    "value": {
+                      "stringValue": "Agent"
+                    }
+                  },
+                  {
+                    "key": "subagent_type",
+                    "value": {
+                      "stringValue": "Explore"
+                    }
+                  },
+                  {
+                    "key": "agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287001"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_02"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_02"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 13240
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002879",
+                "parentSpanId": "0000000000002878",
+                "name": "claude_code.tool.execution",
+                "kind": 1,
+                "startTimeUnixNano": "1790927327529000000",
+                "endTimeUnixNano": "1790927340767426472",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.execution"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_02"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_02"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 13238
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "000000000000287a",
+                "parentSpanId": "0000000000002879",
+                "name": "claude_code.llm_request",
+                "kind": 1,
+                "startTimeUnixNano": "1790927327563000000",
+                "endTimeUnixNano": "1790927332221248036",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "llm_request"
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "claude-sonnet-5-5"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.system",
+                    "value": {
+                      "stringValue": "anthropic"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.request.model",
+                    "value": {
+                      "stringValue": "claude-sonnet-5-5"
+                    }
+                  },
+                  {
+                    "key": "llm_request.context",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "speed",
+                    "value": {
+                      "stringValue": "normal"
+                    }
+                  },
+                  {
+                    "key": "query_source_safe",
+                    "value": {
+                      "stringValue": "agent.builtin.Explore"
+                    }
+                  },
+                  {
+                    "key": "agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287002"
+                    }
+                  },
+                  {
+                    "key": "parent_agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287001"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 4658
+                    }
+                  },
+                  {
+                    "key": "input_tokens",
+                    "value": {
+                      "intValue": 3360
+                    }
+                  },
+                  {
+                    "key": "output_tokens",
+                    "value": {
+                      "intValue": 517
+                    }
+                  },
+                  {
+                    "key": "cache_read_tokens",
+                    "value": {
+                      "intValue": 9761
+                    }
+                  },
+                  {
+                    "key": "cache_creation_tokens",
+                    "value": {
+                      "intValue": 6399
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  },
+                  {
+                    "key": "attempt",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "request_id",
+                    "value": {
+                      "stringValue": "req_synthetic_287_03"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.id",
+                    "value": {
+                      "stringValue": "req_synthetic_287_03"
+                    }
+                  },
+                  {
+                    "key": "ttft_ms",
+                    "value": {
+                      "intValue": 1083
+                    }
+                  },
+                  {
+                    "key": "first_content_ms",
+                    "value": {
+                      "intValue": 1084
+                    }
+                  },
+                  {
+                    "key": "effort",
+                    "value": {
+                      "stringValue": "medium"
+                    }
+                  },
+                  {
+                    "key": "stop_reason",
+                    "value": {
+                      "stringValue": "tool_use"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.finish_reasons",
+                    "value": {
+                      "arrayValue": {
+                        "values": [
+                          {
+                            "stringValue": "tool_use"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "attempt",
+                        "value": {
+                          "intValue": 1
+                        }
+                      }
+                    ],
+                    "name": "gen_ai.request.attempt",
+                    "timeUnixNano": "1790927327572417589",
+                    "droppedAttributesCount": 0
+                  }
+                ],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "000000000000287b",
+                "parentSpanId": "0000000000002879",
+                "name": "claude_code.tool",
+                "kind": 1,
+                "startTimeUnixNano": "1790927331625000000",
+                "endTimeUnixNano": "1790927331636837830",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Read"
+                    }
+                  },
+                  {
+                    "key": "tool_name_safe",
+                    "value": {
+                      "stringValue": "Read"
+                    }
+                  },
+                  {
+                    "key": "file_path",
+                    "value": {
+                      "stringValue": "/work/tiq/README.md"
+                    }
+                  },
+                  {
+                    "key": "agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287002"
+                    }
+                  },
+                  {
+                    "key": "parent_agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287001"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_03"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_03"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 12
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "000000000000287c",
+                "parentSpanId": "000000000000287b",
+                "name": "claude_code.tool.blocked_on_user",
+                "kind": 1,
+                "startTimeUnixNano": "1790927331626000000",
+                "endTimeUnixNano": "1790927331632467660",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.blocked_on_user"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 6
+                    }
+                  },
+                  {
+                    "key": "decision",
+                    "value": {
+                      "stringValue": "unknown"
+                    }
+                  },
+                  {
+                    "key": "source",
+                    "value": {
+                      "stringValue": "unknown"
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "000000000000287d",
+                "parentSpanId": "000000000000287b",
+                "name": "claude_code.tool.execution",
+                "kind": 1,
+                "startTimeUnixNano": "1790927331632000000",
+                "endTimeUnixNano": "1790927331636899113",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.execution"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_03"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_03"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 5
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "000000000000287e",
+                "parentSpanId": "000000000000287f",
+                "name": "claude_code.tool.blocked_on_user",
+                "kind": 1,
+                "startTimeUnixNano": "1790927332110000000",
+                "endTimeUnixNano": "1790927332114902572",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.blocked_on_user"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 5
+                    }
+                  },
+                  {
+                    "key": "decision",
+                    "value": {
+                      "stringValue": "unknown"
+                    }
+                  },
+                  {
+                    "key": "source",
+                    "value": {
+                      "stringValue": "unknown"
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "000000000000287f",
+                "parentSpanId": "0000000000002879",
+                "name": "claude_code.tool",
+                "kind": 1,
+                "startTimeUnixNano": "1790927332110000000",
+                "endTimeUnixNano": "1790927332122255082",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Read"
+                    }
+                  },
+                  {
+                    "key": "tool_name_safe",
+                    "value": {
+                      "stringValue": "Read"
+                    }
+                  },
+                  {
+                    "key": "file_path",
+                    "value": {
+                      "stringValue": "/work/tiq/main.go"
+                    }
+                  },
+                  {
+                    "key": "agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287002"
+                    }
+                  },
+                  {
+                    "key": "parent_agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287001"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_04"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_04"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 12
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002880",
+                "parentSpanId": "000000000000287f",
+                "name": "claude_code.tool.execution",
+                "kind": 1,
+                "startTimeUnixNano": "1790927332115000000",
+                "endTimeUnixNano": "1790927332121772518",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.execution"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_04"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_04"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 7
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002881",
+                "parentSpanId": "0000000000002879",
+                "name": "claude_code.tool",
+                "kind": 1,
+                "startTimeUnixNano": "1790927332259000000",
+                "endTimeUnixNano": "1790927332644763761",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Bash"
+                    }
+                  },
+                  {
+                    "key": "tool_name_safe",
+                    "value": {
+                      "stringValue": "Bash"
+                    }
+                  },
+                  {
+                    "key": "full_command",
+                    "value": {
+                      "stringValue": "ls -laR /work/tiq"
+                    }
+                  },
+                  {
+                    "key": "bash_command_class",
+                    "value": {
+                      "stringValue": "file_search"
+                    }
+                  },
+                  {
+                    "key": "bash_argv0",
+                    "value": {
+                      "stringValue": "ls"
+                    }
+                  },
+                  {
+                    "key": "agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287002"
+                    }
+                  },
+                  {
+                    "key": "parent_agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287001"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_05"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_05"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 386
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002882",
+                "parentSpanId": "0000000000002881",
+                "name": "claude_code.tool.blocked_on_user",
+                "kind": 1,
+                "startTimeUnixNano": "1790927332260000000",
+                "endTimeUnixNano": "1790927332287637619",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.blocked_on_user"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 28
+                    }
+                  },
+                  {
+                    "key": "decision",
+                    "value": {
+                      "stringValue": "unknown"
+                    }
+                  },
+                  {
+                    "key": "source",
+                    "value": {
+                      "stringValue": "unknown"
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002883",
+                "parentSpanId": "0000000000002881",
+                "name": "claude_code.tool.execution",
+                "kind": 1,
+                "startTimeUnixNano": "1790927332288000000",
+                "endTimeUnixNano": "1790927332644885464",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.execution"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_05"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_05"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 357
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002884",
+                "parentSpanId": "0000000000002879",
+                "name": "claude_code.llm_request",
+                "kind": 1,
+                "startTimeUnixNano": "1790927332724000000",
+                "endTimeUnixNano": "1790927336756141339",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "llm_request"
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "claude-sonnet-5-5"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.system",
+                    "value": {
+                      "stringValue": "anthropic"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.request.model",
+                    "value": {
+                      "stringValue": "claude-sonnet-5-5"
+                    }
+                  },
+                  {
+                    "key": "llm_request.context",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "speed",
+                    "value": {
+                      "stringValue": "normal"
+                    }
+                  },
+                  {
+                    "key": "query_source_safe",
+                    "value": {
+                      "stringValue": "agent.builtin.Explore"
+                    }
+                  },
+                  {
+                    "key": "agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287002"
+                    }
+                  },
+                  {
+                    "key": "parent_agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287001"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 4032
+                    }
+                  },
+                  {
+                    "key": "input_tokens",
+                    "value": {
+                      "intValue": 2
+                    }
+                  },
+                  {
+                    "key": "output_tokens",
+                    "value": {
+                      "intValue": 160
+                    }
+                  },
+                  {
+                    "key": "cache_read_tokens",
+                    "value": {
+                      "intValue": 8080
+                    }
+                  },
+                  {
+                    "key": "cache_creation_tokens",
+                    "value": {
+                      "intValue": 7531
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  },
+                  {
+                    "key": "attempt",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "request_id",
+                    "value": {
+                      "stringValue": "req_synthetic_287_04"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.id",
+                    "value": {
+                      "stringValue": "req_synthetic_287_04"
+                    }
+                  },
+                  {
+                    "key": "ttft_ms",
+                    "value": {
+                      "intValue": 2907
+                    }
+                  },
+                  {
+                    "key": "first_content_ms",
+                    "value": {
+                      "intValue": 3223
+                    }
+                  },
+                  {
+                    "key": "effort",
+                    "value": {
+                      "stringValue": "medium"
+                    }
+                  },
+                  {
+                    "key": "stop_reason",
+                    "value": {
+                      "stringValue": "tool_use"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.finish_reasons",
+                    "value": {
+                      "arrayValue": {
+                        "values": [
+                          {
+                            "stringValue": "tool_use"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "attempt",
+                        "value": {
+                          "intValue": 1
+                        }
+                      }
+                    ],
+                    "name": "gen_ai.request.attempt",
+                    "timeUnixNano": "1790927332728830746",
+                    "droppedAttributesCount": 0
+                  }
+                ],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002885",
+                "parentSpanId": "0000000000002879",
+                "name": "claude_code.tool",
+                "kind": 1,
+                "startTimeUnixNano": "1790927336731000000",
+                "endTimeUnixNano": "1790927336766239508",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "tool_name",
+                    "value": {
+                      "stringValue": "Read"
+                    }
+                  },
+                  {
+                    "key": "tool_name_safe",
+                    "value": {
+                      "stringValue": "Read"
+                    }
+                  },
+                  {
+                    "key": "file_path",
+                    "value": {
+                      "stringValue": "/work/tiq/tiq-delegator.md"
+                    }
+                  },
+                  {
+                    "key": "agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287002"
+                    }
+                  },
+                  {
+                    "key": "parent_agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287001"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_06"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_06"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 35
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002886",
+                "parentSpanId": "0000000000002885",
+                "name": "claude_code.tool.blocked_on_user",
+                "kind": 1,
+                "startTimeUnixNano": "1790927336732000000",
+                "endTimeUnixNano": "1790927336741705460",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.blocked_on_user"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 10
+                    }
+                  },
+                  {
+                    "key": "decision",
+                    "value": {
+                      "stringValue": "unknown"
+                    }
+                  },
+                  {
+                    "key": "source",
+                    "value": {
+                      "stringValue": "unknown"
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002887",
+                "parentSpanId": "0000000000002885",
+                "name": "claude_code.tool.execution",
+                "kind": 1,
+                "startTimeUnixNano": "1790927336742000000",
+                "endTimeUnixNano": "1790927336766246482",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "tool.execution"
+                    }
+                  },
+                  {
+                    "key": "tool_use_id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_06"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.tool.call.id",
+                    "value": {
+                      "stringValue": "toolu_synthetic_287_06"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 24
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002888",
+                "parentSpanId": "0000000000002879",
+                "name": "claude_code.llm_request",
+                "kind": 1,
+                "startTimeUnixNano": "1790927336843000000",
+                "endTimeUnixNano": "1790927340678851596",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "llm_request"
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "claude-sonnet-5-5"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.system",
+                    "value": {
+                      "stringValue": "anthropic"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.request.model",
+                    "value": {
+                      "stringValue": "claude-sonnet-5-5"
+                    }
+                  },
+                  {
+                    "key": "llm_request.context",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "speed",
+                    "value": {
+                      "stringValue": "normal"
+                    }
+                  },
+                  {
+                    "key": "query_source_safe",
+                    "value": {
+                      "stringValue": "agent.builtin.Explore"
+                    }
+                  },
+                  {
+                    "key": "agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287002"
+                    }
+                  },
+                  {
+                    "key": "parent_agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287001"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 3836
+                    }
+                  },
+                  {
+                    "key": "input_tokens",
+                    "value": {
+                      "intValue": 2
+                    }
+                  },
+                  {
+                    "key": "output_tokens",
+                    "value": {
+                      "intValue": 369
+                    }
+                  },
+                  {
+                    "key": "cache_read_tokens",
+                    "value": {
+                      "intValue": 15611
+                    }
+                  },
+                  {
+                    "key": "cache_creation_tokens",
+                    "value": {
+                      "intValue": 285
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  },
+                  {
+                    "key": "attempt",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "request_id",
+                    "value": {
+                      "stringValue": "req_synthetic_287_05"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.id",
+                    "value": {
+                      "stringValue": "req_synthetic_287_05"
+                    }
+                  },
+                  {
+                    "key": "ttft_ms",
+                    "value": {
+                      "intValue": 804
+                    }
+                  },
+                  {
+                    "key": "first_content_ms",
+                    "value": {
+                      "intValue": 1113
+                    }
+                  },
+                  {
+                    "key": "effort",
+                    "value": {
+                      "stringValue": "medium"
+                    }
+                  },
+                  {
+                    "key": "stop_reason",
+                    "value": {
+                      "stringValue": "end_turn"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.finish_reasons",
+                    "value": {
+                      "arrayValue": {
+                        "values": [
+                          {
+                            "stringValue": "end_turn"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "attempt",
+                        "value": {
+                          "intValue": 1
+                        }
+                      }
+                    ],
+                    "name": "gen_ai.request.attempt",
+                    "timeUnixNano": "1790927336847331660",
+                    "droppedAttributesCount": 0
+                  }
+                ],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "0000000000002889",
+                "parentSpanId": "0000000000002875",
+                "name": "claude_code.llm_request",
+                "kind": 1,
+                "startTimeUnixNano": "1790927340792000000",
+                "endTimeUnixNano": "1790927346337404072",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "llm_request"
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "claude-sonnet-5-5"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.system",
+                    "value": {
+                      "stringValue": "anthropic"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.request.model",
+                    "value": {
+                      "stringValue": "claude-sonnet-5-5"
+                    }
+                  },
+                  {
+                    "key": "llm_request.context",
+                    "value": {
+                      "stringValue": "tool"
+                    }
+                  },
+                  {
+                    "key": "speed",
+                    "value": {
+                      "stringValue": "normal"
+                    }
+                  },
+                  {
+                    "key": "query_source_safe",
+                    "value": {
+                      "stringValue": "agent.custom"
+                    }
+                  },
+                  {
+                    "key": "agent_id",
+                    "value": {
+                      "stringValue": "a0000000000287001"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 5545
+                    }
+                  },
+                  {
+                    "key": "input_tokens",
+                    "value": {
+                      "intValue": 2
+                    }
+                  },
+                  {
+                    "key": "output_tokens",
+                    "value": {
+                      "intValue": 565
+                    }
+                  },
+                  {
+                    "key": "cache_read_tokens",
+                    "value": {
+                      "intValue": 4258
+                    }
+                  },
+                  {
+                    "key": "cache_creation_tokens",
+                    "value": {
+                      "intValue": 2088
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  },
+                  {
+                    "key": "attempt",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "request_id",
+                    "value": {
+                      "stringValue": "req_synthetic_287_06"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.id",
+                    "value": {
+                      "stringValue": "req_synthetic_287_06"
+                    }
+                  },
+                  {
+                    "key": "ttft_ms",
+                    "value": {
+                      "intValue": 5530
+                    }
+                  },
+                  {
+                    "key": "first_content_ms",
+                    "value": {
+                      "intValue": 5530
+                    }
+                  },
+                  {
+                    "key": "effort",
+                    "value": {
+                      "stringValue": "medium"
+                    }
+                  },
+                  {
+                    "key": "stop_reason",
+                    "value": {
+                      "stringValue": "end_turn"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.finish_reasons",
+                    "value": {
+                      "arrayValue": {
+                        "values": [
+                          {
+                            "stringValue": "end_turn"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "attempt",
+                        "value": {
+                          "intValue": 1
+                        }
+                      }
+                    ],
+                    "name": "gen_ai.request.attempt",
+                    "timeUnixNano": "1790927340800253043",
+                    "droppedAttributesCount": 0
+                  }
+                ],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "link.type",
+                        "value": {
+                          "stringValue": "parent_of"
+                        }
+                      }
+                    ],
+                    "spanId": "47d1b51c7d763ec1",
+                    "traceId": "a716adfdd0c8ea0483a0a300da33b2c5",
+                    "droppedAttributesCount": 0,
+                    "flags": 769
+                  }
+                ],
+                "droppedLinksCount": 0,
+                "flags": 257
+              },
+              {
+                "traceId": "00000000000000000000000000000287",
+                "spanId": "000000000000288a",
+                "parentSpanId": "0000000000002871",
+                "name": "claude_code.llm_request",
+                "kind": 1,
+                "startTimeUnixNano": "1790927346369000000",
+                "endTimeUnixNano": "1790927349581737334",
+                "attributes": [
+                  {
+                    "key": "user.id",
+                    "value": {
+                      "stringValue": "synthetic-user-0001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-000000000287"
+                    }
+                  },
+                  {
+                    "key": "organization.id",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000aa"
+                    }
+                  },
+                  {
+                    "key": "user.email",
+                    "value": {
+                      "stringValue": "synthetic@example.invalid"
+                    }
+                  },
+                  {
+                    "key": "user.account_uuid",
+                    "value": {
+                      "stringValue": "00000000-0000-4000-8000-0000000000bb"
+                    }
+                  },
+                  {
+                    "key": "user.account_id",
+                    "value": {
+                      "stringValue": "user_synthetic0001"
+                    }
+                  },
+                  {
+                    "key": "terminal.type",
+                    "value": {
+                      "stringValue": "gnome-terminal"
+                    }
+                  },
+                  {
+                    "key": "span.type",
+                    "value": {
+                      "stringValue": "llm_request"
+                    }
+                  },
+                  {
+                    "key": "model",
+                    "value": {
+                      "stringValue": "claude-opus-5-5"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.system",
+                    "value": {
+                      "stringValue": "anthropic"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.request.model",
+                    "value": {
+                      "stringValue": "claude-opus-5-5"
+                    }
+                  },
+                  {
+                    "key": "llm_request.context",
+                    "value": {
+                      "stringValue": "interaction"
+                    }
+                  },
+                  {
+                    "key": "speed",
+                    "value": {
+                      "stringValue": "normal"
+                    }
+                  },
+                  {
+                    "key": "query_source_safe",
+                    "value": {
+                      "stringValue": "sdk"
+                    }
+                  },
+                  {
+                    "key": "duration_ms",
+                    "value": {
+                      "intValue": 3213
+                    }
+                  },
+                  {
+                    "key": "input_tokens",
+                    "value": {
+                      "intValue": 2
+                    }
+                  },
+                  {
+                    "key": "output_tokens",
+                    "value": {
+                      "intValue": 163
+                    }
+                  },
+                  {
+                    "key": "cache_read_tokens",
+                    "value": {
+                      "intValue": 11024
+                    }
+                  },
+                  {
+                    "key": "cache_creation_tokens",
+                    "value": {
+                      "intValue": 3399
+                    }
+                  },
+                  {
+                    "key": "success",
+                    "value": {
+                      "boolValue": true
+                    }
+                  },
+                  {
+                    "key": "attempt",
+                    "value": {
+                      "intValue": 1
+                    }
+                  },
+                  {
+                    "key": "request_id",
+                    "value": {
+                      "stringValue": "req_synthetic_287_07"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.id",
+                    "value": {
+                      "stringValue": "req_synthetic_287_07"
+                    }
+                  },
+                  {
+                    "key": "ttft_ms",
+                    "value": {
+                      "intValue": 1414
+                    }
+                  },
+                  {
+                    "key": "first_content_ms",
+                    "value": {
+                      "intValue": 1757
+                    }
+                  },
+                  {
+                    "key": "effort",
+                    "value": {
+                      "stringValue": "medium"
+                    }
+                  },
+                  {
+                    "key": "stop_reason",
+                    "value": {
+                      "stringValue": "end_turn"
+                    }
+                  },
+                  {
+                    "key": "gen_ai.response.finish_reasons",
+                    "value": {
+                      "arrayValue": {
+                        "values": [
+                          {
+                            "stringValue": "end_turn"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "events": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "attempt",
+                        "value": {
+                          "intValue": 1
+                        }
+                      }
+                    ],
+                    "name": "gen_ai.request.attempt",
+                    "timeUnixNano": "1790927346375265706",
+                    "droppedAttributesCount": 0
+                  }
+                ],
+                "droppedEventsCount": 0,
+                "status": {
+                  "code": 0
+                },
+                "links": [],
+                "droppedLinksCount": 0,
+                "flags": 257
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

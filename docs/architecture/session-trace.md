@@ -9,7 +9,7 @@ invent stage sequences, per-file diffs, or session joins.
 | Lane | Source |
 |---|---|
 | Conversation | `conversation.Project` retained Claude Code content |
-| Agent | Model / lifecycle events plus `planning` / `llm_request` spans |
+| Agent | Model / lifecycle events plus `planning` / `llm_request` spans; stored sub-agent tree (`agenttree.Build`, #246) as a nested **Sub-agents** list |
 | Tools & MCP | Operations, skills, MCP events, and tool spans |
 | Files | `insights.SessionFilesFromEvidence` |
 | Spans | `spans.Project` flat nodes with retained parent span IDs; nest depth is
@@ -31,5 +31,12 @@ available as the accessible alternative (T10).
 - Unknown values never become zero.
 - Planning labels require explicit `planning` evidence; otherwise the Agent lane
   reports planning telemetry unavailable.
+- The Agent lane's **Sub-agents** list renders stored relations only: raw agent ids,
+  `subagent_type` or "not reported", the read-time parent state label, counts, the
+  four token counts, LLM/tool time labelled *summed* and wall clock labelled
+  *elapsed* (nil rollups read "not reported", a real zero reads 0), and a link to
+  the first resolvable span in the event inspector. A reader failure, no retained
+  relations, and relations without loadable events are three distinct messages.
+  Sub-agents are not planning telemetry, so planning availability is unchanged.
 - Codex trace-only observations are not joined to conversations by time or model.
 - Share remains unavailable until the E03 architecture gate (#198).

@@ -23,6 +23,8 @@ const (
 	subAgentKeyCacheRead     = "cache_read_tokens"
 	subAgentKeyCacheCreation = "cache_creation_tokens"
 	subAgentKeyDurationMs    = "duration_ms"
+	subAgentKeyToolName      = "tool_name"
+	subAgentKeyToolUseID     = "tool_use_id"
 )
 
 // subAgentSpan is the reduced per-span view the reconstruction needs: the span
@@ -44,6 +46,8 @@ type subAgentSpan struct {
 	agentID       string
 	parentAgentID string
 	subagentType  string
+	toolName      string
+	toolUseID     string
 	workflowRunID string
 	workflowName  string
 	inputTokens   *int64
@@ -72,6 +76,7 @@ func ReconstructSubAgentRelations(events []canonical.Event) []canonical.AgentRel
 	if len(spans) == 0 {
 		return nil
 	}
+	index := spanIndex(spans)
 	groups := map[string][]subAgentSpan{}
 	order := []string{}
 	for _, span := range spans {
@@ -86,7 +91,7 @@ func ReconstructSubAgentRelations(events []canonical.Event) []canonical.AgentRel
 	}
 	relations := make([]canonical.AgentRelation, 0, len(order))
 	for _, key := range order {
-		relations = append(relations, relationFromGroup(groups[key]))
+		relations = append(relations, relationFromGroup(groups[key], index))
 	}
 	sort.SliceStable(relations, func(i, j int) bool {
 		if relations[i].TraceID != relations[j].TraceID {
@@ -145,6 +150,8 @@ func subAgentSpanFromEvent(event canonical.Event) (subAgentSpan, bool) {
 		agentID:       stringValue(attrs[subAgentKeyAgentID]),
 		parentAgentID: stringValue(attrs[subAgentKeyParentAgentID]),
 		subagentType:  stringValue(attrs[subAgentKeySubagentType]),
+		toolName:      stringValue(attrs[subAgentKeyToolName]),
+		toolUseID:     stringValue(attrs[subAgentKeyToolUseID]),
 		workflowRunID: stringValue(attrs[attrWorkflowRunID]),
 		workflowName:  stringValue(attrs[attrWorkflowName]),
 		inputTokens:   normalize.OptionalTokenCount(attrs[subAgentKeyInputTokens]),
@@ -157,11 +164,67 @@ func subAgentSpanFromEvent(event canonical.Event) (subAgentSpan, bool) {
 	return span, true
 }
 
+// spanIndex keys every span by (trace_id, span_id) so an agent's observed
+// parent_span_id chain can be walked within its own trace.
+func spanIndex(spans []subAgentSpan) map[string]subAgentSpan {
+	index := make(map[string]subAgentSpan, len(spans))
+	for _, span := range spans {
+		if span.spanID != "" {
+			index[span.traceID+"\x00"+span.spanID] = span
+		}
+	}
+	return index
+}
+
+// spawnSpanFor walks the observed parent_span_id chain (same trace only) from one
+// of an agent's spans to the span that spawned the agent: the first ancestor
+// claude_code.tool span whose agent_id differs from the agent's own. Observed on
+// 2.1.287 that is the spawner's Agent tool span, which carries subagent_type and
+// the spawner's agent_id (absent when the main session spawned). A missing
+// ancestor or a loop yields no spawn span, never a guessed one.
+func spawnSpanFor(span subAgentSpan, index map[string]subAgentSpan) (subAgentSpan, bool) {
+	seen := map[string]struct{}{}
+	current := span
+	for current.parentSpanID != "" {
+		key := current.traceID + "\x00" + current.parentSpanID
+		if _, loop := seen[key]; loop {
+			return subAgentSpan{}, false
+		}
+		seen[key] = struct{}{}
+		parent, ok := index[key]
+		if !ok {
+			return subAgentSpan{}, false
+		}
+		if parent.spanType == spanTypeTool && parent.agentID != span.agentID {
+			return parent, true
+		}
+		current = parent
+	}
+	return subAgentSpan{}, false
+}
+
+// spawnExtension is the present-only provider_extensions.spawn block naming the
+// observed spawning tool span; agent_id is the spawner's raw id and is absent
+// when the spawning span belongs to the main session.
+func spawnExtension(spawn subAgentSpan) map[string]any {
+	block := map[string]any{"span_id": spawn.spanID}
+	for key, value := range map[string]string{
+		"tool_use_id": spawn.toolUseID, "tool_name": spawn.toolName, "agent_id": spawn.agentID,
+	} {
+		if value != "" {
+			block[key] = value
+		}
+	}
+	return block
+}
+
 // relationFromGroup rolls one agent's spans (already grouped by trace + agent_id)
 // into a canonical.AgentRelation. Present-only fields take the value from the
 // earliest span (by ordering key) that carries one, so a conflicting later value
-// never makes the record nondeterministic.
-func relationFromGroup(spans []subAgentSpan) canonical.AgentRelation {
+// never makes the record nondeterministic. subagent_type comes from the observed
+// spawning span first: the agent's own Agent tool spans carry the type of the
+// child they spawn, never their own.
+func relationFromGroup(spans []subAgentSpan, index map[string]subAgentSpan) canonical.AgentRelation {
 	sort.SliceStable(spans, func(i, j int) bool {
 		if spans[i].orderingKey != spans[j].orderingKey {
 			return spans[i].orderingKey < spans[j].orderingKey
@@ -181,17 +244,33 @@ func relationFromGroup(spans []subAgentSpan) canonical.AgentRelation {
 		Provenance:    canonical.ProvenanceObserved,
 		SpanCount:     len(spans),
 	}
+	extensions := map[string]any{}
+	for _, span := range spans {
+		if spawn, ok := spawnSpanFor(span, index); ok {
+			setStringPtrIfEmpty(&relation.SubagentType, spawn.subagentType)
+			extensions["spawn"] = spawnExtension(spawn)
+			break
+		}
+	}
 	spanIDs := make([]string, 0, len(spans))
+	parentAgentIDs := []string{}
 	var bounds boundsTracker
 	for _, span := range spans {
 		spanIDs = append(spanIDs, span.spanID)
+		parentAgentIDs = appendDistinct(parentAgentIDs, span.parentAgentID)
 		accumulateSpan(&relation, span)
 		bounds.add(span)
 	}
 	if wall, ok := bounds.wallClockMs(); ok {
 		relation.WallClockMs = &wall
 	}
-	relation.ProviderExtensions = map[string]any{"span_ids": spanIDs}
+	extensions["span_ids"] = spanIDs
+	if len(parentAgentIDs) > 1 {
+		// Conflicting observed parents: keep every raw candidate so readers can
+		// surface the conflict instead of trusting the earliest-wins edge.
+		extensions["parent_agent_ids"] = parentAgentIDs
+	}
+	relation.ProviderExtensions = extensions
 	return relation
 }
 
@@ -204,7 +283,9 @@ func accumulateSpan(relation *canonical.AgentRelation, span subAgentSpan) {
 		relation.ParentAgentID = &parent
 		relation.ParentKind = canonical.ParentKindSubAgent
 	}
-	setStringPtrIfEmpty(&relation.SubagentType, span.subagentType)
+	if span.spanType != spanTypeTool {
+		setStringPtrIfEmpty(&relation.SubagentType, span.subagentType)
+	}
 	setStringPtrIfEmpty(&relation.WorkflowRunID, span.workflowRunID)
 	setStringPtrIfEmpty(&relation.WorkflowName, span.workflowName)
 	switch span.spanType {
@@ -317,6 +398,20 @@ func setStringPtrIfEmpty(dst **string, value string) {
 	}
 	copied := value
 	*dst = &copied
+}
+
+// appendDistinct appends a non-empty value not already present, preserving the
+// first-observed order.
+func appendDistinct(values []string, value string) []string {
+	if value == "" {
+		return values
+	}
+	for _, existing := range values {
+		if existing == value {
+			return values
+		}
+	}
+	return append(values, value)
 }
 
 // addOptional accumulates present-only counts: an absent addend leaves the

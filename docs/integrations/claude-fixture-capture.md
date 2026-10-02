@@ -514,6 +514,46 @@ Committed evidence:
 - `fixtures/claude/observed-sanitised/claude-code-2.1.287-tool-content-spans-otlp.json`
 - `fixtures/claude/expected/claude-code-2.1.287-tool-content-spans.events.json`
 
+## Sub-agent span capture (#246)
+
+The sub-agent tree is now captured live (2.1.287). The Agent tool needs no
+`--dangerously-skip-permissions`: pre-approve it with `--allowedTools` and use the
+`--settings` exporter override from the #251 recipe (traces + logs, enhanced beta,
+`OTEL_LOG_TOOL_DETAILS=1`). Paths navigated, each against the loopback sink:
+
+1. Single sub-agent — `claude -p "Use the Agent tool to launch an Explore sub-agent
+   that lists the files in this directory, then reply done" --settings
+   capture-settings.json --allowedTools='Agent,Task,Read,Glob,Grep' < /dev/null`.
+   **Captured**: `agent_id` on the child's `llm_request` / `tool` spans;
+   `subagent_type` only on the main session's spawning `tool` span (`tool_name=Agent`,
+   no `agent_id`); the child's spans parent to that span's `tool.execution`.
+2. Nested spawn — a project `.claude/agents/tiq-delegator.md` (tools: `Agent, Read,
+   Glob`) told to spawn an Explore sub-agent; prompt "Use the Agent tool with
+   subagent_type tiq-delegator". **Captured** (committed fixture): the grandchild's
+   spans carry `parent_agent_id`; the delegator's own spawning span carries
+   `subagent_type=Explore` *and* the delegator's `agent_id`.
+3. Parallel spawn with detailed beta (`ENABLE_BETA_TRACING_DETAILED=1
+   BETA_TRACING_ENDPOINT=…`) — two sibling Explore agents under one interaction.
+   **Captured**: same shape; detailed tracing adds `query_source`
+   (`agent:builtin:Explore`) but no further sub-agent attributes. No `workflow.*`
+   attributes were emitted on any path, so `workflow_run_id` / `workflow_name` stay
+   proven only by the synthetic 2.1.268 fixture and remain null when absent.
+4. Session JSONL — sub-agent transcripts live in
+   `<session>/subagents/agent-<agent_id>.jsonl` (`isSidechain: true`, `agentId`) with
+   a sibling `agent-<agent_id>.meta.json` carrying `agentType`, `toolUseId`,
+   `spawnDepth` and, for nested agents, `parentAgentId`. That is a second lineage
+   source not yet ingested (follow-up); the OTLP span tree is the retained source.
+
+The exporter's separate batches were merged into one payload in start-time order.
+Sanitise as above, plus replace `agent_id` / `parent_agent_id` with synthetic ids
+of the same shape. Keep synthetic paths short (`/work/tiq/…`): long slash-joined
+paths trip the validator's entropy check.
+
+Committed evidence:
+
+- `fixtures/claude/observed-sanitised/claude-code-2.1.287-subagent-spans-otlp.json`
+- `fixtures/claude/expected/claude-code-2.1.287-subagent-spans.relations.json`
+
 ## Validation
 
 The validator rejects missing origin or tool-version metadata, prohibited field
