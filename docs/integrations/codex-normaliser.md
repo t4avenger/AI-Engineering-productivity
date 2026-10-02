@@ -51,7 +51,11 @@ the only parent edge. Relations are stored on the exact root
 direct root children have a null `parent_agent_id`. Explicit `task_started`
 trace/turn IDs, `SubAgentActivity` lifecycle, final `token_count`,
 `task_complete.duration_ms`, and completed operation item IDs supply provenance
-and rollups. A failed child command remains a failed operation when the provider
+and rollups. Every relation in one reconstructed root uses the root thread's
+trace ID (or the exact root thread ID when that trace is absent), while each
+thread's own reported trace remains in `provider_extensions.codex.thread_trace_id`.
+This keeps nested tree keys stable when a child omits or differs on trace ID. A
+failed child command remains a failed operation when the provider
 separately reports the agent completed. Missing counts and outcomes stay null,
 and an unretained parent remains `parent_agent_not_retained`; lineage is never
 inferred from time, order, path, name, model, or content. Replay, shuffled

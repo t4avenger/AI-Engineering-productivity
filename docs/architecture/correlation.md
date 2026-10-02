@@ -39,9 +39,10 @@ children are stored with a null canonical parent. Parent-side
 `SubAgentActivity.agent_thread_id` records contribute lifecycle and conflict
 evidence but cannot replace an absent child-reported edge. Each child relation
 keeps cross-session event evidence with the raw child `session_id` and
-`event_id`. The explicit `task_started.trace_id` is the relation trace; when it
-is absent the exact root thread id is used only as the storage grouping key and
-labelled `trace_id_source=root_thread_id`. All Codex rollout sessions are rebuilt
+`event_id`. The root thread's explicit `task_started.trace_id` groups every
+relation in that tree; when it is absent the exact root thread id is used as the
+storage key and labelled `trace_id_source=root_thread_id`. Any thread-local
+reported trace remains in `provider_extensions.codex.thread_trace_id`. All Codex rollout sessions are rebuilt
 together so child-before-parent arrival and replay are deterministic. No
 timestamp, event proximity, path, nickname, role, model, or content joins are
 permitted.

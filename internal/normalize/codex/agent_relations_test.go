@@ -6,9 +6,11 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/wayne/telemetryiq/internal/agenttree"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
 
@@ -70,6 +72,52 @@ func TestReconstructAgentRelationsKeepsUnretainedParent(t *testing.T) {
 	if len(relations) != 1 || relations[0].ParentAgentID == nil || *relations[0].ParentAgentID != "missing-parent" {
 		t.Fatalf("orphan relation = %#v", relations)
 	}
+}
+
+func TestReconstructAgentRelationsUsesOneRootTraceWhenChildTraceIsAbsent(t *testing.T) {
+	events := agentRolloutEvents(t,
+		`{"timestamp":"2026-10-02T19:30:00Z","type":"session_meta","payload":{"id":"root"}}\n`+
+			`{"timestamp":"2026-10-02T19:30:01Z","type":"event_msg","payload":{"type":"task_started","turn_id":"root-turn","trace_id":"root-trace"}}\n`,
+		`{"timestamp":"2026-10-02T19:30:02Z","type":"session_meta","payload":{"id":"alpha","source":{"subagent":{"thread_spawn":{"parent_thread_id":"root","depth":1}}}}}\n`+
+			`{"timestamp":"2026-10-02T19:30:03Z","type":"event_msg","payload":{"type":"task_started","turn_id":"alpha-turn","trace_id":"alpha-local-trace"}}\n`,
+		`{"timestamp":"2026-10-02T19:30:04Z","type":"session_meta","payload":{"id":"beta","source":{"subagent":{"thread_spawn":{"parent_thread_id":"alpha","depth":2}}}}}\n`,
+	)
+	relations := ReconstructAgentRelations(events)
+	if len(relations) != 2 || relations[0].TraceID != "root-trace" || relations[1].TraceID != "root-trace" {
+		t.Fatalf("relation traces = %#v, want one root trace", relations)
+	}
+	tree := agenttree.Build(relations, events)
+	if len(tree) != 1 || tree[0].AgentID != "alpha" || len(tree[0].Children) != 1 || tree[0].Children[0].AgentID != "beta" {
+		t.Fatalf("tree = %#v, want alpha with nested beta", tree)
+	}
+	codexExtension := relationsByAgent(relations)["alpha"].ProviderExtensions["codex"].(map[string]any)
+	if codexExtension["thread_trace_id"] != "alpha-local-trace" {
+		t.Fatalf("thread trace provenance = %#v", codexExtension)
+	}
+}
+
+func TestReconstructAgentRelationsRejectsOverflowingOperationDuration(t *testing.T) {
+	events := agentRolloutEvents(t,
+		`{"timestamp":"2026-10-02T19:30:00Z","type":"session_meta","payload":{"id":"child","source":{"subagent":{"thread_spawn":{"parent_thread_id":"missing","depth":1}}}}}\n`+
+			`{"timestamp":"2026-10-02T19:30:01Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","id":"overflow","duration":{"secs":9223372036854776,"nanos":0}}}}\n`,
+	)
+	relations := ReconstructAgentRelations(events)
+	if len(relations) != 1 || relations[0].OperationCount == nil || *relations[0].OperationCount != 1 || relations[0].ToolDurationMsTotal != nil {
+		t.Fatalf("overflow relation = %#v", relations)
+	}
+}
+
+func agentRolloutEvents(t *testing.T, rollouts ...string) []canonical.Event {
+	t.Helper()
+	var events []canonical.Event
+	for _, raw := range rollouts {
+		normalized, err := NormalizeRollout([]byte(strings.ReplaceAll(raw, `\n`, "\n")), time.Unix(0, 0).UTC())
+		if err != nil {
+			t.Fatal(err)
+		}
+		events = append(events, normalized...)
+	}
+	return events
 }
 
 func multiAgentFixtureEvents(t *testing.T) []canonical.Event {

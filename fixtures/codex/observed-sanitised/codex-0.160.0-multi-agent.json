@@ -16,6 +16,7 @@
       "codex-0.160.0-multi-agent-gamma.jsonl"
     ],
     "trace_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa235",
+    "otlp_wire_fixture": "codex-0.160.0-multi-agent-otlp.json",
     "synchronized_telemetry": {
       "otlp_trace_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa235",
       "metrics_session_dimension_observed": false,

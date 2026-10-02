@@ -191,5 +191,6 @@ uses timestamps, names, models, or content as joins.
 Committed evidence:
 
 - `fixtures/codex/observed-sanitised/codex-0.160.0-multi-agent-{root,alpha,beta,cancel,gamma}.jsonl`
+- `fixtures/codex/observed-sanitised/codex-0.160.0-multi-agent-otlp.json`
 - `fixtures/codex/observed-sanitised/codex-0.160.0-multi-agent.json`
 - `fixtures/codex/expected/codex-0.160.0-multi-agent.relations.json`

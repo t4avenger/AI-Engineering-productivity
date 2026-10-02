@@ -38,6 +38,7 @@ func ReconstructAgentRelations(events []canonical.Event) []canonical.AgentRelati
 type codexAgentThread struct {
 	id, parentID, traceID, turnID    string
 	path, nickname, role             string
+	retained                         bool
 	depth                            *int64
 	outcome                          *string
 	input, output, cached, reasoning *int64
@@ -59,6 +60,7 @@ func collectAgentThreads(events []canonical.Event) map[string]*codexAgentThread 
 		}
 		threadID := strings.TrimPrefix(event.SessionID, codexSessionPrefix)
 		thread := ensureAgentThread(threads, threadID)
+		thread.retained = true
 		thread.addEvidence(event)
 		switch record["type"] {
 		case "session_meta":
@@ -176,8 +178,8 @@ func (thread *codexAgentThread) observeOperation(item map[string]any) {
 		thread.operationCount = &zero
 	}
 	*thread.operationCount = *thread.operationCount + 1
-	if duration, ok := codexAgentDurationMs(item["duration"]); ok {
-		thread.toolDuration = addAgentOptional(thread.toolDuration, &duration)
+	if duration := rolloutDurationMs(item["duration"]); duration != nil {
+		thread.toolDuration = addAgentOptional(thread.toolDuration, duration)
 	}
 }
 
@@ -210,10 +212,10 @@ func relationFromAgentThread(thread *codexAgentThread, threads map[string]*codex
 		return left < right
 	})
 	rootID, complete := codexAgentRoot(thread, threads)
-	traceID := thread.traceID
-	traceSource := "trace_id"
-	if traceID == "" {
-		traceID, traceSource = rootID, "root_thread_id"
+	traceID := rootID
+	traceSource := "root_thread_id"
+	if root := threads[rootID]; root != nil && root.traceID != "" {
+		traceID, traceSource = root.traceID, "root_task_started.trace_id"
 	}
 	relation := canonical.AgentRelation{
 		SchemaVersion:       canonical.RecordSchemaVersion,
@@ -250,6 +252,7 @@ func relationFromAgentThread(thread *codexAgentThread, threads map[string]*codex
 	}
 	codexExtension := extensions["codex"].(map[string]any)
 	putCodexAgentValue(codexExtension, "turn_id", thread.turnID)
+	putCodexAgentValue(codexExtension, "thread_trace_id", thread.traceID)
 	putCodexAgentValue(codexExtension, "agent_path", thread.path)
 	putCodexAgentValue(codexExtension, "agent_nickname", thread.nickname)
 	putCodexAgentValue(codexExtension, "agent_role", thread.role)
@@ -280,8 +283,8 @@ func codexAgentRoot(thread *codexAgentThread, threads map[string]*codexAgentThre
 	current := thread
 	for current.parentID != "" {
 		parent := threads[current.parentID]
-		if parent == nil {
-			return thread.id, false
+		if parent == nil || !parent.retained {
+			return current.id, false
 		}
 		if _, loop := seen[parent.id]; loop {
 			return thread.id, false
@@ -330,23 +333,6 @@ func appendAgentDistinct(values []string, value string) []string {
 		}
 	}
 	return append(values, value)
-}
-
-func codexAgentDurationMs(value any) (int64, bool) {
-	duration := codexAgentMap(value)
-	seconds := codexAgentInt(duration["secs"])
-	nanos := codexAgentInt(duration["nanos"])
-	if seconds == nil && nanos == nil {
-		return 0, false
-	}
-	var result int64
-	if seconds != nil {
-		result += *seconds * 1000
-	}
-	if nanos != nil {
-		result += *nanos / 1_000_000
-	}
-	return result, true
 }
 
 func codexAgentInt(value any) *int64 {
