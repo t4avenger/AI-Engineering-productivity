@@ -365,8 +365,8 @@ func addAgentOptional(total, value *int64) *int64 {
 		return total
 	}
 	if total == nil {
-		copy := *value
-		return &copy
+		initial := *value
+		return &initial
 	}
 	*total += *value
 	return total
