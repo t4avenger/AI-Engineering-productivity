@@ -232,17 +232,20 @@ func relationFromGroup(spans []subAgentSpan, index map[string]subAgentSpan) cano
 		return spans[i].spanID < spans[j].spanID
 	})
 	first := spans[0]
+	zero := int64(0)
 	relation := canonical.AgentRelation{
-		SchemaVersion: canonical.RecordSchemaVersion,
-		RelationID:    first.traceID + ":" + first.agentID,
-		SessionID:     first.sessionID,
-		TraceID:       first.traceID,
-		Provider:      first.provider,
-		Tool:          first.tool,
-		AgentID:       first.agentID,
-		ParentKind:    canonical.ParentKindMainSession,
-		Provenance:    canonical.ProvenanceObserved,
-		SpanCount:     len(spans),
+		SchemaVersion:   canonical.RecordSchemaVersion,
+		RelationID:      first.traceID + ":" + first.agentID,
+		SessionID:       first.sessionID,
+		TraceID:         first.traceID,
+		Provider:        first.provider,
+		Tool:            first.tool,
+		AgentID:         first.agentID,
+		ParentKind:      canonical.ParentKindMainSession,
+		Provenance:      canonical.ProvenanceObserved,
+		SpanCount:       int64Ptr(int64(len(spans))),
+		LLMRequestCount: &zero,
+		ToolCount:       int64Ptr(0),
 	}
 	extensions := map[string]any{}
 	for _, span := range spans {
@@ -290,17 +293,28 @@ func accumulateSpan(relation *canonical.AgentRelation, span subAgentSpan) {
 	setStringPtrIfEmpty(&relation.WorkflowName, span.workflowName)
 	switch span.spanType {
 	case "llm_request":
-		relation.LLMRequestCount++
+		incrementOptional(&relation.LLMRequestCount)
 		relation.InputTokens = addOptional(relation.InputTokens, span.inputTokens)
 		relation.OutputTokens = addOptional(relation.OutputTokens, span.outputTokens)
 		relation.CacheReadTokens = addOptional(relation.CacheReadTokens, span.cacheRead)
 		relation.CacheCreationTokens = addOptional(relation.CacheCreationTokens, span.cacheCreation)
 		relation.LLMDurationMsTotal = addOptional(relation.LLMDurationMsTotal, span.durationMs)
 	case spanTypeTool:
-		relation.ToolCount++
+		incrementOptional(&relation.ToolCount)
 		relation.ToolDurationMsTotal = addOptional(relation.ToolDurationMsTotal, span.durationMs)
 	}
 }
+
+func incrementOptional(value **int64) {
+	if *value == nil {
+		initial := int64(1)
+		*value = &initial
+		return
+	}
+	**value = **value + 1
+}
+
+func int64Ptr(value int64) *int64 { return &value }
 
 // boundsTracker tracks the earliest start and latest end across an agent's spans
 // so WallClockMs is the true elapsed span, from genuinely observed bounds only.

@@ -20,6 +20,7 @@ import (
 	"github.com/wayne/telemetryiq/internal/cost"
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 	"github.com/wayne/telemetryiq/internal/normalize/claude"
+	"github.com/wayne/telemetryiq/internal/normalize/codex"
 	"github.com/wayne/telemetryiq/internal/storage"
 )
 
@@ -502,16 +503,23 @@ func (r *Repository) SaveOperations(ctx context.Context, operations []canonical.
 
 func (r *Repository) saveEventsTx(ctx context.Context, tx *sql.Tx, events []canonical.Event) error {
 	ids := map[string]struct{}{}
+	rebuildCodexAgents := false
 	for _, event := range events {
 		if err := r.saveEventTx(ctx, tx, event); err != nil {
 			return err
 		}
 		ids[event.SessionID] = struct{}{}
+		if event.Tool == "codex" && event.SourceSchema == "codex_rollout_jsonl" {
+			rebuildCodexAgents = true
+		}
 	}
 	for id := range ids {
 		if err := r.rebuildSession(ctx, tx, id); err != nil {
 			return err
 		}
+	}
+	if rebuildCodexAgents {
+		return rebuildCodexAgentRelations(ctx, tx)
 	}
 	return nil
 }
@@ -718,20 +726,45 @@ func (r *Repository) rebuildSession(ctx context.Context, tx *sql.Tx, id string) 
 	return rebuildAgentRelations(ctx, tx, id, events)
 }
 
-// rebuildAgentRelations re-derives the session's sub-agent tree (#102) from its
+// rebuildAgentRelations re-derives the session's Claude sub-agent tree (#102)
+// from its
 // full event set and REPLACEs the stored rows (DELETE then INSERT), so a rollup
 // is complete and idempotent no matter how the trace's spans were split across
 // OTLP batches — an INSERT OR IGNORE would let a first partial row win and
 // undercount. Only claude-code sessions carry sub-agent spans; other tools skip
 // the reconstruction but still clear any stale rows.
 func rebuildAgentRelations(ctx context.Context, tx *sql.Tx, id string, events []canonical.Event) error {
-	if _, err := tx.ExecContext(ctx, "DELETE FROM agent_relations WHERE session_id=?", id); err != nil {
-		return fmt.Errorf("clear agent relations: %w", err)
-	}
 	if events[0].Tool != "claude-code" {
 		return nil
 	}
-	for _, relation := range claude.ReconstructSubAgentRelations(events) {
+	if _, err := tx.ExecContext(ctx, "DELETE FROM agent_relations WHERE session_id=?", id); err != nil {
+		return fmt.Errorf("clear agent relations: %w", err)
+	}
+	return insertAgentRelations(ctx, tx, id, claude.ReconstructSubAgentRelations(events))
+}
+
+// rebuildCodexAgentRelations re-derives every Codex root tree from the complete
+// retained rollout set. Child rollouts arrive as independent provider sessions,
+// so rebuilding only the session currently being ingested would make nested
+// lineage depend on arrival order.
+func rebuildCodexAgentRelations(ctx context.Context, tx *sql.Tx) error {
+	if _, err := tx.ExecContext(ctx, "DELETE FROM agent_relations WHERE json_extract(relation_json,'$.tool')='codex'"); err != nil {
+		return fmt.Errorf("clear Codex agent relations: %w", err)
+	}
+	events, err := loadCodexRolloutEvents(ctx, tx)
+	if err != nil {
+		return err
+	}
+	for _, relation := range codex.ReconstructAgentRelations(events) {
+		if err := insertAgentRelations(ctx, tx, relation.SessionID, []canonical.AgentRelation{relation}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func insertAgentRelations(ctx context.Context, tx *sql.Tx, id string, relations []canonical.AgentRelation) error {
+	for _, relation := range relations {
 		payload, err := json.Marshal(relation)
 		if err != nil {
 			return fmt.Errorf("marshal agent relation: %w", err)
@@ -744,6 +777,27 @@ func rebuildAgentRelations(ctx context.Context, tx *sql.Tx, id string, events []
 		}
 	}
 	return nil
+}
+
+func loadCodexRolloutEvents(ctx context.Context, tx *sql.Tx) ([]canonical.Event, error) {
+	rows, err := tx.QueryContext(ctx, "SELECT event_json FROM events WHERE tool='codex' AND json_extract(event_json,'$.source_schema')='codex_rollout_jsonl' ORDER BY occurred_at,event_id")
+	if err != nil {
+		return nil, fmt.Errorf("load Codex rollout events: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var events []canonical.Event
+	for rows.Next() {
+		var payload []byte
+		if err := rows.Scan(&payload); err != nil {
+			return nil, err
+		}
+		var event canonical.Event
+		if err := decodeStoredJSON(payload, &event); err != nil {
+			return nil, fmt.Errorf("decode Codex rollout event: %w", err)
+		}
+		events = append(events, event)
+	}
+	return events, rows.Err()
 }
 
 func loadSessionEvents(ctx context.Context, tx *sql.Tx, id string) ([]canonical.Event, error) {
@@ -1305,6 +1359,9 @@ func (r *Repository) DeleteSession(ctx context.Context, id string) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 	if err := deleteSessionRows(ctx, tx, id); err != nil {
+		return err
+	}
+	if err := rebuildCodexAgentRelations(ctx, tx); err != nil {
 		return err
 	}
 	return tx.Commit()

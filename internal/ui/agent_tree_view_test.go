@@ -31,11 +31,11 @@ func stringPtr(value string) *string { return &value }
 func storedAgentRelations() []canonical.AgentRelation {
 	return []canonical.AgentRelation{
 		{
-			TraceID: "t", AgentID: "agent-<a>", SubagentType: stringPtr("tiq-delegator"), SpanCount: 2, LLMRequestCount: 1, ToolCount: 1,
+			TraceID: "t", AgentID: "agent-<a>", SubagentType: stringPtr("tiq-delegator"), SpanCount: int64Ptr(2), LLMRequestCount: int64Ptr(1), ToolCount: int64Ptr(1),
 			InputTokens: int64Ptr(0), WallClockMs: int64Ptr(1200),
 			ProviderExtensions: map[string]any{"spawn": map[string]any{"span_id": "s0"}, "span_ids": []any{"sa", "gone"}},
 		},
-		{TraceID: "t", AgentID: "agent-b", ParentAgentID: stringPtr("agent-<a>"), SpanCount: 1, LLMRequestCount: 1},
+		{TraceID: "t", AgentID: "agent-b", ParentAgentID: stringPtr("agent-<a>"), SpanCount: int64Ptr(1), LLMRequestCount: int64Ptr(1)},
 		{TraceID: "t", AgentID: "agent-orphan", ParentAgentID: stringPtr("agent-missing")},
 	}
 }
@@ -49,7 +49,7 @@ func TestSessionAgentLaneRendersStoredSubAgentTree(t *testing.T) {
 		"Parent agent-missing not retained", "not reported",
 		"<dt>Input tokens</dt><dd>0</dd>", "<dt>Output tokens</dt><dd>not reported</dd>",
 		"Wall clock (elapsed)", "1200 ms", "LLM time (summed)",
-		"source=trace", "Span evidence <code>sa</code>", "Spans not retained: <code>gone</code>",
+		"source=trace", "Span evidence <code>sa</code>", "Evidence not retained: <code>gone</code>",
 	})
 	// agent-b nests inside agent-<a>'s list item; the orphan stays a root.
 	nested := strings.Index(tree, `data-agent-id="agent-b"`)

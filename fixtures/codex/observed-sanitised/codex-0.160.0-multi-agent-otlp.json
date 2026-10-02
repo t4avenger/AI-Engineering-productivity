@@ -1,0 +1,56 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "openai",
+  "tool": "codex",
+  "tool_version": "0.160.0",
+  "captured_at": "2026-10-02T19:25:27Z",
+  "sanitisation_reviewed": true,
+  "capture_note": "Reduced wire-shaped requests from the same isolated synthetic run as codex-0.160.0-multi-agent-*.jsonl. Logs joined conversation.id to rollout session_meta ids; session_task.turn spans joined thread.id and turn.id to rollout task_started ids, with one provider trace shared by all five threads. The reviewed metrics requests carried no conversation, thread, turn, or session dimension. Identifiers, timestamps, span ids, counts, resource values, and non-correlation attributes are synthetic replacements preserving observed OTLP JSON field names, types, nesting, and join semantics.",
+  "payload": {
+    "requests": [
+      {
+        "path": "/v1/logs",
+        "body": {
+          "resourceLogs": [{
+            "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "codex_exec"}}, {"key": "service.version", "value": {"stringValue": "0.160.0"}}]},
+            "scopeLogs": [{"scope": {"name": "codex"}, "logRecords": [
+              {"attributes": [{"key": "event.name", "value": {"stringValue": "codex.conversation_starts"}}, {"key": "conversation.id", "value": {"stringValue": "00000000-0000-4000-8000-000000000235"}}]},
+              {"attributes": [{"key": "event.name", "value": {"stringValue": "codex.conversation_starts"}}, {"key": "conversation.id", "value": {"stringValue": "00000000-0000-4000-8000-000000000236"}}]},
+              {"attributes": [{"key": "event.name", "value": {"stringValue": "codex.conversation_starts"}}, {"key": "conversation.id", "value": {"stringValue": "00000000-0000-4000-8000-000000000237"}}]},
+              {"attributes": [{"key": "event.name", "value": {"stringValue": "codex.conversation_starts"}}, {"key": "conversation.id", "value": {"stringValue": "00000000-0000-4000-8000-000000000238"}}]},
+              {"attributes": [{"key": "event.name", "value": {"stringValue": "codex.conversation_starts"}}, {"key": "conversation.id", "value": {"stringValue": "00000000-0000-4000-8000-000000000239"}}]}
+            ]}]
+          }]
+        }
+      },
+      {
+        "path": "/v1/traces",
+        "body": {
+          "resourceSpans": [{
+            "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "codex_exec"}}, {"key": "service.version", "value": {"stringValue": "0.160.0"}}]},
+            "scopeSpans": [{"scope": {"name": "codex"}, "spans": [
+              {"traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa235", "spanId": "0000000000000235", "name": "session_task.turn", "kind": 1, "startTimeUnixNano": "1790969100000000000", "endTimeUnixNano": "1790969101000000000", "attributes": [{"key": "thread.id", "value": {"stringValue": "00000000-0000-4000-8000-000000000235"}}, {"key": "turn.id", "value": {"stringValue": "10000000-0000-4000-8000-000000000235"}}], "status": {"message": "", "code": 0}},
+              {"traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa235", "spanId": "0000000000000236", "name": "session_task.turn", "kind": 1, "startTimeUnixNano": "1790969101000000000", "endTimeUnixNano": "1790969102000000000", "attributes": [{"key": "thread.id", "value": {"stringValue": "00000000-0000-4000-8000-000000000236"}}, {"key": "turn.id", "value": {"stringValue": "10000000-0000-4000-8000-000000000236"}}], "status": {"message": "", "code": 0}},
+              {"traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa235", "spanId": "0000000000000237", "name": "session_task.turn", "kind": 1, "startTimeUnixNano": "1790969102000000000", "endTimeUnixNano": "1790969103000000000", "attributes": [{"key": "thread.id", "value": {"stringValue": "00000000-0000-4000-8000-000000000237"}}, {"key": "turn.id", "value": {"stringValue": "10000000-0000-4000-8000-000000000237"}}], "status": {"message": "", "code": 0}},
+              {"traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa235", "spanId": "0000000000000238", "name": "session_task.turn", "kind": 1, "startTimeUnixNano": "1790969103000000000", "endTimeUnixNano": "1790969104000000000", "attributes": [{"key": "thread.id", "value": {"stringValue": "00000000-0000-4000-8000-000000000238"}}, {"key": "turn.id", "value": {"stringValue": "10000000-0000-4000-8000-000000000238"}}], "status": {"message": "", "code": 0}},
+              {"traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa235", "spanId": "0000000000000239", "name": "session_task.turn", "kind": 1, "startTimeUnixNano": "1790969104000000000", "endTimeUnixNano": "1790969105000000000", "attributes": [{"key": "thread.id", "value": {"stringValue": "00000000-0000-4000-8000-000000000239"}}, {"key": "turn.id", "value": {"stringValue": "10000000-0000-4000-8000-000000000239"}}], "status": {"message": "", "code": 0}}
+            ]}]
+          }]
+        }
+      },
+      {
+        "path": "/v1/metrics",
+        "body": {
+          "resourceMetrics": [{
+            "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "codex_exec"}}, {"key": "service.version", "value": {"stringValue": "0.160.0"}}]},
+            "scopeMetrics": [{"scope": {"name": "codex"}, "metrics": [{
+              "name": "codex.thread.started",
+              "sum": {"aggregationTemporality": 1, "isMonotonic": true, "dataPoints": [{"attributes": [{"key": "app.version", "value": {"stringValue": "0.160.0"}}, {"key": "originator", "value": {"stringValue": "codex_exec"}}], "startTimeUnixNano": "1790969100000000000", "timeUnixNano": "1790969105000000000", "asInt": "5"}]}
+            }]}]
+          }]
+        }
+      }
+    ]
+  }
+}

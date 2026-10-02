@@ -32,10 +32,12 @@ available as the accessible alternative (T10).
 - Planning labels require explicit `planning` evidence; otherwise the Agent lane
   reports planning telemetry unavailable.
 - The Agent lane's **Sub-agents** list renders stored relations only: raw agent ids,
-  `subagent_type` or "not reported", the read-time parent state label, counts, the
-  four token counts, LLM/tool time labelled *summed* and wall clock labelled
+  `subagent_type` or "not reported", the read-time parent state label, counts,
+  input/output/cache/reasoning token counts, outcome, LLM/tool time labelled
+  *summed*, and wall clock labelled
   *elapsed* (nil rollups read "not reported", a real zero reads 0), and a link to
-  the first resolvable span in the event inspector. A reader failure, no retained
+  the first resolvable span or cross-session rollout event in the event inspector.
+  A reader failure, no retained
   relations, and relations without loadable events are three distinct messages.
   Sub-agents are not planning telemetry, so planning availability is unchanged.
 - Codex trace-only observations are not joined to conversations by time or model.

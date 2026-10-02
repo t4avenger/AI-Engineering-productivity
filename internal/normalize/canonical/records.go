@@ -121,13 +121,16 @@ type AgentRelation struct {
 	SubagentType        *string         `json:"subagent_type"`
 	WorkflowRunID       *string         `json:"workflow_run_id"`
 	WorkflowName        *string         `json:"workflow_name"`
-	SpanCount           int             `json:"span_count"`
-	LLMRequestCount     int             `json:"llm_request_count"`
-	ToolCount           int             `json:"tool_count"`
+	SpanCount           *int64          `json:"span_count"`
+	LLMRequestCount     *int64          `json:"llm_request_count"`
+	ToolCount           *int64          `json:"tool_count"`
+	OperationCount      *int64          `json:"operation_count"`
+	Outcome             *string         `json:"outcome"`
 	InputTokens         *int64          `json:"input_tokens"`
 	OutputTokens        *int64          `json:"output_tokens"`
 	CacheReadTokens     *int64          `json:"cache_read_tokens"`
 	CacheCreationTokens *int64          `json:"cache_creation_tokens"`
+	ReasoningTokens     *int64          `json:"reasoning_tokens"`
 	LLMDurationMsTotal  *int64          `json:"llm_duration_ms_total"`
 	ToolDurationMsTotal *int64          `json:"tool_duration_ms_total"`
 	WallClockMs         *int64          `json:"wall_clock_ms"`

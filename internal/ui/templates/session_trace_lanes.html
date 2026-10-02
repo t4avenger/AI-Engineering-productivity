@@ -95,8 +95,8 @@
     <dl class="agent-tree-stats">
       {{range .Stats}}<div><dt>{{.Label}}</dt><dd>{{.Value}}</dd></div>{{end}}
     </dl>
-    {{if .EvidencePath}}<a class="event-select" href="{{.EvidencePath}}" aria-label="Open span evidence for {{.AgentID}}">Span evidence <code>{{.EvidenceSpanID}}</code></a>{{end}}
-    {{if .UnresolvedSpans}}<p class="muted">Spans not retained: {{range $i, $span := .UnresolvedSpans}}{{if $i}}, {{end}}<code>{{$span}}</code>{{end}}</p>{{end}}
+    {{if .EvidencePath}}<a class="event-select" href="{{.EvidencePath}}" aria-label="{{.EvidenceAriaLabel}}">{{.EvidenceLabel}} <code>{{.EvidenceID}}</code></a>{{end}}
+    {{if .UnresolvedEvidence}}<p class="muted">Evidence not retained: {{range $i, $item := .UnresolvedEvidence}}{{if $i}}, {{end}}<code>{{$item}}</code>{{end}}</p>{{end}}
     {{if .Children}}{{template "agent-tree-nodes" .Children}}{{end}}
   </li>
   {{end}}

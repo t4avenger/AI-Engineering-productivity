@@ -1,17 +1,15 @@
-import { type Page, expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import {
   authToken,
   claudeContentOTLPLogs,
   claudeInteractionOTLPTraces,
   claudeSubAgentOTLPTraces,
-  expectSessionDetailHeading,
-  expectSessionTraceLanes,
   fetchLiveSessions,
   ingestOTLPLogs,
   ingestOTLPTraces,
+  openLiveSessionTrace,
   resetDaemonBetweenTests,
-  unlockDashboard,
 } from "./live-ingest-helpers";
 
 /**
@@ -24,16 +22,6 @@ import {
  * coverage is unavailable — never merged by proximity.
  */
 resetDaemonBetweenTests();
-
-// openSessionTrace unlocks the dashboard and opens the Session Trace for one
-// session, asserting the detail heading and the five lanes render. Shared by
-// both tests so the nav/unlock/lane assertions live in exactly one place.
-async function openSessionTrace(page: Page, sessionId: string): Promise<void> {
-  await unlockDashboard(page, authToken);
-  await page.goto(`/sessions/${encodeURIComponent(sessionId)}`);
-  await expectSessionDetailHeading(page);
-  await expectSessionTraceLanes(page);
-}
 
 test("joins Claude trace spans and content logs on a shared session.id", async ({
   page,
@@ -59,7 +47,7 @@ test("joins Claude trace spans and content logs on a shared session.id", async (
       }),
     );
 
-  await openSessionTrace(page, "claude-code:tiq-live-e2e-claude-corr");
+  await openLiveSessionTrace(page, "claude-code:tiq-live-e2e-claude-corr");
   await expect(page.locator("#conversation")).toContainText(
     "tiq-live-e2e retained user",
   );
@@ -103,7 +91,7 @@ test("keeps a Claude trace with no session.id a conversation-unavailable observa
     }),
   ]);
 
-  await openSessionTrace(page, observationID);
+  await openLiveSessionTrace(page, observationID);
   await expect(page.getByLabel("Conversation lane")).toContainText(
     "No retained conversation evidence for this session.",
   );
@@ -144,7 +132,7 @@ test("renders the stored Claude sub-agent tree on the Agent lane", async ({
       }),
     ]);
 
-  await openSessionTrace(page, sessionId);
+  await openLiveSessionTrace(page, sessionId);
   const tree = page.getByRole("region", { name: "Sub-agents" });
   const delegator = tree.locator('[data-agent-id="a-live-e2e-delegator"]');
   await expect(delegator).toContainText("Spawned by the main session");
@@ -177,7 +165,7 @@ test("shows an honest empty sub-agent state for a trace without agent ids", asyn
     .poll(async () => (await fetchLiveSessions()).map((row) => row.session_id))
     .toContain("claude-code:tiq-live-e2e-no-subagents");
 
-  await openSessionTrace(page, "claude-code:tiq-live-e2e-no-subagents");
+  await openLiveSessionTrace(page, "claude-code:tiq-live-e2e-no-subagents");
   await expect(page.getByRole("region", { name: "Sub-agents" })).toContainText(
     "No sub-agent relations retained for this session.",
   );
