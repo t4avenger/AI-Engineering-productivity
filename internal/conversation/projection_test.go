@@ -46,6 +46,13 @@ func TestIsConversationEventGuardsProviderAndTool(t *testing.T) {
 		{name: "codex content event", event: canonical.Event{Provider: "openai", Tool: "codex", EventType: "user_prompt"}, want: true},
 		{name: "unrelated provider content event", event: canonical.Event{Provider: "cursor", Tool: "cursor", EventType: "user_prompt"}, want: false},
 		{name: "claude non-content event", event: canonical.Event{Provider: "anthropic", Tool: "claude-code", EventType: "api_request"}, want: false},
+		{name: "claude transcript prompt", event: transcriptEvent("p", "user_message", time.Time{}, map[string]any{"prompt_content": "hi"}), want: true},
+		{name: "claude transcript response", event: transcriptEvent("r", "assistant_message", time.Time{}, map[string]any{"response_content": "ok"}), want: true},
+		{name: "claude transcript thinking only", event: transcriptEvent("t", "assistant_message", time.Time{}, map[string]any{"thinking": "plan"}), want: true},
+		{name: "claude transcript tool_use only", event: transcriptEvent("u", "assistant_message", time.Time{}, map[string]any{"cwd": "/repo"}), want: false},
+		{name: "claude transcript empty prompt", event: transcriptEvent("e", "user_message", time.Time{}, map[string]any{"prompt_content": "  "}), want: false},
+		{name: "claude transcript non-string response", event: transcriptEvent("n", "assistant_message", time.Time{}, map[string]any{"response_content": 42}), want: false},
+		{name: "codex transcript-shaped event", event: canonical.Event{Provider: "openai", Tool: "codex", EventType: "user_message", ProviderExtensions: map[string]any{"transcript": map[string]any{"prompt_content": "hi"}}}, want: false},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -53,6 +60,36 @@ func TestIsConversationEventGuardsProviderAndTool(t *testing.T) {
 				t.Fatalf("IsConversationEvent = %v, want %v", got, test.want)
 			}
 		})
+	}
+}
+
+// TestProjectClaudeTranscriptRecords proves Claude session JSONL prompt,
+// response, and thinking text project under the same availability rules as the
+// OTLP content events, with thinking carried separately and never synthesised.
+func TestProjectClaudeTranscriptRecords(t *testing.T) {
+	at := time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC)
+	events := []canonical.Event{
+		transcriptEvent("prompt", "user_message", at, map[string]any{"prompt_content": "transcript prompt"}),
+		transcriptEvent("answer", "assistant_message", at.Add(time.Second), map[string]any{"response_content": "transcript answer", "thinking": "transcript plan"}),
+		transcriptEvent("thought", "assistant_message", at.Add(2*time.Second), map[string]any{"thinking": "only thinking"}),
+		transcriptEvent("redacted", "user_message", at.Add(3*time.Second), map[string]any{"prompt_content": "<redacted>"}),
+		transcriptEvent("tool-only", "assistant_message", at.Add(4*time.Second), map[string]any{"cwd": "/repo"}),
+	}
+
+	records := Project(events)
+	if len(records) != 4 {
+		t.Fatalf("records = %#v", records)
+	}
+	assertRecord(t, records[0], RoleUser, AvailabilityAvailable, "transcript prompt")
+	assertRecord(t, records[1], RoleAssistant, AvailabilityAvailable, "transcript answer")
+	assertRecord(t, records[2], RoleAssistant, AvailabilityUnavailable, "")
+	assertRecord(t, records[3], RoleUser, AvailabilityProviderRedacted, "<redacted>")
+	wantThinking := []string{"", "transcript plan", "only thinking", ""}
+	for index, want := range wantThinking {
+		got := records[index].Thinking
+		if (want == "") != (got == nil) || (got != nil && *got != want) {
+			t.Fatalf("record %d thinking = %#v, want %q", index, got, want)
+		}
 	}
 }
 
@@ -70,9 +107,17 @@ func TestPageUsesSourceEventCursorAfterProjection(t *testing.T) {
 }
 
 func contentEvent(id, eventType string, at time.Time, echo map[string]any) canonical.Event {
+	return claudeEvent(id, eventType, at, "event", echo)
+}
+
+func transcriptEvent(id, eventType string, at time.Time, transcript map[string]any) canonical.Event {
+	return claudeEvent(id, eventType, at, "transcript", transcript)
+}
+
+func claudeEvent(id, eventType string, at time.Time, namespace string, extension map[string]any) canonical.Event {
 	return canonical.Event{
 		EventID: id, EventType: eventType, OccurredAt: at, Provider: "anthropic", Tool: "claude-code",
-		ProviderExtensions: map[string]any{"event": echo},
+		ProviderExtensions: map[string]any{namespace: extension},
 	}
 }
 

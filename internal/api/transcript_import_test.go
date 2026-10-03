@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -71,6 +72,7 @@ func TestTranscriptImportMergesWithOTLPSession(t *testing.T) {
 	timeline := getInsightJSON[eventListResponse](t, server.URL+"/api/v1/sessions/"+wantSessionID+"/events")
 	assertTranscriptAssistantTokens(t, requireTranscriptAssistantEvent(t, timeline))
 	assertTranscriptContentCapture(t, repository, wantSessionID, timeline, sessions, server.URL)
+	assertTranscriptConversation(t, server.URL, wantSessionID, detail.Data.Availability)
 	if sessions[0].State == "" {
 		t.Fatalf("session state must not be empty: %#v", sessions[0])
 	}
@@ -338,6 +340,56 @@ func assertSessionHeaderAvailability(t *testing.T, availability map[string]strin
 	}
 	if availability["pr_link"] != prLink {
 		t.Fatalf("pr_link availability = %q, want %q", availability["pr_link"], prLink)
+	}
+}
+
+// assertTranscriptConversation proves the JSONL prompt, response, and thinking
+// project through the conversation read API (#243) and mark the session's
+// conversation coverage observed.
+func assertTranscriptConversation(t *testing.T, baseURL, sessionID string, availability map[string]string) {
+	t.Helper()
+	if availability["conversation"] != "observed" {
+		t.Fatalf("conversation availability = %q, want observed", availability["conversation"])
+	}
+	page := getConversationPage(t, baseURL+"/api/v1/sessions/"+sessionID+"/conversation")
+	if len(page.Data) != 2 {
+		t.Fatalf("conversation records = %#v, want prompt + response", page.Data)
+	}
+	prompt, response := page.Data[0], page.Data[1]
+	if prompt.Role != "user" || prompt.Text == nil || *prompt.Text != "tiq-canary-user-prompt" || prompt.Thinking != nil {
+		t.Fatalf("prompt record = %#v", prompt)
+	}
+	if response.Role != "assistant" || response.ContentAvailability != "available" ||
+		response.Text == nil || *response.Text != "tiq-canary-response" ||
+		response.Thinking == nil || *response.Thinking != "tiq-canary-thinking" {
+		t.Fatalf("response record = %#v", response)
+	}
+}
+
+// TestTranscriptConversationAvailabilityBoundary proves the session conversation
+// coverage signal follows retained text, not the event type: a thinking-only
+// assistant record is retained conversation evidence, while a tool_use-only
+// assistant record is model work and leaves conversation unavailable (#243).
+func TestTranscriptConversationAvailabilityBoundary(t *testing.T) {
+	const record = `{"type":"assistant","uuid":"boundary-1","sessionId":"%s","timestamp":"2026-09-12T10:00:00.000Z","version":"2.1.269","message":{"role":"assistant","model":"claude-opus-4-8","content":[%s],"usage":{"input_tokens":1,"output_tokens":1}}}`
+	tests := []struct {
+		name    string
+		session string
+		content string
+		want    string
+	}{
+		{name: "thinking only", session: "boundary-thinking", content: `{"type":"thinking","thinking":"tiq-boundary-thinking"}`, want: "observed"},
+		{name: "tool_use only", session: "boundary-tool", content: `{"type":"tool_use","id":"tu_boundary","name":"Bash","input":{"command":"true"}}`, want: "unavailable"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, server := transcriptTestServer(t, true)
+			postAcceptedTranscript(t, server.URL, fmt.Sprintf(record, test.session, test.content))
+			detail := getInsightJSON[sessionDetailResponse](t, server.URL+"/api/v1/sessions/claude-code:"+test.session)
+			if got := detail.Data.Availability["conversation"]; got != test.want {
+				t.Fatalf("conversation availability = %q, want %q", got, test.want)
+			}
+		})
 	}
 }
 

@@ -15,12 +15,14 @@ import {
   claudeTranscriptNDJSON,
   expectOperationCategory,
   expectSessionDetailHeading,
+  fetchLiveConversation,
   fetchLiveOperations,
   fetchLiveSessionFiles,
   fetchLiveSessions,
   ingestClaudeTranscript,
   ingestOTLPLogs,
   ingestOTLPTraces,
+  openSessionTraceDisclosures,
   resetDaemonBetweenTests,
   unlockDashboard,
 } from './live-ingest-helpers';
@@ -54,6 +56,20 @@ test('renders a Claude transcript session ingested through the live daemon', asy
   expect(transcriptSession?.availability?.entrypoint).toBe('observed');
   expect(transcriptSession?.availability?.git_branch).toBe('observed');
   expect(transcriptSession?.availability?.pr_link).toBe('unavailable');
+  expect(transcriptSession?.availability?.conversation).toBe('observed');
+
+  // #243: the stored JSONL prompt, response, and thinking project through the
+  // conversation read API; the tool_result-only user record is not a turn.
+  expect(await fetchLiveConversation(transcriptSession?.session_id ?? '')).toEqual([
+    expect.objectContaining({
+      event_type: 'user_message', role: 'user', text: 'tiq-canary-live-user-prompt',
+      content_availability: 'available', thinking: null,
+    }),
+    expect.objectContaining({
+      event_type: 'assistant_message', role: 'assistant', text: 'tiq-canary-live-response',
+      content_availability: 'available', thinking: 'tiq-canary-live-thinking',
+    }),
+  ]);
 
   // #105: the Bash tool_use is reconstructed as a shell-command operation.
   const operations = await fetchLiveOperations();
@@ -79,6 +95,16 @@ test('renders a Claude transcript session ingested through the live daemon', asy
   await expect(timeline.getByText('assistant_message')).toBeVisible();
   await expect(timeline.getByText('2048 tokens')).toBeVisible();
   await expect(timeline.getByText('256 tokens')).toBeVisible();
+
+  // #243: the Conversation lane previews the retained text and the chronological
+  // list labels the stored thinking as provider text.
+  await openSessionTraceDisclosures(page);
+  const lane = page.getByLabel('Conversation lane');
+  await expect(lane.getByText('tiq-canary-live-user-prompt')).toBeVisible();
+  await expect(lane.getByText('tiq-canary-live-response')).toBeVisible();
+  const conversation = page.locator('#conversation');
+  await expect(conversation.getByRole('heading', { name: 'Provider thinking' })).toBeVisible();
+  await expect(conversation.getByText('tiq-canary-live-thinking')).toBeVisible();
 
   // cwd is not one of the six #105 signals: it must never reach any surface.
   const pageText = await page.locator('body').innerText();

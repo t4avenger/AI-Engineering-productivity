@@ -39,8 +39,11 @@ shared cross-tool fields rendered by the dashboard: `provider`, `tool`,
 `git_branch`, `pr_link`, `tool_version`, `observed_events`, `token_usage`, and
 `conversation`. `conversation` is `observed` when the session retains at least one
 projected conversation content event (`user_prompt`, `assistant_response`,
-`api_request_body`, or `api_response_body`) and `unavailable` otherwise, so a
-trace-only session reports `conversation: unavailable` without any heuristic join.
+`api_request_body`, `api_response_body`, or a Claude transcript `user_message` /
+`assistant_message` carrying retained prompt, response, or thinking text) and
+`unavailable` otherwise, so a trace-only session — or a transcript session whose
+assistant records only carry tool_use — reports `conversation: unavailable`
+without any heuristic join.
 Values are `observed`, `partial`, `unavailable`, `unsupported`, or `unknown`.
 The UI must render non-observed states as labelled cells, never as blanks or
 numeric zeroes.
@@ -127,15 +130,26 @@ parent is exposed as `parent_agent_not_retained`; absent rollups stay null.
 projection (#188 / T03). It cursor-pages chronological `data` records keyed by
 the source `event_id`, with `event_type`, `occurred_at`, provider/tool/version
 provenance, `role` (`user`, `assistant`, or `unknown`), nullable inline `text`,
-and `content_availability`. `available`, `provider_redacted`, `length_only`,
-`body_reference`, and `unavailable` remain distinct; a missing body is never
-replaced with text. The currently reviewed surface is Claude Code OTLP logs:
-`user_prompt` and `assistant_response` map to user/assistant roles, while
-`api_request_body` and `api_response_body` remain unknown-role raw evidence.
+`content_availability`, and nullable `thinking`. `available`,
+`provider_redacted`, `length_only`, `body_reference`, and `unavailable` remain
+distinct; a missing body is never replaced with text. `content_availability`
+describes `text` only; `thinking` is present-only provider reasoning text (a
+string or null, with no separate status). The reviewed Claude Code surfaces are:
+
+- OTLP logs: `user_prompt` and `assistant_response` map to user/assistant roles,
+  while `api_request_body` and `api_response_body` remain unknown-role raw
+  evidence.
+- Session JSONL transcripts (#91, #105, #243): `user_message` projects
+  `provider_extensions.transcript.prompt_content` as a user record and
+  `assistant_message` projects `transcript.response_content` as an assistant
+  record with `transcript.thinking` in `thinking`. A thinking-only assistant
+  record has `text: null`, `content_availability: unavailable`, and a
+  `thinking` value; a tool_use-only assistant record is model work and is not
+  projected (its tool body rides on the Operation).
+
 The API does not parse raw request/response payloads into duplicate messages,
-fetch provider data, or join records by time. Claude transcript, tool-body, and
-other prior adapter gaps remain unavailable and are tracked by #173, #104, and
-#105.
+fetch provider data, or join records by time: a prompt retained by both OTLP and
+the transcript appears once per source event, each with its own provenance.
 
 `GET /api/v1/sessions/{id}/events/{event_id}` is the additive session-scoped
 event inspector (#189 / T08). It returns one retained event (timeline fields plus

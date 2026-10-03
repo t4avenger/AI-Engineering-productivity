@@ -34,11 +34,15 @@ type Record struct {
 	Role                string
 	Text                *string
 	ContentAvailability string
+	// Thinking is the provider's retained reasoning text, verbatim, or nil when
+	// none was retained. ContentAvailability describes Text only.
+	Thinking *string
 }
 
-// Project selects only the reviewed Claude Code log content surface. Raw API
-// bodies intentionally remain unknown-role evidence: a body is not parsed into
-// messages because no stable identity proves its relationship to log records.
+// Project selects only the reviewed content surfaces: Claude Code OTLP logs and
+// session JSONL transcripts, and Codex. Raw API bodies intentionally remain
+// unknown-role evidence: a body is not parsed into messages because no stable
+// identity proves its relationship to log records.
 func Project(events []canonical.Event) []Record {
 	result := make([]Record, 0)
 	for _, event := range events {
@@ -74,13 +78,14 @@ func projectEvent(event canonical.Event) (Record, bool) {
 	if !IsConversationEvent(event) {
 		return Record{}, false
 	}
-	key, role, lengthKeys, _ := contentShape(event.EventType)
-	echo, _ := event.ProviderExtensions["event"].(map[string]any)
-	text, availability := contentValue(echo, key, lengthKeys...)
+	shape, _ := contentShape(event)
+	extension, _ := event.ProviderExtensions[shape.namespace].(map[string]any)
+	text, availability := contentValue(extension, shape.key, shape.lengthKeys...)
 	return Record{
 		EventID: event.EventID, EventType: event.EventType, OccurredAt: event.OccurredAt,
 		Provider: event.Provider, Tool: event.Tool, SourceVersion: event.SourceVersion,
-		Role: role, Text: text, ContentAvailability: availability,
+		Role: shape.role, Text: text, ContentAvailability: availability,
+		Thinking: thinkingValue(event, shape),
 	}, true
 }
 
@@ -94,26 +99,85 @@ func IsConversationEvent(event canonical.Event) bool {
 	if !isConversationProvider(event.Provider, event.Tool) {
 		return false
 	}
-	_, _, _, ok := contentShape(event.EventType)
-	return ok
+	shape, ok := contentShape(event)
+	if !ok {
+		return false
+	}
+	if shape.namespace != transcriptNamespace {
+		return true
+	}
+	// A transcript record projects only when it carries retained text: a
+	// tool_use-only assistant record is model work, its body rides on the
+	// Operation, and projecting it would invent an empty conversation turn.
+	transcript, _ := event.ProviderExtensions[transcriptNamespace].(map[string]any)
+	return nonEmptyString(transcript, shape.key) || nonEmptyString(transcript, shape.thinkingKey)
 }
 
 func isConversationProvider(provider, tool string) bool {
-	return (provider == "anthropic" && tool == "claude-code") ||
-		(provider == "openai" && tool == "codex")
+	return isClaudeCode(provider, tool) || (provider == "openai" && tool == "codex")
 }
 
-func contentShape(eventType string) (key, role string, lengthKeys []string, ok bool) {
-	switch eventType {
+func isClaudeCode(provider, tool string) bool {
+	return provider == "anthropic" && tool == "claude-code"
+}
+
+const (
+	eventNamespace      = "event"
+	transcriptNamespace = "transcript"
+)
+
+// contentLocation locates an event type's retained content: the provider_extensions
+// namespace and key holding the body, the length-only fallbacks, and (for
+// transcript assistant records) the provider thinking key.
+type contentLocation struct {
+	namespace   string
+	key         string
+	role        string
+	lengthKeys  []string
+	thinkingKey string
+}
+
+func contentShape(event canonical.Event) (contentLocation, bool) {
+	switch event.EventType {
 	case "user_prompt":
-		return "prompt", RoleUser, []string{"prompt_length"}, true
+		return contentLocation{namespace: eventNamespace, key: "prompt", role: RoleUser, lengthKeys: []string{"prompt_length"}}, true
 	case "assistant_response":
-		return "response", RoleAssistant, []string{"response_length"}, true
+		return contentLocation{namespace: eventNamespace, key: "response", role: RoleAssistant, lengthKeys: []string{"response_length"}}, true
 	case "api_request_body", "api_response_body":
-		return "body", RoleUnknown, []string{"body_length"}, true
-	default:
-		return "", "", nil, false
+		return contentLocation{namespace: eventNamespace, key: "body", role: RoleUnknown, lengthKeys: []string{"body_length"}}, true
 	}
+	// Session JSONL transcript records are a Claude Code-only surface.
+	if !isClaudeCode(event.Provider, event.Tool) {
+		return contentLocation{}, false
+	}
+	switch event.EventType {
+	case "user_message":
+		return contentLocation{namespace: transcriptNamespace, key: "prompt_content", role: RoleUser}, true
+	case "assistant_message":
+		return contentLocation{namespace: transcriptNamespace, key: "response_content", role: RoleAssistant, thinkingKey: "thinking"}, true
+	default:
+		return contentLocation{}, false
+	}
+}
+
+func thinkingValue(event canonical.Event, shape contentLocation) *string {
+	if shape.thinkingKey == "" {
+		return nil
+	}
+	extension, _ := event.ProviderExtensions[shape.namespace].(map[string]any)
+	if !nonEmptyString(extension, shape.thinkingKey) {
+		return nil
+	}
+	thinking := extension[shape.thinkingKey].(string)
+	return &thinking
+}
+
+func nonEmptyString(values map[string]any, key string) bool {
+	if key == "" {
+		return false
+	}
+	text, ok := values[key].(string)
+	return ok && strings.TrimSpace(text) != ""
 }
 
 func contentValue(echo map[string]any, key string, lengthKeys ...string) (*string, string) {

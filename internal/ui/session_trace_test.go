@@ -241,3 +241,87 @@ func TestSessionTraceFoldsDenseLaneIntoFlowMarks(t *testing.T) {
 		t.Fatalf("folded agent marks must show a count: %s", body)
 	}
 }
+
+// transcriptTraceEvent builds a Claude session JSONL conversation event carrying
+// its retained text under provider_extensions.transcript (#243).
+func transcriptTraceEvent(sessionID, eventID, eventType string, at time.Time, transcript map[string]any) canonical.Event {
+	return canonical.Event{
+		EventID: eventID, EventType: eventType, SessionID: sessionID,
+		OccurredAt: at, ReceivedAt: at, Provider: "anthropic", Tool: "claude-code",
+		ProviderExtensions: map[string]any{"transcript": transcript},
+	}
+}
+
+// TestSessionTraceProjectsClaudeTranscriptText proves stored JSONL prompt,
+// response, and thinking text reaches the conversation lane preview, the marker
+// title, and the chronological conversation list, with thinking labelled as
+// provider text and long previews truncated rather than dropped (#243).
+func TestSessionTraceProjectsClaudeTranscriptText(t *testing.T) {
+	now := time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)
+	completed := now.Add(10 * time.Second)
+	session := syntheticSession("transcript-trace", now)
+	session.CompletedAt = &completed
+	longPrompt := strings.Repeat("x", 250)
+	events := []canonical.Event{
+		transcriptTraceEvent("transcript-trace", "jsonl-user", "user_message", now, map[string]any{"prompt_content": "jsonl lane prompt"}),
+		transcriptTraceEvent("transcript-trace", "jsonl-answer", "assistant_message", now.Add(2*time.Second), map[string]any{"response_content": "jsonl lane answer", "thinking": "jsonl lane reasoning"}),
+		transcriptTraceEvent("transcript-trace", "jsonl-thought", "assistant_message", now.Add(4*time.Second), map[string]any{"thinking": "jsonl thinking only"}),
+		transcriptTraceEvent("transcript-trace", "jsonl-long", "user_message", now.Add(6*time.Second), map[string]any{"prompt_content": longPrompt}),
+	}
+	body := renderSessionDetail(t, &fullStub{
+		sessions: []canonical.Session{session},
+		events:   map[string][]canonical.Event{"transcript-trace": events},
+	}, nil, "transcript-trace")
+
+	assertContainsAll(t, body, []string{
+		`<span class="trace-marker-preview">jsonl lane prompt</span>`,
+		`<span class="trace-marker-preview">jsonl lane answer</span>`,
+		`<span class="trace-marker-preview">jsonl thinking only</span>`,
+		`<span class="trace-marker-preview">` + strings.Repeat("x", 240) + "…</span>",
+		"User message · point event, no duration · 0 ms · jsonl lane prompt",
+		"Assistant thinking",
+		"<h4>Provider thinking</h4>",
+		"jsonl lane reasoning",
+		"Show full retained text",
+	})
+	if strings.Contains(body, "No retained conversation evidence for this session.") {
+		t.Fatalf("transcript session must not render the empty conversation lane: %q", body)
+	}
+}
+
+// TestSessionTraceFoldedConversationPreviewMatchesSelection proves a folded
+// conversation mark previews the same event it selects (group[0]) and that the
+// inspector's interval list shows every folded member's own text (#243).
+func TestSessionTraceFoldedConversationPreviewMatchesSelection(t *testing.T) {
+	now := time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)
+	completed := now.Add(60 * time.Second)
+	session := syntheticSession("folded-transcript", now)
+	session.CompletedAt = &completed
+	texts := []string{"fold first", "fold second", "fold third", "fold fourth", "fold fifth", "fold sixth"}
+	events := make([]canonical.Event, 0, len(texts))
+	for i, text := range texts {
+		events = append(events, transcriptTraceEvent("folded-transcript", "fold-"+string(rune('a'+i)), "user_message",
+			now.Add(time.Duration(i)*time.Second), map[string]any{"prompt_content": text}))
+	}
+	server, err := ui.New("test-token", &fullStub{
+		sessions: []canonical.Session{session},
+		events:   map[string][]canonical.Event{"folded-transcript": events},
+	}, defaultContextWasteThresholds, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	cookie := unlock(t, handler)
+	body := getAuthed(t, handler, cookie, "/sessions/folded-transcript?event=fold-a&inspector=events&source=trace").Body.String()
+
+	if strings.Count(body, `class="trace-marker-preview"`) != 1 {
+		t.Fatalf("six close prompts must fold into one previewed mark: %q", body)
+	}
+	assertContainsAll(t, body, []string{
+		`<span class="trace-marker-preview">fold first</span>`,
+		"User message · 6 events · fold first",
+		"Events in this mark",
+		"fold second",
+		"fold sixth",
+	})
+}
