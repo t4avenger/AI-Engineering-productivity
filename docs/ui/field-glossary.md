@@ -109,6 +109,7 @@ strings.
 | `outcomes` | Skill outcomes | Outcome counts reported by the skill payload itself. | Count by outcome | Do not borrow session or task outcome. |
 | `outcome_state` | Skill outcome evidence | Whether skill-specific outcome data was observed. | Enum | Show `Not available from this provider` when no skill outcome field exists. |
 | `source_event_ids` | Source events | Retained event IDs that prove an unapproved explicit-skill finding. | IDs | Inferred or unnamed skill signals never create named findings. |
+| `corroborating_event_ids` | Also in | Prompt-keyword finding only: other retained copies of the same Claude prompt (OTLP `user_prompt` / session JSONL `user_message`, joined on message uuid in one session) that also matched the rule. `source_event_id` stays the primary source. | IDs | Omitted when only one source matched; never inferred from time or text. |
 
 ## Model Performance Fields
 

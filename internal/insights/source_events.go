@@ -150,26 +150,46 @@ func copyGovernanceStateEvidence(thin *canonical.Event, event canonical.Event) b
 	return true
 }
 
+// userPromptShapes locates the retained Claude user-prompt body on each
+// reviewed surface: the OTLP user_prompt echo and the session JSONL
+// user_message transcript (#259), plus the provider message uuid each surface
+// keeps under correlation for the governance cross-surface join.
+var userPromptShapes = map[string]struct {
+	namespace      string
+	keys           []string
+	correlationKey string
+}{
+	"user_prompt":  {namespace: "event", keys: []string{"prompt", "prompt_length"}, correlationKey: "message_uuid"},
+	"user_message": {namespace: "transcript", keys: []string{"prompt_content"}, correlationKey: "uuid"},
+}
+
 // copyUserPromptEvidence keeps the retained Claude user-prompt body, or its
 // length-only signal, so later policy checks can tell a real match from
 // missing coverage. Assistant and raw API bodies are not copied.
 func copyUserPromptEvidence(thin *canonical.Event, event canonical.Event) bool {
-	if event.EventType != "user_prompt" || event.Provider != "anthropic" || event.Tool != "claude-code" {
+	shape, ok := userPromptShapes[event.EventType]
+	if !ok || event.Provider != "anthropic" || event.Tool != "claude-code" {
 		return false
 	}
-	raw, _ := event.ProviderExtensions["event"].(map[string]any)
-	echo := map[string]any{}
-	if raw != nil {
-		for _, key := range []string{"prompt", "prompt_length"} {
-			if value, ok := raw[key]; ok {
-				echo[key] = value
-			}
-		}
+	raw, _ := event.ProviderExtensions[shape.namespace].(map[string]any)
+	if echo := selectedKeys(raw, shape.keys...); len(echo) > 0 {
+		thin.ProviderExtensions[shape.namespace] = echo
 	}
-	if len(echo) > 0 {
-		thin.ProviderExtensions["event"] = echo
+	correlation, _ := event.ProviderExtensions["correlation"].(map[string]any)
+	if keys := selectedKeys(correlation, shape.correlationKey); len(keys) > 0 {
+		thin.ProviderExtensions["correlation"] = keys
 	}
 	return true
+}
+
+func selectedKeys(source map[string]any, keys ...string) map[string]any {
+	out := map[string]any{}
+	for _, key := range keys {
+		if value, ok := source[key]; ok {
+			out[key] = value
+		}
+	}
+	return out
 }
 
 func copySkillPolicyEvidence(thin *canonical.Event, event canonical.Event) bool {

@@ -2262,7 +2262,12 @@ func TestGovernancePromptKeywordsSaveRoundTrip(t *testing.T) {
 	repo.events["gov-session-1"] = append(repo.events["gov-session-1"], canonical.Event{
 		EventID: "prompt-e1", SessionID: "gov-session-1", EventType: "user_prompt",
 		OccurredAt: now, ReceivedAt: now, Provider: "anthropic", Tool: "claude-code",
-		ProviderExtensions: map[string]any{"event": map[string]any{"prompt": "contains retained user phrase"}},
+		ProviderExtensions: map[string]any{"event": map[string]any{"prompt": "contains retained user phrase"}, "correlation": map[string]any{"message_uuid": "prompt-uuid-1"}},
+	}, canonical.Event{
+		// The session JSONL copy of the same prompt (#259): joined on message uuid.
+		EventID: "prompt-t1", SessionID: "gov-session-1", EventType: "user_message",
+		OccurredAt: now, ReceivedAt: now, Provider: "anthropic", Tool: "claude-code",
+		ProviderExtensions: map[string]any{"transcript": map[string]any{"prompt_content": "contains retained user phrase"}, "correlation": map[string]any{"uuid": "prompt-uuid-1"}},
 	})
 	controller := &testPolicyController{}
 	handler, cookie := pathRulesTestHandler(t, repo, controller)
@@ -2288,6 +2293,7 @@ func TestGovernancePromptKeywordsSaveRoundTrip(t *testing.T) {
 		"Prompt findings saved",
 		"Retained user phrase",
 		"prompt-e1",
+		"Also in</span> <a href=\"/sessions/gov-session-1?event=prompt-t1",
 		`aria-label="Credentials rules"`,
 	})
 	if strings.Contains(saved, "contains retained user phrase") {

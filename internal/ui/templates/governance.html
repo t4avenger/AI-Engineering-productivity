@@ -318,7 +318,7 @@
     <section aria-labelledby="prompt-findings-report-heading">
       <h3 id="prompt-findings-report-heading">Prompt findings</h3>
       {{if .PromptKeywordReport.Findings}}
-      <section class="table-wrap" aria-label="Prompt keyword findings"><table><thead><tr><th scope="col">Label</th><th scope="col">Group</th><th scope="col">Kind</th><th scope="col">Source event</th></tr></thead><tbody>{{range .PromptKeywordReport.Findings}}<tr><td>{{.Label}}</td><td>{{.Group}}</td><td>{{.Kind}}</td><td>{{if and .SessionID .SourceEventID}}<a href="{{pathFindingEvidencePath .SessionID .SourceEventID}}"><code>{{.SourceEventID}}</code></a>{{else}}<code>{{.SourceEventID}}</code>{{end}}</td></tr>{{end}}</tbody></table></section>
+      <section class="table-wrap" aria-label="Prompt keyword findings"><table><thead><tr><th scope="col">Label</th><th scope="col">Group</th><th scope="col">Kind</th><th scope="col">Source event</th></tr></thead><tbody>{{range .PromptKeywordReport.Findings}}{{$finding := .}}<tr><td>{{.Label}}</td><td>{{.Group}}</td><td>{{.Kind}}</td><td>{{if and .SessionID .SourceEventID}}<a href="{{pathFindingEvidencePath .SessionID .SourceEventID}}"><code>{{.SourceEventID}}</code></a>{{else}}<code>{{.SourceEventID}}</code>{{end}}{{range .CorroboratingEventIDs}}<br><span class="muted">Also in</span> {{if $finding.SessionID}}<a href="{{pathFindingEvidencePath $finding.SessionID .}}"><code>{{.}}</code></a>{{else}}<code>{{.}}</code>{{end}}{{end}}</td></tr>{{end}}</tbody></table></section>
       {{else}}<p class="muted">Prompt-rule matches, when any exist, are listed here after capture.</p>{{end}}
     </section>
   </details>

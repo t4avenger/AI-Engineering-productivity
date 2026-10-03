@@ -996,13 +996,8 @@ const claudeLivePRLinkBaseURL = claudeLivePRLinkURL.slice(
 export const claudePRLinkTranscriptSessionID =
   "tiq-live-e2e-session-pr-link-transcript";
 export function claudePRLinkTranscriptNDJSON(): string {
-  const record = {
-    sessionId: claudePRLinkTranscriptSessionID,
-    version: "2.1.286",
-  };
-  return [
-    JSON.stringify({
-      ...record,
+  return claudeTranscriptRecordsNDJSON(claudePRLinkTranscriptSessionID, "2.1.286", [
+    {
       type: "assistant",
       uuid: "tiq-live-pr-link-assistant-1",
       timestamp: "2026-09-30T20:02:23.000Z",
@@ -1020,9 +1015,8 @@ export function claudePRLinkTranscriptNDJSON(): string {
           },
         ],
       },
-    }),
-    JSON.stringify({
-      ...record,
+    },
+    {
       type: "user",
       uuid: "tiq-live-pr-link-user-1",
       parentUuid: "tiq-live-pr-link-assistant-1",
@@ -1039,8 +1033,37 @@ export function claudePRLinkTranscriptNDJSON(): string {
           },
         ],
       },
-    }),
-  ].join("\n");
+    },
+  ]);
+}
+
+// claudeTranscriptRecordsNDJSON serialises session JSONL transcript records
+// with the shared sessionId/version envelope the /v1/claude/transcript route reads.
+export function claudeTranscriptRecordsNDJSON(
+  sessionId: string,
+  version: string,
+  records: Array<Record<string, unknown>>,
+): string {
+  return records
+    .map((record) => JSON.stringify({ sessionId, version, ...record }))
+    .join("\n");
+}
+
+// claudePromptTranscriptNDJSON is a transcript-only Claude session whose user
+// prompt is retained solely by the session JSONL surface (#259).
+export const claudePromptTranscriptSessionID = "tiq-live-e2e-transcript-prompt";
+export function claudePromptTranscriptNDJSON(): string {
+  return claudeTranscriptRecordsNDJSON(claudePromptTranscriptSessionID, "2.1.283", [
+    {
+      type: "user",
+      uuid: "tiq-live-transcript-prompt-1",
+      timestamp: "2026-09-27T09:35:29.776Z",
+      message: {
+        role: "user",
+        content: "tiq-live-e2e transcript-only phrase",
+      },
+    },
+  ]);
 }
 
 // Codex apply_patch tool_result proves filesystem write category without a path.

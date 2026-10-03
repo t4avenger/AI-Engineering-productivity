@@ -78,7 +78,20 @@ CREATE INDEX IF NOT EXISTS events_session_type_occurred ON events(session_id, ev
 // ensurePromptInsightSignals is migration 8: rebuild thin dashboard signals so
 // retained Claude user-prompt bodies are available to local prompt findings.
 func (r *Repository) ensurePromptInsightSignals(ctx context.Context) error {
-	applied, err := r.migrationApplied(ctx, 8)
+	return r.rebuildInsightSignalsMigration(ctx, 8)
+}
+
+// ensureTranscriptPromptInsightSignals is migration 10: rebuild thin dashboard
+// signals so Claude session JSONL prompts and the message uuid join keys reach
+// local prompt findings (#259).
+func (r *Repository) ensureTranscriptPromptInsightSignals(ctx context.Context) error {
+	return r.rebuildInsightSignalsMigration(ctx, 10)
+}
+
+// rebuildInsightSignalsMigration re-derives every session's thin insight
+// signals once, recorded as the given migration version.
+func (r *Repository) rebuildInsightSignalsMigration(ctx context.Context, version int) error {
+	applied, err := r.migrationApplied(ctx, version)
 	if err != nil {
 		return err
 	}
@@ -87,17 +100,17 @@ func (r *Repository) ensurePromptInsightSignals(ctx context.Context) error {
 	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin migration 8: %w", err)
+		return fmt.Errorf("begin migration %d: %w", version, err)
 	}
 	defer func() { _ = tx.Rollback() }()
 	if err := r.backfillInsightSignals(ctx, tx); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO schema_migrations(version) VALUES (8)"); err != nil {
-		return fmt.Errorf("record migration 8: %w", err)
+	if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO schema_migrations(version) VALUES (?)", version); err != nil {
+		return fmt.Errorf("record migration %d: %w", version, err)
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit migration 8: %w", err)
+		return fmt.Errorf("commit migration %d: %w", version, err)
 	}
 	return nil
 }

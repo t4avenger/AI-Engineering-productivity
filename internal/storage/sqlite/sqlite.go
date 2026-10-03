@@ -174,6 +174,9 @@ CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, session_json B
 	if err := r.ensureDiagnosticDimensions(ctx); err != nil {
 		return err
 	}
+	if err := r.ensureTranscriptPromptInsightSignals(ctx); err != nil {
+		return err
+	}
 	return nil
 }
 

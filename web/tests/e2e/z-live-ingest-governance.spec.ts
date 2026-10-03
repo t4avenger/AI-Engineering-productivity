@@ -1,15 +1,18 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import {
   authToken,
   expectAllowlistDiscardConfirmation,
   claudeContentOTLPLogs,
+  claudePromptTranscriptNDJSON,
+  claudePromptTranscriptSessionID,
   claudeMCPConnectionOTLPLogs,
   claudeRiskyAccessOTLPLogs,
   claudeSkillOTLPLogs,
   expectFiveDestinationPrimaryNav,
   expectGovernanceAccessRulesShells,
   expectGovernanceMCPEditorInteractions,
+  ingestClaudeTranscript,
   ingestOTLPLogs,
   openGovernanceFindings,
   resetDaemonBetweenTests,
@@ -225,22 +228,53 @@ test('saves a prompt finding rule and records the retained match', async ({
   await page.getByRole('button', { name: 'Reset changes' }).click();
   await expect(draft).toHaveCount(0);
 
+  await savePromptKeywordRule(page, 'retained-user', 'Retained user phrase', 'retained user');
+  await expectPromptFindingOpensSession(page, 'tiq-live-e2e-conversation-content', 'retained-user');
+});
+
+test('records a prompt finding retained only by the session JSONL transcript', async ({
+  page,
+}) => {
+  // #259: the prompt exists only on the transcript surface (user_message).
+  await ingestClaudeTranscript(claudePromptTranscriptNDJSON());
+  await unlockDashboard(page, authToken);
+  await page.goto('/governance?rules=prompts');
+
+  await savePromptKeywordRule(page, 'transcript-only', 'Transcript only phrase', 'transcript-only phrase');
+  await expectPromptFindingOpensSession(page, claudePromptTranscriptSessionID, 'transcript-only');
+});
+
+async function savePromptKeywordRule(
+  page: Page,
+  id: string,
+  label: string,
+  pattern: string,
+): Promise<void> {
   await page.getByRole('button', { name: 'Add credentials rule' }).click();
-  const row = page.locator('.prompt-rule-list[data-group="credentials"] .prompt-rule-row');
-  await row.getByRole('textbox', { name: 'Rule ID' }).fill('retained-user');
-  await row.getByRole('textbox', { name: 'Rule label' }).fill('Retained user phrase');
-  await row.getByRole('textbox', { name: 'Pattern' }).fill('retained user');
+  // Saved rules persist in the daemon config across tests; edit the new draft row.
+  const row = page.locator('.prompt-rule-list[data-group="credentials"] .prompt-rule-row').last();
+  await row.getByRole('textbox', { name: 'Rule ID' }).fill(id);
+  await row.getByRole('textbox', { name: 'Rule label' }).fill(label);
+  await row.getByRole('textbox', { name: 'Pattern' }).fill(pattern);
   await page.getByRole('button', { name: 'Save local changes' }).first().click();
 
   await expect(page).toHaveURL(/\/governance\?rules=prompts&saved=1$/);
   await expect(page.getByRole('status')).toContainText('Prompt findings saved');
-  await expect(page.getByText('Retained user phrase').first()).toBeVisible();
+  await expect(page.getByText(label).first()).toBeVisible();
   await expect(page.getByText('Record finding').first()).toBeVisible();
-  await openGovernanceFindings(page);
+}
 
+// expectPromptFindingOpensSession follows the governance finding link to the
+// session event inspector and asserts the live API reports the observed match.
+async function expectPromptFindingOpensSession(
+  page: Page,
+  sessionID: string,
+  ruleID: string,
+): Promise<void> {
+  await openGovernanceFindings(page);
   await page.getByLabel('Prompt keyword findings').getByRole('link').first().click();
   await expect(page).toHaveURL(
-    /\/sessions\/claude-code:tiq-live-e2e-conversation-content\?event=.+&inspector=details#event-inspector$/,
+    new RegExp(`/sessions/claude-code:${sessionID}\\?event=.+&inspector=details#event-inspector$`),
   );
   await expect(page.locator('#event-inspector')).toBeVisible();
 
@@ -253,7 +287,7 @@ test('saves a prompt finding rule and records the retained match', async ({
     data: {
       outcome: 'violation',
       visibility: 'observed',
-      findings: [{ rule_id: 'retained-user', group: 'credentials' }],
+      findings: [{ rule_id: ruleID, group: 'credentials' }],
     },
   });
-});
+}

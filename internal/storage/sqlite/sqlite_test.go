@@ -805,3 +805,51 @@ func TestMCPOperationMergeNeverDowngradesOutcome(t *testing.T) {
 		t.Errorf("provenance = %q, want observed (must not downgrade)", got[0].Provenance)
 	}
 }
+
+// TestMigrationTenRebuildsTranscriptPromptSignals proves an upgraded database
+// re-derives thin insight signals once so a Claude JSONL transcript prompt
+// stored before #259 reaches prompt findings.
+func TestMigrationTenRebuildsTranscriptPromptSignals(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "prompt-signals.db")
+	repo, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prompt := event(t, "transcript-prompt", "s1", "user_message", "2026-01-02T10:00:00Z")
+	prompt.Provider, prompt.Tool = "anthropic", "claude-code"
+	prompt.ProviderExtensions = map[string]any{
+		"transcript":  map[string]any{"prompt_content": "synthetic transcript prompt"},
+		"correlation": map[string]any{"uuid": "u1"},
+	}
+	if err := repo.SaveEvents(context.Background(), []canonical.Event{prompt}); err != nil {
+		t.Fatal(err)
+	}
+	// Simulate a pre-#259 database: no transcript prompt signal, migration 10 unrecorded.
+	if _, err := repo.db.Exec(`DELETE FROM insight_signals WHERE signal_id='transcript-prompt'; DELETE FROM schema_migrations WHERE version=10`); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = reopened.Close() }()
+	events, err := reopened.ListInsightSourceEvents(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, signal := range events {
+		if signal.EventID != "transcript-prompt" {
+			continue
+		}
+		transcript, _ := signal.ProviderExtensions["transcript"].(map[string]any)
+		correlation, _ := signal.ProviderExtensions["correlation"].(map[string]any)
+		if transcript["prompt_content"] != "synthetic transcript prompt" || correlation["uuid"] != "u1" {
+			t.Fatalf("rebuilt prompt signal = %#v", signal.ProviderExtensions)
+		}
+		return
+	}
+	t.Fatalf("migration 10 did not rebuild the transcript prompt signal: %#v", events)
+}

@@ -1,6 +1,7 @@
 package insights
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -61,6 +62,42 @@ func TestSourceEventsFromSessionRetainsIncompleteSkillPolicyEvidence(t *testing.
 	}
 	if thin[1].ProviderExtensions["skill"].(map[string]any)["name"] != "" {
 		t.Fatalf("explicit skill evidence = %#v", thin[1].ProviderExtensions)
+	}
+}
+
+// TestSourceEventsFromSessionRetainsTranscriptPromptAndJoinKeys proves the thin
+// signal keeps the Claude JSONL prompt body and both surfaces' message uuid
+// (#259) while dropping unrelated transcript and correlation fields.
+func TestSourceEventsFromSessionRetainsTranscriptPromptAndJoinKeys(t *testing.T) {
+	now := time.Now().UTC()
+	base := canonical.Event{SessionID: "s1", OccurredAt: now, ReceivedAt: now, Provider: "anthropic", Tool: "claude-code"}
+	otlp, transcript := base, base
+	otlp.EventID, otlp.EventType = "otlp", "user_prompt"
+	otlp.ProviderExtensions = map[string]any{
+		"event":       map[string]any{"prompt": "synthetic prompt"},
+		"correlation": map[string]any{"message_uuid": "u1", "prompt_id": "drop-me"},
+	}
+	transcript.EventID, transcript.EventType = "transcript", "user_message"
+	transcript.ProviderExtensions = map[string]any{
+		"transcript":  map[string]any{"prompt_content": "synthetic prompt", "cwd": "drop-me"},
+		"correlation": map[string]any{"uuid": "u1", "dedup_key": "drop-me"},
+	}
+	want := map[string]map[string]any{
+		"otlp":       {"event": map[string]any{"prompt": "synthetic prompt"}, "correlation": map[string]any{"message_uuid": "u1"}},
+		"transcript": {"transcript": map[string]any{"prompt_content": "synthetic prompt"}, "correlation": map[string]any{"uuid": "u1"}},
+	}
+	for _, thin := range SourceEventsFromSession([]canonical.Event{otlp, transcript}) {
+		expected, ok := want[thin.EventID]
+		if !ok {
+			continue
+		}
+		if !reflect.DeepEqual(thin.ProviderExtensions, expected) {
+			t.Fatalf("%s thin extensions = %#v", thin.EventID, thin.ProviderExtensions)
+		}
+		delete(want, thin.EventID)
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing prompt signals: %v", want)
 	}
 }
 
