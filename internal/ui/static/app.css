@@ -744,6 +744,11 @@ section { margin: 1.5rem 0; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.trace-marker-preview {
+  font-size: var(--font-sm);
+  max-width: 18rem;
+}
+.trace-marker-preview,
 .trace-marker-time {
   color: #d7e6f7;
   overflow: hidden;

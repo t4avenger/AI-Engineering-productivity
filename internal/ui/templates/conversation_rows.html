@@ -4,18 +4,16 @@
   <h3><a class="event-select" href="{{.SelectPath}}" id="conversation-event-{{.EventID}}-select">{{.Title}}</a></h3>
   <p class="muted">{{.OccurredAt}} · {{.Source}} · <code>{{.EventID}}</code></p>
   <p>Content {{template "status-badge" .Availability}}</p>
-  {{if .HasText}}
-    {{if .Truncated}}
-    <pre class="conversation-preview">{{.Preview}}</pre>
-    <details>
-      <summary>Show full retained text</summary>
-      <pre class="conversation-text">{{.Text}}</pre>
-    </details>
-    {{else}}
-    <pre class="conversation-text">{{.Text}}</pre>
-    {{end}}
+  {{if .Body.HasText}}
+  {{template "conversation-text" .Body}}
   {{else}}
   <p class="muted">No inline text was retained for this source event.</p>
+  {{end}}
+  {{if .Thinking.HasText}}
+  <section class="conversation-thinking" aria-label="Provider thinking">
+    <h4>Provider thinking</h4>
+    {{template "conversation-text" .Thinking}}
+  </section>
   {{end}}
 </article>
 {{else}}
@@ -31,5 +29,17 @@
     hx-on::after-swap="this.closest('#conversation-more').remove()"
   >Load more retained conversation evidence</a>
 </p>
+{{end}}
+{{end}}
+
+{{define "conversation-text"}}
+{{if .Truncated}}
+<pre class="conversation-preview">{{.Preview}}</pre>
+<details>
+  <summary>Show full retained text</summary>
+  <pre class="conversation-text">{{.Text}}</pre>
+</details>
+{{else}}
+<pre class="conversation-text">{{.Text}}</pre>
 {{end}}
 {{end}}

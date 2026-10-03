@@ -42,7 +42,8 @@
           >
             {{template "event-kind-icon" .Kind}}
             <span class="trace-marker-copy">
-              <span class="trace-marker-label">{{.Label}}</span>
+              <span class="trace-marker-label">{{.Label}}</span>{{if .Preview}}
+              <span class="trace-marker-preview">{{.Preview}}</span>{{end}}
               <span class="muted trace-marker-time">{{if gt .Count 1}}{{.Count}} · {{end}}{{.OffsetLabel}}</span>
             </span>
           </a>

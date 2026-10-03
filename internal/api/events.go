@@ -68,6 +68,7 @@ type conversationRecord struct {
 	Role                string  `json:"role"`
 	Text                *string `json:"text"`
 	ContentAvailability string  `json:"content_availability"`
+	Thinking            *string `json:"thinking"`
 }
 
 type conversationResponse struct {
@@ -125,7 +126,7 @@ func publicConversationRecord(record conversation.Record) conversationRecord {
 	return conversationRecord{
 		EventID: record.EventID, EventType: record.EventType, OccurredAt: record.OccurredAt.UTC().Format(time.RFC3339Nano),
 		Provider: record.Provider, Tool: record.Tool, SourceVersion: record.SourceVersion, Role: record.Role,
-		Text: record.Text, ContentAvailability: record.ContentAvailability,
+		Text: record.Text, ContentAvailability: record.ContentAvailability, Thinking: record.Thinking,
 	}
 }
 

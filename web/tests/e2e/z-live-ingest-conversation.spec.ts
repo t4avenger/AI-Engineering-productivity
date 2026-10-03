@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import {
   authToken,
   claudeContentOTLPLogs,
+  fetchLiveConversation,
   ingestOTLPLogs,
   openSessionTraceDisclosures,
   resetDaemonBetweenTests,
@@ -17,15 +18,7 @@ test('renders retained Claude conversation evidence ingested through the live da
   await ingestOTLPLogs(claudeContentOTLPLogs());
 
   const sessionId = 'claude-code:tiq-live-e2e-conversation-content';
-  const response = await fetch(
-    `http://localhost:18080/api/v1/sessions/${encodeURIComponent(sessionId)}/conversation`,
-    { headers: { Authorization: `Bearer ${authToken}` } },
-  );
-  expect(response.status).toBe(200);
-  const body = (await response.json()) as {
-    data: Array<{ role: string; text: string | null; content_availability: string }>;
-  };
-  expect(body.data).toEqual([
+  expect(await fetchLiveConversation(sessionId)).toEqual([
     expect.objectContaining({
       role: 'user',
       text: 'tiq-live-e2e retained user\nsecond line',

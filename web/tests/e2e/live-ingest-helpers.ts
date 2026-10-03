@@ -1210,18 +1210,41 @@ export function expectOperationCategory(
 }
 
 /** Files-lane rows for one session, shared across live gates (CPD rule). */
+/**
+ * Reads one authenticated session sub-resource from the live daemon, asserts a
+ * 200, and returns its `data` envelope — the single fetch shared by every
+ * session read helper below so specs never repeat the boilerplate (Sonar CPD).
+ */
+async function fetchSessionData<T>(sessionId: string, resource: string): Promise<T> {
+  const response = await fetch(
+    `${daemonBase}/api/v1/sessions/${encodeURIComponent(sessionId)}${resource}`,
+    { headers: { Authorization: `Bearer ${authToken}` } },
+  );
+  expect(response.status).toBe(200);
+  return ((await response.json()) as { data: T }).data;
+}
+
 export type LiveSessionFile = { path: string | null; action: string | null };
 
 export async function fetchLiveSessionFiles(
   sessionId: string,
 ): Promise<LiveSessionFile[]> {
-  const response = await fetch(
-    `${daemonBase}/api/v1/sessions/${encodeURIComponent(sessionId)}/files`,
-    { headers: { Authorization: `Bearer ${authToken}` } },
-  );
-  expect(response.status).toBe(200);
-  const body = (await response.json()) as { data: LiveSessionFile[] };
-  return body.data;
+  return fetchSessionData<LiveSessionFile[]>(sessionId, "/files");
+}
+
+/** Retained conversation record (#188); thinking is provider text (#243). */
+export type LiveConversationRecord = {
+  event_type: string;
+  role: string;
+  text: string | null;
+  content_availability: string;
+  thinking: string | null;
+};
+
+export async function fetchLiveConversation(
+  sessionId: string,
+): Promise<LiveConversationRecord[]> {
+  return fetchSessionData<LiveConversationRecord[]>(sessionId, "/conversation");
 }
 
 /** Full-session duration breakdown (#190 / T09); never page-scoped. */
@@ -1243,13 +1266,7 @@ export type LiveBreakdown = {
 export async function fetchSessionBreakdown(
   sessionId: string,
 ): Promise<LiveBreakdown> {
-  const response = await fetch(
-    `${daemonBase}/api/v1/sessions/${encodeURIComponent(sessionId)}/breakdown`,
-    { headers: { Authorization: `Bearer ${authToken}` } },
-  );
-  expect(response.status).toBe(200);
-  const body = (await response.json()) as { data: LiveBreakdown };
-  return body.data;
+  return fetchSessionData<LiveBreakdown>(sessionId, "/breakdown");
 }
 
 /** Event-detail payload (#189 T08) exposing retained attributes + extensions. */
@@ -1270,27 +1287,19 @@ export async function fetchEventDetail(
   sessionId: string,
   eventId: string,
 ): Promise<LiveEventDetail> {
-  const response = await fetch(
-    `${daemonBase}/api/v1/sessions/${encodeURIComponent(sessionId)}/events/${encodeURIComponent(eventId)}`,
-    { headers: { Authorization: `Bearer ${authToken}` } },
+  return fetchSessionData<LiveEventDetail>(
+    sessionId,
+    `/events/${encodeURIComponent(eventId)}`,
   );
-  expect(response.status).toBe(200);
-  const body = (await response.json()) as { data: LiveEventDetail };
-  return body.data;
 }
 
 export async function fetchLiveSessionEvents(
   sessionId: string,
 ): Promise<Array<{ event_id: string; event_type: string }>> {
-  const response = await fetch(
-    `${daemonBase}/api/v1/sessions/${encodeURIComponent(sessionId)}/events?limit=100`,
-    { headers: { Authorization: `Bearer ${authToken}` } },
+  return fetchSessionData<Array<{ event_id: string; event_type: string }>>(
+    sessionId,
+    "/events?limit=100",
   );
-  expect(response.status).toBe(200);
-  const body = (await response.json()) as {
-    data: Array<{ event_id: string; event_type: string }>;
-  };
-  return body.data;
 }
 
 /** Right-rail T09 assertions shared by live breakdown coverage. */

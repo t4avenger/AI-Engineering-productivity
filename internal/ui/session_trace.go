@@ -99,6 +99,7 @@ type traceFlowMember struct {
 	Label       string
 	SelectPath  string
 	OffsetLabel string
+	Preview     string
 }
 
 type timedTraceItem struct {
@@ -171,21 +172,35 @@ func conversationTraceItems(events []canonical.Event) []timedTraceItem {
 	items := make([]timedTraceItem, 0, len(records))
 	for _, record := range records {
 		preview := ""
-		if record.Text != nil {
-			preview, _ = conversationPreview(*record.Text)
+		if shown := conversationMarkerText(record); shown != nil {
+			preview, _ = conversationPreview(*shown)
+		}
+		detail := record.Role + " · " + record.ContentAvailability
+		if record.Thinking != nil {
+			detail += " · provider thinking"
 		}
 		items = append(items, timedTraceItem{
 			eventID: record.EventID,
 			lane:    traceLaneConversation,
 			kind:    "conversation",
-			label:   conversationTitle(record.Role),
-			detail:  record.Role + " · " + record.ContentAvailability,
+			label:   conversationTitle(record),
+			detail:  detail,
 			preview: preview,
 			start:   record.OccurredAt,
 			placed:  !record.OccurredAt.IsZero(),
 		})
 	}
 	return items
+}
+
+// conversationMarkerText is the retained text a conversation marker previews:
+// the prompt/response body, else the provider thinking. It is nil when neither
+// was retained, so the marker never shows synthesised text.
+func conversationMarkerText(record conversation.Record) *string {
+	if record.Text != nil {
+		return record.Text
+	}
+	return record.Thinking
 }
 
 func agentAndToolEventItems(events []canonical.Event) []timedTraceItem {
@@ -655,7 +670,8 @@ func flowNode(group []traceMarkerView, windowMs int64, bars bool) traceMarkerVie
 	node := group[0]
 	full := dominantFlowLabel(group)
 	node.Label = shortFlowLabel(full)
-	node.Preview = ""
+	// The node keeps group[0]'s preview: group[0] is the event the node selects,
+	// so the shown text and the inspector selection always agree.
 	node.Count = len(group)
 	node.StackIndex = 0
 	node.NestDepth = 0
@@ -665,12 +681,13 @@ func flowNode(group []traceMarkerView, windowMs int64, bars bool) traceMarkerVie
 		node.MemberIDs = append(node.MemberIDs, member.EventID)
 		node.Members = append(node.Members, traceFlowMember{
 			Label: member.Label, SelectPath: member.SelectPath, OffsetLabel: member.OffsetLabel,
+			Preview: member.Preview,
 		})
 	}
 	if len(group) == 1 {
 		node.AccessibleName = group[0].AccessibleName
 	} else {
-		node.AccessibleName = fmt.Sprintf("%s · %d events", full, len(group))
+		node.AccessibleName = appendPreview(fmt.Sprintf("%s · %d events", full, len(group)), node.Preview)
 	}
 	node.OffsetLabel = formatTraceClock(group[0].OffsetMs, windowMs)
 	if bars {
@@ -875,7 +892,18 @@ func finishTraceMarker(marker traceMarkerView) traceMarkerView {
 	if marker.OffsetLabel != "" {
 		marker.AccessibleName += " · " + marker.OffsetLabel
 	}
+	marker.AccessibleName = appendPreview(marker.AccessibleName, marker.Preview)
 	return marker
+}
+
+func appendPreview(text, preview string) string {
+	if preview == "" {
+		return text
+	}
+	if text == "" {
+		return preview
+	}
+	return text + " · " + preview
 }
 
 func traceClockTicks(windowMs int64) []string {
@@ -931,7 +959,7 @@ func flowIntervalRows(members []traceFlowMember) ([]inspectorRelationRow, int) {
 			break
 		}
 		rows = append(rows, inspectorRelationRow{
-			Label: member.Label, Href: member.SelectPath, Meta: member.OffsetLabel,
+			Label: member.Label, Href: member.SelectPath, Meta: appendPreview(member.OffsetLabel, member.Preview),
 		})
 	}
 	extra := len(members) - len(rows)

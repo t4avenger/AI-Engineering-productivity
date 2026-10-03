@@ -137,14 +137,21 @@ type conversationRow struct {
 	OccurredAt   string
 	Role         string
 	Title        string
-	Text         string
-	Preview      string
-	HasText      bool
-	Truncated    bool
+	Body         conversationText
+	Thinking     conversationText
 	Availability string
 	Source       string
 	Selected     bool
 	SelectPath   string
+}
+
+// conversationText is one retained text block of a conversation row (the
+// prompt/response body or the provider thinking) with its folded preview.
+type conversationText struct {
+	Text      string
+	Preview   string
+	HasText   bool
+	Truncated bool
 }
 
 type fileEvidenceRow struct {
@@ -1619,20 +1626,28 @@ func encodeConversationCursor(occurredAt time.Time, eventID string) string {
 func newConversationRow(record conversation.Record) conversationRow {
 	row := conversationRow{
 		EventID: record.EventID, EventType: record.EventType, OccurredAt: record.OccurredAt.UTC().Format(time.RFC3339Nano),
-		Role: record.Role, Title: conversationTitle(record.Role), Availability: record.ContentAvailability,
+		Role: record.Role, Title: conversationTitle(record), Availability: record.ContentAvailability,
 		Source: record.Tool + " / " + record.EventType + " / " + record.SourceVersion,
 	}
-	if record.Text == nil {
-		return row
-	}
-	row.HasText = true
-	row.Text = *record.Text
-	row.Preview, row.Truncated = conversationPreview(row.Text)
+	row.Body = newConversationText(record.Text)
+	row.Thinking = newConversationText(record.Thinking)
 	return row
 }
 
-func conversationTitle(role string) string {
-	switch role {
+func newConversationText(text *string) conversationText {
+	if text == nil {
+		return conversationText{}
+	}
+	body := conversationText{HasText: true, Text: *text}
+	body.Preview, body.Truncated = conversationPreview(body.Text)
+	return body
+}
+
+func conversationTitle(record conversation.Record) string {
+	if record.Text == nil && record.Thinking != nil {
+		return "Assistant thinking"
+	}
+	switch record.Role {
 	case conversation.RoleUser:
 		return "User message"
 	case conversation.RoleAssistant:

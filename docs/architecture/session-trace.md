@@ -8,7 +8,7 @@ invent stage sequences, per-file diffs, or session joins.
 
 | Lane | Source |
 |---|---|
-| Conversation | `conversation.Project` retained Claude Code content |
+| Conversation | `conversation.Project` retained Claude Code OTLP and session JSONL content (#243); each mark previews its retained text (or provider thinking) truncated at 240 runes, and a folded mark previews the event it selects |
 | Agent | Model / lifecycle events plus `planning` / `llm_request` spans; stored sub-agent tree (`agenttree.Build`, #246) as a nested **Sub-agents** list |
 | Tools & MCP | Operations, skills, MCP events, and tool spans |
 | Files | `insights.SessionFilesFromEvidence` |
