@@ -68,6 +68,31 @@ func TestNormalizeRolloutLifecycleFixtures(t *testing.T) {
 	}
 }
 
+func TestRolloutLifecycleProjectsOnlyReviewedTerminalEvidence(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		payload    map[string]any
+		wantType   string
+		wantStatus string
+	}{
+		{name: "empty error object fails", payload: map[string]any{"type": "task_complete", "error": map[string]any{}}, wantType: "session.failed", wantStatus: "failed"},
+		{name: "explicit null completes", payload: map[string]any{"type": "task_complete", "error": nil}, wantType: "session.completed", wantStatus: "completed"},
+		{name: "reviewed interruption cancels", payload: map[string]any{"type": "turn_aborted", "reason": "interrupted"}, wantType: "session.cancelled", wantStatus: "cancelled"},
+		{name: "unknown abort stays raw", payload: map[string]any{"type": "turn_aborted", "reason": "model_error"}, wantType: "codex.rollout.event_msg"},
+		{name: "missing abort reason stays raw", payload: map[string]any{"type": "turn_aborted"}, wantType: "codex.rollout.event_msg"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			event := canonical.Event{EventType: "codex.rollout.event_msg", Attributes: map[string]any{}, ProviderExtensions: map[string]any{}}
+			record := rolloutRecord{recordType: "event_msg", decoded: map[string]any{"payload": test.payload}}
+			applyRolloutLifecycleAndGovernance(&event, record)
+			status, _ := event.Attributes["lifecycle_status"].(string)
+			if event.EventType != test.wantType || status != test.wantStatus {
+				t.Fatalf("terminal projection = %q, %#v; want %q, %q", event.EventType, event.Attributes, test.wantType, test.wantStatus)
+			}
+		})
+	}
+}
+
 func assertRolloutLifecycleFixture(t *testing.T, test rolloutLifecycleFixture) {
 	t.Helper()
 	events, err := NormalizeRollout(readRolloutFixture(t, test.fixture), time.Unix(1, 0))

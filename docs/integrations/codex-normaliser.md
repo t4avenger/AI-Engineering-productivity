@@ -131,8 +131,9 @@ call IDs from different sessions. `tool_calls` is removed from
 `codex.auth_recovery` retain lifecycle/governance evidence. CLI 0.160.0 rollout
 `task_started` maps to `session.active`; `task_complete` maps to
 `session.completed` when `error` is null and `session.failed` when the provider
-reports an error object; `turn_aborted` maps to `session.cancelled` (or failed
-only for an explicit failure reason). Exact numeric `started_at`/`completed_at`
+reports an error object; `turn_aborted` maps to `session.cancelled` only when
+the fixture-reviewed reason is `interrupted`, while absent or unreviewed reasons
+remain raw and unprojected. Exact numeric `started_at`/`completed_at`
 and duration are retained, with raw records unchanged. `turn_context` promotes
 approval/sandbox policy while retaining its structured policy evidence. Other
 Codex log events keep
@@ -226,6 +227,10 @@ plugin loaded-cache request outcomes, MCP discovery/cache publication, and app
 refresh. They stay observation-scope because the metrics have no provider session
 key. Discovery, cache activity, disabled configuration, and explicit MCP use
 remain distinct; none is relabelled loaded, enabled, or used.
+Integration datapoints require a strictly parsed positive integer count. Plugin
+cache outcomes are projected only for the reviewed `hit` and `load` values, and
+MCP cache publication requires the reviewed `result=published`; malformed,
+absent, non-positive, or unreviewed values remain unprojected.
 
 ### Skill metrics
 

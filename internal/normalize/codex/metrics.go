@@ -261,8 +261,8 @@ func integrationSumEvents(resource map[string]any, scopeID, version string, item
 	for index, point := range item.Sum.DataPoints {
 		fields := attributes(point.Attributes)
 		kind, state := integrationMetricState(item.Name, fields)
-		count := metricCount(point.AsInt)
-		if state != "" && count > 0 {
+		count, countObserved := positiveMetricCount(point.AsInt)
+		if state != "" && countObserved {
 			events = append(events, integrationMetricEvent(integrationMetricEventInput{
 				resource: resource, scopeID: scopeID, version: version, metricName: item.Name, kind: kind, state: state,
 				fields: fields, datapoint: point.raw, timeUnixNano: point.TimeUnixNano, count: count, index: index, receivedAt: receivedAt,
@@ -278,12 +278,15 @@ func integrationHistogramEvents(resource map[string]any, scopeID, version string
 	}
 	events := make([]canonical.Event, 0, len(item.Histogram.DataPoints))
 	for index, point := range item.Histogram.DataPoints {
-		count := metricCount(point.Count)
-		if count <= 0 {
+		count, countObserved := positiveMetricCount(point.Count)
+		if !countObserved {
 			continue
 		}
 		fields := attributes(point.Attributes)
 		kind, state := integrationMetricState(item.Name, fields)
+		if state == "" {
+			continue
+		}
 		events = append(events, integrationMetricEvent(integrationMetricEventInput{
 			resource: resource, scopeID: scopeID, version: version, metricName: item.Name, kind: kind, state: state,
 			fields: fields, datapoint: point.raw, timeUnixNano: point.TimeUnixNano, count: count, index: index, receivedAt: receivedAt,
@@ -296,19 +299,32 @@ func integrationMetricState(metricName string, fields map[string]any) (string, s
 	switch metricName {
 	case pluginCacheRequestMetric:
 		outcome := strings.ToLower(strings.TrimSpace(stringValue(fields["outcome"], "")))
-		if outcome == "" {
+		switch outcome {
+		case "hit", "load":
+			return "plugin", "cache_" + outcome
+		default:
 			return "plugin", ""
 		}
-		return "plugin", "cache_" + outcome
 	case mcpDiscoveryMetric:
 		return "mcp", "discovered"
 	case mcpCachePublishMetric:
-		return "mcp", "cache_published"
+		if result := strings.ToLower(strings.TrimSpace(stringValue(fields["result"], ""))); result == "published" {
+			return "mcp", "cache_published"
+		}
+		return "mcp", ""
 	case appRefreshMetric:
 		return "app", "refreshed"
 	default:
 		return "", ""
 	}
+}
+
+func positiveMetricCount(value any) (int, bool) {
+	count := normalize.OptionalTokenCount(value)
+	if count == nil || *count <= 0 || uint64(*count) > uint64(^uint(0)>>1) {
+		return 0, false
+	}
+	return int(*count), true
 }
 
 func integrationMetricEvent(input integrationMetricEventInput) canonical.Event {

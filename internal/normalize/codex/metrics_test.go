@@ -114,11 +114,46 @@ func TestNormalizeMetricsProjectsDistinctIntegrationStates(t *testing.T) {
 	assertCodexGolden(t, "codex-0.160.0-integration-states-metrics.events.json", events)
 }
 
-func TestNormalizeMetricsDoesNotClaimIntegrationActivityFromZero(t *testing.T) {
-	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.mcp.protocol_discovery","sum":{"dataPoints":[{"attributes":[{"key":"outcome","value":{"stringValue":"legacy"}}],"asInt":"0"}]}}]}]}]}`)
-	_, err := NormalizeMetrics(payload, time.Unix(1, 0))
-	if !errors.Is(err, ErrUnsupportedMetrics) {
-		t.Fatalf("zero-only metric = %v, want ErrUnsupportedMetrics", err)
+func TestIntegrationMetricsRequirePositiveIntegerCount(t *testing.T) {
+	for name, count := range map[string]any{
+		"absent": nil, "malformed": "invalid", "fractional": 1.5, "zero": "0", "negative": "-1",
+	} {
+		t.Run(name, func(t *testing.T) {
+			resource := map[string]any{serviceNameAttribute: "codex_exec"}
+			metrics := []otlpMetric{
+				{Name: mcpDiscoveryMetric, Sum: &metricSum{DataPoints: []metricDataPoint{{AsInt: count}}}},
+				{Name: appRefreshMetric, Histogram: &metricHistogram{DataPoints: []histogramDataPoint{{Count: count}}}},
+			}
+			for _, metric := range metrics {
+				if events := integrationEventsFromMetric(resource, "", "0.160.0", metric, time.Unix(1, 0)); len(events) != 0 {
+					t.Fatalf("%s with count %#v produced %#v", metric.Name, count, events)
+				}
+			}
+		})
+	}
+}
+
+func TestIntegrationMetricStateUsesOnlyReviewedProviderValues(t *testing.T) {
+	for _, test := range []struct {
+		name, metric, key, value, wantKind, wantState string
+	}{
+		{name: "cache hit", metric: pluginCacheRequestMetric, key: "outcome", value: "hit", wantKind: "plugin", wantState: "cache_hit"},
+		{name: "cache load", metric: pluginCacheRequestMetric, key: "outcome", value: "load", wantKind: "plugin", wantState: "cache_load"},
+		{name: "unknown cache outcome", metric: pluginCacheRequestMetric, key: "outcome", value: "error", wantKind: "plugin"},
+		{name: "published cache", metric: mcpCachePublishMetric, key: "result", value: "published", wantKind: "mcp", wantState: "cache_published"},
+		{name: "missing publish result", metric: mcpCachePublishMetric, wantKind: "mcp"},
+		{name: "unknown publish result", metric: mcpCachePublishMetric, key: "result", value: "error", wantKind: "mcp"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fields := map[string]any{}
+			if test.key != "" {
+				fields[test.key] = test.value
+			}
+			kind, state := integrationMetricState(test.metric, fields)
+			if kind != test.wantKind || state != test.wantState {
+				t.Fatalf("integrationMetricState() = %q, %q; want %q, %q", kind, state, test.wantKind, test.wantState)
+			}
+		})
 	}
 }
 

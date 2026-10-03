@@ -2,7 +2,6 @@ package codex
 
 import (
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/wayne/telemetryiq/internal/normalize"
@@ -37,15 +36,12 @@ func applyRolloutLifecycleAndGovernance(event *canonical.Event, record rolloutRe
 		attachRolloutLifecycle(event, payload, "task_complete", status, eventType)
 		useRolloutBoundary(event, payload["completed_at"])
 	case "turn_aborted":
-		status := "cancelled"
-		if reason, ok := normalize.ObservedString(payload["reason"]); ok {
-			status = rolloutAbortStatus(reason)
+		reason, reasonObserved := normalize.ObservedString(payload["reason"])
+		status, statusReviewed := rolloutAbortStatus(reason)
+		if !reasonObserved || !statusReviewed {
+			return
 		}
-		eventType := "session.cancelled"
-		if status == "failed" {
-			eventType = "session.failed"
-		}
-		attachRolloutLifecycle(event, payload, "turn_aborted", status, eventType)
+		attachRolloutLifecycle(event, payload, "turn_aborted", status, "session.cancelled")
 		useRolloutBoundary(event, payload["completed_at"])
 	}
 }
@@ -84,25 +80,15 @@ func useRolloutBoundary(event *canonical.Event, value any) {
 }
 
 func rolloutErrorObserved(value any) bool {
-	if value == nil {
-		return false
-	}
-	switch typed := value.(type) {
-	case string:
-		return strings.TrimSpace(typed) != ""
-	case map[string]any:
-		return len(typed) > 0
-	default:
-		return true
-	}
+	return value != nil
 }
 
-func rolloutAbortStatus(reason string) string {
-	switch strings.ToLower(strings.TrimSpace(reason)) {
-	case "failed", "failure", "error":
-		return "failed"
+func rolloutAbortStatus(reason string) (string, bool) {
+	switch reason {
+	case "interrupted":
+		return "cancelled", true
 	default:
-		return "cancelled"
+		return "", false
 	}
 }
 
