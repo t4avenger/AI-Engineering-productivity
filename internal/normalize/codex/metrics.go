@@ -33,6 +33,16 @@ type metricsPayload struct {
 	ResourceMetrics []resourceMetric `json:"resourceMetrics"`
 }
 
+type integrationMetricEventInput struct {
+	resource                map[string]any
+	scopeID, version        string
+	metricName, kind, state string
+	fields, datapoint       map[string]any
+	timeUnixNano            string
+	count, index            int
+	receivedAt              time.Time
+}
+
 type resourceMetric struct {
 	Resource struct {
 		Attributes []attribute `json:"attributes"`
@@ -253,7 +263,10 @@ func integrationSumEvents(resource map[string]any, scopeID, version string, item
 		kind, state := integrationMetricState(item.Name, fields)
 		count := metricCount(point.AsInt)
 		if state != "" && count > 0 {
-			events = append(events, integrationMetricEvent(resource, scopeID, version, item.Name, kind, state, fields, point.raw, point.TimeUnixNano, count, index, receivedAt))
+			events = append(events, integrationMetricEvent(integrationMetricEventInput{
+				resource: resource, scopeID: scopeID, version: version, metricName: item.Name, kind: kind, state: state,
+				fields: fields, datapoint: point.raw, timeUnixNano: point.TimeUnixNano, count: count, index: index, receivedAt: receivedAt,
+			}))
 		}
 	}
 	return events
@@ -271,7 +284,10 @@ func integrationHistogramEvents(resource map[string]any, scopeID, version string
 		}
 		fields := attributes(point.Attributes)
 		kind, state := integrationMetricState(item.Name, fields)
-		events = append(events, integrationMetricEvent(resource, scopeID, version, item.Name, kind, state, fields, point.raw, point.TimeUnixNano, count, index, receivedAt))
+		events = append(events, integrationMetricEvent(integrationMetricEventInput{
+			resource: resource, scopeID: scopeID, version: version, metricName: item.Name, kind: kind, state: state,
+			fields: fields, datapoint: point.raw, timeUnixNano: point.TimeUnixNano, count: count, index: index, receivedAt: receivedAt,
+		}))
 	}
 	return events
 }
@@ -295,25 +311,25 @@ func integrationMetricState(metricName string, fields map[string]any) (string, s
 	}
 }
 
-func integrationMetricEvent(resource map[string]any, scopeID, version, metricName, kind, state string, fields, datapoint map[string]any, timeUnixNano string, count, index int, receivedAt time.Time) canonical.Event {
-	occurredAt := metricTime(timeUnixNano, receivedAt)
-	identity := strings.Join([]string{metricName, state, timeUnixNano, metricResourceIdentity(resource, codexMetricIdentityAttributes(resource)), scopeID, strconv.Itoa(index), strconv.Itoa(count), stableJSON(fields)}, "|")
+func integrationMetricEvent(input integrationMetricEventInput) canonical.Event {
+	occurredAt := metricTime(input.timeUnixNano, input.receivedAt)
+	identity := strings.Join([]string{input.metricName, input.state, input.timeUnixNano, metricResourceIdentity(input.resource, codexMetricIdentityAttributes(input.resource)), input.scopeID, strconv.Itoa(input.index), strconv.Itoa(input.count), stableJSON(input.fields)}, "|")
 	eventID := contentID("codex:integration:", []byte(identity))
 	extensions := map[string]any{
 		"correlation": integrationCorrelation(eventID, occurredAt),
 		"integration_state": map[string]any{
-			"kind": kind, "state": state, "count": count,
-			"source_metric": metricName, "provenance": string(canonical.ProvenanceObserved),
+			"kind": input.kind, "state": input.state, "count": input.count,
+			"source_metric": input.metricName, "provenance": string(canonical.ProvenanceObserved),
 		},
-		"metric":    map[string]any{"name": metricName, "count": count},
-		"datapoint": datapoint, "resource": rawCodexAttributes(resource), "metric_attributes": rawCodexAttributes(fields),
+		"metric":    map[string]any{"name": input.metricName, "count": input.count},
+		"datapoint": input.datapoint, "resource": rawCodexAttributes(input.resource), "metric_attributes": rawCodexAttributes(input.fields),
 	}
-	event := tokenEvent(eventID, occurredAt, receivedAt, version, map[string]any{
-		"integration_kind": kind, "integration_state": state,
+	event := tokenEvent(eventID, occurredAt, input.receivedAt, input.version, map[string]any{
+		"integration_kind": input.kind, "integration_state": input.state,
 		"unavailable_fields": []string{"model", "token_usage", "cache_usage", "tool_calls", "file_operations", "command_execution", "approvals", "prompt_content", "response_content", "repository_context", "task_outcome", "provider_cost", "session_lifecycle"},
 	}, extensions)
-	event.EventType = metricName
-	applyCodexEnvironment(&event, fields, resource)
+	event.EventType = input.metricName
+	applyCodexEnvironment(&event, input.fields, input.resource)
 	return event
 }
 

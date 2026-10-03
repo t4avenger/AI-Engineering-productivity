@@ -1134,7 +1134,7 @@ export function codexLifecycleRolloutNDJSON(): string {
         id: sessionID,
         cli_version: "0.160.0",
         creator_user_id: "tiq-live-lifecycle-user",
-        cwd: "/tmp/tiq-live-lifecycle-workspace",
+        cwd: "/workspace/telemetryiq-synthetic-lifecycle",
       },
     },
     {
