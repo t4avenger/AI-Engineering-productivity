@@ -36,6 +36,14 @@ func TestPromptKeywordsFromEvents(t *testing.T) {
 		{name: "length only body is not a clean pass", rules: []config.PromptKeyword{literal}, events: []canonical.Event{promptEvent("p", "length", "")}, outcome: OutcomeIndeterminate, visibility: "unavailable"},
 		{name: "mixed coverage stays partial", rules: []config.PromptKeyword{literal}, events: []canonical.Event{promptEvent("ok", "available", "hello"), promptEvent("missing", "length", "")}, outcome: OutcomeIndeterminate, visibility: "partial"},
 		{name: "assistant text is not prompt evidence", rules: []config.PromptKeyword{literal}, events: []canonical.Event{otherContentEvent("assistant_response", map[string]any{"response": "has Secret inside"})}, outcome: OutcomeIndeterminate, visibility: "unavailable"},
+		{name: "transcript only prompt is scanned", rules: []config.PromptKeyword{literal}, events: []canonical.Event{transcriptPromptEvent("t", "u1", "has Secret inside")}, outcome: OutcomeViolation, visibility: "observed", ruleID: "secret-word"},
+		{name: "transcript only clean prompt is observed", rules: []config.PromptKeyword{literal}, events: []canonical.Event{transcriptPromptEvent("t", "u1", "hello")}, outcome: OutcomeNotViolation, visibility: "observed"},
+		{name: "redacted transcript prompt is not a clean pass", rules: []config.PromptKeyword{literal}, events: []canonical.Event{transcriptPromptEvent("t", "u1", "<redacted>")}, outcome: OutcomeIndeterminate, visibility: "unavailable"},
+		{name: "length only otlp corroborated by transcript is observed", rules: []config.PromptKeyword{literal}, events: []canonical.Event{withMessageUUID(promptEvent("p", "length", ""), "u1"), transcriptPromptEvent("t", "u1", "hello")}, outcome: OutcomeNotViolation, visibility: "observed"},
+		{name: "redacted otlp corroborated by transcript is observed", rules: []config.PromptKeyword{literal}, events: []canonical.Event{withMessageUUID(promptEvent("p", "redacted", "<redacted>"), "u1"), transcriptPromptEvent("t", "u1", "hello")}, outcome: OutcomeNotViolation, visibility: "observed"},
+		{name: "independent incomplete prompts stay unavailable", rules: []config.PromptKeyword{literal}, events: []canonical.Event{withMessageUUID(promptEvent("p", "length", ""), "u1"), transcriptPromptEvent("t", "u2", "<redacted>")}, outcome: OutcomeIndeterminate, visibility: "unavailable"},
+		{name: "uncorroborated incomplete prompt stays partial", rules: []config.PromptKeyword{literal}, events: []canonical.Event{withMessageUUID(promptEvent("p", "length", ""), "u1"), transcriptPromptEvent("t", "u2", "hello")}, outcome: OutcomeIndeterminate, visibility: "partial"},
+		{name: "transcript assistant text is not prompt evidence", rules: []config.PromptKeyword{literal}, events: []canonical.Event{transcriptAssistantEvent("has Secret inside")}, outcome: OutcomeIndeterminate, visibility: "unavailable"},
 		{name: "no prompt events stay unavailable", rules: []config.PromptKeyword{literal}, events: []canonical.Event{{EventID: "other", EventType: "tool_use"}}, outcome: OutcomeIndeterminate, visibility: "unavailable"},
 	}
 	for _, test := range tests {
@@ -65,6 +73,59 @@ func assertPromptKeywordReport(t *testing.T, report PromptKeywordReport, outcome
 	}
 	if strings.Contains(decision.Evidence[0].Reference, "Secret") || strings.Contains(decision.Evidence[0].Reference, "TOKEN") {
 		t.Fatalf("decision evidence leaked matched text: %#v", decision.Evidence)
+	}
+}
+
+// TestPromptKeywordsDualSourceJoin pins the #259 dual-source rule: Claude OTLP
+// and transcript copies of one prompt join only on session + message uuid;
+// every other shape reports one finding per source event.
+func TestPromptKeywordsDualSourceJoin(t *testing.T) {
+	secret := config.PromptKeyword{ID: "secret", Label: "Secret", Group: "credentials", Enabled: true, Kind: "literal", Value: "Secret"}
+	token := config.PromptKeyword{ID: "token", Label: "Token", Group: "custom", Enabled: true, Kind: "literal", Value: "Token"}
+	otherSession := transcriptPromptEvent("t", "u1", "Secret")
+	otherSession.SessionID = "session-2"
+	codex := withMessageUUID(promptEvent("p", "available", "Secret"), "u1")
+	codex.Provider, codex.Tool = "openai", "codex"
+	blankSession := transcriptPromptEvent("t", "u1", "Secret")
+	blankSession.SessionID = " "
+	tests := []struct {
+		name   string
+		events []canonical.Event
+		want   []string
+	}{
+		{name: "same uuid joins with otlp primary", events: []canonical.Event{withMessageUUID(promptEvent("p", "available", "Secret"), "u1"), transcriptPromptEvent("t", "u1", "Secret")}, want: []string{"secret:p:t"}},
+		{name: "join ignores input order", events: []canonical.Event{transcriptPromptEvent("t", "u1", "Secret"), withMessageUUID(promptEvent("p", "available", "Secret"), "u1")}, want: []string{"secret:p:t"}},
+		{name: "only transcript copy matches", events: []canonical.Event{withMessageUUID(promptEvent("p", "available", "hello"), "u1"), transcriptPromptEvent("t", "u1", "Secret expanded")}, want: []string{"secret:t:"}},
+		{name: "only otlp copy matches", events: []canonical.Event{withMessageUUID(promptEvent("p", "available", "Secret"), "u1"), transcriptPromptEvent("t", "u1", "hello")}, want: []string{"secret:p:"}},
+		{name: "copies match different rules", events: []canonical.Event{withMessageUUID(promptEvent("p", "available", "Secret"), "u1"), transcriptPromptEvent("t", "u1", "Token")}, want: []string{"secret:p:", "token:t:"}},
+		{name: "missing uuid reports each source", events: []canonical.Event{promptEvent("p", "available", "Secret"), transcriptPromptEvent("t", "", "Secret")}, want: []string{"secret:p:", "secret:t:"}},
+		{name: "different uuids report each source", events: []canonical.Event{withMessageUUID(promptEvent("p", "available", "Secret"), "u1"), transcriptPromptEvent("t", "u2", "Secret")}, want: []string{"secret:p:", "secret:t:"}},
+		{name: "same uuid in another session does not join", events: []canonical.Event{withMessageUUID(promptEvent("p", "available", "Secret"), "u1"), otherSession}, want: []string{"secret:p:", "secret:t:"}},
+		{name: "non claude provider does not join", events: []canonical.Event{codex, transcriptPromptEvent("t", "u1", "Secret")}, want: []string{"secret:p:", "secret:t:"}},
+		{name: "blank session does not join", events: []canonical.Event{withMessageUUID(promptEvent("p", "available", "Secret"), "u1"), blankSession}, want: []string{"secret:p:", "secret:t:"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			report := PromptKeywordsFromEvents(test.events, []config.PromptKeyword{secret, token})
+			got := make([]string, 0, len(report.Findings))
+			for _, finding := range report.Findings {
+				got = append(got, finding.RuleID+":"+finding.SourceEventID+":"+strings.Join(finding.CorroboratingEventIDs, ","))
+			}
+			if strings.Join(got, "|") != strings.Join(test.want, "|") || report.Outcome != OutcomeViolation {
+				t.Fatalf("findings = %v, outcome = %s; want %v", got, report.Outcome, test.want)
+			}
+		})
+	}
+}
+
+func TestPromptKeywordDecisionCitesCorroboratingSource(t *testing.T) {
+	report := PromptKeywordsFromEvents(
+		[]canonical.Event{withMessageUUID(promptEvent("p", "available", "has Secret"), "u1"), transcriptPromptEvent("t", "u1", "has Secret")},
+		[]config.PromptKeyword{{ID: "secret", Label: "Secret", Group: "credentials", Enabled: true, Kind: "literal", Value: "Secret"}},
+	)
+	evidence := report.Decision().Evidence
+	if len(evidence) != 1 || evidence[0].Reference != "rule:secret;event:p;corroborated_by:t" {
+		t.Fatalf("evidence = %#v", evidence)
 	}
 }
 
@@ -112,6 +173,33 @@ func promptEvent(id, shape, text string) canonical.Event {
 		EventID: id, SessionID: "session-1", EventType: "user_prompt", Provider: "anthropic", Tool: "claude-code",
 		OccurredAt: time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC), ProviderExtensions: map[string]any{"event": echo},
 	}
+}
+
+// withMessageUUID stamps the OTLP message.uuid correlation the Claude
+// normaliser retains as correlation.message_uuid.
+func withMessageUUID(event canonical.Event, uuid string) canonical.Event {
+	event.ProviderExtensions["correlation"] = map[string]any{"message_uuid": uuid}
+	return event
+}
+
+// transcriptPromptEvent is the Claude session JSONL user_message shape: prompt
+// text under transcript.prompt_content and the record uuid under
+// correlation.uuid.
+func transcriptPromptEvent(id, uuid, text string) canonical.Event {
+	event := promptEvent(id, "", "")
+	event.EventType = "user_message"
+	event.ProviderExtensions = map[string]any{
+		"transcript":  map[string]any{"prompt_content": text},
+		"correlation": map[string]any{"uuid": uuid},
+	}
+	return event
+}
+
+func transcriptAssistantEvent(text string) canonical.Event {
+	event := transcriptPromptEvent("assistant", "u1", "")
+	event.EventType = "assistant_message"
+	event.ProviderExtensions["transcript"] = map[string]any{"response_content": text}
+	return event
 }
 
 func otherContentEvent(eventType string, echo map[string]any) canonical.Event {

@@ -102,7 +102,20 @@ or blocks actions. Prompt Keywords is an editable local detect-and-report policy
 `governance.prompt_keywords` matches retained user-prompt text after capture and
 records a finding. Literal rules are case-sensitive; RE2 rules fold case only with
 an explicit flag. Missing or provider-redacted prompt bodies stay indeterminate,
-and the page shows only rules the operator configured. The page makes no enforcement claim; the local
+and the page shows only rules the operator configured. Since #259 (policy and
+detector `0.2.0`) the scan covers every user-role conversation record: Claude OTLP
+`user_prompt` and Claude session JSONL `user_message`, so a transcript-only session
+reports `observed` rather than `unavailable`. A prompt retained by both Claude
+surfaces is reported once only when it is provably the same message: same
+canonical session and the OTLP `message.uuid` (`correlation.message_uuid`) equals
+the transcript record `uuid` (`correlation.uuid`), proven by the paired 2.1.283
+observed fixtures. That finding keeps the OTLP event as `source_event_id` and lists
+every other copy that also matched in `corroborating_event_ids`. Without both keys
+each source event reports its own finding (an honest possible double count); prompts
+are never joined by time or text. Coverage is judged per prompt, so a length-only
+OTLP prompt whose transcript copy retained the body counts as observed. Thin
+insight signals carry the transcript prompt body and both uuid keys; migration 10
+rebuilds them for databases written before #259. The page makes no enforcement claim; the local
 edition remains detect-and-report only.
 
 The preceding Access Rules shell description reflects #160, whose PR #185

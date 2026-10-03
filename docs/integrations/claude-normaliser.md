@@ -200,6 +200,13 @@ block, not new canonical fields):
   non-string values are skipped, never coerced into an id), and `correlationEventFields`
   excludes them from the `provider_extensions.event` echo so each value has exactly one
   typed home. `request_id` is unchanged — it is already retained/namespaced elsewhere.
+  The OTLP `user_prompt` `message.uuid` equals the session JSONL user record `uuid`
+  (`correlation.uuid` on the transcript `user_message`) for the same prompt — proven by
+  the paired 2.1.283 observed fixtures and pinned in
+  `TestNormalizeClaudeSharedSessionCorrelation`. Governance prompt keywords use that
+  exact pair (within one session) as their only cross-surface join (#259); `prompt.id`
+  is shared by the whole turn and is not a per-prompt key. The transcript `promptId`
+  field is not yet retained by the JSONL normaliser (follow-up).
 - **Trace spans** (`NormalizeTraces`, `spanCorrelation`): `workflow.run_id` →
   `correlation.workflow_run_id` and `workflow.name` → `correlation.workflow_name`,
   present-only, so a sub-agent workflow's spans expose the same key. These are the same

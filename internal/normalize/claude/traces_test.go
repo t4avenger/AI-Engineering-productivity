@@ -356,6 +356,34 @@ func TestNormalizeClaudeSharedSessionCorrelation(t *testing.T) {
 	assertAllEventsShareSession(t, "trace", traceEvents, wantSession)
 	assertAllEventsShareSession(t, "log", logEvents, wantSession)
 	assertAllEventsShareSession(t, "transcript", transcriptEvents, wantSession)
+	// #259: the OTLP user_prompt message.uuid and the transcript user record
+	// uuid are the same provider message id — the governance prompt join key.
+	otlpUUID := correlationString(t, logEvents, "user_prompt", "message_uuid")
+	if transcriptUUID := correlationString(t, transcriptEvents, "user_message", "uuid"); otlpUUID != transcriptUUID {
+		t.Fatalf("user prompt uuid: otlp %q, transcript %q", otlpUUID, transcriptUUID)
+	}
+}
+
+// correlationString returns the non-blank provider_extensions.correlation value
+// of the single event of eventType, failing on zero or multiple matches.
+func correlationString(t *testing.T, events []canonical.Event, eventType, key string) string {
+	t.Helper()
+	found := ""
+	for _, event := range events {
+		if event.EventType != eventType {
+			continue
+		}
+		correlation, _ := event.ProviderExtensions["correlation"].(map[string]any)
+		value, _ := correlation[key].(string)
+		if found != "" || value == "" {
+			t.Fatalf("%s correlation.%s must be one non-blank value, got %q after %q", eventType, key, value, found)
+		}
+		found = value
+	}
+	if found == "" {
+		t.Fatalf("no %s event carries correlation.%s", eventType, key)
+	}
+	return found
 }
 
 // assertAllEventsShareSession fails unless every event carries the expected raw
