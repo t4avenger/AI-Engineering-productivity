@@ -4,7 +4,7 @@
   "source_version": "0.157.1",
   "event_types": [
     "codex.rollout.session_meta",
-    "codex.rollout.event_msg",
+    "session.active",
     "user_prompt",
     "codex.rollout.world_state",
     "codex.rollout.turn_context",
@@ -13,7 +13,7 @@
     "tool_call",
     "codex.rollout.response_item",
     "codex.rollout.token_usage_record",
-    "codex.rollout.event_msg",
+    "session.completed",
     "codex.rollout.future_provider_record"
   ]
 }

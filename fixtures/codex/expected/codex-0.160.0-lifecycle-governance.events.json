@@ -1,0 +1,300 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex-log:f6315b91d1194c3c360df87a7f4d0a7fdbb8283140793de752f166947be558d5",
+    "event_type": "session.active",
+    "occurred_at": "2026-10-03T10:50:27Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.160.0",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:00000000-0000-4000-8000-000000000236",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "approval_policy": "never",
+      "auth_mode": "Chatgpt",
+      "entrypoint": "codex exec",
+      "lifecycle_kind": "session_start",
+      "model": "gpt-6.1-sol",
+      "sandbox_policy": "workspace-write",
+      "unavailable_fields": [
+        "cache_usage",
+        "reasoning_tokens",
+        "file_operations",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost",
+        "command_execution",
+        "tool_calls",
+        "task_outcome"
+      ]
+    },
+    "provider_extensions": {
+      "environment": {
+        "terminal_type": "synthetic-terminal"
+      },
+      "log_attributes": {
+        "approval_policy": "never",
+        "auth_mode": "Chatgpt",
+        "conversation.id": "00000000-0000-4000-8000-000000000236",
+        "event.name": "codex.conversation_starts",
+        "model": "gpt-6.1-sol",
+        "originator": "codex_exec",
+        "sandbox_policy": "workspace-write",
+        "terminal.type": "synthetic-terminal"
+      },
+      "log_record": {
+        "attributes": [
+          {
+            "key": "event.name",
+            "value": {
+              "stringValue": "codex.conversation_starts"
+            }
+          },
+          {
+            "key": "conversation.id",
+            "value": {
+              "stringValue": "00000000-0000-4000-8000-000000000236"
+            }
+          },
+          {
+            "key": "model",
+            "value": {
+              "stringValue": "gpt-6.1-sol"
+            }
+          },
+          {
+            "key": "approval_policy",
+            "value": {
+              "stringValue": "never"
+            }
+          },
+          {
+            "key": "sandbox_policy",
+            "value": {
+              "stringValue": "workspace-write"
+            }
+          },
+          {
+            "key": "auth_mode",
+            "value": {
+              "stringValue": "Chatgpt"
+            }
+          },
+          {
+            "key": "originator",
+            "value": {
+              "stringValue": "codex_exec"
+            }
+          },
+          {
+            "key": "terminal.type",
+            "value": {
+              "stringValue": "synthetic-terminal"
+            }
+          }
+        ],
+        "timeUnixNano": "1791024627000000000"
+      },
+      "resource_attributes": {
+        "deployment.environment": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.160.0"
+      },
+      "resource_log": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.160.0"
+              }
+            },
+            {
+              "key": "deployment.environment",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope_log": {},
+      "session_lifecycle": {
+        "approval_policy": "never",
+        "auth_mode": "Chatgpt",
+        "entrypoint": "codex exec",
+        "kind": "session_start",
+        "originator": "codex_exec",
+        "provenance": "observed",
+        "sandbox_policy": "workspace-write",
+        "source_event": "codex.conversation_starts",
+        "terminal.type": "synthetic-terminal"
+      },
+      "severity": ""
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex-log:a00a3df15c53fb17bef4f0dc6dc5379d6085f12df18287c9cfae2d07c1171bc9",
+    "event_type": "codex.auth_recovery",
+    "occurred_at": "2026-10-03T10:52:52Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.160.0",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:00000000-0000-4000-8000-000000000237",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "auth_mode": "managed",
+      "entrypoint": "codex exec",
+      "lifecycle_kind": "auth_recovery",
+      "lifecycle_phase": "reload",
+      "lifecycle_status": "recovery_not_run",
+      "unavailable_fields": [
+        "cache_usage",
+        "reasoning_tokens",
+        "file_operations",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost",
+        "command_execution",
+        "tool_calls",
+        "task_outcome"
+      ]
+    },
+    "provider_extensions": {
+      "environment": {
+        "terminal_type": "synthetic-terminal"
+      },
+      "log_attributes": {
+        "auth.mode": "managed",
+        "auth.outcome": "recovery_not_run",
+        "auth.recovery_reason": "not_chatgpt_auth",
+        "auth.step": "reload",
+        "conversation.id": "00000000-0000-4000-8000-000000000237",
+        "event.name": "codex.auth_recovery",
+        "originator": "codex_exec",
+        "terminal.type": "synthetic-terminal"
+      },
+      "log_record": {
+        "attributes": [
+          {
+            "key": "event.name",
+            "value": {
+              "stringValue": "codex.auth_recovery"
+            }
+          },
+          {
+            "key": "conversation.id",
+            "value": {
+              "stringValue": "00000000-0000-4000-8000-000000000237"
+            }
+          },
+          {
+            "key": "auth.mode",
+            "value": {
+              "stringValue": "managed"
+            }
+          },
+          {
+            "key": "auth.step",
+            "value": {
+              "stringValue": "reload"
+            }
+          },
+          {
+            "key": "auth.outcome",
+            "value": {
+              "stringValue": "recovery_not_run"
+            }
+          },
+          {
+            "key": "auth.recovery_reason",
+            "value": {
+              "stringValue": "not_chatgpt_auth"
+            }
+          },
+          {
+            "key": "originator",
+            "value": {
+              "stringValue": "codex_exec"
+            }
+          },
+          {
+            "key": "terminal.type",
+            "value": {
+              "stringValue": "synthetic-terminal"
+            }
+          }
+        ],
+        "timeUnixNano": "1791024772000000000"
+      },
+      "resource_attributes": {
+        "deployment.environment": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.160.0"
+      },
+      "resource_log": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.160.0"
+              }
+            },
+            {
+              "key": "deployment.environment",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope_log": {},
+      "session_lifecycle": {
+        "auth.mode": "managed",
+        "auth.outcome": "recovery_not_run",
+        "auth.recovery_reason": "not_chatgpt_auth",
+        "auth.step": "reload",
+        "entrypoint": "codex exec",
+        "kind": "auth_recovery",
+        "originator": "codex_exec",
+        "phase": "reload",
+        "provenance": "observed",
+        "source_event": "codex.auth_recovery",
+        "status": "recovery_not_run",
+        "terminal.type": "synthetic-terminal"
+      },
+      "severity": ""
+    }
+  }
+]

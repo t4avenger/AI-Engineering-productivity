@@ -20,6 +20,12 @@ type rolloutGoldenProjection struct {
 	EventTypes    []string `json:"event_types"`
 }
 
+type rolloutLifecycleFixture struct {
+	name, fixture, eventType, kind, status string
+	duration                               int64
+	completedAt                            time.Time
+}
+
 func TestNormalizeRolloutGolden(t *testing.T) {
 	input := rolloutFixtureNDJSON(t)
 	receivedAt := time.Date(2026, 9, 29, 8, 0, 0, 0, time.UTC)
@@ -47,6 +53,94 @@ func TestNormalizeRolloutGolden(t *testing.T) {
 	}
 	if got, want := eventIDs(replayed), eventIDs(events); !reflect.DeepEqual(got, want) {
 		t.Fatalf("replay event IDs = %#v, want %#v", got, want)
+	}
+}
+
+func TestNormalizeRolloutLifecycleFixtures(t *testing.T) {
+	for _, test := range []rolloutLifecycleFixture{
+		{name: "completed", fixture: "codex-0.160.0-lifecycle-completed.jsonl", eventType: "session.completed", kind: "task_complete", status: "completed", duration: 4562, completedAt: time.Unix(1791024631, 0).UTC()},
+		{name: "failed", fixture: "codex-0.160.0-lifecycle-failed.jsonl", eventType: "session.failed", kind: "task_complete", status: "failed", duration: 2476, completedAt: time.Unix(1791024774, 0).UTC()},
+		{name: "cancelled", fixture: "codex-0.160.0-lifecycle-cancelled.jsonl", eventType: "session.cancelled", kind: "turn_aborted", status: "cancelled", duration: 4842, completedAt: time.Unix(1791024742, 0).UTC()},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			assertRolloutLifecycleFixture(t, test)
+		})
+	}
+}
+
+func assertRolloutLifecycleFixture(t *testing.T, test rolloutLifecycleFixture) {
+	t.Helper()
+	events, err := NormalizeRollout(readRolloutFixture(t, test.fixture), time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	active := rolloutEventByType(events, "session.active")
+	terminal := rolloutEventByType(events, test.eventType)
+	if active == nil || terminal == nil {
+		t.Fatalf("lifecycle events missing: %#v", projectRolloutGolden(events).EventTypes)
+	}
+	if terminal.Attributes["lifecycle_kind"] != test.kind || terminal.Attributes["lifecycle_status"] != test.status || terminal.Attributes["duration_ms"] != test.duration {
+		t.Fatalf("terminal lifecycle = %#v", terminal.Attributes)
+	}
+	if !terminal.OccurredAt.Equal(test.completedAt) {
+		t.Fatalf("terminal boundary = %s, want %s", terminal.OccurredAt, test.completedAt)
+	}
+	lifecycle := terminal.ProviderExtensions["session_lifecycle"].(map[string]any)
+	if lifecycle["provenance"] != "observed" || lifecycle["turn_id"] == nil {
+		t.Fatalf("lifecycle evidence = %#v", lifecycle)
+	}
+	golden := "codex-0.160.0-lifecycle-" + test.name + ".events.json"
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		writeCodexGolden(t, golden, events)
+	}
+	assertCodexGolden(t, golden, events)
+}
+
+func TestNormalizeRolloutProjectsGovernanceWithoutFlatteningRawPolicy(t *testing.T) {
+	events, err := NormalizeRollout(readRolloutFixture(t, "codex-0.160.0-lifecycle-completed.jsonl"), time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	governance := rolloutEventByType(events, "codex.rollout.turn_context")
+	if governance == nil || governance.Attributes["approval_policy"] != "never" || governance.Attributes["sandbox_policy"] != "workspace-write" {
+		t.Fatalf("governance projection = %#v", governance)
+	}
+	state := governance.ProviderExtensions["governance_state"].(map[string]any)
+	sandbox := state["sandbox_policy"].(map[string]any)
+	if sandbox["network_access"] != false || state["permission_profile"] == nil || state["file_system_sandbox_policy"] == nil {
+		t.Fatalf("raw governance evidence = %#v", state)
+	}
+}
+
+func TestNormalizeRolloutProjectsCurrentReadOnlyGovernance(t *testing.T) {
+	events, err := NormalizeRollout(readRolloutFixture(t, "codex-0.160.0-governance-read-only.jsonl"), time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	governance := rolloutEventByType(events, "codex.rollout.turn_context")
+	if governance == nil || governance.Attributes["approval_policy"] != "never" || governance.Attributes["sandbox_policy"] != "read-only" {
+		t.Fatalf("read-only governance projection = %#v", governance)
+	}
+	state := governance.ProviderExtensions["governance_state"].(map[string]any)
+	if state["approvals_reviewer"] != nil || state["permission_profile"] == nil {
+		t.Fatalf("selected raw governance evidence = %#v", state)
+	}
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		writeCodexGolden(t, "codex-0.160.0-governance-read-only.events.json", events)
+	}
+	assertCodexGolden(t, "codex-0.160.0-governance-read-only.events.json", events)
+}
+
+func TestNormalizeRolloutKeepsDisabledPluginDistinctFromUse(t *testing.T) {
+	data := []byte(`{"timestamp":"2026-10-03T12:00:00Z","type":"session_meta","payload":{"id":"plugin-state","cli_version":"0.160.0"}}
+{"timestamp":"2026-10-03T12:00:01Z","type":"turn_context","payload":{"disabled_plugin_ids":["tiq-synthetic-plugin"]}}`)
+	events, err := NormalizeRollout(data, time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := rolloutEventByType(events, codexIntegrationStateEvent)
+	if state == nil || state.Attributes["integration_kind"] != "plugin" || state.Attributes["integration_name"] != "tiq-synthetic-plugin" || state.Attributes["integration_state"] != "disabled" {
+		t.Fatalf("plugin integration state = %#v", state)
 	}
 }
 
@@ -86,6 +180,15 @@ func FuzzNormalizeRollout(f *testing.F) {
 func rolloutFixtureNDJSON(t testing.TB) []byte {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join(codexFixturesDir(t), "observed-sanitised", "codex-0.157.1-rollout-synchronised.jsonl"))
+	if err != nil {
+		t.Fatalf("read rollout fixture: %v", err)
+	}
+	return raw
+}
+
+func readRolloutFixture(t testing.TB, name string) []byte {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(codexFixturesDir(t), "observed-sanitised", name))
 	if err != nil {
 		t.Fatalf("read rollout fixture: %v", err)
 	}

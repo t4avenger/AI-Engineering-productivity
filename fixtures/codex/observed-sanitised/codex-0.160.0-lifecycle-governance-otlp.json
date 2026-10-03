@@ -1,0 +1,40 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "openai",
+  "tool": "codex",
+  "tool_version": "0.160.0",
+  "captured_at": "2026-10-03T10:59:00Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "resourceLogs": [{
+      "resource": {"attributes": [
+        {"key": "service.name", "value": {"stringValue": "codex_exec"}},
+        {"key": "service.version", "value": {"stringValue": "0.160.0"}},
+        {"key": "deployment.environment", "value": {"stringValue": "telemetryiq-synthetic"}}
+      ]},
+      "scopeLogs": [{"logRecords": [
+        {"attributes": [
+          {"key": "event.name", "value": {"stringValue": "codex.conversation_starts"}},
+          {"key": "conversation.id", "value": {"stringValue": "00000000-0000-4000-8000-000000000236"}},
+          {"key": "model", "value": {"stringValue": "gpt-6.1-sol"}},
+          {"key": "approval_policy", "value": {"stringValue": "never"}},
+          {"key": "sandbox_policy", "value": {"stringValue": "workspace-write"}},
+          {"key": "auth_mode", "value": {"stringValue": "Chatgpt"}},
+          {"key": "originator", "value": {"stringValue": "codex_exec"}},
+          {"key": "terminal.type", "value": {"stringValue": "synthetic-terminal"}}
+        ], "timeUnixNano": "1791024627000000000"},
+        {"attributes": [
+          {"key": "event.name", "value": {"stringValue": "codex.auth_recovery"}},
+          {"key": "conversation.id", "value": {"stringValue": "00000000-0000-4000-8000-000000000237"}},
+          {"key": "auth.mode", "value": {"stringValue": "managed"}},
+          {"key": "auth.step", "value": {"stringValue": "reload"}},
+          {"key": "auth.outcome", "value": {"stringValue": "recovery_not_run"}},
+          {"key": "auth.recovery_reason", "value": {"stringValue": "not_chatgpt_auth"}},
+          {"key": "originator", "value": {"stringValue": "codex_exec"}},
+          {"key": "terminal.type", "value": {"stringValue": "synthetic-terminal"}}
+        ], "timeUnixNano": "1791024772000000000"}
+      ]}]
+    }]
+  }
+}

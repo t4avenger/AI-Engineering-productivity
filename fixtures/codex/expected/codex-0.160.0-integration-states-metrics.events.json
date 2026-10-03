@@ -1,0 +1,619 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:integration:6ed0151b48de68e90f7e81a64e36a9b29b1da57dd02eb8bcff4857522738c16e",
+    "event_type": "codex.plugins.loaded_cache.request",
+    "occurred_at": "2026-10-03T10:50:31Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.160.0",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:integration:6ed0151b48de68e90f7e81a64e36a9b29b1da57dd02eb8bcff4857522738c16e",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "integration_kind": "plugin",
+      "integration_state": "cache_load",
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "tool_calls",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:integration:6ed0151b48de68e90f7e81a64e36a9b29b1da57dd02eb8bcff4857522738c16e",
+        "ordering_key": "01791024631000000000:codex:integration:6ed0151b48de68e90f7e81a64e36a9b29b1da57dd02eb8bcff4857522738c16e",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex integration metrics have no reviewed provider session key"
+        }
+      },
+      "datapoint": {
+        "asInt": "1",
+        "attributes": [
+          {
+            "key": "outcome",
+            "value": {
+              "stringValue": "load"
+            }
+          }
+        ],
+        "timeUnixNano": "1791024631000000000"
+      },
+      "integration_state": {
+        "count": 1,
+        "kind": "plugin",
+        "provenance": "observed",
+        "source_metric": "codex.plugins.loaded_cache.request",
+        "state": "cache_load"
+      },
+      "metric": {
+        "count": 1,
+        "name": "codex.plugins.loaded_cache.request"
+      },
+      "metric_attributes": {
+        "outcome": "load"
+      },
+      "metric_envelope": {
+        "name": "codex.plugins.loaded_cache.request",
+        "sum": {
+          "aggregationTemporality": 1,
+          "isMonotonic": true
+        }
+      },
+      "resource": {
+        "deployment.environment": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.160.0"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.160.0"
+              }
+            },
+            {
+              "key": "deployment.environment",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex"
+        }
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:integration:78232314ddefcd7b7b7583d64a913bc361bfa21d08d4be8a5a838484ff065c9f",
+    "event_type": "codex.apps.refresh.duration_ms",
+    "occurred_at": "2026-10-03T10:50:31Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.160.0",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:integration:78232314ddefcd7b7b7583d64a913bc361bfa21d08d4be8a5a838484ff065c9f",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "integration_kind": "app",
+      "integration_state": "refreshed",
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "tool_calls",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:integration:78232314ddefcd7b7b7583d64a913bc361bfa21d08d4be8a5a838484ff065c9f",
+        "ordering_key": "01791024631000000000:codex:integration:78232314ddefcd7b7b7583d64a913bc361bfa21d08d4be8a5a838484ff065c9f",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex integration metrics have no reviewed provider session key"
+        }
+      },
+      "datapoint": {
+        "attributes": [
+          {
+            "key": "path",
+            "value": {
+              "stringValue": "legacy"
+            }
+          },
+          {
+            "key": "trigger",
+            "value": {
+              "stringValue": "initial"
+            }
+          }
+        ],
+        "count": "1",
+        "max": 921,
+        "min": 921,
+        "sum": 921,
+        "timeUnixNano": "1791024631000000000"
+      },
+      "integration_state": {
+        "count": 1,
+        "kind": "app",
+        "provenance": "observed",
+        "source_metric": "codex.apps.refresh.duration_ms",
+        "state": "refreshed"
+      },
+      "metric": {
+        "count": 1,
+        "name": "codex.apps.refresh.duration_ms"
+      },
+      "metric_attributes": {
+        "path": "legacy",
+        "trigger": "initial"
+      },
+      "metric_envelope": {
+        "histogram": {
+          "aggregationTemporality": 1
+        },
+        "name": "codex.apps.refresh.duration_ms"
+      },
+      "resource": {
+        "deployment.environment": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.160.0"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.160.0"
+              }
+            },
+            {
+              "key": "deployment.environment",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex"
+        }
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:integration:c84631a853713bc909315f4a3d349ff5a7957e21db626089d744cbb918f9194a",
+    "event_type": "codex.plugins.loaded_cache.request",
+    "occurred_at": "2026-10-03T10:50:31Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.160.0",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:integration:c84631a853713bc909315f4a3d349ff5a7957e21db626089d744cbb918f9194a",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "integration_kind": "plugin",
+      "integration_state": "cache_hit",
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "tool_calls",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:integration:c84631a853713bc909315f4a3d349ff5a7957e21db626089d744cbb918f9194a",
+        "ordering_key": "01791024631000000000:codex:integration:c84631a853713bc909315f4a3d349ff5a7957e21db626089d744cbb918f9194a",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex integration metrics have no reviewed provider session key"
+        }
+      },
+      "datapoint": {
+        "asInt": "10",
+        "attributes": [
+          {
+            "key": "outcome",
+            "value": {
+              "stringValue": "hit"
+            }
+          }
+        ],
+        "timeUnixNano": "1791024631000000000"
+      },
+      "integration_state": {
+        "count": 10,
+        "kind": "plugin",
+        "provenance": "observed",
+        "source_metric": "codex.plugins.loaded_cache.request",
+        "state": "cache_hit"
+      },
+      "metric": {
+        "count": 10,
+        "name": "codex.plugins.loaded_cache.request"
+      },
+      "metric_attributes": {
+        "outcome": "hit"
+      },
+      "metric_envelope": {
+        "name": "codex.plugins.loaded_cache.request",
+        "sum": {
+          "aggregationTemporality": 1,
+          "isMonotonic": true
+        }
+      },
+      "resource": {
+        "deployment.environment": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.160.0"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.160.0"
+              }
+            },
+            {
+              "key": "deployment.environment",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex"
+        }
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:integration:e3991a8bef591fea03ce60cf4edb6349eab51b66870b70bef6f4b6d34c86aca3",
+    "event_type": "codex.mcp.tools.cache_publish.duration_ms",
+    "occurred_at": "2026-10-03T10:50:31Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.160.0",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:integration:e3991a8bef591fea03ce60cf4edb6349eab51b66870b70bef6f4b6d34c86aca3",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "integration_kind": "mcp",
+      "integration_state": "cache_published",
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "tool_calls",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:integration:e3991a8bef591fea03ce60cf4edb6349eab51b66870b70bef6f4b6d34c86aca3",
+        "ordering_key": "01791024631000000000:codex:integration:e3991a8bef591fea03ce60cf4edb6349eab51b66870b70bef6f4b6d34c86aca3",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex integration metrics have no reviewed provider session key"
+        }
+      },
+      "datapoint": {
+        "attributes": [
+          {
+            "key": "result",
+            "value": {
+              "stringValue": "published"
+            }
+          },
+          {
+            "key": "source",
+            "value": {
+              "stringValue": "startup"
+            }
+          }
+        ],
+        "count": "1",
+        "max": 11,
+        "min": 11,
+        "sum": 11,
+        "timeUnixNano": "1791024631000000000"
+      },
+      "integration_state": {
+        "count": 1,
+        "kind": "mcp",
+        "provenance": "observed",
+        "source_metric": "codex.mcp.tools.cache_publish.duration_ms",
+        "state": "cache_published"
+      },
+      "metric": {
+        "count": 1,
+        "name": "codex.mcp.tools.cache_publish.duration_ms"
+      },
+      "metric_attributes": {
+        "result": "published",
+        "source": "startup"
+      },
+      "metric_envelope": {
+        "histogram": {
+          "aggregationTemporality": 1
+        },
+        "name": "codex.mcp.tools.cache_publish.duration_ms"
+      },
+      "resource": {
+        "deployment.environment": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.160.0"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.160.0"
+              }
+            },
+            {
+              "key": "deployment.environment",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex"
+        }
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:integration:e75b45823a01d5dbd01d06e7559c94a01ba2756c67a85e0211291cc6edc873c0",
+    "event_type": "codex.mcp.protocol_discovery",
+    "occurred_at": "2026-10-03T10:50:31Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.160.0",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:integration:e75b45823a01d5dbd01d06e7559c94a01ba2756c67a85e0211291cc6edc873c0",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "integration_kind": "mcp",
+      "integration_state": "discovered",
+      "unavailable_fields": [
+        "model",
+        "token_usage",
+        "cache_usage",
+        "tool_calls",
+        "file_operations",
+        "command_execution",
+        "approvals",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "task_outcome",
+        "provider_cost",
+        "session_lifecycle"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:integration:e75b45823a01d5dbd01d06e7559c94a01ba2756c67a85e0211291cc6edc873c0",
+        "ordering_key": "01791024631000000000:codex:integration:e75b45823a01d5dbd01d06e7559c94a01ba2756c67a85e0211291cc6edc873c0",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex integration metrics have no reviewed provider session key"
+        }
+      },
+      "datapoint": {
+        "asInt": "1",
+        "attributes": [
+          {
+            "key": "mode",
+            "value": {
+              "stringValue": "legacy"
+            }
+          },
+          {
+            "key": "outcome",
+            "value": {
+              "stringValue": "legacy"
+            }
+          },
+          {
+            "key": "server_kind",
+            "value": {
+              "stringValue": "openai_codex_apps"
+            }
+          }
+        ],
+        "timeUnixNano": "1791024631000000000"
+      },
+      "integration_state": {
+        "count": 1,
+        "kind": "mcp",
+        "provenance": "observed",
+        "source_metric": "codex.mcp.protocol_discovery",
+        "state": "discovered"
+      },
+      "metric": {
+        "count": 1,
+        "name": "codex.mcp.protocol_discovery"
+      },
+      "metric_attributes": {
+        "mode": "legacy",
+        "outcome": "legacy",
+        "server_kind": "openai_codex_apps"
+      },
+      "metric_envelope": {
+        "name": "codex.mcp.protocol_discovery",
+        "sum": {
+          "aggregationTemporality": 1,
+          "isMonotonic": true
+        }
+      },
+      "resource": {
+        "deployment.environment": "telemetryiq-synthetic",
+        "service.name": "codex_exec",
+        "service.version": "0.160.0"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex_exec"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.160.0"
+              }
+            },
+            {
+              "key": "deployment.environment",
+              "value": {
+                "stringValue": "telemetryiq-synthetic"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex"
+        }
+      }
+    }
+  }
+]

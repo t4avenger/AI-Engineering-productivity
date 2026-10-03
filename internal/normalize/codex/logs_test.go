@@ -3,6 +3,7 @@ package codex
 import (
 	"encoding/json"
 	"errors"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -94,6 +95,24 @@ func TestNormalizeLogsMapsCodexSessionLifecycle(t *testing.T) {
 
 	encoded, _ := json.Marshal(events)
 	assertStringCanariesPresent(t, string(encoded), []string{"tiq-canary-lifecycle-slug", "lifecycle-user@example.test", "tiq-canary-lifecycle-body", "lifecycle-host.example.test", "lifecycle-account-123", "tiq-canary-lifecycle-reasoning", "tiq-canary-lifecycle-endpoint.example.test"})
+}
+
+func TestNormalizeLogsMapsCurrentAuthRecoveryAndGovernance(t *testing.T) {
+	events, err := NormalizeLogs(readCodexFixturePayload(t, "codex-0.160.0-lifecycle-governance-otlp.json"), time.Unix(1, 0))
+	if err != nil || len(events) != 2 {
+		t.Fatalf("events = %#v, %v", events, err)
+	}
+	start, recovery := events[0], events[1]
+	if start.Attributes["approval_policy"] != "never" || start.Attributes["sandbox_policy"] != "workspace-write" || start.Attributes["auth_mode"] != "Chatgpt" {
+		t.Fatalf("session governance = %#v", start.Attributes)
+	}
+	if recovery.EventType != codexAuthRecovery || recovery.Attributes["lifecycle_kind"] != "auth_recovery" || recovery.Attributes["lifecycle_phase"] != "reload" || recovery.Attributes["lifecycle_status"] != "recovery_not_run" || recovery.Attributes["auth_mode"] != "managed" {
+		t.Fatalf("auth recovery = %#v", recovery)
+	}
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		writeCodexGolden(t, "codex-0.160.0-lifecycle-governance.events.json", events)
+	}
+	assertCodexGolden(t, "codex-0.160.0-lifecycle-governance.events.json", events)
 }
 
 func TestNormalizeLogsRetainsAllProviderFieldsAndBody(t *testing.T) {

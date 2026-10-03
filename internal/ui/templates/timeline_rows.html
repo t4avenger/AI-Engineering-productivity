@@ -20,6 +20,14 @@
     {{if .LifecycleStatus}}<div><dt>Status</dt><dd>{{.LifecycleStatus}}</dd></div>{{end}}
     {{if .Entrypoint}}<div><dt>Entrypoint</dt><dd>{{.Entrypoint}}</dd></div>{{end}}
     {{end}}
+    {{if .ApprovalPolicy}}<div><dt>Approval policy</dt><dd>{{.ApprovalPolicy}}</dd></div>{{end}}
+    {{if .SandboxPolicy}}<div><dt>Sandbox policy</dt><dd>{{.SandboxPolicy}}</dd></div>{{end}}
+    {{if .AuthMode}}<div><dt>Auth mode</dt><dd>{{.AuthMode}}</dd></div>{{end}}
+    {{if .IntegrationKind}}
+    <div><dt>Integration kind</dt><dd>{{.IntegrationKind}}</dd></div>
+    {{if .IntegrationName}}<div><dt>Integration</dt><dd>{{.IntegrationName}}</dd></div>{{end}}
+    {{if .IntegrationState}}<div><dt>Integration state</dt><dd>{{.IntegrationState}}</dd></div>{{end}}
+    {{end}}
   </dl>
   {{if .HasOperation}}
   <section class="timeline-operation" aria-label="Operation details">

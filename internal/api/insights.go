@@ -37,6 +37,14 @@ type operationStatsResponse struct {
 	Data insights.OperationStats `json:"data"`
 }
 
+type integrationStatesResponse struct {
+	Data insights.IntegrationStates `json:"data"`
+}
+
+type governanceStatesResponse struct {
+	Data insights.GovernanceStates `json:"data"`
+}
+
 type riskyAccessResponse struct {
 	Data governance.RiskyAccess `json:"data"`
 }
@@ -87,6 +95,22 @@ func (a sessionAPI) contextWaste(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSessionJSON(w, http.StatusOK, contextWasteResponse{Data: insights.ContextWasteFromEvents(events, a.thresholds.ContextWaste)})
+}
+
+func (a sessionAPI) integrationStates(w http.ResponseWriter, r *http.Request) {
+	events, ok := a.loadInsightEvents(w, r)
+	if !ok {
+		return
+	}
+	writeSessionJSON(w, http.StatusOK, integrationStatesResponse{Data: insights.IntegrationStatesFromEvents(events)})
+}
+
+func (a sessionAPI) governanceStates(w http.ResponseWriter, r *http.Request) {
+	events, ok := a.loadInsightEvents(w, r)
+	if !ok {
+		return
+	}
+	writeSessionJSON(w, http.StatusOK, governanceStatesResponse{Data: insights.GovernanceStatesFromEvents(events)})
 }
 
 func (a sessionAPI) operations(w http.ResponseWriter, r *http.Request) {

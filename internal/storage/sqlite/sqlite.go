@@ -931,7 +931,7 @@ func sessionIdentity(events []canonical.Event) (string, string) {
 func observationIdentity(id string) (string, string, bool) {
 	switch {
 	case strings.HasPrefix(id, "codex-log:"), strings.HasPrefix(id, "codex:token:"),
-		strings.HasPrefix(id, "codex:skill:"), strings.HasPrefix(id, "codex:skill-turn:"),
+		strings.HasPrefix(id, "codex:skill:"), strings.HasPrefix(id, "codex:skill-turn:"), strings.HasPrefix(id, "codex:integration:"),
 		strings.HasPrefix(id, "cursor:token:"):
 		return identityObservation, "content-derived", true
 	case strings.HasPrefix(id, "codex:trace:"):

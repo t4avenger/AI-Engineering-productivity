@@ -55,6 +55,23 @@
     </div>
     {{end}}
   </section>
+  <section id="integration-states" aria-labelledby="integration-states-heading">
+    <h2 id="integration-states-heading">Observed integration states</h2>
+    <p class="muted">Discovery, cache activity, configuration and execution remain separate provider-reported states. Discovery or cache activity does not prove use.</p>
+    {{if .StateError}}<p class="error" role="alert">{{.StateError}}</p>
+    {{else if .States}}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Provider / tool</th><th scope="col">Kind</th><th scope="col">Integration</th><th scope="col">State</th><th scope="col">Observed</th></tr></thead>
+        <tbody>
+          {{range .States}}
+          <tr><td>{{.Provider}} / {{.Tool}}</td><td>{{.Kind}}</td><td>{{.Name}}</td><td>{{template "status-badge" .State}}</td><td><time datetime="{{.ObservedAt}}">{{.ObservedAt}}</time></td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}<p>No retained provider integration-state evidence yet.</p>{{end}}
+  </section>
   <section>
     <h2>Cursor Enterprise OpenTelemetry Export</h2>
     <p>Ingest status {{template "status-badge" .CursorEnterprise.Status}}</p>

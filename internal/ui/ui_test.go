@@ -874,10 +874,50 @@ func TestTimelineRendersLifecycleSignals(t *testing.T) {
 		Attributes: map[string]any{
 			"lifecycle_kind":     "session_start",
 			"entrypoint":         "codex exec",
+			"approval_policy":    "never",
+			"sandbox_policy":     "workspace-write",
+			"auth_mode":          "Chatgpt",
 			"unavailable_fields": []string{"tool_calls"},
 		},
 	}
-	assertTimelineContains(t, "lifecycle-session", event, "Session active", "Lifecycle", "session_start", "Entrypoint", "codex exec")
+	assertTimelineContains(t, "lifecycle-session", event, "Session active", "Lifecycle", "session_start", "Entrypoint", "codex exec", "Approval policy", "never", "Sandbox policy", "workspace-write", "Auth mode", "Chatgpt")
+}
+
+func TestIntegrationsRendersProviderStatesWithoutClaimingUse(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	session := canonical.Session{SessionID: "integration-observation", Provider: "openai", Tool: "codex", State: "unknown", StartedAt: now, Attributes: map[string]any{"identity_scope": "observation"}}
+	event := canonical.Event{
+		EventID: "mcp-discovery", EventType: "codex.mcp.protocol_discovery", SessionID: session.SessionID,
+		OccurredAt: now, ReceivedAt: now, Provider: "openai", Tool: "codex",
+		Attributes:         map[string]any{"integration_kind": "mcp", "integration_state": "discovered"},
+		ProviderExtensions: map[string]any{"integration_state": map[string]any{"provenance": "observed"}},
+	}
+	repo := &fullStub{sessions: []canonical.Session{session}, events: map[string][]canonical.Event{session.SessionID: {event}}}
+	server, err := ui.New("test-token", repo, defaultContextWasteThresholds, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Wrap(http.NotFoundHandler())
+	body := getAuthed(t, handler, unlock(t, handler), "/integrations").Body.String()
+	assertContainsAll(t, body, []string{"Observed integration states", "Discovery or cache activity does not prove use", "mcp", "discovered", now.Format(time.RFC3339Nano)})
+	if strings.Contains(body, ">used<") {
+		t.Fatalf("discovery must not render as use: %q", body)
+	}
+}
+
+func TestGovernanceRendersObservedProviderStateWithoutEnforcementClaim(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	repo := governanceFindingsFixture(t)
+	repo.events["gov-session-1"] = append(repo.events["gov-session-1"], canonical.Event{
+		EventID: "provider-governance", EventType: "codex.rollout.turn_context", SessionID: "gov-session-1",
+		OccurredAt: now, ReceivedAt: now, Provider: "openai", Tool: "codex",
+		Attributes: map[string]any{"approval_policy": "never", "sandbox_policy": "workspace-write"},
+	})
+	body := renderGovernance(t, repo, nil)
+	assertContainsAll(t, body, []string{
+		"Observed provider governance state", "approval_policy", "never", "sandbox_policy", "workspace-write",
+		"describe captured state and do not imply local enforcement", `/sessions/gov-session-1`, now.Format(time.RFC3339Nano),
+	})
 }
 
 func TestTimelineRendersToolDecisionApprovals(t *testing.T) {

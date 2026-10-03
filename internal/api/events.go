@@ -40,6 +40,12 @@ type timelineEvent struct {
 	LifecyclePhase        *string  `json:"lifecycle_phase"`
 	LifecycleStatus       *string  `json:"lifecycle_status"`
 	Entrypoint            *string  `json:"entrypoint"`
+	ApprovalPolicy        *string  `json:"approval_policy"`
+	SandboxPolicy         *string  `json:"sandbox_policy"`
+	AuthMode              *string  `json:"auth_mode"`
+	IntegrationKind       *string  `json:"integration_kind"`
+	IntegrationName       *string  `json:"integration_name"`
+	IntegrationState      *string  `json:"integration_state"`
 	UnavailableFields     []string `json:"unavailable_fields"`
 }
 
@@ -219,6 +225,8 @@ func publicTimelineEvent(event canonical.Event) timelineEvent {
 		ApprovalID: optionalString(event.Attributes["approval_id"]), ApprovalDecision: optionalString(event.Attributes["approval_decision"]), ApprovalReasonClass: optionalString(event.Attributes["approval_reason_class"]),
 		ToolName: optionalString(event.Attributes["tool_name"]), ToolNamespace: optionalString(event.Attributes["tool_namespace"]), ToolSource: optionalString(event.Attributes["tool_source"]),
 		LifecycleKind: optionalString(event.Attributes["lifecycle_kind"]), LifecyclePhase: optionalString(event.Attributes["lifecycle_phase"]), LifecycleStatus: optionalString(event.Attributes["lifecycle_status"]), Entrypoint: optionalString(event.Attributes["entrypoint"]),
+		ApprovalPolicy: optionalString(event.Attributes["approval_policy"]), SandboxPolicy: optionalString(event.Attributes["sandbox_policy"]), AuthMode: optionalString(event.Attributes["auth_mode"]),
+		IntegrationKind: optionalString(event.Attributes["integration_kind"]), IntegrationName: optionalString(event.Attributes["integration_name"]), IntegrationState: optionalString(event.Attributes["integration_state"]),
 		UnavailableFields: unavailableFields(event.Attributes["unavailable_fields"]),
 	}
 }

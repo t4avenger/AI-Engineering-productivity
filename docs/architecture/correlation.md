@@ -25,6 +25,13 @@ rollout record ID is preferred for deduplication; otherwise its original line
 position plus raw-record digest provides a deterministic replay key. Metrics
 without that exact provider key remain observation-only.
 
+CLI 0.160.0 root rollout `task_started`, `task_complete`, and `turn_aborted`
+records provide provider task boundaries. Terminal state uses only the record
+discriminator plus explicit error/reason. Numeric `started_at`/`completed_at`
+values are provider Unix-second boundaries. Integration metrics still have no
+provider session key and remain `codex:integration:*` observations; they are
+never joined to a session by timestamp.
+
 CLI 0.159.2 rollout completed-item operations use the exact provider `item.id`
 as `codex:<session>:tool:<item.id>`. Legacy custom tool invocations use exact
 `call_id` and pair only to an output with the same value; absent outputs retain

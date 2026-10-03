@@ -37,6 +37,7 @@ const (
 	codexConversationStarts  = "codex.conversation_starts"
 	codexStartupPhaseEvent   = "codex.startup_phase"
 	codexWebsocketConnect    = "codex.websocket_connect"
+	codexAuthRecovery        = "codex.auth_recovery"
 )
 
 type logsPayload struct {
@@ -253,36 +254,49 @@ func attachCodexLogSignals(attributes, extensions map[string]any, fields map[str
 }
 
 func attachCodexLifecycleSignal(attributes, extensions, resource, fields map[string]any, eventName string) {
-	if !codexLifecycleEvent(eventName) {
+	kind, phase, status := codexLifecycleDetails(eventName, fields)
+	if kind == "" {
 		return
 	}
 	lifecycle := map[string]any{
 		"source_event": eventName,
 		"provenance":   string(canonical.ProvenanceObserved),
+		"kind":         kind,
 	}
+	attributes["lifecycle_kind"] = kind
+	if phase != "" {
+		attributes["lifecycle_phase"] = phase
+		lifecycle["phase"] = phase
+	}
+	if status != "" {
+		attributes["lifecycle_status"] = status
+		lifecycle["status"] = status
+	}
+	attachCodexLifecycleMetadata(attributes, lifecycle, resource, fields, eventName)
+	attachCodexGovernanceAttributes(attributes, fields)
+	extensions["session_lifecycle"] = lifecycle
+}
+
+func codexLifecycleDetails(eventName string, fields map[string]any) (kind, phase, status string) {
 	switch eventName {
 	case codexConversationStarts:
-		attributes["lifecycle_kind"] = "session_start"
-		lifecycle["kind"] = "session_start"
+		return "session_start", "", ""
 	case codexStartupPhaseEvent:
-		attributes["lifecycle_kind"] = "startup_phase"
-		lifecycle["kind"] = "startup_phase"
-		if phase, ok := normalize.ObservedString(fields["startup.phase"]); ok {
-			attributes["lifecycle_phase"] = phase
-			lifecycle["phase"] = phase
-		}
-		if status, ok := normalize.ObservedString(fields["startup.status"]); ok {
-			attributes["lifecycle_status"] = status
-			lifecycle["status"] = status
-		}
+		phase, _ = normalize.ObservedString(fields["startup.phase"])
+		status, _ = normalize.ObservedString(fields["startup.status"])
+		return "startup_phase", phase, status
 	case codexWebsocketConnect:
-		attributes["lifecycle_kind"] = "websocket_connect"
-		lifecycle["kind"] = "websocket_connect"
-		if status := codexSuccessStatus(fields["success"]); status != "" {
-			attributes["lifecycle_status"] = status
-			lifecycle["status"] = status
-		}
+		return "websocket_connect", "", codexSuccessStatus(fields["success"])
+	case codexAuthRecovery:
+		phase, _ = normalize.ObservedString(fields["auth.step"])
+		status, _ = normalize.ObservedString(fields["auth.outcome"])
+		return "auth_recovery", phase, status
+	default:
+		return "", "", ""
 	}
+}
+
+func attachCodexLifecycleMetadata(attributes, lifecycle, resource, fields map[string]any, eventName string) {
 	if entrypoint := codexEntrypoint(resource[codexServiceNameKey]); entrypoint != "" {
 		attributes["entrypoint"] = entrypoint
 		lifecycle["entrypoint"] = entrypoint
@@ -296,7 +310,17 @@ func attachCodexLifecycleSignal(attributes, extensions, resource, fields map[str
 			lifecycle[key] = value
 		}
 	}
-	extensions["session_lifecycle"] = lifecycle
+}
+
+func attachCodexGovernanceAttributes(attributes, fields map[string]any) {
+	for _, key := range []string{"approval_policy", "sandbox_policy", "auth_mode"} {
+		if value, ok := normalize.ObservedString(fields[key]); ok {
+			attributes[key] = value
+		}
+	}
+	if value, ok := normalize.ObservedString(fields["auth.mode"]); ok {
+		attributes["auth_mode"] = value
+	}
 }
 
 func attachCodexToolCallSignal(attributes, extensions map[string]any, fields map[string]any, id, sessionID string) {
@@ -417,7 +441,7 @@ func codexErrorCode(fields map[string]any, status string) string {
 
 func codexLifecycleEvent(eventName string) bool {
 	switch eventName {
-	case codexConversationStarts, codexStartupPhaseEvent, codexWebsocketConnect:
+	case codexConversationStarts, codexStartupPhaseEvent, codexWebsocketConnect, codexAuthRecovery:
 		return true
 	default:
 		return false
@@ -433,6 +457,8 @@ func codexLifecycleFieldKeys(eventName string) []string {
 		keys = append(keys, "startup.phase", "startup.status", "duration_ms")
 	case codexWebsocketConnect:
 		keys = append(keys, "duration_ms", "success")
+	case codexAuthRecovery:
+		keys = append(keys, "auth.mode", "auth.step", "auth.outcome", "auth.recovery_reason")
 	}
 	return keys
 }
