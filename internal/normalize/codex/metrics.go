@@ -308,7 +308,7 @@ func integrationMetricState(metricName string, fields map[string]any) (string, s
 	case mcpDiscoveryMetric:
 		return "mcp", "discovered"
 	case mcpCachePublishMetric:
-		if result := strings.ToLower(strings.TrimSpace(stringValue(fields["result"], ""))); result == "published" {
+		if strings.ToLower(strings.TrimSpace(stringValue(fields["result"], ""))) == "published" {
 			return "mcp", "cache_published"
 		}
 		return "mcp", ""
