@@ -93,7 +93,7 @@ func (thread *codexAgentThread) observeMetadata(payload map[string]any) {
 	thread.path = codexAgentString(spawn["agent_path"])
 	thread.nickname = codexAgentString(spawn["agent_nickname"])
 	thread.role = codexAgentString(spawn["agent_role"])
-	thread.depth = codexAgentInt(spawn["depth"])
+	thread.depth = codexRolloutInt(spawn["depth"])
 }
 
 func (thread *codexAgentThread) observeEvent(payload map[string]any, event canonical.Event, threads map[string]*codexAgentThread) {
@@ -103,7 +103,7 @@ func (thread *codexAgentThread) observeEvent(payload map[string]any, event canon
 		thread.turnID = codexAgentString(payload["turn_id"])
 	case "task_complete":
 		thread.turnID = firstAgentString(thread.turnID, codexAgentString(payload["turn_id"]))
-		thread.duration = codexAgentInt(payload["duration_ms"])
+		thread.duration = codexRolloutInt(payload["duration_ms"])
 		thread.setOutcome("completed")
 	case "turn_aborted":
 		outcome := codexAgentString(payload["reason"])
@@ -123,10 +123,10 @@ func (thread *codexAgentThread) observeTokens(payload map[string]any) {
 	if usage == nil {
 		return
 	}
-	thread.input = codexAgentInt(usage["input_tokens"])
-	thread.output = codexAgentInt(usage["output_tokens"])
-	thread.cached = codexAgentInt(usage["cached_input_tokens"])
-	thread.reasoning = codexAgentInt(usage["reasoning_output_tokens"])
+	thread.input = codexRolloutInt(usage["input_tokens"])
+	thread.output = codexRolloutInt(usage["output_tokens"])
+	thread.cached = codexRolloutInt(usage["cached_input_tokens"])
+	thread.reasoning = codexRolloutInt(usage["reasoning_output_tokens"])
 }
 
 func (thread *codexAgentThread) observeItem(payload map[string]any, event canonical.Event, threads map[string]*codexAgentThread) {
@@ -335,7 +335,7 @@ func appendAgentDistinct(values []string, value string) []string {
 	return append(values, value)
 }
 
-func codexAgentInt(value any) *int64 {
+func codexRolloutInt(value any) *int64 {
 	if number, ok := value.(json.Number); ok {
 		parsed, err := number.Int64()
 		if err != nil || parsed < 0 {

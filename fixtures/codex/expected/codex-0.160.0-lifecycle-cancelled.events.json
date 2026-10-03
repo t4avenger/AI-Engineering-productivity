@@ -1,0 +1,145 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex-rollout:00000000-0000-4000-8000-000000000238:2:0d3f26dcaa125c3754b900100505128dd926d6c9cc40a8734ceb15a1148dec1c",
+    "event_type": "session.active",
+    "occurred_at": "2026-10-03T10:52:17Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "codex_rollout_jsonl",
+    "source_version": "0.160.0",
+    "actor_id": "codex:synthetic-user-238",
+    "device_id": "unavailable",
+    "session_id": "codex:00000000-0000-4000-8000-000000000238",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "governed-content",
+    "attributes": {
+      "lifecycle_kind": "task_start",
+      "lifecycle_status": "active",
+      "unavailable_fields": []
+    },
+    "provider_extensions": {
+      "rollout": {
+        "line": 2,
+        "record": {
+          "payload": {
+            "collaboration_mode_kind": "default",
+            "model_context_window": 258400,
+            "root_turn_id": "10000000-0000-4000-8000-000000000238",
+            "started_at": 1791024737,
+            "trace_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa238",
+            "turn_id": "10000000-0000-4000-8000-000000000238",
+            "type": "task_started"
+          },
+          "timestamp": "2026-10-03T10:52:17.942Z",
+          "type": "event_msg"
+        },
+        "record_type": "event_msg"
+      },
+      "session_lifecycle": {
+        "kind": "task_start",
+        "provenance": "observed",
+        "root_turn_id": "10000000-0000-4000-8000-000000000238",
+        "source": "rollout.event_msg",
+        "started_at": 1791024737,
+        "status": "active",
+        "trace_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa238",
+        "turn_id": "10000000-0000-4000-8000-000000000238"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex-rollout:00000000-0000-4000-8000-000000000238:session_meta:00000000-0000-4000-8000-000000000238",
+    "event_type": "codex.rollout.session_meta",
+    "occurred_at": "2026-10-03T10:52:17.941Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "codex_rollout_jsonl",
+    "source_version": "0.160.0",
+    "actor_id": "codex:synthetic-user-238",
+    "device_id": "unavailable",
+    "session_id": "codex:00000000-0000-4000-8000-000000000238",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "governed-content",
+    "attributes": {
+      "unavailable_fields": []
+    },
+    "provider_extensions": {
+      "rollout": {
+        "line": 1,
+        "record": {
+          "payload": {
+            "cli_version": "0.160.0",
+            "creator_account_id": "synthetic-account-238",
+            "creator_user_id": "synthetic-user-238",
+            "cwd": "/tmp/telemetryiq-synthetic-lifecycle",
+            "id": "00000000-0000-4000-8000-000000000238",
+            "originator": "codex_exec",
+            "source": "exec",
+            "timestamp": "2026-10-03T10:52:17.941Z"
+          },
+          "timestamp": "2026-10-03T10:52:17.941Z",
+          "type": "session_meta"
+        },
+        "record_type": "session_meta"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex-rollout:00000000-0000-4000-8000-000000000238:3:14414562e5b40c075ec673341c9ecd7ba17a212e5b2e04dfcd0711b182ee6618",
+    "event_type": "session.cancelled",
+    "occurred_at": "2026-10-03T10:52:22Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "codex_rollout_jsonl",
+    "source_version": "0.160.0",
+    "actor_id": "codex:synthetic-user-238",
+    "device_id": "unavailable",
+    "session_id": "codex:00000000-0000-4000-8000-000000000238",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "governed-content",
+    "attributes": {
+      "duration_ms": 4842,
+      "lifecycle_kind": "turn_aborted",
+      "lifecycle_status": "cancelled",
+      "unavailable_fields": []
+    },
+    "provider_extensions": {
+      "rollout": {
+        "line": 3,
+        "record": {
+          "payload": {
+            "completed_at": 1791024742,
+            "duration_ms": 4842,
+            "reason": "interrupted",
+            "started_at": 1791024737,
+            "turn_id": "10000000-0000-4000-8000-000000000238",
+            "type": "turn_aborted"
+          },
+          "timestamp": "2026-10-03T10:52:22.772Z",
+          "type": "event_msg"
+        },
+        "record_type": "event_msg"
+      },
+      "session_lifecycle": {
+        "completed_at": 1791024742,
+        "duration_ms": 4842,
+        "kind": "turn_aborted",
+        "provenance": "observed",
+        "reason": "interrupted",
+        "source": "rollout.event_msg",
+        "started_at": 1791024737,
+        "status": "cancelled",
+        "turn_id": "10000000-0000-4000-8000-000000000238"
+      }
+    }
+  }
+]

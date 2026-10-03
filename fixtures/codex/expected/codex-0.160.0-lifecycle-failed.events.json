@@ -1,0 +1,152 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex-rollout:00000000-0000-4000-8000-000000000237:2:d597d384ae5ef33803135c7424d24893a13261f1064c9ee29c15f4b53131ab66",
+    "event_type": "session.active",
+    "occurred_at": "2026-10-03T10:52:51Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "codex_rollout_jsonl",
+    "source_version": "0.160.0",
+    "actor_id": "codex:synthetic-user-237",
+    "device_id": "unavailable",
+    "session_id": "codex:00000000-0000-4000-8000-000000000237",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "governed-content",
+    "attributes": {
+      "lifecycle_kind": "task_start",
+      "lifecycle_status": "active",
+      "unavailable_fields": []
+    },
+    "provider_extensions": {
+      "rollout": {
+        "line": 2,
+        "record": {
+          "payload": {
+            "collaboration_mode_kind": "default",
+            "model_context_window": 258400,
+            "root_turn_id": "10000000-0000-4000-8000-000000000237",
+            "started_at": 1791024771,
+            "trace_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa237",
+            "turn_id": "10000000-0000-4000-8000-000000000237",
+            "type": "task_started"
+          },
+          "timestamp": "2026-10-03T10:52:51.963Z",
+          "type": "event_msg"
+        },
+        "record_type": "event_msg"
+      },
+      "session_lifecycle": {
+        "kind": "task_start",
+        "provenance": "observed",
+        "root_turn_id": "10000000-0000-4000-8000-000000000237",
+        "source": "rollout.event_msg",
+        "started_at": 1791024771,
+        "status": "active",
+        "trace_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa237",
+        "turn_id": "10000000-0000-4000-8000-000000000237"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex-rollout:00000000-0000-4000-8000-000000000237:session_meta:00000000-0000-4000-8000-000000000237",
+    "event_type": "codex.rollout.session_meta",
+    "occurred_at": "2026-10-03T10:52:51.962Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "codex_rollout_jsonl",
+    "source_version": "0.160.0",
+    "actor_id": "codex:synthetic-user-237",
+    "device_id": "unavailable",
+    "session_id": "codex:00000000-0000-4000-8000-000000000237",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "governed-content",
+    "attributes": {
+      "unavailable_fields": []
+    },
+    "provider_extensions": {
+      "rollout": {
+        "line": 1,
+        "record": {
+          "payload": {
+            "cli_version": "0.160.0",
+            "creator_account_id": "synthetic-account-237",
+            "creator_user_id": "synthetic-user-237",
+            "cwd": "/tmp/telemetryiq-synthetic-lifecycle",
+            "id": "00000000-0000-4000-8000-000000000237",
+            "originator": "codex_exec",
+            "source": "exec",
+            "timestamp": "2026-10-03T10:52:51.962Z"
+          },
+          "timestamp": "2026-10-03T10:52:51.962Z",
+          "type": "session_meta"
+        },
+        "record_type": "session_meta"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex-rollout:00000000-0000-4000-8000-000000000237:3:e01c8991e6d328ce00eded9169b8311d7f2b060b61d5d4eada5e3014c795c1dd",
+    "event_type": "session.failed",
+    "occurred_at": "2026-10-03T10:52:54Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "codex_rollout_jsonl",
+    "source_version": "0.160.0",
+    "actor_id": "codex:synthetic-user-237",
+    "device_id": "unavailable",
+    "session_id": "codex:00000000-0000-4000-8000-000000000237",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "governed-content",
+    "attributes": {
+      "duration_ms": 2476,
+      "lifecycle_kind": "task_complete",
+      "lifecycle_status": "failed",
+      "unavailable_fields": []
+    },
+    "provider_extensions": {
+      "rollout": {
+        "line": 3,
+        "record": {
+          "payload": {
+            "completed_at": 1791024774,
+            "duration_ms": 2476,
+            "error": {
+              "codex_error_info": "other",
+              "message": "Synthetic invalid-model request failed with provider status 400"
+            },
+            "last_agent_message": null,
+            "started_at": 1791024771,
+            "turn_id": "10000000-0000-4000-8000-000000000237",
+            "type": "task_complete"
+          },
+          "timestamp": "2026-10-03T10:52:54.425Z",
+          "type": "event_msg"
+        },
+        "record_type": "event_msg"
+      },
+      "session_lifecycle": {
+        "completed_at": 1791024774,
+        "duration_ms": 2476,
+        "error": {
+          "codex_error_info": "other",
+          "message": "Synthetic invalid-model request failed with provider status 400"
+        },
+        "kind": "task_complete",
+        "provenance": "observed",
+        "source": "rollout.event_msg",
+        "started_at": 1791024771,
+        "status": "failed",
+        "turn_id": "10000000-0000-4000-8000-000000000237"
+      }
+    }
+  }
+]

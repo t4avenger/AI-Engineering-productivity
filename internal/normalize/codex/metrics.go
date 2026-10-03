@@ -18,15 +18,29 @@ import (
 var ErrUnsupportedMetrics = errors.New("unsupported Codex metrics payload")
 
 const (
-	skillInjectedMetric     = "codex.skill.injected"
-	skillTurnDurationMetric = "codex.skill.turn.duration_seconds"
-	turnTokenUsageMetric    = "codex.turn.token_usage"
-	serviceNameAttribute    = "service.name"
-	serviceVersionAttribute = "service.version"
+	skillInjectedMetric      = "codex.skill.injected"
+	skillTurnDurationMetric  = "codex.skill.turn.duration_seconds"
+	turnTokenUsageMetric     = "codex.turn.token_usage"
+	pluginCacheRequestMetric = "codex.plugins.loaded_cache.request"
+	mcpDiscoveryMetric       = "codex.mcp.protocol_discovery"
+	mcpCachePublishMetric    = "codex.mcp.tools.cache_publish.duration_ms"
+	appRefreshMetric         = "codex.apps.refresh.duration_ms"
+	serviceNameAttribute     = "service.name"
+	serviceVersionAttribute  = "service.version"
 )
 
 type metricsPayload struct {
 	ResourceMetrics []resourceMetric `json:"resourceMetrics"`
+}
+
+type integrationMetricEventInput struct {
+	resource                map[string]any
+	scopeID, version        string
+	metricName, kind, state string
+	fields, datapoint       map[string]any
+	timeUnixNano            string
+	count, index            int
+	receivedAt              time.Time
 }
 
 type resourceMetric struct {
@@ -203,6 +217,9 @@ func rawMetricEnvelope(raw map[string]any) map[string]any {
 }
 
 func skillEventsFromMetric(resourceAttrs map[string]any, scopeID string, version string, item otlpMetric, receivedAt time.Time) ([]canonical.Event, error) {
+	if events := integrationEventsFromMetric(resourceAttrs, scopeID, version, item, receivedAt); len(events) > 0 {
+		return events, nil
+	}
 	if item.Name == skillTurnDurationMetric && item.Histogram != nil {
 		return skillTurnEventsFromHistogram(resourceAttrs, version, item.Histogram, receivedAt), nil
 	}
@@ -223,6 +240,122 @@ func skillEventsFromMetric(resourceAttrs map[string]any, scopeID string, version
 		}
 	}
 	return events, nil
+}
+
+func integrationEventsFromMetric(resource map[string]any, scopeID, version string, item otlpMetric, receivedAt time.Time) []canonical.Event {
+	switch item.Name {
+	case pluginCacheRequestMetric, mcpDiscoveryMetric:
+		return integrationSumEvents(resource, scopeID, version, item, receivedAt)
+	case mcpCachePublishMetric, appRefreshMetric:
+		return integrationHistogramEvents(resource, scopeID, version, item, receivedAt)
+	default:
+		return nil
+	}
+}
+
+func integrationSumEvents(resource map[string]any, scopeID, version string, item otlpMetric, receivedAt time.Time) []canonical.Event {
+	if item.Sum == nil {
+		return nil
+	}
+	events := make([]canonical.Event, 0, len(item.Sum.DataPoints))
+	for index, point := range item.Sum.DataPoints {
+		fields := attributes(point.Attributes)
+		kind, state := integrationMetricState(item.Name, fields)
+		count, countObserved := positiveMetricCount(point.AsInt)
+		if state != "" && countObserved {
+			events = append(events, integrationMetricEvent(integrationMetricEventInput{
+				resource: resource, scopeID: scopeID, version: version, metricName: item.Name, kind: kind, state: state,
+				fields: fields, datapoint: point.raw, timeUnixNano: point.TimeUnixNano, count: count, index: index, receivedAt: receivedAt,
+			}))
+		}
+	}
+	return events
+}
+
+func integrationHistogramEvents(resource map[string]any, scopeID, version string, item otlpMetric, receivedAt time.Time) []canonical.Event {
+	if item.Histogram == nil {
+		return nil
+	}
+	events := make([]canonical.Event, 0, len(item.Histogram.DataPoints))
+	for index, point := range item.Histogram.DataPoints {
+		count, countObserved := positiveMetricCount(point.Count)
+		if !countObserved {
+			continue
+		}
+		fields := attributes(point.Attributes)
+		kind, state := integrationMetricState(item.Name, fields)
+		if state == "" {
+			continue
+		}
+		events = append(events, integrationMetricEvent(integrationMetricEventInput{
+			resource: resource, scopeID: scopeID, version: version, metricName: item.Name, kind: kind, state: state,
+			fields: fields, datapoint: point.raw, timeUnixNano: point.TimeUnixNano, count: count, index: index, receivedAt: receivedAt,
+		}))
+	}
+	return events
+}
+
+func integrationMetricState(metricName string, fields map[string]any) (string, string) {
+	switch metricName {
+	case pluginCacheRequestMetric:
+		outcome := strings.ToLower(strings.TrimSpace(stringValue(fields["outcome"], "")))
+		switch outcome {
+		case "hit", "load":
+			return "plugin", "cache_" + outcome
+		default:
+			return "plugin", ""
+		}
+	case mcpDiscoveryMetric:
+		return "mcp", "discovered"
+	case mcpCachePublishMetric:
+		if strings.ToLower(strings.TrimSpace(stringValue(fields["result"], ""))) == "published" {
+			return "mcp", "cache_published"
+		}
+		return "mcp", ""
+	case appRefreshMetric:
+		return "app", "refreshed"
+	default:
+		return "", ""
+	}
+}
+
+func positiveMetricCount(value any) (int, bool) {
+	count := normalize.OptionalTokenCount(value)
+	if count == nil || *count <= 0 || uint64(*count) > uint64(^uint(0)>>1) {
+		return 0, false
+	}
+	return int(*count), true
+}
+
+func integrationMetricEvent(input integrationMetricEventInput) canonical.Event {
+	occurredAt := metricTime(input.timeUnixNano, input.receivedAt)
+	identity := strings.Join([]string{input.metricName, input.state, input.timeUnixNano, metricResourceIdentity(input.resource, codexMetricIdentityAttributes(input.resource)), input.scopeID, strconv.Itoa(input.index), strconv.Itoa(input.count), stableJSON(input.fields)}, "|")
+	eventID := contentID("codex:integration:", []byte(identity))
+	extensions := map[string]any{
+		"correlation": integrationCorrelation(eventID, occurredAt),
+		"integration_state": map[string]any{
+			"kind": input.kind, "state": input.state, "count": input.count,
+			"source_metric": input.metricName, "provenance": string(canonical.ProvenanceObserved),
+		},
+		"metric":    map[string]any{"name": input.metricName, "count": input.count},
+		"datapoint": input.datapoint, "resource": rawCodexAttributes(input.resource), "metric_attributes": rawCodexAttributes(input.fields),
+	}
+	event := tokenEvent(eventID, occurredAt, input.receivedAt, input.version, map[string]any{
+		"integration_kind": input.kind, "integration_state": input.state,
+		"unavailable_fields": []string{"model", "token_usage", "cache_usage", "tool_calls", "file_operations", "command_execution", "approvals", "prompt_content", "response_content", "repository_context", "task_outcome", "provider_cost", "session_lifecycle"},
+	}, extensions)
+	event.EventType = input.metricName
+	applyCodexEnvironment(&event, input.fields, input.resource)
+	return event
+}
+
+func integrationCorrelation(eventID string, occurredAt time.Time) map[string]any {
+	return map[string]any{
+		"dedup_key": eventID, "ordering_key": fmt.Sprintf("%020d:%s", occurredAt.UnixNano(), eventID),
+		"task_boundary": map[string]any{
+			"confidence": "unknown", "reason": "Codex integration metrics have no reviewed provider session key",
+		},
+	}
 }
 
 func tokenUsageEventsFromHistogram(resourceAttrs map[string]any, scopeID string, version string, histogram *metricHistogram, receivedAt time.Time) []canonical.Event {

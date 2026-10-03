@@ -448,6 +448,25 @@ export function codexPRLinkOTLPLogs(): string {
 // Codex token metrics do not carry a conversation identifier in the observed
 // 0.153.4 surface. They must remain inspectable observations without inflating
 // the primary session list.
+function codexOTLPMetrics(
+  metrics: Array<Record<string, unknown>>,
+  version = "0.153.4",
+): string {
+  return JSON.stringify({
+    resourceMetrics: [
+      {
+        resource: {
+          attributes: [
+            { key: "service.name", value: { stringValue: "codex_exec" } },
+            { key: "service.version", value: { stringValue: version } },
+          ],
+        },
+        scopeMetrics: [{ metrics }],
+      },
+    ],
+  });
+}
+
 export function codexTurnTokenOTLPMetrics(): string {
   const tokenTypes: Array<[string, string]> = [
     ["input", "1200"],
@@ -457,44 +476,28 @@ export function codexTurnTokenOTLPMetrics(): string {
     ["reasoning_output", "55"],
     ["total", "1774"],
   ];
-  return JSON.stringify({
-    resourceMetrics: [
-      {
-        resource: {
+  return codexOTLPMetrics([
+    {
+      name: "codex.turn.token_usage",
+      histogram: {
+        dataPoints: tokenTypes.map(([tokenType, sum], index) => ({
           attributes: [
-            { key: "service.name", value: { stringValue: "codex_exec" } },
-            { key: "service.version", value: { stringValue: "0.153.4" } },
+            {
+              key: "model",
+              value: { stringValue: "gpt-5-codex-live" },
+            },
+            {
+              key: "token_type",
+              value: { stringValue: tokenType },
+            },
           ],
-        },
-        scopeMetrics: [
-          {
-            metrics: [
-              {
-                name: "codex.turn.token_usage",
-                histogram: {
-                  dataPoints: tokenTypes.map(([tokenType, sum], index) => ({
-                    attributes: [
-                      {
-                        key: "model",
-                        value: { stringValue: "gpt-5-codex-live" },
-                      },
-                      {
-                        key: "token_type",
-                        value: { stringValue: tokenType },
-                      },
-                    ],
-                    count: "1",
-                    sum,
-                    timeUnixNano: `178904216000000000${index}`,
-                  })),
-                },
-              },
-            ],
-          },
-        ],
+          count: "1",
+          sum,
+          timeUnixNano: `178904216000000000${index}`,
+        })),
       },
-    ],
-  });
+    },
+  ]);
 }
 
 // Codex CLI 0.154.0 was observed exporting this resource/scope/span shape via
@@ -1118,6 +1121,111 @@ export function codexLifecycleOTLPLogs(): string {
       timeUnixNano: "1788717763000000002",
     },
   ]);
+}
+
+export function codexLifecycleRolloutNDJSON(): string {
+  const sessionID = "tiq-live-e2e-lifecycle-session";
+  const turnID = "tiq-live-e2e-lifecycle-turn";
+  return [
+    {
+      timestamp: "2026-09-06T18:02:43.000Z",
+      type: "session_meta",
+      payload: {
+        id: sessionID,
+        cli_version: "0.160.0",
+        creator_user_id: "tiq-live-lifecycle-user",
+        cwd: "/workspace/telemetryiq-synthetic-lifecycle",
+      },
+    },
+    {
+      timestamp: "2026-09-06T18:02:43.100Z",
+      type: "event_msg",
+      payload: {
+        type: "task_started",
+        turn_id: turnID,
+        root_turn_id: turnID,
+        trace_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa236",
+        started_at: 1788717763,
+      },
+    },
+    {
+      timestamp: "2026-09-06T18:02:43.200Z",
+      type: "turn_context",
+      payload: {
+        turn_id: turnID,
+        approval_policy: "never",
+        sandbox_policy: { type: "workspace-write", network_access: false },
+        disabled_plugin_ids: [],
+      },
+    },
+    {
+      timestamp: "2026-09-06T18:02:43.300Z",
+      type: "turn_context",
+      payload: {
+        turn_id: turnID,
+        approval_policy: "on-request",
+        sandbox_policy: { type: "read-only" },
+        file_system_sandbox_policy: null,
+        permission_profile: {
+          type: "managed",
+          file_system: {
+            type: "restricted",
+            entries: [
+              {
+                path: { type: "special", value: { kind: "root" } },
+                access: "read",
+              },
+            ],
+          },
+          network: "restricted",
+        },
+        disabled_plugin_ids: [],
+      },
+    },
+    {
+      timestamp: "2026-09-06T18:02:47.562Z",
+      type: "event_msg",
+      payload: {
+        type: "task_complete",
+        turn_id: turnID,
+        started_at: 1788717763,
+        completed_at: 1788717767,
+        duration_ms: 4562,
+        error: null,
+      },
+    },
+  ]
+    .map((record) => JSON.stringify(record))
+    .join("\n");
+}
+
+export function codexIntegrationStateOTLPMetrics(): string {
+  return codexOTLPMetrics(
+    [
+      {
+        name: "codex.mcp.protocol_discovery",
+        sum: {
+          aggregationTemporality: 1,
+          isMonotonic: true,
+          dataPoints: [
+            {
+              attributes: [
+                { key: "mode", value: { stringValue: "legacy" } },
+                { key: "outcome", value: { stringValue: "legacy" } },
+                {
+                  key: "server_kind",
+                  value: { stringValue: "openai_codex_apps" },
+                },
+              ],
+              asInt: "1",
+              timeUnixNano: "1788717767562000000",
+            },
+          ],
+        },
+      },
+    ],
+    "0.160.0",
+  );
 }
 
 export function codexToolDecisionOTLPLogs(): string {
@@ -2076,43 +2184,27 @@ export function claudeSkillOTLPLogs(): string {
 
 // codexSkillOTLPMetrics is a sanitised Codex skill.injected OTLP metrics payload.
 export function codexSkillOTLPMetrics(): string {
-  return JSON.stringify({
-    resourceMetrics: [
-      {
-        resource: {
-          attributes: [
-            { key: "service.name", value: { stringValue: "codex_exec" } },
-            { key: "service.version", value: { stringValue: "0.153.4" } },
-          ],
-        },
-        scopeMetrics: [
+  return codexOTLPMetrics([
+    {
+      name: "codex.skill.injected",
+      sum: {
+        dataPoints: [
           {
-            metrics: [
+            attributes: [
+              { key: "skill", value: { stringValue: "tiq-probe" } },
+              { key: "status", value: { stringValue: "ok" } },
               {
-                name: "codex.skill.injected",
-                sum: {
-                  dataPoints: [
-                    {
-                      attributes: [
-                        { key: "skill", value: { stringValue: "tiq-probe" } },
-                        { key: "status", value: { stringValue: "ok" } },
-                        {
-                          key: "invoke_type",
-                          value: { stringValue: "explicit" },
-                        },
-                      ],
-                      asInt: 1,
-                      timeUnixNano: "1788706421601372612",
-                    },
-                  ],
-                },
+                key: "invoke_type",
+                value: { stringValue: "explicit" },
               },
             ],
+            asInt: 1,
+            timeUnixNano: "1788706421601372612",
           },
         ],
       },
-    ],
-  });
+    },
+  ]);
 }
 
 /** Claude api_request provider-completion success contract for scorecard e2e. */

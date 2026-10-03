@@ -2,9 +2,12 @@
   {
     "actor_id": "codex:lifecycle-account-123",
     "attributes": {
+      "approval_policy": "on-request",
+      "auth_mode": "api-key",
       "entrypoint": "codex exec",
       "lifecycle_kind": "session_start",
       "model": "gpt-6-astra",
+      "sandbox_policy": "workspace-write",
       "unavailable_fields": [
         "cache_usage",
         "reasoning_tokens",

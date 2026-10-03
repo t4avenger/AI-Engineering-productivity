@@ -53,7 +53,9 @@ test('renders risky-access findings after live OTLP ingest', async ({
   await unlockDashboard(page, authToken);
   await page.goto('/governance');
   await expectFiveDestinationPrimaryNav(page);
-  await expect(page.getByRole('heading', { name: 'Governance' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Governance Policies', exact: true }),
+  ).toBeVisible();
   await openGovernanceFindings(page);
   await expect(page.getByRole('heading', { name: 'Risky access' })).toBeVisible();
   await expect(page.getByText('Violation').first()).toBeVisible();

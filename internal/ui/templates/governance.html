@@ -28,6 +28,23 @@
     <article class="governance-summary-card"><h2><svg class="nav-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M2 3h12v2H2zm0 4h8v2H2zm0 4h10v2H2z"/></svg> Prompt rules</h2>{{if .PromptKeywordsConfigured}}<p class="summary-value">{{.PromptKeywordCount}} configured</p>{{else}}<p>{{template "status-badge" "policy_unconfigured"}}</p>{{end}}<p class="muted">Prompt findings — after capture</p></article>
   </section>
 
+  <section id="provider-governance-states" aria-labelledby="provider-governance-states-heading">
+    <h2 id="provider-governance-states-heading">Observed provider governance state</h2>
+    <p class="muted">Exact provider-reported approval, sandbox and authentication values are shown as observations. They describe captured state and do not imply local enforcement.</p>
+    {{if .ProviderStates.States}}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Provider / tool</th><th scope="col">State kind</th><th scope="col">Observed value</th><th scope="col">Phase</th><th scope="col">Session</th><th scope="col">Observed</th></tr></thead>
+        <tbody>
+          {{range .ProviderStates.States}}
+          <tr><td>{{.Provider}} / {{.Tool}}</td><td><code>{{.Kind}}</code></td><td>{{.Value}}</td><td>{{if .Phase}}{{.Phase}}{{else}}{{template "status-badge" "unavailable"}}{{end}}</td><td><a href="{{sessionPath .SessionID}}"><code>{{.SessionID}}</code></a></td><td><time datetime="{{.ObservedAt}}">{{.ObservedAt}}</time></td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}<p>No retained provider governance-state evidence yet.</p>{{end}}
+  </section>
+
   <div class="governance-workspace">
   <section id="access-rules" aria-labelledby="access-rules-heading">
     <h2 id="access-rules-heading">Access Rules</h2>

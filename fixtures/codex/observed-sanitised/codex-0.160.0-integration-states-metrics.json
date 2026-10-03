@@ -1,0 +1,43 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "openai",
+  "tool": "codex",
+  "tool_version": "0.160.0",
+  "captured_at": "2026-10-03T10:59:00Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "resourceMetrics": [{
+      "resource": {"attributes": [
+        {"key": "service.name", "value": {"stringValue": "codex_exec"}},
+        {"key": "service.version", "value": {"stringValue": "0.160.0"}},
+        {"key": "deployment.environment", "value": {"stringValue": "telemetryiq-synthetic"}}
+      ]},
+      "scopeMetrics": [{"scope": {"name": "codex"}, "metrics": [
+        {"name": "codex.plugins.loaded_cache.request", "sum": {"aggregationTemporality": 1, "isMonotonic": true, "dataPoints": [
+          {"attributes": [{"key": "outcome", "value": {"stringValue": "hit"}}], "asInt": "10", "timeUnixNano": "1791024631000000000"},
+          {"attributes": [{"key": "outcome", "value": {"stringValue": "load"}}], "asInt": "1", "timeUnixNano": "1791024631000000000"}
+        ]}},
+        {"name": "codex.mcp.protocol_discovery", "sum": {"aggregationTemporality": 1, "isMonotonic": true, "dataPoints": [
+          {"attributes": [
+            {"key": "mode", "value": {"stringValue": "legacy"}},
+            {"key": "outcome", "value": {"stringValue": "legacy"}},
+            {"key": "server_kind", "value": {"stringValue": "openai_codex_apps"}}
+          ], "asInt": "1", "timeUnixNano": "1791024631000000000"}
+        ]}},
+        {"name": "codex.mcp.tools.cache_publish.duration_ms", "histogram": {"aggregationTemporality": 1, "dataPoints": [
+          {"attributes": [
+            {"key": "result", "value": {"stringValue": "published"}},
+            {"key": "source", "value": {"stringValue": "startup"}}
+          ], "count": "1", "sum": 11, "min": 11, "max": 11, "timeUnixNano": "1791024631000000000"}
+        ]}},
+        {"name": "codex.apps.refresh.duration_ms", "histogram": {"aggregationTemporality": 1, "dataPoints": [
+          {"attributes": [
+            {"key": "path", "value": {"stringValue": "legacy"}},
+            {"key": "trigger", "value": {"stringValue": "initial"}}
+          ], "count": "1", "sum": 921, "min": 921, "max": 921, "timeUnixNano": "1791024631000000000"}
+        ]}}
+      ]}]
+    }]
+  }
+}

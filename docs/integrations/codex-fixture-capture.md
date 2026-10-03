@@ -194,3 +194,25 @@ Committed evidence:
 - `fixtures/codex/observed-sanitised/codex-0.160.0-multi-agent-otlp.json`
 - `fixtures/codex/observed-sanitised/codex-0.160.0-multi-agent.json`
 - `fixtures/codex/expected/codex-0.160.0-multi-agent.relations.json`
+
+## Lifecycle, governance, auth, and integration-state capture
+
+Issue #236 captured Codex CLI 0.160.0 on 2026-10-03 with an isolated temporary
+`CODEX_HOME`, synthetic Git repository, and synchronized loopback rollout plus
+OTLP logs, metrics, and traces. Graceful completion emitted `task_complete` with
+null error; controlled invalid-model failure emitted `task_complete` with an
+error object; termination emitted `turn_aborted` with `interrupted`. Every
+boundary included provider timestamps and duration where applicable.
+
+`turn_context` retained approval and structured sandbox policy. OTLP retained
+ChatGPT auth mode and managed auth-recovery step/outcome/reason. Metrics proved
+plugin loaded-cache request activity, MCP discovery/cache publication, and app
+refresh only. These do not prove named loaded/enabled integrations or execution;
+actual MCP use remains the separate rollout `McpToolCall` surface. Raw capture
+and copied authentication material stayed outside the repository. Evidence:
+
+- `fixtures/codex/observed-sanitised/codex-0.160.0-lifecycle-{completed,failed,cancelled}.jsonl`
+- `fixtures/codex/observed-sanitised/codex-0.160.0-governance-read-only.jsonl`
+- `fixtures/codex/observed-sanitised/codex-0.160.0-lifecycle-governance-otlp.json`
+- `fixtures/codex/observed-sanitised/codex-0.160.0-integration-states-metrics.json`
+- `fixtures/codex/observed-sanitised/codex-0.160.0-lifecycle-governance.json`

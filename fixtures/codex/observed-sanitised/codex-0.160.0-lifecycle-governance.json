@@ -1,0 +1,31 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "openai",
+  "tool": "codex",
+  "tool_version": "0.160.0",
+  "captured_at": "2026-10-03T10:59:00Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "capture_id": "codex-0.160.0-lifecycle-governance",
+    "rollouts": [
+      "codex-0.160.0-lifecycle-completed.jsonl",
+      "codex-0.160.0-lifecycle-failed.jsonl",
+      "codex-0.160.0-lifecycle-cancelled.jsonl",
+      "codex-0.160.0-governance-read-only.jsonl"
+    ],
+    "otlp_logs": "codex-0.160.0-lifecycle-governance-otlp.json",
+    "otlp_metrics": "codex-0.160.0-integration-states-metrics.json",
+    "verdicts": {
+      "normal_completion": "task_complete with null error",
+      "failure": "task_complete with provider error object",
+      "cancellation": "turn_aborted with interrupted reason",
+      "governance": "turn_context approval_policy and structured workspace-write/read-only sandbox_policy",
+      "auth": "conversation_starts auth_mode and auth_recovery auth.mode/outcome",
+      "plugin_state": "loaded-cache hit/load activity only; loaded or enabled identity remains unknown",
+      "app_state": "refresh activity only; configured or enabled identity remains unknown",
+      "mcp_state": "protocol discovery and cache publication only; execution remains separately proven by rollout McpToolCall evidence"
+    },
+    "notes": "Reduced from isolated synthetic Codex CLI 0.160.0 runs with synchronized rollout and loopback OTLP logs, metrics and traces. Provider identifiers, content, paths, errors, timestamps and counts are synthetic replacements preserving field names, types, nesting and lifecycle relationships. Raw captures and copied authentication remained outside the repository. Discovery, refresh and cache activity are not treated as executed use."
+  }
+}

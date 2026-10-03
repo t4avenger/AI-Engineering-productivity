@@ -97,6 +97,103 @@ func TestCodexRolloutOperationsIngestToRead(t *testing.T) {
 	}
 }
 
+func TestCodexLifecycleGovernanceAndIntegrationStatesIngestToRead(t *testing.T) {
+	_, server := authenticatedRolloutTestServer(t)
+	for _, name := range []string{
+		"codex-0.160.0-lifecycle-completed.jsonl",
+		"codex-0.160.0-lifecycle-failed.jsonl",
+		"codex-0.160.0-lifecycle-cancelled.jsonl",
+	} {
+		postAcceptedRollout(t, server.URL, readCodexObservedFixture(t, name))
+	}
+	postAcceptedOTLP(t, server.URL, "/v1/logs", string(readCodexObservedFixture(t, "codex-0.160.0-lifecycle-governance-otlp.json")))
+	postAcceptedOTLP(t, server.URL, "/v1/metrics", string(readCodexObservedFixture(t, "codex-0.160.0-integration-states-metrics.json")))
+
+	sessions := getAuthenticatedJSON[sessionListResponse](t, server.URL+"/api/v1/sessions?limit=10")
+	assertCodexLifecycleSessions(t, sessions)
+	timeline := getAuthenticatedJSON[eventListResponse](t, server.URL+"/api/v1/sessions/codex:00000000-0000-4000-8000-000000000236/events?limit=20")
+	assertCurrentCodexLifecycleTimeline(t, timeline)
+	states := getAuthenticatedJSON[integrationStatesResponse](t, server.URL+"/api/v1/insights/integration-states")
+	if len(states.Data.States) != 5 {
+		t.Fatalf("integration states = %#v", states.Data.States)
+	}
+	postAcceptedRollout(t, server.URL, readCodexObservedFixture(t, "codex-0.160.0-governance-read-only.jsonl"))
+	governanceStates := getAuthenticatedJSON[governanceStatesResponse](t, server.URL+"/api/v1/insights/governance-states")
+	assertCodexGovernanceStates(t, governanceStates)
+}
+
+func assertCodexLifecycleSessions(t *testing.T, sessions sessionListResponse) {
+	t.Helper()
+	wantStates := map[string]string{
+		"codex:00000000-0000-4000-8000-000000000236": "completed",
+		"codex:00000000-0000-4000-8000-000000000237": "failed",
+		"codex:00000000-0000-4000-8000-000000000238": "cancelled",
+	}
+	if len(sessions.Data) != len(wantStates) {
+		t.Fatalf("sessions = %#v", sessions.Data)
+	}
+	for _, session := range sessions.Data {
+		if session.State != wantStates[session.SessionID] || session.CompletedAt == nil {
+			t.Fatalf("session lifecycle = %#v", session)
+		}
+	}
+}
+
+func assertCurrentCodexLifecycleTimeline(t *testing.T, timeline eventListResponse) {
+	t.Helper()
+	var governance, terminal *timelineEvent
+	for index := range timeline.Data {
+		switch timeline.Data[index].EventType {
+		case "codex.rollout.turn_context":
+			governance = &timeline.Data[index]
+		case "session.completed":
+			terminal = &timeline.Data[index]
+		}
+	}
+	if governance == nil || governance.ApprovalPolicy == nil || *governance.ApprovalPolicy != "never" || governance.SandboxPolicy == nil || *governance.SandboxPolicy != "workspace-write" {
+		t.Fatalf("governance timeline = %#v", governance)
+	}
+	if terminal == nil || terminal.LifecycleStatus == nil || *terminal.LifecycleStatus != "completed" || terminal.DurationMs == nil || *terminal.DurationMs != "4562" {
+		t.Fatalf("terminal timeline = %#v", terminal)
+	}
+}
+
+func assertCodexGovernanceStates(t *testing.T, governanceStates governanceStatesResponse) {
+	t.Helper()
+	wantGovernance := map[string]bool{
+		"approval_policy/never": false, "sandbox_policy/workspace-write": false, "sandbox_policy/read-only": false,
+		"auth_mode/Chatgpt": false, "auth_mode/managed": false, "auth_recovery/recovery_not_run": false,
+	}
+	for _, state := range governanceStates.Data.States {
+		key := state.Kind + "/" + state.Value
+		if _, wanted := wantGovernance[key]; wanted {
+			wantGovernance[key] = true
+		}
+	}
+	for state, observed := range wantGovernance {
+		if !observed {
+			t.Fatalf("governance state %q missing: %#v", state, governanceStates.Data.States)
+		}
+	}
+}
+
+func readCodexObservedFixture(t *testing.T, name string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "..", "fixtures", "codex", "observed-sanitised", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document map[string]any
+	if json.Unmarshal(data, &document) == nil && document["fixture_version"] != nil && document["payload"] != nil {
+		payload, marshalErr := json.Marshal(document["payload"])
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
+		return payload
+	}
+	return data
+}
+
 func injectRolloutPrecisionNumber(t *testing.T, fixture []byte) []byte {
 	t.Helper()
 	old := []byte(`"arguments":{"value":"synthetic-mcp-success"}`)

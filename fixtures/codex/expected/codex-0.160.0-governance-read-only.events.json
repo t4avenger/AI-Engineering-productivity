@@ -1,0 +1,132 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex-rollout:00000000-0000-4000-8000-000000000239:session_meta:00000000-0000-4000-8000-000000000239",
+    "event_type": "codex.rollout.session_meta",
+    "occurred_at": "2026-10-03T10:54:43.337Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "codex_rollout_jsonl",
+    "source_version": "0.160.0",
+    "actor_id": "codex:synthetic-user-239",
+    "device_id": "unavailable",
+    "session_id": "codex:00000000-0000-4000-8000-000000000239",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "governed-content",
+    "attributes": {
+      "unavailable_fields": []
+    },
+    "provider_extensions": {
+      "rollout": {
+        "line": 1,
+        "record": {
+          "ordinal": 0,
+          "payload": {
+            "cli_version": "0.160.0",
+            "creator_account_id": "synthetic-account-239",
+            "creator_user_id": "synthetic-user-239",
+            "cwd": "/tmp/telemetryiq-synthetic-read-only",
+            "id": "00000000-0000-4000-8000-000000000239",
+            "originator": "codex_exec",
+            "source": "exec",
+            "timestamp": "2026-10-03T10:54:43.337Z"
+          },
+          "timestamp": "2026-10-03T10:54:43.337Z",
+          "type": "session_meta"
+        },
+        "record_type": "session_meta"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex-rollout:00000000-0000-4000-8000-000000000239:2:27d6af1f51ed2aec04de398b21ba3a63a08d9ce51cce1a6252fae1df64662418",
+    "event_type": "codex.rollout.turn_context",
+    "occurred_at": "2026-10-03T10:54:43.415Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "codex_rollout_jsonl",
+    "source_version": "0.160.0",
+    "actor_id": "codex:synthetic-user-239",
+    "device_id": "unavailable",
+    "session_id": "codex:00000000-0000-4000-8000-000000000239",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "governed-content",
+    "attributes": {
+      "approval_policy": "never",
+      "sandbox_policy": "read-only",
+      "unavailable_fields": []
+    },
+    "provider_extensions": {
+      "governance_state": {
+        "approval_policy": "never",
+        "disabled_plugin_ids": [],
+        "file_system_sandbox_policy": null,
+        "permission_profile": {
+          "file_system": {
+            "entries": [
+              {
+                "access": "read",
+                "path": {
+                  "type": "special",
+                  "value": {
+                    "kind": "root"
+                  }
+                }
+              }
+            ],
+            "type": "restricted"
+          },
+          "network": "restricted",
+          "type": "managed"
+        },
+        "provenance": "observed",
+        "sandbox_policy": {
+          "type": "read-only"
+        },
+        "source": "rollout.turn_context"
+      },
+      "rollout": {
+        "line": 2,
+        "record": {
+          "ordinal": 7,
+          "payload": {
+            "approval_policy": "never",
+            "approvals_reviewer": "user",
+            "disabled_plugin_ids": [],
+            "file_system_sandbox_policy": null,
+            "permission_profile": {
+              "file_system": {
+                "entries": [
+                  {
+                    "access": "read",
+                    "path": {
+                      "type": "special",
+                      "value": {
+                        "kind": "root"
+                      }
+                    }
+                  }
+                ],
+                "type": "restricted"
+              },
+              "network": "restricted",
+              "type": "managed"
+            },
+            "sandbox_policy": {
+              "type": "read-only"
+            },
+            "turn_id": "10000000-0000-4000-8000-000000000239"
+          },
+          "timestamp": "2026-10-03T10:54:43.415Z",
+          "type": "turn_context"
+        },
+        "record_type": "turn_context"
+      }
+    }
+  }
+]

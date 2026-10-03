@@ -16,6 +16,10 @@ retained session `pr_link` HTTP(S) URLs and linked sessions; it does not call
 GitHub and does not invent PR rows from counters or branch/time. Provider URL
 capture proof remains #183 and #184. The `/insights` route remains directly
 available as a utility during the Home-based insight surface from issue #150.
+Integrations also renders retained provider-state evidence. Discovery, cache,
+refresh, disabled-configuration, and execution stay separate; the page states
+explicitly that discovery/cache activity does not prove use and leaves
+unobserved loaded/enabled identities unavailable (#236).
 
 Historical V1 used a four-tab light shell (Home · Sessions · Governance ·
 Integrations) with Models/PRs secondary; that IA is superseded by ADR 0003.
@@ -76,6 +80,12 @@ finding section shows outcome and visibility badges, evidence tables (raw
 path/command or MCP server name), and session links when a finding carries a
 session id. An empty MCP allowlist is labelled allowlist-not-configured /
 indeterminate.
+
+The same destination also shows an observed provider-governance table for
+fixture-backed approval policy, sandbox policy, authentication mode, and
+authentication-recovery state. Exact provider values and session links remain
+visible as observations; absent values stay absent, and the table makes no
+enforcement or provider-capability claim.
 
 Below Findings, an Access Rules tablist offers MCP servers, Skills, Files &
 Paths, and Prompt Keywords (`?rules=`). MCP and Skills are editable local

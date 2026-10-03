@@ -99,3 +99,37 @@ func TestSourceEventsFromSessionRetainsUserPromptAndDropsAssistantText(t *testin
 		t.Fatalf("unrelated prompt field retained: %#v", echo)
 	}
 }
+
+func TestSourceEventsFromSessionRetainsOnlyGovernanceStateEvidence(t *testing.T) {
+	now := time.Now().UTC()
+	event := canonical.Event{
+		EventID: "governance", EventType: "codex.auth_recovery", SessionID: "s1",
+		OccurredAt: now, ReceivedAt: now, Provider: "openai", Tool: "codex",
+		Attributes: map[string]any{
+			"auth_mode": "managed", "lifecycle_kind": "auth_recovery", "lifecycle_phase": "reload",
+			"lifecycle_status": "recovery_not_run", "unrelated": "drop-me",
+		},
+		ProviderExtensions: map[string]any{
+			"session_lifecycle": map[string]any{"kind": "auth_recovery", "provenance": "observed"},
+			"raw_log_record":    map[string]any{"body": "drop-me"},
+		},
+	}
+	unrelatedLifecycle := event
+	unrelatedLifecycle.EventID = "session-active"
+	unrelatedLifecycle.EventType = "session.active"
+	unrelatedLifecycle.Attributes = map[string]any{"lifecycle_kind": "session_start", "lifecycle_status": "active"}
+	unrelatedLifecycle.ProviderExtensions = map[string]any{"session_lifecycle": map[string]any{"kind": "session_start"}}
+	thin := SourceEventsFromSession([]canonical.Event{event, unrelatedLifecycle})
+	if len(thin) != 2 {
+		t.Fatalf("retained events = %#v", thin)
+	}
+	if thin[0].Attributes["auth_mode"] != "managed" || thin[0].Attributes["lifecycle_status"] != "recovery_not_run" {
+		t.Fatalf("governance attributes = %#v", thin[0].Attributes)
+	}
+	if _, present := thin[0].Attributes["unrelated"]; present || thin[0].ProviderExtensions["raw_log_record"] != nil {
+		t.Fatalf("unrelated evidence retained = %#v", thin[0])
+	}
+	if thin[0].ProviderExtensions["session_lifecycle"].(map[string]any)["provenance"] != "observed" {
+		t.Fatalf("lifecycle provenance = %#v", thin[0].ProviderExtensions)
+	}
+}

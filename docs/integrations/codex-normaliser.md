@@ -126,13 +126,17 @@ provider call ID when present, so replay deduplication cannot collapse reused
 call IDs from different sessions. `tool_calls` is removed from
 `attributes.unavailable_fields` only for `codex.tool_result`;
 `command_execution` is removed only for `codex.sandbox_outcome`. Codex
-`codex.conversation_starts` is normalised to canonical `session.active` and
-stamps `lifecycle_kind=session_start`, while `codex.startup_phase` and
-`codex.websocket_connect` retain lifecycle/governance evidence such as
-phase, status, duration, entrypoint, auth mode, approval policy, sandbox policy,
-and terminal type. These lifecycle-backed events remove `session_lifecycle` from
-`attributes.unavailable_fields`; session end remains unknown because no reviewed
-Codex 0.153.4 fixture proves a completion signal. Other Codex log events keep
+`codex.conversation_starts` is normalised to canonical `session.active`, while
+`codex.startup_phase`, `codex.websocket_connect`, and current
+`codex.auth_recovery` retain lifecycle/governance evidence. CLI 0.160.0 rollout
+`task_started` maps to `session.active`; `task_complete` maps to
+`session.completed` when `error` is null and `session.failed` when the provider
+reports an error object; `turn_aborted` maps to `session.cancelled` only when
+the fixture-reviewed reason is `interrupted`, while absent or unreviewed reasons
+remain raw and unprojected. Exact numeric `started_at`/`completed_at`
+and duration are retained, with raw records unchanged. `turn_context` promotes
+approval/sandbox policy while retaining its structured policy evidence. Other
+Codex log events keep
 those fields unavailable.
 
 When a `codex.tool_result` carries a non-empty `mcp_server`, the event normaliser
@@ -192,10 +196,9 @@ Codex log shape into stable-primitive `canonical.ModelInteraction` records
 - **Pull-request / merge-request URLs** (`supported` for 0.155.1 `codex.tool_result`) are recognised only when a provider-emitted field contains an exact HTTP(S) URL with a GitHub/GitLab/Bitbucket/Azure DevOps-compatible pull or merge-request path. The raw URL and source field remain in provider extensions; one distinct session candidate becomes `attributes.pr_link`, while conflicts are `partial`. The normaliser never derives a link from repository metadata or calls the host.
 - **Approval/permission decisions** (`supported` for `codex.tool_decision`) are retained as event-level approval signals rather than `canonical.Operation` records, because they describe permission decisions before/around a tool call, not execution itself. Missing decisions are labelled `unknown`; approved/denied variants retain every emitted field in the raw log-attribute echo, including credentials, account/email identity, content, command evidence and slug values.
 - **MCP-backed tool results** (`partial` for MCP inventory) are represented only when Codex reports a non-empty `mcp_server`; the provider-reported raw server name is retained under `provider_extensions.mcp_call` and is itself the correlation identity.
-- **Session lifecycle/governance** (`partial`) maps `codex.conversation_starts`
-  to canonical `session.active` and keeps startup/websocket governance
-  metadata on the timeline. Session end is still `unknown` pending fixture-backed
-  evidence.
+- **Session lifecycle/governance** (`partial`) maps OTLP start/auth signals and
+  CLI 0.160.0 rollout task boundaries into active/completed/failed/cancelled
+  states. Missing named plugin/app loaded or enabled state stays unknown.
 - **Session/request identity** uses the raw `codex:<conversation.id>` or
   `codex:<thread.id>` when the corresponding provider key is present. Request
   IDs and records without either key use a non-keyed content ID for deterministic correlation and
@@ -219,7 +222,15 @@ is the golden output for the checked-in observed-sanitised input.
 the canonical event can preserve absent-vs-zero semantics. Metrics outside the
 mapped set remain HTTP-accepted but intentionally ignored, so Codex exporters can
 flush without TelemetryIQ inventing rows for internal timings, startup counters,
-SQLite/cache internals, or app/plugin inventory signals.
+or SQLite internals. Issue #236 adds only reviewed integration-state instruments:
+plugin loaded-cache request outcomes, MCP discovery/cache publication, and app
+refresh. They stay observation-scope because the metrics have no provider session
+key. Discovery, cache activity, disabled configuration, and explicit MCP use
+remain distinct; none is relabelled loaded, enabled, or used.
+Integration datapoints require a strictly parsed positive integer count. Plugin
+cache outcomes are projected only for the reviewed `hit` and `load` values, and
+MCP cache publication requires the reviewed `result=published`; malformed,
+absent, non-positive, or unreviewed values remain unprojected.
 
 ### Skill metrics
 

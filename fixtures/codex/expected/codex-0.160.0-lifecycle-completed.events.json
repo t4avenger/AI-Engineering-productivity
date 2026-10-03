@@ -1,0 +1,233 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex-rollout:00000000-0000-4000-8000-000000000236:2:bf754c3d2569485ceb3d618ae232607df3852c11c65c05e86e33d4f423076669",
+    "event_type": "session.active",
+    "occurred_at": "2026-10-03T10:50:27Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "codex_rollout_jsonl",
+    "source_version": "0.160.0",
+    "actor_id": "codex:synthetic-user-236",
+    "device_id": "unavailable",
+    "session_id": "codex:00000000-0000-4000-8000-000000000236",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "governed-content",
+    "attributes": {
+      "lifecycle_kind": "task_start",
+      "lifecycle_status": "active",
+      "unavailable_fields": []
+    },
+    "provider_extensions": {
+      "rollout": {
+        "line": 2,
+        "record": {
+          "payload": {
+            "collaboration_mode_kind": "default",
+            "model_context_window": 258400,
+            "root_turn_id": "10000000-0000-4000-8000-000000000236",
+            "started_at": 1791024627,
+            "trace_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa236",
+            "turn_id": "10000000-0000-4000-8000-000000000236",
+            "type": "task_started"
+          },
+          "timestamp": "2026-10-03T10:50:27.071Z",
+          "type": "event_msg"
+        },
+        "record_type": "event_msg"
+      },
+      "session_lifecycle": {
+        "kind": "task_start",
+        "provenance": "observed",
+        "root_turn_id": "10000000-0000-4000-8000-000000000236",
+        "source": "rollout.event_msg",
+        "started_at": 1791024627,
+        "status": "active",
+        "trace_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa236",
+        "turn_id": "10000000-0000-4000-8000-000000000236"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex-rollout:00000000-0000-4000-8000-000000000236:session_meta:00000000-0000-4000-8000-000000000236",
+    "event_type": "codex.rollout.session_meta",
+    "occurred_at": "2026-10-03T10:50:27.07Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "codex_rollout_jsonl",
+    "source_version": "0.160.0",
+    "actor_id": "codex:synthetic-user-236",
+    "device_id": "unavailable",
+    "session_id": "codex:00000000-0000-4000-8000-000000000236",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "governed-content",
+    "attributes": {
+      "unavailable_fields": []
+    },
+    "provider_extensions": {
+      "rollout": {
+        "line": 1,
+        "record": {
+          "payload": {
+            "cli_version": "0.160.0",
+            "creator_account_id": "synthetic-account-236",
+            "creator_user_id": "synthetic-user-236",
+            "cwd": "/tmp/telemetryiq-synthetic-lifecycle",
+            "id": "00000000-0000-4000-8000-000000000236",
+            "originator": "codex_exec",
+            "source": "exec",
+            "timestamp": "2026-10-03T10:50:27.070Z"
+          },
+          "timestamp": "2026-10-03T10:50:27.070Z",
+          "type": "session_meta"
+        },
+        "record_type": "session_meta"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex-rollout:00000000-0000-4000-8000-000000000236:3:be5037589b316911565d91f85562bd05ea4ecba6ab32cd01a185e63badc7c973",
+    "event_type": "codex.rollout.turn_context",
+    "occurred_at": "2026-10-03T10:50:27.072Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "codex_rollout_jsonl",
+    "source_version": "0.160.0",
+    "actor_id": "codex:synthetic-user-236",
+    "device_id": "unavailable",
+    "session_id": "codex:00000000-0000-4000-8000-000000000236",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "governed-content",
+    "attributes": {
+      "approval_policy": "never",
+      "sandbox_policy": "workspace-write",
+      "unavailable_fields": []
+    },
+    "provider_extensions": {
+      "governance_state": {
+        "approval_policy": "never",
+        "disabled_plugin_ids": [],
+        "file_system_sandbox_policy": {
+          "entries": [
+            {
+              "access": "write",
+              "path": {
+                "path": "/tmp/telemetryiq-synthetic-lifecycle",
+                "type": "path"
+              }
+            }
+          ],
+          "kind": "restricted"
+        },
+        "permission_profile": {
+          "network": "restricted",
+          "type": "managed"
+        },
+        "provenance": "observed",
+        "sandbox_policy": {
+          "exclude_slash_tmp": false,
+          "exclude_tmpdir_env_var": false,
+          "network_access": false,
+          "type": "workspace-write"
+        },
+        "source": "rollout.turn_context"
+      },
+      "rollout": {
+        "line": 3,
+        "record": {
+          "payload": {
+            "approval_policy": "never",
+            "disabled_plugin_ids": [],
+            "file_system_sandbox_policy": {
+              "entries": [
+                {
+                  "access": "write",
+                  "path": {
+                    "path": "/tmp/telemetryiq-synthetic-lifecycle",
+                    "type": "path"
+                  }
+                }
+              ],
+              "kind": "restricted"
+            },
+            "permission_profile": {
+              "network": "restricted",
+              "type": "managed"
+            },
+            "sandbox_policy": {
+              "exclude_slash_tmp": false,
+              "exclude_tmpdir_env_var": false,
+              "network_access": false,
+              "type": "workspace-write"
+            },
+            "turn_id": "10000000-0000-4000-8000-000000000236"
+          },
+          "timestamp": "2026-10-03T10:50:27.072Z",
+          "type": "turn_context"
+        },
+        "record_type": "turn_context"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex-rollout:00000000-0000-4000-8000-000000000236:4:878ee2796c5d725339f3a032cb09d69588d059dc382368eac7169583039a7287",
+    "event_type": "session.completed",
+    "occurred_at": "2026-10-03T10:50:31Z",
+    "received_at": "1970-01-01T00:00:01Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "codex_rollout_jsonl",
+    "source_version": "0.160.0",
+    "actor_id": "codex:synthetic-user-236",
+    "device_id": "unavailable",
+    "session_id": "codex:00000000-0000-4000-8000-000000000236",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "governed-content",
+    "attributes": {
+      "duration_ms": 4562,
+      "lifecycle_kind": "task_complete",
+      "lifecycle_status": "completed",
+      "unavailable_fields": []
+    },
+    "provider_extensions": {
+      "rollout": {
+        "line": 4,
+        "record": {
+          "payload": {
+            "completed_at": 1791024631,
+            "duration_ms": 4562,
+            "error": null,
+            "last_agent_message": "synthetic lifecycle complete",
+            "started_at": 1791024627,
+            "turn_id": "10000000-0000-4000-8000-000000000236",
+            "type": "task_complete"
+          },
+          "timestamp": "2026-10-03T10:50:31.621Z",
+          "type": "event_msg"
+        },
+        "record_type": "event_msg"
+      },
+      "session_lifecycle": {
+        "completed_at": 1791024631,
+        "duration_ms": 4562,
+        "error": null,
+        "kind": "task_complete",
+        "provenance": "observed",
+        "source": "rollout.event_msg",
+        "started_at": 1791024627,
+        "status": "completed",
+        "turn_id": "10000000-0000-4000-8000-000000000236"
+      }
+    }
+  }
+]

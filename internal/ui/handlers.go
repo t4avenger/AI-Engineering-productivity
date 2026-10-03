@@ -203,6 +203,12 @@ type timelineRow struct {
 	LifecyclePhase    string
 	LifecycleStatus   string
 	Entrypoint        string
+	ApprovalPolicy    string
+	SandboxPolicy     string
+	AuthMode          string
+	IntegrationKind   string
+	IntegrationName   string
+	IntegrationState  string
 	UnavailableFields []string
 }
 
@@ -245,6 +251,7 @@ type pullRequestsData struct {
 // governanceData is the server-rendered Governance findings view (#151)
 // plus Access Rules tab shells (#160).
 type governanceData struct {
+	ProviderStates              insights.GovernanceStates
 	RiskyAccess                 governance.RiskyAccess
 	UnapprovedMCP               governance.UnapprovedMCP
 	UnapprovedSkills            governance.UnapprovedSkills
@@ -327,6 +334,8 @@ const (
 type integrationsData struct {
 	Tools            []integrationRow
 	Empty            bool
+	States           []integrationStateRow
+	StateError       string
 	Capabilities     []capabilityRow
 	Providers        []string
 	CursorEnterprise cursorEnterpriseStatus
@@ -337,6 +346,15 @@ type integrationRow struct {
 	Provider      string
 	LastSeen      string
 	LastSeenState string
+}
+
+type integrationStateRow struct {
+	Provider   string
+	Tool       string
+	Kind       string
+	Name       string
+	State      string
+	ObservedAt string
 }
 
 // capabilityRow is one headline matrix capability for the Integrations table.
@@ -1128,6 +1146,7 @@ func (s *Server) governancePageData(r *http.Request, mcpSelected, skillsSelected
 		data.MCPServers = mcpAllowlistOptions(insights.MCPInventory{}, draftAllowlist, activeAllowlist)
 		data.Skills = skillAllowlistOptions(nil, draftSkills, activeSkills)
 	} else {
+		data.ProviderStates = insights.GovernanceStatesFromEvents(events)
 		data.RiskyAccess = governance.RiskyAccessFromEvents(events)
 		// Findings and preview always evaluate the active (saved) allowlist; selected
 		// is only a draft for checkbox rendering until save succeeds.
@@ -1253,6 +1272,21 @@ func (s *Server) integrationsPage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	data.Empty = len(data.Tools) == 0
+	events, eventsErr := s.insightSourceEvents(r)
+	if eventsErr != nil {
+		data.StateError = "Unable to load retained integration-state evidence."
+	} else {
+		for _, state := range insights.IntegrationStatesFromEvents(events).States {
+			name := statusLabel("unavailable")
+			if state.Name != nil {
+				name = *state.Name
+			}
+			data.States = append(data.States, integrationStateRow{
+				Provider: state.Provider, Tool: state.Tool, Kind: state.Kind, Name: name,
+				State: state.State, ObservedAt: state.ObservedAt.UTC().Format(time.RFC3339Nano),
+			})
+		}
+	}
 	data.CursorEnterprise = s.cursorEnterpriseFromSessions(r, sessions)
 	s.render(w, tmplIntegrations, layoutData{Title: "Integrations", Nav: "integrations", Health: s.healthLabel(r), Content: data})
 }
@@ -1572,6 +1606,12 @@ func (s *Server) loadTimeline(r *http.Request, sessionID, cursorRaw string) ([]t
 			LifecyclePhase:    attrString(event.Attributes["lifecycle_phase"]),
 			LifecycleStatus:   attrString(event.Attributes["lifecycle_status"]),
 			Entrypoint:        attrString(event.Attributes["entrypoint"]),
+			ApprovalPolicy:    optionalAttrString(event.Attributes["approval_policy"]),
+			SandboxPolicy:     optionalAttrString(event.Attributes["sandbox_policy"]),
+			AuthMode:          optionalAttrString(event.Attributes["auth_mode"]),
+			IntegrationKind:   optionalAttrString(event.Attributes["integration_kind"]),
+			IntegrationName:   optionalAttrString(event.Attributes["integration_name"]),
+			IntegrationState:  optionalAttrString(event.Attributes["integration_state"]),
 			UnavailableFields: fieldLabels(unavailableFields(event.Attributes["unavailable_fields"])),
 		}
 	}
@@ -1741,6 +1781,11 @@ func attrString(value any) string {
 	default:
 		return statusLabel("unavailable")
 	}
+}
+
+func optionalAttrString(value any) string {
+	text, _ := observedString(value)
+	return text
 }
 
 // approvalToolQualifier returns the value that qualifies the approved/denied

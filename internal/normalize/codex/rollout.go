@@ -63,6 +63,7 @@ func NormalizeRolloutEvidence(data []byte, receivedAt time.Time) ([]canonical.Ev
 	}
 	operations, correlationEvents := rolloutOperations(records, metadata, receivedAt)
 	events = append(events, correlationEvents...)
+	events = append(events, rolloutIntegrationEvents(records, metadata, receivedAt)...)
 	return normalize.CorrelateEvents(events), normalize.CorrelateOperations(operations), nil
 }
 
@@ -185,7 +186,7 @@ func rolloutEvent(record rolloutRecord, metadata rolloutMetadata, receivedAt tim
 	if echo != nil {
 		extensions["event"] = echo
 	}
-	return canonical.Event{
+	event := canonical.Event{
 		SchemaVersion:      canonicalSchemaVersion,
 		EventID:            rolloutEventID(record, metadata.sessionID),
 		EventType:          eventType,
@@ -202,6 +203,8 @@ func rolloutEvent(record rolloutRecord, metadata rolloutMetadata, receivedAt tim
 		Attributes:         map[string]any{"unavailable_fields": []string{}},
 		ProviderExtensions: extensions,
 	}
+	applyRolloutLifecycleAndGovernance(&event, record)
+	return event
 }
 
 func rolloutEventID(record rolloutRecord, sessionID string) string {

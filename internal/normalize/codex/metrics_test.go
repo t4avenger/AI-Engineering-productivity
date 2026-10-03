@@ -84,6 +84,79 @@ func TestNormalizeMetricsTokenUsageGolden(t *testing.T) {
 	assertCodexGolden(t, "codex-0.153.4-turn-token-usage-metrics.events.json", first)
 }
 
+func TestNormalizeMetricsProjectsDistinctIntegrationStates(t *testing.T) {
+	events, err := NormalizeMetrics(readCodexFixturePayload(t, "codex-0.160.0-integration-states-metrics.json"), time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		"plugin/cache_hit":    "codex.plugins.loaded_cache.request",
+		"plugin/cache_load":   "codex.plugins.loaded_cache.request",
+		"mcp/discovered":      "codex.mcp.protocol_discovery",
+		"mcp/cache_published": "codex.mcp.tools.cache_publish.duration_ms",
+		"app/refreshed":       "codex.apps.refresh.duration_ms",
+	}
+	if len(events) != len(want) {
+		t.Fatalf("integration events = %d, want %d: %#v", len(events), len(want), events)
+	}
+	for _, event := range events {
+		key := event.Attributes["integration_kind"].(string) + "/" + event.Attributes["integration_state"].(string)
+		if event.EventType != want[key] {
+			t.Fatalf("integration state %q = %#v", key, event)
+		}
+		if event.ProviderExtensions["integration_state"].(map[string]any)["provenance"] != "observed" {
+			t.Fatalf("integration provenance = %#v", event.ProviderExtensions)
+		}
+	}
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		writeCodexGolden(t, "codex-0.160.0-integration-states-metrics.events.json", events)
+	}
+	assertCodexGolden(t, "codex-0.160.0-integration-states-metrics.events.json", events)
+}
+
+func TestIntegrationMetricsRequirePositiveIntegerCount(t *testing.T) {
+	for name, count := range map[string]any{
+		"absent": nil, "malformed": "invalid", "fractional": 1.5, "zero": "0", "negative": "-1",
+	} {
+		t.Run(name, func(t *testing.T) {
+			resource := map[string]any{serviceNameAttribute: "codex_exec"}
+			metrics := []otlpMetric{
+				{Name: mcpDiscoveryMetric, Sum: &metricSum{DataPoints: []metricDataPoint{{AsInt: count}}}},
+				{Name: appRefreshMetric, Histogram: &metricHistogram{DataPoints: []histogramDataPoint{{Count: count}}}},
+			}
+			for _, metric := range metrics {
+				if events := integrationEventsFromMetric(resource, "", "0.160.0", metric, time.Unix(1, 0)); len(events) != 0 {
+					t.Fatalf("%s with count %#v produced %#v", metric.Name, count, events)
+				}
+			}
+		})
+	}
+}
+
+func TestIntegrationMetricStateUsesOnlyReviewedProviderValues(t *testing.T) {
+	for _, test := range []struct {
+		name, metric, key, value, wantKind, wantState string
+	}{
+		{name: "cache hit", metric: pluginCacheRequestMetric, key: "outcome", value: "hit", wantKind: "plugin", wantState: "cache_hit"},
+		{name: "cache load", metric: pluginCacheRequestMetric, key: "outcome", value: "load", wantKind: "plugin", wantState: "cache_load"},
+		{name: "unknown cache outcome", metric: pluginCacheRequestMetric, key: "outcome", value: "error", wantKind: "plugin"},
+		{name: "published cache", metric: mcpCachePublishMetric, key: "result", value: "published", wantKind: "mcp", wantState: "cache_published"},
+		{name: "missing publish result", metric: mcpCachePublishMetric, wantKind: "mcp"},
+		{name: "unknown publish result", metric: mcpCachePublishMetric, key: "result", value: "error", wantKind: "mcp"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fields := map[string]any{}
+			if test.key != "" {
+				fields[test.key] = test.value
+			}
+			kind, state := integrationMetricState(test.metric, fields)
+			if kind != test.wantKind || state != test.wantState {
+				t.Fatalf("integrationMetricState() = %q, %q; want %q, %q", kind, state, test.wantKind, test.wantState)
+			}
+		})
+	}
+}
+
 func assertTokenUsageEvents(t *testing.T, events []canonical.Event) {
 	t.Helper()
 	if len(events) != 6 {
@@ -262,6 +335,20 @@ func readCodexFixture(t *testing.T, name string) []byte {
 		t.Fatalf("read fixture: %v", err)
 	}
 	return data
+}
+
+func readCodexFixturePayload(t *testing.T, name string) []byte {
+	t.Helper()
+	raw := readCodexFixture(t, name)
+	var document map[string]any
+	if err := json.Unmarshal(raw, &document); err != nil {
+		t.Fatal(err)
+	}
+	payload, err := json.Marshal(document["payload"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	return payload
 }
 
 func writeCodexGolden(t *testing.T, name string, value any) {

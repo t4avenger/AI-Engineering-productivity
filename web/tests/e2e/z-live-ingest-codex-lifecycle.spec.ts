@@ -2,9 +2,13 @@ import { expect, test } from '@playwright/test';
 
 import {
   authToken,
+  codexIntegrationStateOTLPMetrics,
   codexLifecycleOTLPLogs,
+  codexLifecycleRolloutNDJSON,
   codexPRLinkOTLPLogs,
+  ingestCodexRollout,
   ingestOTLPLogs,
+  ingestOTLPMetrics,
   openSessionTraceDisclosures,
   resetDaemonBetweenTests,
   unlockDashboard,
@@ -16,6 +20,8 @@ test('renders Codex lifecycle signals ingested through the live daemon', async (
   page,
 }) => {
   await ingestOTLPLogs(codexLifecycleOTLPLogs());
+  await ingestCodexRollout(codexLifecycleRolloutNDJSON());
+  await ingestOTLPMetrics(codexIntegrationStateOTLPMetrics());
 
   const sessions = await fetch('http://localhost:18080/api/v1/sessions?limit=20', {
     headers: { Authorization: `Bearer ${authToken}` },
@@ -35,8 +41,8 @@ test('renders Codex lifecycle signals ingested through the live daemon', async (
     (candidate) =>
       candidate.session_id === 'codex:tiq-live-e2e-lifecycle-session',
   );
-  expect(session?.state).toBe('active');
-  expect(session?.completed_at ?? null).toBeNull();
+  expect(session?.state).toBe('completed');
+  expect(session?.completed_at).toBe('2026-09-06T18:02:47Z');
   expect(session?.attributes.entrypoint).toBe('codex exec');
   expect(session?.attributes.service_name).toBe('codex_exec');
   expect(session?.attributes.service_version).toBe('0.153.4');
@@ -63,6 +69,8 @@ test('renders Codex lifecycle signals ingested through the live daemon', async (
       lifecycle_phase?: string;
       lifecycle_status?: string;
       entrypoint?: string;
+      approval_policy?: string;
+      sandbox_policy?: string;
       unavailable_fields?: string[];
     }>;
   };
@@ -79,6 +87,53 @@ test('renders Codex lifecycle signals ingested through the live daemon', async (
     ),
   ).toBe(true);
 
+  const governanceStatesResponse = await fetch(
+    'http://localhost:18080/api/v1/insights/governance-states',
+    { headers: { Authorization: `Bearer ${authToken}` } },
+  );
+  expect(governanceStatesResponse.status).toBe(200);
+  const governanceStatesBody = (await governanceStatesResponse.json()) as {
+    data: { states: Array<{ kind: string; value: string; provenance: string }> };
+  };
+  expect(governanceStatesBody.data.states).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        kind: 'approval_policy',
+        value: 'on-request',
+        provenance: 'observed',
+      }),
+      expect.objectContaining({
+        kind: 'approval_policy',
+        value: 'never',
+        provenance: 'observed',
+      }),
+      expect.objectContaining({
+        kind: 'sandbox_policy',
+        value: 'workspace-write',
+        provenance: 'observed',
+      }),
+      expect.objectContaining({
+        kind: 'sandbox_policy',
+        value: 'read-only',
+        provenance: 'observed',
+      }),
+    ]),
+  );
+  const governance = timelineBody.data.find(
+    (event) =>
+      event.event_type === 'codex.rollout.turn_context' &&
+      event.sandbox_policy === 'workspace-write',
+  );
+  expect(governance?.approval_policy).toBe('never');
+  expect(governance?.sandbox_policy).toBe('workspace-write');
+  expect(
+    timelineBody.data.some(
+      (event) =>
+        event.event_type === 'session.completed' &&
+        event.lifecycle_status === 'completed',
+    ),
+  ).toBe(true);
+
   await unlockDashboard(page, authToken);
   await page.goto('/sessions/codex:tiq-live-e2e-lifecycle-session');
   await openSessionTraceDisclosures(page);
@@ -90,12 +145,45 @@ test('renders Codex lifecycle signals ingested through the live daemon', async (
   await expect(page.getByText('PR').first()).toBeVisible();
   const timelineUI = page.locator('#timeline');
   await expect(
-    timelineUI.getByRole('link', { name: 'Session active', exact: true }),
+    timelineUI
+      .getByRole('link', { name: 'Session active', exact: true })
+      .first(),
   ).toBeVisible();
   await expect(timelineUI.getByText('Lifecycle').first()).toBeVisible();
   await expect(timelineUI.getByText('session_start')).toBeVisible();
+  await expect(timelineUI.getByText('task_complete')).toBeVisible();
+  const governanceRow = timelineUI
+    .locator('.timeline-item')
+    .filter({ hasText: 'codex.rollout.turn_context' })
+    .filter({ hasText: 'workspace-write' });
+  await expect(governanceRow.getByText('Approval policy')).toBeVisible();
+  await expect(governanceRow.getByText('workspace-write')).toBeVisible();
   await expect(page.getByText('tiq-canary-live-lifecycle')).toHaveCount(0);
   await expect(page.getByText('lifecycle-live@example.test')).toHaveCount(0);
+
+  await page.goto('/governance');
+  const providerGovernance = page.locator('#provider-governance-states');
+  await expect(
+    providerGovernance.getByRole('heading', {
+      name: 'Observed provider governance state',
+    }),
+  ).toBeVisible();
+  await expect(providerGovernance.getByText('on-request')).toBeVisible();
+  await expect(providerGovernance.getByText('never')).toBeVisible();
+  await expect(providerGovernance.getByText('workspace-write')).toBeVisible();
+  await expect(providerGovernance.getByText('read-only')).toBeVisible();
+
+  await page.goto('/integrations');
+  const states = page.locator('#integration-states');
+  await expect(
+    states.getByRole('heading', { name: 'Observed integration states' }),
+  ).toBeVisible();
+  await expect(states.getByText('discovered')).toBeVisible();
+  await expect(
+    states.getByText('Discovery or cache activity does not prove use', {
+      exact: false,
+    }),
+  ).toBeVisible();
 
   // #187 N02: live capture without pr_link stays an honest empty destination.
   await page.goto('/pull-requests');
