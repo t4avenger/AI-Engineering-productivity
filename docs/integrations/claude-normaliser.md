@@ -205,8 +205,11 @@ block, not new canonical fields):
   the paired 2.1.283 observed fixtures and pinned in
   `TestNormalizeClaudeSharedSessionCorrelation`. Governance prompt keywords use that
   exact pair (within one session) as their only cross-surface join (#259); `prompt.id`
-  is shared by the whole turn and is not a per-prompt key. The transcript `promptId`
-  field is not yet retained by the JSONL normaliser (follow-up).
+  is shared by the whole turn and is not a per-prompt key. The session JSONL
+  transcript `promptId` equals OTLP `prompt.id` (paired 2.1.283 captures) and is retained
+  as the same `correlation.prompt_id` (#263) on the `user_message` event and, from the
+  `tool_result` record, on the paired `tool_call`/`mcp_call` event; 2.1.269 transcripts do
+  not emit it, so it stays absent there.
 - **Trace spans** (`NormalizeTraces`, `spanCorrelation`): `workflow.run_id` →
   `correlation.workflow_run_id` and `workflow.name` → `correlation.workflow_name`,
   present-only, so a sub-agent workflow's spans expose the same key. These are the same
@@ -849,7 +852,30 @@ it to canonical events and is served live at `POST /v1/claude/transcript`
   `cwd` is now retained raw there too (#173 — it was the one deliberately excluded
   envelope field, and is captured for both content-bearing records and pure
   `tool_result` user records, riding onto the tool Operation), and account/email
-  identifiers are never on this surface.
+  identifiers are never on this surface. #263 adds `permission_mode`, `prompt_source`,
+  `turn_origin`, `message_id` (namespaced `claude-code:` like `request_id`), and
+  `stop_reason` to the envelope.
+- **Nothing dropped: residual raw echo (#263).** Every other `user`/`assistant` record
+  field is echoed raw under `provider_extensions.transcript_record`, keeping its wire key
+  name and nesting (`message.*`, `message.usage.*`, e.g. `perTurnEffort`, `wireToolInputs`,
+  `turnPosition`, `message.stop_details`, `usage.iterations[]`, `usage.server_tool_use`,
+  `usage.service_tier`/`speed`/`inference_geo`). The typed-home registry lives in
+  `jsonl_residual.go`, and a field is omitted from the residual only when its typed home
+  stored that exact value: an explicit `null`, an empty or wrong-typed value, a quoted
+  number, a value a typed home trims, or a timestamp that does not round-trip through
+  `occurred_at` byte-for-byte (e.g. `.000Z`) stays in the residual. `message.content`
+  blocks appear there as `{index, block}` only for keys their shaper does not store, and an
+  unrecognised block type is echoed whole. A `tool_result`-only `user` record emits no
+  `user_message`, so its raw envelope (everything except the tool_result bodies and
+  `toolUseResult`, which live on the Operation) rides on the paired call's correlation
+  event as `provider_extensions.transcript_result`, including `uuid`, `timestamp`,
+  `promptId`, and `sourceToolAssistantUUID`. The `TestTranscriptRetainsEveryRecordValue`
+  gate checks every leaf of every committed transcript fixture against the output.
+  Known limits: a `tool_result` record whose `tool_use` was never seen has no call to ride
+  on; the auxiliary `system`/`ai-title`/`cost-state` record types are still skipped
+  (follow-up); and because events persist with `INSERT OR IGNORE`, events stored
+  before this change do not gain the new fields when a transcript is re-imported (no
+  backfill migration — the data is additive provider extensions).
 - **MCP tool calls (J17 #104).** MCP invocations are the one tool body read here.
   Each assistant `message.content[]` `tool_use` block named `mcp__<server>__<tool>`
   is paired with its later `user` `tool_result` (by `tool_use_id`, in a single

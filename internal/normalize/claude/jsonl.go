@@ -42,28 +42,36 @@ const eventTypeUserMessage = "user_message"
 // the record body — no filename or path is passed to the normaliser, so correlation
 // is the in-record sessionId, not the on-disk file stem.
 type transcriptRecord struct {
-	Type          string            `json:"type"`
-	UUID          string            `json:"uuid"`
-	ParentUUID    *string           `json:"parentUuid"`
-	SessionID     string            `json:"sessionId"`
-	Timestamp     string            `json:"timestamp"`
-	Version       string            `json:"version"`
-	Cwd           string            `json:"cwd"`
-	GitBranch     string            `json:"gitBranch"`
-	Entrypoint    string            `json:"entrypoint"`
-	UserType      string            `json:"userType"`
-	RequestID     string            `json:"requestId"`
-	Effort        string            `json:"effort"`
-	APIBlockIndex *int64            `json:"apiBlockIndex"`
-	IsSidechain   *bool             `json:"isSidechain"`
-	Message       *assistantMessage `json:"message"`
+	Type           string            `json:"type"`
+	UUID           string            `json:"uuid"`
+	ParentUUID     *string           `json:"parentUuid"`
+	SessionID      string            `json:"sessionId"`
+	Timestamp      string            `json:"timestamp"`
+	Version        string            `json:"version"`
+	Cwd            string            `json:"cwd"`
+	GitBranch      string            `json:"gitBranch"`
+	Entrypoint     string            `json:"entrypoint"`
+	UserType       string            `json:"userType"`
+	RequestID      string            `json:"requestId"`
+	Effort         string            `json:"effort"`
+	PromptID       string            `json:"promptId"`
+	PermissionMode string            `json:"permissionMode"`
+	PromptSource   string            `json:"promptSource"`
+	TurnOrigin     string            `json:"turnOrigin"`
+	APIBlockIndex  *int64            `json:"apiBlockIndex"`
+	IsSidechain    *bool             `json:"isSidechain"`
+	Message        *assistantMessage `json:"message"`
 }
 
-// assistantMessage decodes only the model and usage from an assistant record's
-// message. content (the response/tool bodies) is intentionally not declared.
+// assistantMessage decodes the model, message id, stop reason, and usage from a
+// record's message. content (the response/tool bodies) is intentionally not
+// declared: it is read by the content shapers. Any other message key reaches the
+// transcript_record residual echo (#263).
 type assistantMessage struct {
-	Model string          `json:"model"`
-	Usage *assistantUsage `json:"usage"`
+	ID         string          `json:"id"`
+	Model      string          `json:"model"`
+	StopReason string          `json:"stop_reason"`
+	Usage      *assistantUsage `json:"usage"`
 }
 
 // assistantUsage decodes the numeric token counts. json.Number preserves large
@@ -119,9 +127,9 @@ var transcriptContentFields = []string{
 // Lines are walked one at a time (no bytes.Split) so a newline-dense 32 MiB body
 // cannot amplify into hundreds of MiB of slice headers before parsing starts.
 //
-// The per-adapter allow-list is the sole guard (epic #88 removed ingest-time
-// hiding): only safe scalar envelope fields are copied into provider_extensions,
-// and no content body is ever read.
+// Epic #88 removed ingest-time hiding: reviewed record fields are promoted to typed
+// homes, and every other user/assistant record field is echoed raw under
+// provider_extensions.transcript_record (#263), so nothing is dropped at ingest.
 func NormalizeTranscript(data []byte, receivedAt time.Time) ([]canonical.Event, error) {
 	events, calls, err := walkTranscript(data, receivedAt)
 	if err != nil {
@@ -259,10 +267,7 @@ func assistantEvent(line []byte, receivedAt time.Time) (canonical.Event, error) 
 	if responseText != "" {
 		envelope["response_content"] = responseText
 	}
-	extensions := map[string]any{
-		"correlation": transcriptCorrelation(eventID, occurredAt, uuid, trimmedParentUUID(record.ParentUUID)),
-		"transcript":  envelope,
-	}
+	extensions := transcriptEventExtensions(eventID, occurredAt, record, envelope, line, transcriptAssistantRules)
 	if extra := cacheExtraTokens(record.Message); len(extra) > 0 {
 		extensions["cache_usage_extra"] = extra
 	}
@@ -373,11 +378,35 @@ func userEvent(line []byte, receivedAt time.Time) (canonical.Event, bool) {
 		Attributes: map[string]any{
 			"unavailable_fields": userMessageUnavailableFields(),
 		},
-		ProviderExtensions: map[string]any{
-			"correlation": transcriptCorrelation(eventID, occurredAt, uuid, trimmedParentUUID(record.ParentUUID)),
-			"transcript":  envelope,
-		},
+		ProviderExtensions: transcriptEventExtensions(eventID, occurredAt, record, envelope, line, transcriptUserRules),
 	}, true
+}
+
+// transcriptEventExtensions builds the provider_extensions shared by the
+// assistant_message and user_message events: the correlation block (DAG linkage
+// plus the promptId correlation key, #263), the typed transcript envelope, and the
+// raw residual of every record field the rules leave without a typed home.
+func transcriptEventExtensions(eventID string, occurredAt time.Time, record transcriptRecord, envelope map[string]any, line []byte, rules objectRules) map[string]any {
+	correlation := transcriptCorrelation(eventID, occurredAt, strings.TrimSpace(record.UUID), trimmedParentUUID(record.ParentUUID))
+	addTranscriptPromptID(correlation, record.PromptID)
+	extensions := map[string]any{
+		"correlation": correlation,
+		"transcript":  envelope,
+	}
+	if residual := transcriptRecordResidual(line, rules); residual != nil {
+		extensions["transcript_record"] = residual
+	}
+	return extensions
+}
+
+// addTranscriptPromptID stamps the record's promptId as correlation.prompt_id —
+// the same key and value as the OTLP prompt.id (#106; equality proven by the paired
+// 2.1.283 captures). An absent or blank promptId (2.1.269 transcripts) is omitted,
+// never invented.
+func addTranscriptPromptID(correlation map[string]any, promptID string) {
+	if trimmed := strings.TrimSpace(promptID); trimmed != "" {
+		correlation["prompt_id"] = trimmed
+	}
 }
 
 // userMessageUnavailableFields lists the content signals a user event does not
@@ -478,23 +507,22 @@ func transcriptTokenCount(number json.Number) *int64 {
 // any downstream visibility of the path is layered over the retained value.
 func transcriptEnvelope(record transcriptRecord) map[string]any {
 	envelope := map[string]any{}
-	if record.Cwd != "" {
-		envelope["cwd"] = record.Cwd
-	}
-	if record.GitBranch != "" {
-		envelope["git_branch"] = record.GitBranch
-	}
-	if record.Entrypoint != "" {
-		envelope["entrypoint"] = record.Entrypoint
-	}
-	if record.UserType != "" {
-		envelope["user_type"] = record.UserType
+	for key, value := range map[string]string{
+		"cwd":             record.Cwd,
+		"git_branch":      record.GitBranch,
+		"entrypoint":      record.Entrypoint,
+		"user_type":       record.UserType,
+		"effort":          record.Effort,
+		"permission_mode": record.PermissionMode,
+		"prompt_source":   record.PromptSource,
+		"turn_origin":     record.TurnOrigin,
+	} {
+		if value != "" {
+			envelope[key] = value
+		}
 	}
 	if record.RequestID != "" {
 		envelope["request_id"] = nativeSessionPrefix + record.RequestID
-	}
-	if record.Effort != "" {
-		envelope["effort"] = record.Effort
 	}
 	if record.APIBlockIndex != nil {
 		envelope["api_block_index"] = *record.APIBlockIndex
@@ -502,7 +530,22 @@ func transcriptEnvelope(record transcriptRecord) map[string]any {
 	if record.IsSidechain != nil {
 		envelope["is_sidechain"] = *record.IsSidechain
 	}
+	addMessageEnvelope(envelope, record.Message)
 	return envelope
+}
+
+// addMessageEnvelope carries the message id (namespaced like request_id) and stop
+// reason onto the transcript envelope when present (#263).
+func addMessageEnvelope(envelope map[string]any, message *assistantMessage) {
+	if message == nil {
+		return
+	}
+	if message.ID != "" {
+		envelope["message_id"] = nativeSessionPrefix + message.ID
+	}
+	if message.StopReason != "" {
+		envelope["stop_reason"] = message.StopReason
+	}
 }
 
 // transcriptCorrelation carries the DAG linkage (uuid/parent_uuid) alongside the

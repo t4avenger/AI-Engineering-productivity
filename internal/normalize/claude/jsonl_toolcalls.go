@@ -39,6 +39,7 @@ type transcriptContentEnvelope struct {
 	Version     string                 `json:"version"`
 	Cwd         string                 `json:"cwd"`
 	IsSidechain *bool                  `json:"isSidechain"`
+	PromptID    string                 `json:"promptId"`
 	Message     *transcriptContentBody `json:"message"`
 	// ToolUseResult is the record-scoped structured tool result Claude Code writes
 	// as a sibling of message on a user record (stdout/stderr, structured patch,
@@ -102,6 +103,12 @@ type transcriptToolCall struct {
 	resultMeta  any
 	resultScope string
 	outcome     string
+	// resultPromptID is the promptId of the user record carrying this call's
+	// tool_result, and resultRecord that record's raw envelope when the record emits
+	// no user_message event of its own (a tool_result-only turn) — #263, so the
+	// record's fields are retained on the tool call's correlation event.
+	resultPromptID string
+	resultRecord   map[string]any
 }
 
 // toolCallCollector accumulates tool_use invocations across a transcript walk and
@@ -181,13 +188,21 @@ func (c *toolCallCollector) collectToolUses(line []byte) {
 // marker so a shared result is never mis-read as one call's own. A toolUseResult on a
 // record whose result blocks all reference unseen tool_uses has no operation to ride
 // (the block bodies are likewise unmatched) and is not retained here — the residual
-// unmatched-record allow-list scope this change does not widen.
+// unmatched-record allow-list scope this change does not widen. The record's promptId
+// and, for a tool_result-only record (no user_message event of its own), its raw
+// envelope ride on every matched call's correlation event (#263); both are
+// record-scoped, so they hold for each call the record answers.
 func (c *toolCallCollector) collectToolResults(line []byte) {
 	envelope, blocks, ok := decodeContentBlocks(line)
 	if !ok {
 		return
 	}
 	recordCwd := strings.TrimSpace(envelope.Cwd)
+	promptID := strings.TrimSpace(envelope.PromptID)
+	var record map[string]any
+	if transcriptUserContent(line) == "" {
+		record = transcriptRecordResidual(line, transcriptResultRecordRules)
+	}
 	resultBlockCount := 0
 	var matched []*transcriptToolCall
 	for _, block := range blocks {
@@ -204,6 +219,8 @@ func (c *toolCallCollector) collectToolResults(line []byte) {
 		if call.cwd == "" && recordCwd != "" {
 			call.cwd = recordCwd
 		}
+		call.resultPromptID = promptID
+		call.resultRecord = record
 		matched = append(matched, call)
 	}
 	c.attachRecordResult(envelope.ToolUseResult, resultBlockCount, matched)
@@ -333,7 +350,22 @@ func (c transcriptToolCall) toolCorrelationEvent(receivedAt time.Time) canonical
 		"unavailable_fields": toolCallUnavailableFields(),
 	}
 	c.attachPRLinkEvidence(attributes, extensions)
+	c.attachResultRecord(extensions)
 	return c.correlationEventShape(eventID, eventTypeToolCall, receivedAt, attributes, extensions)
+}
+
+// attachResultRecord stamps the tool_result record's promptId as
+// correlation.prompt_id (the OTLP prompt.id key, #106) and carries a
+// tool_result-only record's raw envelope under provider_extensions.
+// transcript_result (#263). Shared by the tool_call and mcp_call shapers so the
+// retention is expressed once (SonarCloud duplication is a hard merge blocker).
+func (c transcriptToolCall) attachResultRecord(extensions map[string]any) {
+	if correlation, ok := extensions["correlation"].(map[string]any); ok {
+		addTranscriptPromptID(correlation, c.resultPromptID)
+	}
+	if c.resultRecord != nil {
+		extensions["transcript_result"] = c.resultRecord
+	}
 }
 
 // correlationEventShape builds the canonical envelope shared by the tool_call and

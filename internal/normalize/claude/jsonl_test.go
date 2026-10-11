@@ -37,6 +37,13 @@ func FuzzNormalizeTranscript(f *testing.F) {
 	f.Add([]byte(`{"type":"assistant","uuid":"a1","sessionId":"s1","timestamp":"2026-09-30T20:02:23Z","version":"2.1.286","message":{"content":[{"type":"tool_use","id":"b1","name":"Bash","input":{"command":"printf 'https://github.com/o/r/pull/%s' 1"}}]}}` +
 		"\n" +
 		`{"type":"user","uuid":"u1","sessionId":"s1","timestamp":"2026-09-30T20:02:25Z","toolUseResult":{"stdout":"https://github.com/o/r/pull/1"},"message":{"content":[{"type":"tool_result","tool_use_id":"b1","is_error":false,"content":"https://github.com/o/r/pull/1"}]}}`))
+	// #263 residual echo: promptId on a prompt and on a tool_result-only record,
+	// explicit nulls, a nested usage residual, and an unrecognised content block.
+	f.Add([]byte(`{"type":"user","uuid":"u0","sessionId":"s1","timestamp":"2026-09-30T20:02:18.787Z","promptId":"p1","permissionMode":"default","turnPosition":{"promptIndex":0},"message":{"role":"user","content":"go"}}` +
+		"\n" +
+		`{"type":"assistant","uuid":"a1","parentUuid":"u0","sessionId":"s1","timestamp":"2026-09-30T20:02:23Z","perTurnEffort":null,"message":{"id":"m1","stop_reason":"tool_use","stop_details":null,"content":[{"type":"image","source":{}},{"type":"tool_use","id":"b1","name":"Bash","input":{"command":"ls"}}],"usage":{"input_tokens":1,"iterations":[{"input_tokens":1}],"output_tokens_details":{"thinking_tokens":0,"x":1}}}}` +
+		"\n" +
+		`{"type":"user","uuid":"u1","sessionId":"s1","timestamp":"2026-09-30T20:02:25Z","promptId":"p1","sourceToolAssistantUUID":"a1","message":{"content":[{"type":"tool_result","tool_use_id":"b1","is_error":false,"content":"ok"}]}}`))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		_, _ = NormalizeTranscript(data, time.Unix(0, 0).UTC())
 		_, _ = ExtractTranscriptOperations(data, time.Unix(0, 0).UTC())

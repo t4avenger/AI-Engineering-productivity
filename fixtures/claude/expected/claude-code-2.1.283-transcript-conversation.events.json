@@ -1,0 +1,151 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:tiq-corr-210:00000000-0000-4000-8000-0000000000c1",
+    "event_type": "user_message",
+    "occurred_at": "2026-09-27T09:35:29.776Z",
+    "received_at": "1970-01-01T00:00:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.283",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:tiq-corr-210",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "unavailable_fields": [
+        "response_content",
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "claude-code:tiq-corr-210:00000000-0000-4000-8000-0000000000c1",
+        "ordering_key": "01790501729776000000:claude-code:tiq-corr-210:00000000-0000-4000-8000-0000000000c1",
+        "parent_uuid": null,
+        "prompt_id": "00000000-0000-4000-8000-0000000000b1",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "00000000-0000-4000-8000-0000000000c1"
+      },
+      "transcript": {
+        "cwd": "/home/synthetic/project",
+        "entrypoint": "sdk-cli",
+        "git_branch": "main",
+        "is_sidechain": false,
+        "permission_mode": "default",
+        "prompt_content": "synthetic correlation prompt for issue 210",
+        "prompt_source": "sdk",
+        "turn_origin": "sdk",
+        "user_type": "external"
+      },
+      "transcript_record": {
+        "message": {
+          "role": "user"
+        },
+        "parentUuid": null
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "claude-code:tiq-corr-210:00000000-0000-4000-8000-0000000000c2",
+    "event_type": "assistant_message",
+    "occurred_at": "2026-09-27T09:35:31.029Z",
+    "received_at": "1970-01-01T00:00:00Z",
+    "provider": "anthropic",
+    "tool": "claude-code",
+    "source_schema": "session_jsonl",
+    "source_version": "2.1.283",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "claude-code:tiq-corr-210",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "cache_write_input_token_count": 8532,
+      "cached_input_token_count": 0,
+      "input_token_count": 2,
+      "model": "claude-opus-4-8",
+      "output_token_count": 4,
+      "reasoning_token_count": 0,
+      "unavailable_fields": [
+        "prompt_content",
+        "tool_io",
+        "mcp_calls",
+        "file_operations",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "cache_usage_extra": {
+        "cache_creation.ephemeral_1h_input_tokens": 2592,
+        "cache_creation.ephemeral_5m_input_tokens": 5940
+      },
+      "correlation": {
+        "dedup_key": "claude-code:tiq-corr-210:00000000-0000-4000-8000-0000000000c2",
+        "ordering_key": "01790501731029000000:claude-code:tiq-corr-210:00000000-0000-4000-8000-0000000000c2",
+        "parent_uuid": "00000000-0000-4000-8000-0000000000c1",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Claude Code transcript records have no reviewed task-boundary signal"
+        },
+        "uuid": "00000000-0000-4000-8000-0000000000c2"
+      },
+      "transcript": {
+        "api_block_index": 0,
+        "cwd": "/home/synthetic/project",
+        "effort": "high",
+        "entrypoint": "sdk-cli",
+        "git_branch": "main",
+        "is_sidechain": false,
+        "message_id": "claude-code:msg_synthetic00000000000000000001",
+        "request_id": "claude-code:req_synthetic00000000000000000001",
+        "response_content": "synthetic correlation response for issue 210",
+        "stop_reason": "end_turn",
+        "user_type": "external"
+      },
+      "transcript_record": {
+        "message": {
+          "role": "assistant",
+          "stop_details": null,
+          "type": "message",
+          "usage": {
+            "inference_geo": "not_available",
+            "iterations": [
+              {
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 2592,
+                  "ephemeral_5m_input_tokens": 5940
+                },
+                "cache_creation_input_tokens": 8532,
+                "cache_read_input_tokens": 0,
+                "input_tokens": 2,
+                "output_tokens": 4,
+                "type": "message"
+              }
+            ],
+            "server_tool_use": {
+              "web_fetch_requests": 0,
+              "web_search_requests": 0
+            },
+            "service_tier": "standard",
+            "speed": "standard"
+          }
+        },
+        "perTurnEffort": null
+      }
+    }
+  }
+]

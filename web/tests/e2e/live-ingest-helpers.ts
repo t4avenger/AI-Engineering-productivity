@@ -2135,6 +2135,52 @@ export function claudeCorrelationOTLPLogs(): string {
   ]);
 }
 
+// claudeCorrelationTranscriptNDJSON is a session JSONL transcript whose user
+// prompt and tool_result-only record carry the same promptId (#263): the prompt
+// becomes a user_message and the tool_result record rides on the Bash tool_call,
+// so both must expose it as correlation.prompt_id — the OTLP prompt.id key.
+export const claudeCorrelationTranscriptSessionID =
+  "tiq-live-e2e-transcript-correlation";
+export function claudeCorrelationTranscriptNDJSON(): string {
+  const base = { promptId: claudeLiveCorrelationPromptID, userType: "external" };
+  return claudeTranscriptRecordsNDJSON(claudeCorrelationTranscriptSessionID, "2.1.286", [
+    {
+      ...base,
+      type: "user",
+      uuid: "tiq-live-corr-user",
+      timestamp: "2026-09-30T20:02:18.787Z",
+      permissionMode: "default",
+      turnPosition: { promptIndex: 0, turnIndex: 1 },
+      message: { role: "user", content: "tiq-live-e2e transcript correlation" },
+    },
+    {
+      type: "assistant",
+      uuid: "tiq-live-corr-assistant",
+      parentUuid: "tiq-live-corr-user",
+      timestamp: "2026-09-30T20:02:23.690Z",
+      message: {
+        id: "msg_tiq_live_corr",
+        role: "assistant",
+        model: "tiq-live-e2e-correlation-model",
+        content: [{ type: "tool_use", id: "toolu_tiq_live_corr", name: "Bash", input: { command: "true" } }],
+        usage: { input_tokens: 1, output_tokens: 1 },
+      },
+    },
+    {
+      ...base,
+      type: "user",
+      uuid: "tiq-live-corr-result",
+      parentUuid: "tiq-live-corr-assistant",
+      timestamp: "2026-09-30T20:02:25.245Z",
+      sourceToolAssistantUUID: "tiq-live-corr-assistant",
+      message: {
+        role: "user",
+        content: [{ type: "tool_result", tool_use_id: "toolu_tiq_live_corr", is_error: false, content: "" }],
+      },
+    },
+  ]);
+}
+
 type ClaudeApiRequestOptions = {
   timestamp: string;
   sequence: string;
