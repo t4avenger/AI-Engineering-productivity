@@ -1571,6 +1571,15 @@ func TestModelsPageRendersScorecardAndUnlockGate(t *testing.T) {
 						"source":        "test",
 					},
 				},
+			}, {
+				EventID: "performance-1", EventType: "codex.turn.ttft.duration_ms", SessionID: "performance-1",
+				OccurredAt: now, ReceivedAt: now, Provider: "openai", Tool: "codex",
+				Attributes: map[string]any{"model": "gpt-6.1-sol-synthetic"},
+				ProviderExtensions: map[string]any{"performance_metric": map[string]any{
+					"name": "codex.turn.ttft.duration_ms", "family": "turn_latency", "kind": "histogram", "unit": "ms", "scope": "observation",
+					"aggregation_temporality": int64(1), "sample_count": int64(2), "sum": float64(900), "min": float64(400), "max": float64(500),
+					"dimensions": map[string]any{"model": "gpt-6.1-sol-synthetic"},
+				}},
 			}},
 		},
 	}
@@ -1585,6 +1594,11 @@ func TestModelsPageRendersScorecardAndUnlockGate(t *testing.T) {
 		"anthropic",
 		"1234 ms",
 		"tokens/task",
+		"Latency and efficiency telemetry",
+		"codex.turn.ttft.duration_ms",
+		"gpt-6.1-sol-synthetic",
+		"450.00 ms",
+		"Observation only",
 		`href="/insights#model-performance"`,
 		"Evidence notes",
 	})

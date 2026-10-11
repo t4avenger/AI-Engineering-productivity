@@ -2,6 +2,7 @@ package insights
 
 import (
 	"testing"
+	"time"
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
@@ -71,6 +72,71 @@ func TestModelPerformanceIgnoresSessionStateWithoutContract(t *testing.T) {
 	}
 }
 
+func TestModelPerformanceSummarisesObservationScopedEfficiencyMetrics(t *testing.T) {
+	events := []canonical.Event{
+		performanceEvent("delta-1", "codex.turn.e2e_duration_ms", "turn_latency", "histogram", 1, time.Unix(1, 0), map[string]any{
+			"sample_count": int64(1), "sum": float64(1200), "min": float64(1200), "max": float64(1200),
+		}),
+		performanceEvent("delta-2", "codex.turn.e2e_duration_ms", "turn_latency", "histogram", 1, time.Unix(2, 0), map[string]any{
+			"sample_count": int64(2), "sum": float64(3000), "min": float64(1400), "max": float64(1600),
+		}),
+		performanceEvent("counter", "codex.turn.memory", "turn_efficiency", "sum", 1, time.Unix(3, 0), map[string]any{"value": int64(1)}),
+	}
+
+	got := ModelPerformanceFromEvents(events)
+	if len(got.Models) != 0 {
+		t.Fatalf("efficiency telemetry must not create outcome scorecards: %#v", got.Models)
+	}
+	if len(got.EfficiencyMetrics) != 2 {
+		t.Fatalf("efficiency metrics = %#v", got.EfficiencyMetrics)
+	}
+	turn := findEfficiencyMetric(t, got, "codex.turn.e2e_duration_ms")
+	assertEfficiencyHistogram(t, turn)
+	memory := findEfficiencyMetric(t, got, "codex.turn.memory")
+	if memory.Value == nil || *memory.Value != 1 || memory.Model != "gpt-6.1-sol-synthetic" {
+		t.Fatalf("counter summary = %#v", memory)
+	}
+}
+
+func assertEfficiencyHistogram(t *testing.T, turn PerformanceMetricSummary) {
+	t.Helper()
+	if turn.MetricName != "codex.turn.e2e_duration_ms" || turn.SampleCount == nil || *turn.SampleCount != 3 {
+		t.Fatalf("delta histogram count = %#v", turn)
+	}
+	if turn.Total == nil || *turn.Total != 4200 || turn.Average == nil || *turn.Average != 1400 {
+		t.Fatalf("delta histogram summary = %#v", turn)
+	}
+	if turn.Min == nil || *turn.Min != 1200 || turn.Max == nil || *turn.Max != 1600 || turn.Scope != "observation" {
+		t.Fatalf("histogram bounds/scope = %#v", turn)
+	}
+}
+
+func TestModelPerformanceKeepsLatestCumulativeMetric(t *testing.T) {
+	events := []canonical.Event{
+		performanceEvent("cumulative-new", "codex.websocket.request", "transport_activity", "sum", 2, time.Unix(1, 1), map[string]any{"value": int64(5)}),
+		performanceEvent("cumulative-old", "codex.websocket.request", "transport_activity", "sum", 2, time.Unix(1, 0), map[string]any{"value": int64(3)}),
+	}
+	got := ModelPerformanceFromEvents(events)
+	if len(got.EfficiencyMetrics) != 1 || got.EfficiencyMetrics[0].Value == nil || *got.EfficiencyMetrics[0].Value != 5 {
+		t.Fatalf("cumulative metric must use latest datapoint: %#v", got.EfficiencyMetrics)
+	}
+}
+
+func performanceEvent(id, name, family, kind string, temporality int64, occurredAt time.Time, measures map[string]any) canonical.Event {
+	metric := map[string]any{
+		"name": name, "family": family, "kind": kind, "unit": "ms", "scope": "observation",
+		"aggregation_temporality": temporality, "dimensions": map[string]any{"model": "gpt-6.1-sol-synthetic"},
+	}
+	for key, value := range measures {
+		metric[key] = value
+	}
+	return canonical.Event{
+		EventID: id, OccurredAt: occurredAt, Provider: "openai", Tool: "codex",
+		Attributes:         map[string]any{"model": "gpt-6.1-sol-synthetic"},
+		ProviderExtensions: map[string]any{"performance_metric": metric},
+	}
+}
+
 type outcomeSpec struct {
 	provider     string
 	tool         string
@@ -118,4 +184,15 @@ func findModel(t *testing.T, got ModelPerformance, model string) ModelScorecard 
 	}
 	t.Fatalf("model %s not found in %#v", model, got.Models)
 	return ModelScorecard{}
+}
+
+func findEfficiencyMetric(t *testing.T, got ModelPerformance, metricName string) PerformanceMetricSummary {
+	t.Helper()
+	for _, row := range got.EfficiencyMetrics {
+		if row.MetricName == metricName {
+			return row
+		}
+	}
+	t.Fatalf("efficiency metric %s not found in %#v", metricName, got.EfficiencyMetrics)
+	return PerformanceMetricSummary{}
 }

@@ -85,3 +85,36 @@ func TestModelPerformanceInsightIngestEndToEnd(t *testing.T) {
 		[]string{"tiq-canary-outcome-session", "tiq-canary@example.test"},
 		marshalJSON(t, scorecard))
 }
+
+func TestCodexPerformanceMetricsIngestToReadEndToEnd(t *testing.T) {
+	server, _ := newPersistentTestServer(t)
+	postAcceptedOTLP(t, server.URL, "/v1/metrics", string(metricsFixturePayloadBytes(t, "codex-0.162.1-performance-metrics.json")))
+
+	scorecard := getInsightJSON[modelPerformanceResponse](t, server.URL+"/api/v1/insights/model-performance")
+	if len(scorecard.Data.EfficiencyMetrics) != 10 {
+		t.Fatalf("efficiency metrics = %d, want 10: %#v", len(scorecard.Data.EfficiencyMetrics), scorecard.Data.EfficiencyMetrics)
+	}
+	var turnFound bool
+	for _, metric := range scorecard.Data.EfficiencyMetrics {
+		if metric.MetricName != "codex.turn.e2e_duration_ms" {
+			continue
+		}
+		turnFound = true
+		if metric.Scope != "observation" || metric.SampleCount == nil || *metric.SampleCount != 2 || metric.Average == nil || *metric.Average != 1800 {
+			t.Fatalf("turn metric = %#v", metric)
+		}
+	}
+	if !turnFound {
+		t.Fatalf("missing turn latency metric: %#v", scorecard.Data.EfficiencyMetrics)
+	}
+
+	observations := fetchSessionList(t, server.URL+"/api/v1/sessions?scope=observation&limit=20")
+	if len(observations.Data) != 10 {
+		t.Fatalf("metric observations = %d, want 10: %#v", len(observations.Data), observations.Data)
+	}
+	for _, observation := range observations.Data {
+		if observation.IdentityScope != "observation" {
+			t.Fatalf("metric session must remain observation-scoped: %#v", observation)
+		}
+	}
+}

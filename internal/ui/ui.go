@@ -139,6 +139,7 @@ func New(token string, sessions storage.SessionReader, contextWasteThresholds in
 		"formatPercent":           formatPercent,
 		"formatMultiplier":        formatMultiplier,
 		"formatMillis":            formatMillis,
+		"formatMetricFloat":       formatMetricFloat,
 		"formatOptionalInt":       formatOptionalInt64,
 		"sessionPath":             sessionPath,
 		"pathFindingEvidencePath": pathFindingEvidencePath,
@@ -301,6 +302,7 @@ var statusLabels = map[string]string{
 	"used":                 "Invoked",
 	"usage_unavailable":    "Usage not available",
 	"provider_reported":    "Provider reported",
+	"observation":          "Observation only",
 	// Skill detection.
 	"explicit": "Explicitly identified",
 	"inferred": "Inferred by provider",
@@ -396,6 +398,22 @@ func formatMillis(value *float64) string {
 		return statusLabel("unavailable")
 	}
 	return fmt.Sprintf("%.0f ms", *value)
+}
+
+func formatMetricFloat(value *float64, unit string) string {
+	if value == nil {
+		return statusLabel("unavailable")
+	}
+	switch strings.TrimSpace(unit) {
+	case "ms":
+		return fmt.Sprintf("%.2f ms", *value)
+	case "By":
+		return fmt.Sprintf("%.0f bytes", *value)
+	case "", "1":
+		return fmt.Sprintf("%.2f", *value)
+	default:
+		return fmt.Sprintf("%.2f %s", *value, strings.TrimSpace(unit))
+	}
 }
 
 func formatOptionalInt64(value *int64, unit string) string {

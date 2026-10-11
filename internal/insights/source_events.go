@@ -68,6 +68,7 @@ func thinInsightEvent(event canonical.Event) (canonical.Event, bool) {
 	}
 	keep = copyMCPInsightEvidence(&thin, event) || keep
 	keep = copyOutcomeInsightEvidence(&thin, event) || keep
+	keep = copyPerformanceInsightEvidence(&thin, event) || keep
 	if copySkillPolicyEvidence(&thin, event) {
 		keep = true
 	}
@@ -83,6 +84,18 @@ func thinInsightEvent(event canonical.Event) (canonical.Event, bool) {
 		keep = true
 	}
 	return thin, keep
+}
+
+func copyPerformanceInsightEvidence(thin *canonical.Event, event canonical.Event) bool {
+	evidence, ok := event.ProviderExtensions["performance_metric"].(map[string]any)
+	if !ok {
+		return false
+	}
+	thin.ProviderExtensions["performance_metric"] = cloneStringKeyedMap(evidence)
+	copySelectedKeys(thin.Attributes, event.Attributes,
+		"model", "metric_name", "metric_family", "metric_kind", "metric_unit",
+		"sample_count", "metric_sum", "metric_average", "metric_min", "metric_max", "metric_value")
+	return true
 }
 
 func copyMCPInsightEvidence(thin *canonical.Event, event canonical.Event) bool {

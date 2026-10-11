@@ -167,6 +167,42 @@
     {{else}}
     <p>No outcome-contract rows yet. Model performance remains unavailable until retained events include explicit outcome evidence.</p>
     {{end}}
+    {{if .EfficiencyMetrics}}
+    <h3>Latency and efficiency telemetry</h3>
+    <p>Provider histogram and counter evidence is shown separately from outcome contracts. Observation-scoped rows are not attributed to a session.</p>
+    <section class="table-wrap" aria-label="Latency and efficiency telemetry">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Metric</th>
+            <th scope="col">Family</th>
+            <th scope="col">Model</th>
+            <th scope="col">Scope</th>
+            <th scope="col">Samples</th>
+            <th scope="col">Average</th>
+            <th scope="col">Minimum</th>
+            <th scope="col">Maximum</th>
+            <th scope="col">Counter value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .EfficiencyMetrics}}
+          <tr>
+            <td>{{.MetricName}}</td>
+            <td>{{.Family}}</td>
+            <td>{{if .Model}}{{.Model}}{{else}}{{template "status-badge" "unavailable"}}{{end}}</td>
+            <td>{{template "status-badge" .Scope}}</td>
+            <td>{{formatOptionalInt .SampleCount "samples"}}</td>
+            <td>{{formatMetricFloat .Average .Unit}}</td>
+            <td>{{formatMetricFloat .Min .Unit}}</td>
+            <td>{{formatMetricFloat .Max .Unit}}</td>
+            <td>{{formatOptionalInt .Value .Unit}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </section>
+    {{end}}
     {{if .RankedModels}}
     <h3>Ranked models</h3>
     <ol>{{range .RankedModels}}<li>{{.}}</li>{{end}}</ol>

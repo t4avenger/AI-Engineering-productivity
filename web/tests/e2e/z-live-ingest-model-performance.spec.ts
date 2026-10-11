@@ -4,7 +4,9 @@ import {
   authToken,
   claudeOutcomeSuccessOTLPLogs,
   codexOutcomeOTLPLogs,
+  codexPerformanceOTLPMetrics,
   ingestOTLPLogs,
+  ingestOTLPMetrics,
   resetDaemonBetweenTests,
   unlockDashboard,
 } from './live-ingest-helpers';
@@ -20,6 +22,7 @@ test('renders model-performance scorecard for live outcome contracts', async ({
 }) => {
   await ingestOTLPLogs(claudeOutcomeSuccessOTLPLogs());
   await ingestOTLPLogs(codexOutcomeOTLPLogs());
+  await ingestOTLPMetrics(codexPerformanceOTLPMetrics());
 
   const response = await fetch(
     'http://localhost:18080/api/v1/insights/model-performance',
@@ -29,6 +32,13 @@ test('renders model-performance scorecard for live outcome contracts', async ({
   const body = (await response.json()) as {
     data: {
       models: Array<{ model: string; sample_size: number }>;
+      efficiency_metrics: Array<{
+        metric_name: string;
+        model?: string;
+        scope: string;
+        sample_count?: number;
+        average?: number;
+      }>;
       ranking_available: boolean;
     };
   };
@@ -39,6 +49,17 @@ test('renders model-performance scorecard for live outcome contracts', async ({
   expect(body.data.models.some((row) => row.model === 'gpt-6-astra')).toBe(
     true,
   );
+  expect(body.data.efficiency_metrics).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        metric_name: 'codex.turn.e2e_duration_ms',
+        model: 'gpt-6.1-sol-live',
+        scope: 'observation',
+        sample_count: 2,
+        average: 1800,
+      }),
+    ]),
+  );
 
   await unlockDashboard(page, authToken);
   await page.goto('/insights');
@@ -48,12 +69,18 @@ test('renders model-performance scorecard for live outcome contracts', async ({
   await expect(page.getByText('gpt-6-astra').first()).toBeVisible();
   await expect(page.getByText('claude-haiku-4-5-20251001').first()).toBeVisible();
   await expect(page.getByText('Ranking available: no')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Latency and efficiency telemetry' }),
+  ).toBeVisible();
+  await expect(page.getByText('codex.turn.e2e_duration_ms')).toBeVisible();
+  await expect(page.getByText('1800.00 ms')).toBeVisible();
 
   await page.goto('/models');
   await expect(page.getByRole('heading', { name: 'Models' })).toBeVisible();
   await expect(page.getByText('gpt-6-astra').first()).toBeVisible();
   await expect(page.getByText('claude-haiku-4-5-20251001').first()).toBeVisible();
   await expect(page.getByText('Ranking available: no')).toBeVisible();
+  await expect(page.getByText('codex.turn.e2e_duration_ms')).toBeVisible();
   await expect(
     page.getByRole('link', { name: 'View detailed Insights evidence' }),
   ).toBeVisible();

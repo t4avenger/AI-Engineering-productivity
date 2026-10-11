@@ -216,3 +216,32 @@ and copied authentication material stayed outside the repository. Evidence:
 - `fixtures/codex/observed-sanitised/codex-0.160.0-lifecycle-governance-otlp.json`
 - `fixtures/codex/observed-sanitised/codex-0.160.0-integration-states-metrics.json`
 - `fixtures/codex/observed-sanitised/codex-0.160.0-lifecycle-governance.json`
+
+## Latency and efficiency metric capture
+
+Issue #237 captured Codex CLI 0.162.1 on 2026-10-11 with an isolated temporary
+`CODEX_HOME`, synthetic Git repository, raw loopback receiver, non-interactive
+`codex exec`, and PTY-backed interactive CLI. Both runs used normal
+workspace-write sandboxing, prompt logging stayed disabled, and exporters were
+shut down gracefully. Raw OTLP, rollout files, and copied authentication
+material remained outside the repository.
+
+The capture proved that non-interactive product metrics retain
+`service.name=codex_exec`, while interactive product metrics are emitted by
+`service.name=codex-app-server`; `codex_cli_rs` chiefly carried TUI/SQLite
+bookkeeping. The reviewed performance families include turn E2E/TTFT/TTFM,
+response inference/overhead/engine timing, tool activity, memory/network proxy,
+rollout size/compression, and websocket activity. No product metric datapoint
+carried a provider conversation/thread/session/turn identifier, so the fixture
+and normalizer keep them observation-scoped.
+
+The combined run emitted 86 distinct instrument names. The exhaustive reviewed
+disposition (mapped, existing projection, intentionally ignored internal noise,
+version-dependent, or unknown) is recorded under **Reviewed 0.162.1 instrument
+inventory** in `codex-normaliser.md`; the counts sum to the captured inventory.
+No exporter-prefixed instrument was present in this run.
+
+Committed evidence:
+
+- `fixtures/codex/observed-sanitised/codex-0.162.1-performance-metrics.json`
+- `fixtures/codex/expected/codex-0.162.1-performance-metrics.events.json`

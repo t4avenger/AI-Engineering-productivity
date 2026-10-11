@@ -217,8 +217,8 @@ is the golden output for the checked-in observed-sanitised input.
 
 ## Codex OTLP metrics
 
-`NormalizeMetrics` maps OTLP `resourceMetrics` from Codex (`codex_cli_rs` /
-`codex_exec`) only where a committed fixture proves a product-facing signal and
+`NormalizeMetrics` maps OTLP `resourceMetrics` from Codex (`codex_exec`,
+`codex_cli_rs`, and CLI 0.162.1's interactive `codex-app-server`) only where a committed fixture proves a product-facing signal and
 the canonical event can preserve absent-vs-zero semantics. Metrics outside the
 mapped set remain HTTP-accepted but intentionally ignored, so Codex exporters can
 flush without TelemetryIQ inventing rows for internal timings, startup counters,
@@ -231,6 +231,113 @@ Integration datapoints require a strictly parsed positive integer count. Plugin
 cache outcomes are projected only for the reviewed `hit` and `load` values, and
 MCP cache publication requires the reviewed `result=published`; malformed,
 absent, non-positive, or unreviewed values remain unprojected.
+
+### Latency and efficiency metrics
+
+Issue #237 revalidated the current surface with Codex CLI 0.162.1. The adapter
+maps the fixture-proven turn E2E/TTFT/TTFM, response inference/overhead/engine,
+tool-call, memory/network-proxy, rollout size/compression, and websocket
+families. Each datapoint becomes an observation-scoped canonical event with
+stable `metric_name`, `metric_family`, `metric_kind`, `metric_unit`, model when
+present, and present-only histogram/counter measures. An explicit histogram
+`count: 0` remains observed; an absent `sum` leaves total and average absent,
+and average is emitted only when both sum is present and count is positive. The complete resource,
+scope, instrument envelope, dimensions, datapoint, aggregation temporality,
+monotonicity, buckets, bounds, exemplars, flags, and unknown fields remain in
+provider extensions.
+
+The 0.162.1 probes emitted no `conversation.id`, `thread.id`, `session.id`, or
+`turn.id` metric dimension. Events therefore use deterministic
+`codex:performance:<digest>` observation identities. They never attach to a
+primary session by timestamp, model, exporter order, or content. The model
+performance response exposes these as additive `efficiency_metrics`, separate
+from outcome contracts and canonical operation totals. Delta series aggregate;
+cumulative or unknown-temporality series retain the latest datapoint.
+
+Fixture and golden:
+
+- `fixtures/codex/observed-sanitised/codex-0.162.1-performance-metrics.json`
+- `fixtures/codex/expected/codex-0.162.1-performance-metrics.events.json`
+
+#### Reviewed 0.162.1 instrument inventory
+
+The synchronized capture contained **86 distinct instrument names** across
+`codex_exec`, `codex-app-server`, and `codex_cli_rs`. The committed fixture is
+the minimal synthetic projection fixture for the mapped families; the following
+exhaustive classification records the disposition of every name in the raw
+capture. "Ignored" still means HTTP-accepted: no exporter batch is rejected
+because it contains one of these instruments.
+
+- **Mapped to latency/efficiency (23):**
+  `codex.responses_api_engine_iapi_tbt.duration_ms`,
+  `codex.responses_api_engine_iapi_ttft.duration_ms`,
+  `codex.responses_api_engine_service_tbt.duration_ms`,
+  `codex.responses_api_engine_service_ttft.duration_ms`,
+  `codex.responses_api_inference_time.duration_ms`,
+  `codex.responses_api_overhead.duration_ms`, `codex.rollout.size_bytes`,
+  `codex.rollout_compression.materialize`, `codex.rollout_compression.read`,
+  `codex.rollout_compression.read.io_duration_ms`, `codex.tool.call`,
+  `codex.tool.call.duration_ms`, `codex.turn.e2e_duration_ms`,
+  `codex.turn.memory`, `codex.turn.network_proxy`, `codex.turn.tool.call`,
+  `codex.turn.ttfm.duration_ms`, `codex.turn.ttft.duration_ms`,
+  `codex.websocket.continuation`, `codex.websocket.event`,
+  `codex.websocket.event.duration_ms`, `codex.websocket.request`, and
+  `codex.websocket.request.duration_ms`.
+- **Mapped by an existing projection (5):** `codex.apps.refresh.duration_ms`,
+  `codex.mcp.protocol_discovery`,
+  `codex.mcp.tools.cache_publish.duration_ms`,
+  `codex.plugins.loaded_cache.request`, and `codex.turn.token_usage`.
+- **Intentionally ignored internal bookkeeping (44):**
+  `codex.app_server.codex_home.size_bytes`,
+  `codex.apps.installed.connector_count`, `codex.apps.installed.duration_ms`,
+  `codex.apps.installed.response_bytes`, `codex.apps.installed.tool_count`,
+  `codex.apps.read.duration_ms`, `codex.apps.snapshot.age_ms`,
+  `codex.auth_storage.duration`, `codex.auth_storage.operation`,
+  `codex.cloud_config_bundle.fetch.duration_ms`,
+  `codex.cloud_config_bundle.load`, `codex.daemon.start`, `codex.db.backfill`,
+  `codex.db.backfill.duration_ms`, `codex.feature.state`,
+  `codex.mcp.binding_catalog.raw_definition_json_bytes`,
+  `codex.mcp.protocol_discovery.duration_ms`,
+  `codex.mcp.tools.cache_write.duration_ms`,
+  `codex.mcp.tools.fetch_uncached.duration_ms`,
+  `codex.mcp.tools.list.duration_ms`, `codex.plugins.loaded_cache.event`,
+  `codex.plugins.loaded_cache.load.duration_ms`,
+  `codex.plugins.loaded_cache.wait.duration_ms`, `codex.process.start`,
+  `codex.remote_models.fetch_update.duration_ms`,
+  `codex.remote_models.load_cache.duration_ms`, `codex.shell_snapshot`,
+  `codex.shell_snapshot.command`, `codex.shell_snapshot.duration_ms`,
+  `codex.shell_snapshot.wait_ms`, `codex.sqlite.init.count`,
+  `codex.sqlite.init.duration_ms`, `codex.sqlite.logs.write.bytes`,
+  `codex.sqlite.logs.write.count`, `codex.sqlite.logs.write.duration_ms`,
+  `codex.sqlite.logs.write.entries`, `codex.sqlite.logs.write.max_entry_bytes`,
+  `codex.startup.phase.duration_ms`,
+  `codex.startup_prewarm.age_at_first_turn_ms`,
+  `codex.startup_prewarm.duration_ms`,
+  `codex.startup_prewarm.websocket_check`,
+  `codex.thread_history.sqlite_projection`, `codex.tui.fullscreen_transcript`,
+  and `codex.tui.start`. These are storage, cache, startup, feature/config,
+  daemon/TUI, or internal discovery mechanics rather than user performance.
+- **Version-dependent, accepted but not projected (10):**
+  `codex.skills.shadow_selection`,
+  `codex.skills.shadow_selection.catalog_entries`,
+  `codex.skills.shadow_selection.duration_ms`,
+  `codex.skills.shadow_selection.query_terms`,
+  `codex.skills.shadow_selection.reduction_bps`,
+  `codex.skills.shadow_selection.selected_entries`,
+  `codex.thread.skills.description_truncated_chars`,
+  `codex.thread.skills.enabled_total`, `codex.thread.skills.kept_total`, and
+  `codex.thread.skills.truncated`. These experimental selection series are not
+  treated as stable product contracts.
+- **Unknown product projection, accepted but not projected (4):**
+  `codex.conversation.turn.count`, `codex.thread.started`,
+  `codex.tool.unified_exec`, and
+  `codex.turn.unified_exec.running_processes`. Their aggregate datapoints have
+  no exact session/turn key and the capture does not prove a safe user-facing
+  denominator or lifecycle meaning.
+
+No exporter-prefixed instrument was emitted in the 0.162.1 run. Future unknown
+instruments remain route-tolerated and unprojected until fixture review proves
+their semantics.
 
 ### Skill metrics
 

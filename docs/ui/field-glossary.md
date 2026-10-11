@@ -129,6 +129,11 @@ strings.
 | `ranking_available` | Ranking available | Whether cross-model ranking passed the minimum sample-size guard. | Boolean | Show "No, sample size below 10" or equivalent; do not rank. |
 | `ranked_models` | Ranked models | Ordered model list when ranking is allowed. | Model identifiers | Hide or show unavailable when `ranking_available=false`. |
 | `outcome_contract_sources` | Evidence sources | Provider contract sources used for the scorecard row. | Source labels | Show unavailable if no row exists. |
+| `efficiency_metrics` | Latency and efficiency telemetry | Fixture-backed provider histogram/counter summaries shown separately from outcome contracts. | Rows | Hide the table when no reviewed metric evidence exists. |
+| `metric_name` / `family` | Metric / family | Exact provider instrument name and TelemetryIQ product-facing grouping. | Identifier | Never infer a family for an unmapped instrument. |
+| `scope` | Scope | Whether the metric has an exact provider session key; Codex 0.162.1 values are `observation`. | Enum | Render `Observation only`; never imply session attribution. |
+| `sample_count` / `total` / `average` / `min` / `max` | Histogram summary | Present-only provider histogram measures with the reported unit. | Provider unit | Show unavailable for each absent measure; do not substitute zero. |
+| `value` | Counter value | Present-only provider sum/counter value using its aggregation temporality. | Provider unit | Show unavailable when absent; a reported zero remains zero. |
 
 ## Context Pressure Fields
 

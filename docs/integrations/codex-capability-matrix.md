@@ -1,7 +1,7 @@
 # Codex Capability Matrix
 
 Observed with Codex CLI 0.153.4 in isolated synthetic sessions on 2026-09-10,
-then revalidated with CLI 0.154.0 on 2026-09-17 after the separate `otel.trace_exporter` appeared, with CLI 0.155.1 on 2026-09-20 and 2026-09-26 for trace-to-log identity and turn correlation, with a synchronized CLI 0.157.1 rollout/OTLP capture on 2026-09-29, with CLI 0.159.2 rollout operation probes on 2026-10-01, and with a CLI 0.160.0 multi-agent rollout/OTLP capture on 2026-10-02. These captures used a temporary `CODEX_HOME`,
+then revalidated with CLI 0.154.0 on 2026-09-17 after the separate `otel.trace_exporter` appeared, with CLI 0.155.1 on 2026-09-20 and 2026-09-26 for trace-to-log identity and turn correlation, with a synchronized CLI 0.157.1 rollout/OTLP capture on 2026-09-29, with CLI 0.159.2 rollout operation probes on 2026-10-01, with a CLI 0.160.0 multi-agent rollout/OTLP capture on 2026-10-02, and with CLI 0.162.1 latency/efficiency probes on 2026-10-11. These captures used a temporary `CODEX_HOME`,
 prompt logging disabled, a raw loopback receiver, non-interactive `codex_exec`,
 and PTY-backed `codex_cli_rs`. Raw captures stayed in `/tmp` and were not
 committed.
@@ -9,12 +9,13 @@ committed.
 | Capability | State | Evidence |
 |---|---|---|
 | OTLP log export | supported | `/v1/logs` accepted current payloads from both `codex_exec` and `codex_cli_rs`; see log signal fixtures below. |
-| OTLP metric export | supported | `/v1/metrics` accepted 74 current metric instruments from `codex_exec` and `codex_cli_rs`; see metric signal fixtures below. |
+| OTLP metric export | supported | `/v1/metrics` accepted the current metric surface. CLI 0.162.1 exports non-interactive product metrics as `codex_exec`; interactive product metrics come from `codex-app-server`, while `codex_cli_rs` primarily emits TUI/SQLite bookkeeping. Evidence: `fixtures/codex/observed-sanitised/codex-0.162.1-performance-metrics.json`. |
 | OTLP trace export | version-dependent | CLI 0.153.4 emitted no `/v1/traces` POSTs; CLI 0.154.0 emitted both OTLP/HTTP JSON and binary protobuf from `codex_exec`, and PTY-backed `codex_cli_rs` flushed binary batches on shutdown. CLI 0.155.1 additionally emits resource-level `conversation.id`; a separate 0.155.1 `session_task.turn` fixture emits `thread.id` and `turn.id`. Same-run sanitised trace/log fixtures prove the exact provider-key joins. Evidence: `fixtures/codex/observed-sanitised/codex-0.154.0-trace-spans-otlp.json`, `codex-0.155.1-trace-conversation-otlp.json`, `codex-0.155.1-log-conversation-otlp.json`, `codex-0.155.1-trace-thread-turn-otlp.json`, and `codex-0.155.1-log-thread-turn-otlp.json`. |
 | Tool version | supported | `service.version` reported `0.153.4` in the log/metric capture and `0.154.0` in the trace resource; synchronized CLI 0.157.1 evidence retains both OTLP `service.version` and rollout `session_meta.payload.cli_version`. |
 | Log exporter service.name | supported | Current fixtures include `codex_exec` and `codex_cli_rs`. |
 | Model identity | supported | `model` remains present on current `codex.sse_event`, `codex.api_request`, `codex.tool_decision`, `codex.tool_result`, and related log signals. |
 | Token usage | supported | In addition to the existing log/metric evidence, the 0.154.0 `session_task.turn` span reports `codex.turn.token_usage.{input,cached_input,cache_write_input,non_cached_input,output,reasoning_output,total}_tokens`; stable categories are promoted to canonical event attributes and the complete raw set remains in `provider_extensions.span_attributes`. |
+| Latency and efficiency metrics | supported | CLI 0.162.1 emits turn E2E/TTFT/TTFM, response inference/overhead/engine latency, tool-call duration/count, memory/network-proxy activity, rollout size/compression, and websocket duration/count instruments. Histogram count/sum/min/max/buckets/bounds and counter temporality are retained. No reviewed datapoint carries `conversation.id`, `thread.id`, `session.id`, or `turn.id`, so all remain observation-scoped and are never time/model joined to a session. Evidence and golden: `codex-0.162.1-performance-metrics.json` and `codex-0.162.1-performance-metrics.events.json`. |
 | Session lifecycle & identifier | partial | Current log signals retain `conversation.id` as a provider-native local session identifier. CLI 0.155.1 trace resources report that same provider key, reviewed `session_task.turn` spans can report `thread.id`, and synchronized CLI 0.157.1 evidence places `thread.id` on the trace resource; exact values and rollout `session_meta.payload.id` all map to `codex:<provider-id>`. Traces without either remain `codex:trace:<trace-id>` observations. CLI 0.160.0 `task_started`, successful/failed `task_complete`, and interrupted `turn_aborted` now map to active/completed/failed/cancelled session state with provider boundaries (#236). `turn_context`, `conversation_starts`, and `auth_recovery` expose exact governance/auth snapshots. Metrics without an exact provider session key remain observation-only and are never inferred into a nearby conversation. |
 | Multi-agent lineage and rollups | version-dependent | CLI 0.160.0 child `session_meta.source.subagent.thread_spawn` records prove exact parent thread, depth, path, nickname, and role; parent `SubAgentActivity` items prove started/completed/interrupted lifecycle. Final token counts, task duration, and exact operation item IDs provide per-agent rollups. Siblings, nesting, cancellation, reporting, and a failed operation with completed agent outcome are fixture-backed in `codex-0.160.0-multi-agent-*`; missing parents and fields remain unknown/null. Earlier reviewed versions do not prove this surface. |
 | Tool execution | supported | OTLP `codex.tool_result` / `codex.sandbox_outcome` and rollout operations map to `canonical.Operation`. CLI 0.159.2 `event_msg/item_completed` proves successful/failed `CommandExecution`, multi-path `FileChange`, and successful/failed `McpToolCall` shapes with exact provider item IDs, raw arguments/results/paths/diffs/commands/output, status, exit code, and duration. Evidence: `fixtures/codex/observed-sanitised/codex-0.159.2-rollout-operations.jsonl` and `fixtures/codex/expected/codex-0.159.2-rollout-operations.operations.json`. A 20,000-byte output remained complete and exposed no truncation flag. |
@@ -44,6 +45,11 @@ No capability not listed here is inferred from this run. `unknown` means not pro
 | `codex.websocket_request` | supported | `codex_cli_rs`, `codex_exec` | `fixtures/codex/observed-sanitised/current-0.153.4-surface/codex-0.153.4-log-codex-websocket-request.json` |
 
 ## Metric instruments
+
+`State` in this historical 0.153.4 table describes capture support, not whether
+TelemetryIQ creates a product projection. The exhaustive 0.162.1 projection
+classification is recorded in `codex-normaliser.md` under **Reviewed 0.162.1
+instrument inventory**.
 
 | Metric name | State | Kind | Service names | Evidence |
 |---|---|---|---|---|
