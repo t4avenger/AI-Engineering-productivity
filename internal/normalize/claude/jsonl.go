@@ -54,13 +54,29 @@ type transcriptRecord struct {
 	UserType       string            `json:"userType"`
 	RequestID      string            `json:"requestId"`
 	Effort         string            `json:"effort"`
-	PromptID       string            `json:"promptId"`
-	PermissionMode string            `json:"permissionMode"`
-	PromptSource   string            `json:"promptSource"`
-	TurnOrigin     string            `json:"turnOrigin"`
+	PromptID       lenientString     `json:"promptId"`
+	PermissionMode lenientString     `json:"permissionMode"`
+	PromptSource   lenientString     `json:"promptSource"`
+	TurnOrigin     lenientString     `json:"turnOrigin"`
 	APIBlockIndex  *int64            `json:"apiBlockIndex"`
 	IsSidechain    *bool             `json:"isSidechain"`
 	Message        *assistantMessage `json:"message"`
+}
+
+// lenientString decodes a JSON string and leaves any other JSON type (number, bool,
+// object, null) unset instead of failing the whole record decode (#263). It types
+// the fields this adapter promoted after their record shape was already in use, so
+// a provider type change cannot abort an import or skip a record; the residual echo
+// (jsonl_residual.go) still retains the unexpected value raw.
+type lenientString string
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (s *lenientString) UnmarshalJSON(data []byte) error {
+	var value string
+	if json.Unmarshal(data, &value) == nil {
+		*s = lenientString(value)
+	}
+	return nil
 }
 
 // assistantMessage decodes the model, message id, stop reason, and usage from a
@@ -68,9 +84,9 @@ type transcriptRecord struct {
 // declared: it is read by the content shapers. Any other message key reaches the
 // transcript_record residual echo (#263).
 type assistantMessage struct {
-	ID         string          `json:"id"`
+	ID         lenientString   `json:"id"`
 	Model      string          `json:"model"`
-	StopReason string          `json:"stop_reason"`
+	StopReason lenientString   `json:"stop_reason"`
 	Usage      *assistantUsage `json:"usage"`
 }
 
@@ -388,7 +404,7 @@ func userEvent(line []byte, receivedAt time.Time) (canonical.Event, bool) {
 // raw residual of every record field the rules leave without a typed home.
 func transcriptEventExtensions(eventID string, occurredAt time.Time, record transcriptRecord, envelope map[string]any, line []byte, rules objectRules) map[string]any {
 	correlation := transcriptCorrelation(eventID, occurredAt, strings.TrimSpace(record.UUID), trimmedParentUUID(record.ParentUUID))
-	addTranscriptPromptID(correlation, record.PromptID)
+	addTranscriptPromptID(correlation, string(record.PromptID))
 	extensions := map[string]any{
 		"correlation": correlation,
 		"transcript":  envelope,
@@ -513,9 +529,9 @@ func transcriptEnvelope(record transcriptRecord) map[string]any {
 		"entrypoint":      record.Entrypoint,
 		"user_type":       record.UserType,
 		"effort":          record.Effort,
-		"permission_mode": record.PermissionMode,
-		"prompt_source":   record.PromptSource,
-		"turn_origin":     record.TurnOrigin,
+		"permission_mode": string(record.PermissionMode),
+		"prompt_source":   string(record.PromptSource),
+		"turn_origin":     string(record.TurnOrigin),
 	} {
 		if value != "" {
 			envelope[key] = value
@@ -541,10 +557,10 @@ func addMessageEnvelope(envelope map[string]any, message *assistantMessage) {
 		return
 	}
 	if message.ID != "" {
-		envelope["message_id"] = nativeSessionPrefix + message.ID
+		envelope["message_id"] = nativeSessionPrefix + string(message.ID)
 	}
 	if message.StopReason != "" {
-		envelope["stop_reason"] = message.StopReason
+		envelope["stop_reason"] = string(message.StopReason)
 	}
 }
 

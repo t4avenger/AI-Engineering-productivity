@@ -19,17 +19,17 @@ import (
 // value: an explicit null, an empty string, a wrong-typed value, or a value the
 // typed home would trim or reformat stays in the residual instead of being lost.
 
-// residualNode returns what is left of one raw value once its typed home has taken
-// the parts it stores. ok is false when nothing is left.
-type residualNode interface {
-	residual(raw json.RawMessage) (left any, ok bool)
+// reducer returns what is left of one raw value once its typed home has taken the
+// parts it stores. ok is false when nothing is left.
+type reducer interface {
+	reduce(raw json.RawMessage) (left any, ok bool)
 }
 
 // scalarRule is a leaf whose value is fully retained by its typed home when stored
 // reports true for the raw value.
 type scalarRule func(raw json.RawMessage) bool
 
-func (rule scalarRule) residual(raw json.RawMessage) (any, bool) {
+func (rule scalarRule) reduce(raw json.RawMessage) (any, bool) {
 	if rule(raw) {
 		return nil, false
 	}
@@ -37,12 +37,13 @@ func (rule scalarRule) residual(raw json.RawMessage) (any, bool) {
 }
 
 // objectRules walks a JSON object: keys with a rule are reduced by it, and every
-// other key is echoed raw. A non-object value has no typed home and is echoed whole.
-type objectRules map[string]residualNode
+// other key is echoed raw. A non-object value (including null) and an empty object
+// have no typed home and are echoed whole.
+type objectRules map[string]reducer
 
-func (rules objectRules) residual(raw json.RawMessage) (any, bool) {
+func (rules objectRules) reduce(raw json.RawMessage) (any, bool) {
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &fields); err != nil || fields == nil {
+	if err := json.Unmarshal(raw, &fields); err != nil || len(fields) == 0 {
 		return decodeRawContent(raw), true
 	}
 	left := map[string]any{}
@@ -52,7 +53,7 @@ func (rules objectRules) residual(raw json.RawMessage) (any, bool) {
 			left[key] = decodeRawContent(value)
 			continue
 		}
-		if residual, ok := rule.residual(value); ok {
+		if residual, ok := rule.reduce(value); ok {
 			left[key] = residual
 		}
 	}
@@ -62,22 +63,22 @@ func (rules objectRules) residual(raw json.RawMessage) (any, bool) {
 // contentRules reduces message.content. A bare string is typed when the record's
 // shaper stores it (stringTyped); an array is walked block by block, and a block
 // keeps a residual entry — {index, block} — only for the keys its type's shaper does
-// not store, or whole when its type is unrecognised or its typed body is missing.
+// not store, or whole when its type is unrecognised or its shaper rejects it. null,
+// an empty array, or any other shape has no typed home and is echoed whole.
 type contentRules struct {
 	stringTyped bool
 	blocks      map[string]objectRules
 }
 
-func (rules contentRules) residual(raw json.RawMessage) (any, bool) {
-	var text string
-	if err := json.Unmarshal(raw, &text); err == nil {
+func (rules contentRules) reduce(raw json.RawMessage) (any, bool) {
+	if text, ok := rawString(raw); ok {
 		if rules.stringTyped && strings.TrimSpace(text) != "" {
 			return nil, false
 		}
 		return text, true
 	}
 	var blocks []json.RawMessage
-	if err := json.Unmarshal(raw, &blocks); err != nil {
+	if err := json.Unmarshal(raw, &blocks); err != nil || len(blocks) == 0 {
 		return decodeRawContent(raw), true
 	}
 	var left []any
@@ -89,38 +90,66 @@ func (rules contentRules) residual(raw json.RawMessage) (any, bool) {
 	return left, len(left) > 0
 }
 
-// blockResidual reduces one content block by the rules for its type. type itself is
-// typed by the block's typed home, but rides back on any residual entry so a
-// leftover key is never separated from its block type.
+// transcriptBlockRequired is the key each known block's shaper requires before it
+// stores anything: a text/thinking block with blank text is skipped, and a tool_use
+// or tool_result without a non-blank id is never paired into an Operation.
+var transcriptBlockRequired = map[string]string{
+	"text":        "text",
+	"thinking":    "thinking",
+	"tool_use":    "id",
+	"tool_result": "tool_use_id",
+}
+
+// blockResidual reduces one content block by the rules for its type. A block whose
+// type is unrecognised, or whose required key is missing or rejected (so its shaper
+// stored none of it), is echoed whole. type itself is typed by the block's typed
+// home, but rides back on any residual entry so a leftover key is never separated
+// from its block type.
 func (rules contentRules) blockResidual(raw json.RawMessage) (any, bool) {
-	var discriminator struct {
-		Type string `json:"type"`
-	}
-	_ = json.Unmarshal(raw, &discriminator)
-	blockRules, known := rules.blocks[discriminator.Type]
-	if !known {
+	var fields map[string]json.RawMessage
+	_ = json.Unmarshal(raw, &fields)
+	blockType, _ := rawString(fields["type"])
+	blockRules, known := rules.blocks[blockType]
+	if !known || !blockAccepted(blockRules, fields, transcriptBlockRequired[blockType]) {
 		return decodeRawContent(raw), true
 	}
-	left, ok := blockRules.residual(raw)
-	fields, isMap := left.(map[string]any)
+	left, ok := blockRules.reduce(raw)
+	leftover, isMap := left.(map[string]any)
 	if !ok || !isMap {
 		return left, ok
 	}
-	delete(fields, "type")
-	if len(fields) == 0 {
+	delete(leftover, "type")
+	if len(leftover) == 0 {
 		return nil, false
 	}
-	fields["type"] = discriminator.Type
-	return fields, true
+	leftover["type"] = blockType
+	return leftover, true
 }
 
-// rawString decodes a JSON string; ok is false for any other JSON type.
+// blockAccepted reports whether a known block's required key is present and stored
+// by its typed home.
+func blockAccepted(rules objectRules, fields map[string]json.RawMessage, required string) bool {
+	value, present := fields[required]
+	if !present {
+		return false
+	}
+	_, left := rules[required].reduce(value)
+	return !left
+}
+
+// rawString decodes a JSON string; ok is false for null and any other JSON type.
 func rawString(raw json.RawMessage) (string, bool) {
 	var value string
-	if err := json.Unmarshal(raw, &value); err != nil {
+	if isJSONNull(raw) || json.Unmarshal(raw, &value) != nil {
 		return "", false
 	}
 	return value, true
+}
+
+// isJSONNull reports an explicit JSON null, which json.Unmarshal silently accepts
+// into strings, bools, and slices — so every predicate rules it out first.
+func isJSONNull(raw json.RawMessage) bool {
+	return string(bytes.TrimSpace(raw)) == "null"
 }
 
 // storedNonEmpty matches a typed home that stores the string verbatim when non-empty.
@@ -145,9 +174,10 @@ func storedNonBlank(raw json.RawMessage) bool {
 	return ok && strings.TrimSpace(value) != ""
 }
 
-// alwaysStored marks a body whose typed home retains it whole (a tool input,
-// a tool_result body, the record-scoped toolUseResult — all on the Operation).
-func alwaysStored(json.RawMessage) bool { return true }
+// storedBody marks a body whose typed home retains it whole (a tool input, a
+// tool_result body, the record-scoped toolUseResult — all on the Operation). The
+// Operation shapers omit a decoded nil, so an explicit null stays in the residual.
+func storedBody(raw json.RawMessage) bool { return !isJSONNull(raw) }
 
 // storedTimestamp matches occurred_at, which is the RFC3339 timestamp in UTC; a raw
 // value that does not round-trip byte-for-byte (an offset, a different precision)
@@ -180,7 +210,7 @@ func storedInteger(raw json.RawMessage) bool {
 // storedBool matches a typed bool home.
 func storedBool(raw json.RawMessage) bool {
 	var value bool
-	return json.Unmarshal(raw, &value) == nil
+	return !isJSONNull(raw) && json.Unmarshal(raw, &value) == nil
 }
 
 // transcriptUsageRules are the message.usage counts promoted to canonical token
@@ -201,7 +231,7 @@ var transcriptUsageRules = objectRules{
 // user_message / assistant_message event: the event identity (type → event_type,
 // sessionId → session_id, timestamp → occurred_at, version → source_version),
 // correlation (uuid, parentUuid, promptId), and transcriptEnvelope.
-var transcriptEnvelopeRules = map[string]residualNode{
+var transcriptEnvelopeRules = map[string]reducer{
 	"type":           scalarRule(storedNonEmpty),
 	"uuid":           scalarRule(storedTrimmed),
 	"parentUuid":     scalarRule(storedTrimmed),
@@ -221,14 +251,14 @@ var transcriptEnvelopeRules = map[string]residualNode{
 	"apiBlockIndex":  scalarRule(storedInteger),
 	"isSidechain":    scalarRule(storedBool),
 	// toolUseResult rides on the paired tool Operation (#173, Site 3).
-	"toolUseResult": scalarRule(alwaysStored),
+	"toolUseResult": scalarRule(storedBody),
 }
 
 // transcriptToolResultBlock is a user tool_result block, whose body and outcome ride
 // on the paired tool Operation.
 var transcriptToolResultBlock = objectRules{
 	"tool_use_id": scalarRule(storedNonBlank),
-	"content":     scalarRule(alwaysStored),
+	"content":     scalarRule(storedBody),
 	"is_error":    scalarRule(storedBool),
 }
 
@@ -241,7 +271,7 @@ var transcriptAssistantRules = transcriptRecordRules(objectRules{
 		"tool_use": {
 			"id":    scalarRule(storedNonBlank),
 			"name":  scalarRule(storedNonEmpty),
-			"input": scalarRule(alwaysStored),
+			"input": scalarRule(storedBody),
 		},
 	}},
 	"model": scalarRule(storedTrimmed),
@@ -284,7 +314,7 @@ func transcriptRecordRules(message objectRules) objectRules {
 // transcriptRecordResidual returns the raw fields of a transcript line that the
 // rules leave without a typed home, or nil when every field is typed.
 func transcriptRecordResidual(line []byte, rules objectRules) map[string]any {
-	left, ok := rules.residual(line)
+	left, ok := rules.reduce(line)
 	if !ok {
 		return nil
 	}

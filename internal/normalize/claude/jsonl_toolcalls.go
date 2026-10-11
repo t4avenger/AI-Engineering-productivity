@@ -39,7 +39,7 @@ type transcriptContentEnvelope struct {
 	Version     string                 `json:"version"`
 	Cwd         string                 `json:"cwd"`
 	IsSidechain *bool                  `json:"isSidechain"`
-	PromptID    string                 `json:"promptId"`
+	PromptID    lenientString          `json:"promptId"`
 	Message     *transcriptContentBody `json:"message"`
 	// ToolUseResult is the record-scoped structured tool result Claude Code writes
 	// as a sibling of message on a user record (stdout/stderr, structured patch,
@@ -198,7 +198,7 @@ func (c *toolCallCollector) collectToolResults(line []byte) {
 		return
 	}
 	recordCwd := strings.TrimSpace(envelope.Cwd)
-	promptID := strings.TrimSpace(envelope.PromptID)
+	promptID := strings.TrimSpace(string(envelope.PromptID))
 	var record map[string]any
 	if transcriptUserContent(line) == "" {
 		record = transcriptRecordResidual(line, transcriptResultRecordRules)
