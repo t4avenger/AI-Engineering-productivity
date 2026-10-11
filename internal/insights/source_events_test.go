@@ -36,6 +36,29 @@ func TestSourceEventsFromSessionKeepsMCPIdentityWithTokenFields(t *testing.T) {
 	}
 }
 
+func TestSourceEventsFromSessionKeepsPerformanceSummaryWithoutRawDatapoint(t *testing.T) {
+	now := time.Now().UTC()
+	event := canonical.Event{
+		EventID: "performance", EventType: "codex.turn.ttft.duration_ms", SessionID: "observation",
+		OccurredAt: now, ReceivedAt: now, Provider: "openai", Tool: "codex",
+		Attributes: map[string]any{"model": "gpt-synthetic", "sample_count": int64(2), "metric_average": float64(450)},
+		ProviderExtensions: map[string]any{
+			"performance_metric": map[string]any{"name": "codex.turn.ttft.duration_ms", "family": "turn_latency", "kind": "histogram", "scope": "observation"},
+			"datapoint":          map[string]any{"secret_canary": "drop-me"},
+		},
+	}
+	thin := SourceEventsFromSession([]canonical.Event{event})
+	if len(thin) != 2 {
+		t.Fatalf("retained events = %#v", thin)
+	}
+	if thin[0].Attributes["metric_average"] != float64(450) || thin[0].ProviderExtensions["performance_metric"] == nil {
+		t.Fatalf("performance signal = %#v", thin[0])
+	}
+	if thin[0].ProviderExtensions["datapoint"] != nil {
+		t.Fatalf("raw datapoint copied into thin insight signal: %#v", thin[0].ProviderExtensions)
+	}
+}
+
 func TestSourceEventsFromSessionRetainsIncompleteSkillPolicyEvidence(t *testing.T) {
 	now := time.Now().UTC()
 	events := []canonical.Event{

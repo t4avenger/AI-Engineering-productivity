@@ -384,7 +384,7 @@ started_at = COALESCE(started_at, json_extract(session_json, '$.started_at')),
 tool = COALESCE(tool, json_extract(session_json, '$.tool')),
 state = COALESCE(state, json_extract(session_json, '$.state')),
 identity_scope = COALESCE(identity_scope, json_extract(session_json, '$.attributes.identity_scope'), CASE
-	WHEN session_id GLOB 'codex-log:*' OR session_id GLOB 'codex:token:*' OR session_id GLOB 'codex:skill:*'
+	WHEN session_id GLOB 'codex-log:*' OR session_id GLOB 'codex:token:*' OR session_id GLOB 'codex:performance:*' OR session_id GLOB 'codex:skill:*'
 		OR session_id GLOB 'codex:skill-turn:*' OR session_id GLOB 'codex:trace:*' OR session_id GLOB 'cursor:token:*'
 		OR session_id GLOB 'claude-code:trace:*' OR session_id GLOB '*:unknown' THEN 'observation'
 	ELSE 'unknown' END),
@@ -934,7 +934,7 @@ func sessionIdentity(events []canonical.Event) (string, string) {
 func observationIdentity(id string) (string, string, bool) {
 	switch {
 	case strings.HasPrefix(id, "codex-log:"), strings.HasPrefix(id, "codex:token:"),
-		strings.HasPrefix(id, "codex:skill:"), strings.HasPrefix(id, "codex:skill-turn:"), strings.HasPrefix(id, "codex:integration:"),
+		strings.HasPrefix(id, "codex:performance:"), strings.HasPrefix(id, "codex:skill:"), strings.HasPrefix(id, "codex:skill-turn:"), strings.HasPrefix(id, "codex:integration:"),
 		strings.HasPrefix(id, "cursor:token:"):
 		return identityObservation, "content-derived", true
 	case strings.HasPrefix(id, "codex:trace:"):

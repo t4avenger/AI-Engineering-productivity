@@ -5,6 +5,8 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/wayne/telemetryiq/internal/normalize/canonical"
 )
@@ -18,11 +20,35 @@ const (
 
 // ModelPerformance is the per-model outcome-contract scorecard.
 type ModelPerformance struct {
-	SchemaVersion    string           `json:"schema_version"`
-	Models           []ModelScorecard `json:"models"`
-	RankingAvailable bool             `json:"ranking_available"`
-	RankedModels     []string         `json:"ranked_models"`
-	Notes            []string         `json:"notes"`
+	SchemaVersion     string                     `json:"schema_version"`
+	Models            []ModelScorecard           `json:"models"`
+	EfficiencyMetrics []PerformanceMetricSummary `json:"efficiency_metrics"`
+	RankingAvailable  bool                       `json:"ranking_available"`
+	RankedModels      []string                   `json:"ranked_models"`
+	Notes             []string                   `json:"notes"`
+}
+
+// PerformanceMetricSummary reports fixture-backed provider telemetry without
+// pretending an aggregate metric datapoint is an individual request or tool
+// operation. Codex metrics without a provider session key remain observation
+// scoped and therefore cannot influence outcome ranking.
+type PerformanceMetricSummary struct {
+	MetricName  string         `json:"metric_name"`
+	Family      string         `json:"family"`
+	Provider    string         `json:"provider"`
+	Tool        string         `json:"tool"`
+	Model       string         `json:"model,omitempty"`
+	Kind        string         `json:"kind"`
+	Unit        string         `json:"unit"`
+	Scope       string         `json:"scope"`
+	State       string         `json:"state"`
+	SampleCount *int64         `json:"sample_count"`
+	Total       *float64       `json:"total"`
+	Average     *float64       `json:"average"`
+	Min         *float64       `json:"min"`
+	Max         *float64       `json:"max"`
+	Value       *int64         `json:"value"`
+	Dimensions  map[string]any `json:"dimensions"`
 }
 
 // ModelScorecard holds raw metrics for one model with sample size.
@@ -66,16 +92,180 @@ func ModelPerformanceFromEvents(events []canonical.Event) ModelPerformance {
 	models := scorecardsFromAccumulators(accumulateContracts(events))
 	rankingAvailable, ranked := rankingFor(models)
 	return ModelPerformance{
-		SchemaVersion:    ModelPerformanceSchemaVersion,
-		Models:           models,
-		RankingAvailable: rankingAvailable,
-		RankedModels:     ranked,
+		SchemaVersion:     ModelPerformanceSchemaVersion,
+		Models:            models,
+		EfficiencyMetrics: performanceMetricsFromEvents(events),
+		RankingAvailable:  rankingAvailable,
+		RankedModels:      ranked,
 		Notes: []string{
-			"Metrics are built only from provider_extensions.outcome_contract signals, never from raw session lifecycle state.",
+			"Outcome scorecards are built only from provider_extensions.outcome_contract signals, never from raw session lifecycle state.",
+			"Efficiency metrics preserve provider histogram and counter semantics; observation-scoped metrics are never joined to a session by time or model.",
 			fmt.Sprintf("Cross-model ranking is suppressed unless every compared model has sample_size >= %d.", MinRankingSampleSize),
 			"Workload and task-mix caveats apply; raw counts are not a productivity score.",
 		},
 	}
+}
+
+type performanceMetricAccumulator struct {
+	summary     PerformanceMetricSummary
+	temporality int64
+	latestKey   string
+}
+
+func performanceMetricsFromEvents(events []canonical.Event) []PerformanceMetricSummary {
+	rows := make(map[string]*performanceMetricAccumulator)
+	for _, event := range events {
+		accumulatePerformanceMetric(rows, event)
+	}
+	return performanceMetricSummaries(rows)
+}
+
+func accumulatePerformanceMetric(rows map[string]*performanceMetricAccumulator, event canonical.Event) {
+	metric, ok := event.ProviderExtensions["performance_metric"].(map[string]any)
+	if !ok {
+		return
+	}
+	summary, ok := performanceSummary(event, metric)
+	if !ok {
+		return
+	}
+	temporality := int64Value(metric["aggregation_temporality"])
+	key := performanceSummaryKey(summary, temporality)
+	latestKey := event.OccurredAt.UTC().Format(time.RFC3339Nano) + "\x00" + event.EventID
+	row, exists := rows[key]
+	if !exists {
+		rows[key] = &performanceMetricAccumulator{summary: summary, temporality: temporality, latestKey: latestKey}
+		return
+	}
+	if temporality == 1 {
+		mergeDeltaPerformance(&row.summary, summary)
+		if latestKey > row.latestKey {
+			row.latestKey = latestKey
+		}
+		return
+	}
+	if latestKey > row.latestKey {
+		row.summary = summary
+		row.latestKey = latestKey
+	}
+}
+
+func performanceMetricSummaries(rows map[string]*performanceMetricAccumulator) []PerformanceMetricSummary {
+	result := make([]PerformanceMetricSummary, 0, len(rows))
+	for _, row := range rows {
+		if row.summary.SampleCount != nil && row.summary.Total != nil && *row.summary.SampleCount > 0 {
+			average := *row.summary.Total / float64(*row.summary.SampleCount)
+			row.summary.Average = &average
+		}
+		result = append(result, row.summary)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		left, right := result[i], result[j]
+		return left.Provider+"\x00"+left.Tool+"\x00"+left.Family+"\x00"+left.MetricName+"\x00"+left.Model+performanceDimensionsKey(left.Dimensions) <
+			right.Provider+"\x00"+right.Tool+"\x00"+right.Family+"\x00"+right.MetricName+"\x00"+right.Model+performanceDimensionsKey(right.Dimensions)
+	})
+	return result
+}
+
+func performanceSummary(event canonical.Event, metric map[string]any) (PerformanceMetricSummary, bool) {
+	name, _ := metric["name"].(string)
+	family, _ := metric["family"].(string)
+	kind, _ := metric["kind"].(string)
+	if name == "" || family == "" || (kind != "histogram" && kind != "sum") {
+		return PerformanceMetricSummary{}, false
+	}
+	unit, _ := metric["unit"].(string)
+	scope, _ := metric["scope"].(string)
+	model, _ := event.Attributes["model"].(string)
+	dimensions := map[string]any{}
+	if raw, ok := metric["dimensions"].(map[string]any); ok {
+		for key, value := range raw {
+			if key != "model" {
+				dimensions[key] = value
+			}
+		}
+	}
+	return PerformanceMetricSummary{
+		MetricName: name, Family: family, Provider: event.Provider, Tool: event.Tool, Model: model,
+		Kind: kind, Unit: unit, Scope: scope, State: "observed", Dimensions: dimensions,
+		SampleCount: int64Pointer(metric["sample_count"]), Total: contractFloat(metric["sum"]),
+		Min: contractFloat(metric["min"]), Max: contractFloat(metric["max"]), Value: int64Pointer(metric["value"]),
+	}, true
+}
+
+func performanceSummaryKey(summary PerformanceMetricSummary, temporality int64) string {
+	return strings.Join([]string{summary.Provider, summary.Tool, summary.Model, summary.MetricName, summary.Unit, summary.Kind, summary.Scope, strconv.FormatInt(temporality, 10), performanceDimensionsKey(summary.Dimensions)}, "\x00")
+}
+
+func performanceDimensionsKey(dimensions map[string]any) string {
+	keys := make([]string, 0, len(dimensions))
+	for key := range dimensions {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	var builder strings.Builder
+	for _, key := range keys {
+		builder.WriteString(key)
+		builder.WriteByte('=')
+		fmt.Fprint(&builder, dimensions[key])
+		builder.WriteByte(';')
+	}
+	return builder.String()
+}
+
+func mergeDeltaPerformance(target *PerformanceMetricSummary, next PerformanceMetricSummary) {
+	target.SampleCount = addInt64Pointers(target.SampleCount, next.SampleCount)
+	target.Total = addFloatPointers(target.Total, next.Total)
+	target.Value = addInt64Pointers(target.Value, next.Value)
+	target.Min = minimumFloatPointer(target.Min, next.Min)
+	target.Max = maximumFloatPointer(target.Max, next.Max)
+}
+
+func addInt64Pointers(left, right *int64) *int64 {
+	if left == nil {
+		return right
+	}
+	if right == nil {
+		return left
+	}
+	value := *left + *right
+	return &value
+}
+
+func addFloatPointers(left, right *float64) *float64 {
+	if left == nil {
+		return right
+	}
+	if right == nil {
+		return left
+	}
+	value := *left + *right
+	return &value
+}
+
+func minimumFloatPointer(left, right *float64) *float64 {
+	if left == nil || (right != nil && *right < *left) {
+		return right
+	}
+	return left
+}
+
+func maximumFloatPointer(left, right *float64) *float64 {
+	if left == nil || (right != nil && *right > *left) {
+		return right
+	}
+	return left
+}
+
+func int64Value(value any) int64 {
+	if parsed := int64Pointer(value); parsed != nil {
+		return *parsed
+	}
+	return 0
+}
+
+func int64Pointer(value any) *int64 {
+	return contractInt(value)
 }
 
 func accumulateContracts(events []canonical.Event) map[modelKey]*modelAccumulator {

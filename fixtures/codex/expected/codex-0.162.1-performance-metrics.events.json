@@ -1,0 +1,1325 @@
+[
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:performance:55317f9fb5ec736b82bcb41d005710593fc5a8292766c89a1c56f1f5b8819987",
+    "event_type": "codex.turn.e2e_duration_ms",
+    "occurred_at": "2026-10-11T11:10:00Z",
+    "received_at": "2026-10-11T11:11:00Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.162.1",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:performance:55317f9fb5ec736b82bcb41d005710593fc5a8292766c89a1c56f1f5b8819987",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "metric_average": 1800,
+      "metric_family": "turn_latency",
+      "metric_kind": "histogram",
+      "metric_max": 2400,
+      "metric_min": 1200,
+      "metric_name": "codex.turn.e2e_duration_ms",
+      "metric_sum": 3600,
+      "metric_unit": "ms",
+      "model": "gpt-6.1-sol-synthetic",
+      "sample_count": 2,
+      "unavailable_fields": [
+        "session_lifecycle",
+        "task_outcome",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:performance:55317f9fb5ec736b82bcb41d005710593fc5a8292766c89a1c56f1f5b8819987",
+        "ordering_key": "01791717000000000000:codex:performance:55317f9fb5ec736b82bcb41d005710593fc5a8292766c89a1c56f1f5b8819987",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex 0.162.1 performance metrics have no provider session or task key"
+        }
+      },
+      "datapoint": {
+        "attributes": [
+          {
+            "key": "model",
+            "value": {
+              "stringValue": "gpt-6.1-sol-synthetic"
+            }
+          },
+          {
+            "key": "originator",
+            "value": {
+              "stringValue": "codex_cli_rs"
+            }
+          },
+          {
+            "key": "session_source",
+            "value": {
+              "stringValue": "cli"
+            }
+          }
+        ],
+        "bucketCounts": [
+          "0",
+          "1",
+          "1"
+        ],
+        "count": "2",
+        "explicitBounds": [
+          1000,
+          2000
+        ],
+        "max": 2400,
+        "min": 1200,
+        "sum": 3600,
+        "timeUnixNano": "1791717000000000000"
+      },
+      "metric_attributes": {
+        "model": "gpt-6.1-sol-synthetic",
+        "originator": "codex_cli_rs",
+        "session_source": "cli"
+      },
+      "metric_envelope": {
+        "description": "Duration in milliseconds.",
+        "histogram": {
+          "aggregationTemporality": 1
+        },
+        "name": "codex.turn.e2e_duration_ms",
+        "unit": "ms"
+      },
+      "performance_metric": {
+        "aggregation_temporality": 1,
+        "average": 1800,
+        "bucket_counts": [
+          "0",
+          "1",
+          "1"
+        ],
+        "description": "Duration in milliseconds.",
+        "dimensions": {
+          "model": "gpt-6.1-sol-synthetic",
+          "originator": "codex_cli_rs",
+          "session_source": "cli"
+        },
+        "explicit_bounds": [
+          1000,
+          2000
+        ],
+        "family": "turn_latency",
+        "kind": "histogram",
+        "max": 2400,
+        "min": 1200,
+        "name": "codex.turn.e2e_duration_ms",
+        "provenance": "observed",
+        "sample_count": 2,
+        "scope": "observation",
+        "sum": 3600,
+        "unit": "ms"
+      },
+      "resource": {
+        "env": "telemetryiq-synthetic-issue-237",
+        "future.resource": "retained-raw",
+        "service.name": "codex-app-server",
+        "service.version": "0.162.1"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex-app-server"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.162.1"
+              }
+            },
+            {
+              "key": "env",
+              "value": {
+                "stringValue": "telemetryiq-synthetic-issue-237"
+              }
+            },
+            {
+              "key": "future.resource",
+              "value": {
+                "stringValue": "retained-raw"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex",
+          "version": "0.162.1"
+        }
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:performance:3e4baf25e9d76033c6424f527b7993251a2c4ca8fd4b1a7b58432c2a26158e69",
+    "event_type": "codex.turn.ttft.duration_ms",
+    "occurred_at": "2026-10-11T11:10:00.000000001Z",
+    "received_at": "2026-10-11T11:11:00Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.162.1",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:performance:3e4baf25e9d76033c6424f527b7993251a2c4ca8fd4b1a7b58432c2a26158e69",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "metric_average": 450,
+      "metric_family": "turn_latency",
+      "metric_kind": "histogram",
+      "metric_max": 500,
+      "metric_min": 400,
+      "metric_name": "codex.turn.ttft.duration_ms",
+      "metric_sum": 900,
+      "metric_unit": "ms",
+      "model": "gpt-6.1-sol-synthetic",
+      "sample_count": 2,
+      "unavailable_fields": [
+        "session_lifecycle",
+        "task_outcome",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:performance:3e4baf25e9d76033c6424f527b7993251a2c4ca8fd4b1a7b58432c2a26158e69",
+        "ordering_key": "01791717000000000001:codex:performance:3e4baf25e9d76033c6424f527b7993251a2c4ca8fd4b1a7b58432c2a26158e69",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex 0.162.1 performance metrics have no provider session or task key"
+        }
+      },
+      "datapoint": {
+        "attributes": [
+          {
+            "key": "model",
+            "value": {
+              "stringValue": "gpt-6.1-sol-synthetic"
+            }
+          },
+          {
+            "key": "future.dimension",
+            "value": {
+              "stringValue": "retained-raw"
+            }
+          }
+        ],
+        "count": "2",
+        "max": 500,
+        "min": 400,
+        "sum": 900,
+        "timeUnixNano": "1791717000000000001"
+      },
+      "metric_attributes": {
+        "future.dimension": "retained-raw",
+        "model": "gpt-6.1-sol-synthetic"
+      },
+      "metric_envelope": {
+        "histogram": {
+          "aggregationTemporality": 1
+        },
+        "name": "codex.turn.ttft.duration_ms",
+        "unit": "ms"
+      },
+      "performance_metric": {
+        "aggregation_temporality": 1,
+        "average": 450,
+        "bucket_counts": null,
+        "description": "",
+        "dimensions": {
+          "future.dimension": "retained-raw",
+          "model": "gpt-6.1-sol-synthetic"
+        },
+        "explicit_bounds": null,
+        "family": "turn_latency",
+        "kind": "histogram",
+        "max": 500,
+        "min": 400,
+        "name": "codex.turn.ttft.duration_ms",
+        "provenance": "observed",
+        "sample_count": 2,
+        "scope": "observation",
+        "sum": 900,
+        "unit": "ms"
+      },
+      "resource": {
+        "env": "telemetryiq-synthetic-issue-237",
+        "future.resource": "retained-raw",
+        "service.name": "codex-app-server",
+        "service.version": "0.162.1"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex-app-server"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.162.1"
+              }
+            },
+            {
+              "key": "env",
+              "value": {
+                "stringValue": "telemetryiq-synthetic-issue-237"
+              }
+            },
+            {
+              "key": "future.resource",
+              "value": {
+                "stringValue": "retained-raw"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex",
+          "version": "0.162.1"
+        }
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:performance:a65cefd6f1258b30e86aaac1dacf610b15961161fc0fc57789fa64cf23d52cf2",
+    "event_type": "codex.responses_api_inference_time.duration_ms",
+    "occurred_at": "2026-10-11T11:10:00.000000002Z",
+    "received_at": "2026-10-11T11:11:00Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.162.1",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:performance:a65cefd6f1258b30e86aaac1dacf610b15961161fc0fc57789fa64cf23d52cf2",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "metric_average": 1150,
+      "metric_family": "response_latency",
+      "metric_kind": "histogram",
+      "metric_max": 1300,
+      "metric_min": 1000,
+      "metric_name": "codex.responses_api_inference_time.duration_ms",
+      "metric_sum": 2300,
+      "metric_unit": "ms",
+      "model": "gpt-6.1-sol-synthetic",
+      "sample_count": 2,
+      "unavailable_fields": [
+        "session_lifecycle",
+        "task_outcome",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:performance:a65cefd6f1258b30e86aaac1dacf610b15961161fc0fc57789fa64cf23d52cf2",
+        "ordering_key": "01791717000000000002:codex:performance:a65cefd6f1258b30e86aaac1dacf610b15961161fc0fc57789fa64cf23d52cf2",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex 0.162.1 performance metrics have no provider session or task key"
+        }
+      },
+      "datapoint": {
+        "attributes": [
+          {
+            "key": "model",
+            "value": {
+              "stringValue": "gpt-6.1-sol-synthetic"
+            }
+          }
+        ],
+        "count": "2",
+        "max": 1300,
+        "min": 1000,
+        "sum": 2300,
+        "timeUnixNano": "1791717000000000002"
+      },
+      "metric_attributes": {
+        "model": "gpt-6.1-sol-synthetic"
+      },
+      "metric_envelope": {
+        "histogram": {
+          "aggregationTemporality": 1
+        },
+        "name": "codex.responses_api_inference_time.duration_ms",
+        "unit": "ms"
+      },
+      "performance_metric": {
+        "aggregation_temporality": 1,
+        "average": 1150,
+        "bucket_counts": null,
+        "description": "",
+        "dimensions": {
+          "model": "gpt-6.1-sol-synthetic"
+        },
+        "explicit_bounds": null,
+        "family": "response_latency",
+        "kind": "histogram",
+        "max": 1300,
+        "min": 1000,
+        "name": "codex.responses_api_inference_time.duration_ms",
+        "provenance": "observed",
+        "sample_count": 2,
+        "scope": "observation",
+        "sum": 2300,
+        "unit": "ms"
+      },
+      "resource": {
+        "env": "telemetryiq-synthetic-issue-237",
+        "future.resource": "retained-raw",
+        "service.name": "codex-app-server",
+        "service.version": "0.162.1"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex-app-server"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.162.1"
+              }
+            },
+            {
+              "key": "env",
+              "value": {
+                "stringValue": "telemetryiq-synthetic-issue-237"
+              }
+            },
+            {
+              "key": "future.resource",
+              "value": {
+                "stringValue": "retained-raw"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex",
+          "version": "0.162.1"
+        }
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:performance:3b086619c2c620e2db60dccd675745469a0b478da076d8ffb0dd6ff3eed346f3",
+    "event_type": "codex.tool.call.duration_ms",
+    "occurred_at": "2026-10-11T11:10:00.000000003Z",
+    "received_at": "2026-10-11T11:11:00Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.162.1",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:performance:3b086619c2c620e2db60dccd675745469a0b478da076d8ffb0dd6ff3eed346f3",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "metric_average": 50,
+      "metric_family": "tool_efficiency",
+      "metric_kind": "histogram",
+      "metric_max": 75,
+      "metric_min": 25,
+      "metric_name": "codex.tool.call.duration_ms",
+      "metric_sum": 150,
+      "metric_unit": "ms",
+      "model": "gpt-6.1-sol-synthetic",
+      "sample_count": 3,
+      "unavailable_fields": [
+        "session_lifecycle",
+        "task_outcome",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:performance:3b086619c2c620e2db60dccd675745469a0b478da076d8ffb0dd6ff3eed346f3",
+        "ordering_key": "01791717000000000003:codex:performance:3b086619c2c620e2db60dccd675745469a0b478da076d8ffb0dd6ff3eed346f3",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex 0.162.1 performance metrics have no provider session or task key"
+        }
+      },
+      "datapoint": {
+        "attributes": [
+          {
+            "key": "model",
+            "value": {
+              "stringValue": "gpt-6.1-sol-synthetic"
+            }
+          },
+          {
+            "key": "tool",
+            "value": {
+              "stringValue": "exec_command"
+            }
+          },
+          {
+            "key": "success",
+            "value": {
+              "boolValue": true
+            }
+          },
+          {
+            "key": "command_category",
+            "value": {
+              "stringValue": "read"
+            }
+          }
+        ],
+        "count": "3",
+        "max": 75,
+        "min": 25,
+        "sum": 150,
+        "timeUnixNano": "1791717000000000003"
+      },
+      "metric_attributes": {
+        "command_category": "read",
+        "model": "gpt-6.1-sol-synthetic",
+        "success": true,
+        "tool": "exec_command"
+      },
+      "metric_envelope": {
+        "histogram": {
+          "aggregationTemporality": 1
+        },
+        "name": "codex.tool.call.duration_ms",
+        "unit": "ms"
+      },
+      "performance_metric": {
+        "aggregation_temporality": 1,
+        "average": 50,
+        "bucket_counts": null,
+        "description": "",
+        "dimensions": {
+          "command_category": "read",
+          "model": "gpt-6.1-sol-synthetic",
+          "success": true,
+          "tool": "exec_command"
+        },
+        "explicit_bounds": null,
+        "family": "tool_efficiency",
+        "kind": "histogram",
+        "max": 75,
+        "min": 25,
+        "name": "codex.tool.call.duration_ms",
+        "provenance": "observed",
+        "sample_count": 3,
+        "scope": "observation",
+        "sum": 150,
+        "unit": "ms"
+      },
+      "resource": {
+        "env": "telemetryiq-synthetic-issue-237",
+        "future.resource": "retained-raw",
+        "service.name": "codex-app-server",
+        "service.version": "0.162.1"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex-app-server"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.162.1"
+              }
+            },
+            {
+              "key": "env",
+              "value": {
+                "stringValue": "telemetryiq-synthetic-issue-237"
+              }
+            },
+            {
+              "key": "future.resource",
+              "value": {
+                "stringValue": "retained-raw"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex",
+          "version": "0.162.1"
+        }
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:performance:ef312d32fcc0b1b3006370bd124a5980deb0d5e5c9a55b43c082517ce062cf64",
+    "event_type": "codex.rollout.size_bytes",
+    "occurred_at": "2026-10-11T11:10:00.000000004Z",
+    "received_at": "2026-10-11T11:11:00Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.162.1",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:performance:ef312d32fcc0b1b3006370bd124a5980deb0d5e5c9a55b43c082517ce062cf64",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "metric_average": 2048,
+      "metric_family": "rollout_efficiency",
+      "metric_kind": "histogram",
+      "metric_max": 2048,
+      "metric_min": 2048,
+      "metric_name": "codex.rollout.size_bytes",
+      "metric_sum": 2048,
+      "metric_unit": "By",
+      "sample_count": 1,
+      "unavailable_fields": [
+        "session_lifecycle",
+        "task_outcome",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:performance:ef312d32fcc0b1b3006370bd124a5980deb0d5e5c9a55b43c082517ce062cf64",
+        "ordering_key": "01791717000000000004:codex:performance:ef312d32fcc0b1b3006370bd124a5980deb0d5e5c9a55b43c082517ce062cf64",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex 0.162.1 performance metrics have no provider session or task key"
+        }
+      },
+      "datapoint": {
+        "count": "1",
+        "max": 2048,
+        "min": 2048,
+        "sum": 2048,
+        "timeUnixNano": "1791717000000000004"
+      },
+      "metric_attributes": {},
+      "metric_envelope": {
+        "histogram": {
+          "aggregationTemporality": 1
+        },
+        "name": "codex.rollout.size_bytes"
+      },
+      "performance_metric": {
+        "aggregation_temporality": 1,
+        "average": 2048,
+        "bucket_counts": null,
+        "description": "",
+        "dimensions": {},
+        "explicit_bounds": null,
+        "family": "rollout_efficiency",
+        "kind": "histogram",
+        "max": 2048,
+        "min": 2048,
+        "name": "codex.rollout.size_bytes",
+        "provenance": "observed",
+        "sample_count": 1,
+        "scope": "observation",
+        "sum": 2048,
+        "unit": "By"
+      },
+      "resource": {
+        "env": "telemetryiq-synthetic-issue-237",
+        "future.resource": "retained-raw",
+        "service.name": "codex-app-server",
+        "service.version": "0.162.1"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex-app-server"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.162.1"
+              }
+            },
+            {
+              "key": "env",
+              "value": {
+                "stringValue": "telemetryiq-synthetic-issue-237"
+              }
+            },
+            {
+              "key": "future.resource",
+              "value": {
+                "stringValue": "retained-raw"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex",
+          "version": "0.162.1"
+        }
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:performance:24da432b69ad8281826362983612a0ab75196e87d0ae81c0ff1fe33e5207753d",
+    "event_type": "codex.websocket.request.duration_ms",
+    "occurred_at": "2026-10-11T11:10:00.000000005Z",
+    "received_at": "2026-10-11T11:11:00Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.162.1",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:performance:24da432b69ad8281826362983612a0ab75196e87d0ae81c0ff1fe33e5207753d",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "metric_average": 40,
+      "metric_family": "transport_latency",
+      "metric_kind": "histogram",
+      "metric_max": 50,
+      "metric_min": 30,
+      "metric_name": "codex.websocket.request.duration_ms",
+      "metric_sum": 80,
+      "metric_unit": "ms",
+      "model": "gpt-6.1-sol-synthetic",
+      "sample_count": 2,
+      "unavailable_fields": [
+        "session_lifecycle",
+        "task_outcome",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:performance:24da432b69ad8281826362983612a0ab75196e87d0ae81c0ff1fe33e5207753d",
+        "ordering_key": "01791717000000000005:codex:performance:24da432b69ad8281826362983612a0ab75196e87d0ae81c0ff1fe33e5207753d",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex 0.162.1 performance metrics have no provider session or task key"
+        }
+      },
+      "datapoint": {
+        "attributes": [
+          {
+            "key": "model",
+            "value": {
+              "stringValue": "gpt-6.1-sol-synthetic"
+            }
+          },
+          {
+            "key": "success",
+            "value": {
+              "boolValue": true
+            }
+          }
+        ],
+        "count": "2",
+        "max": 50,
+        "min": 30,
+        "sum": 80,
+        "timeUnixNano": "1791717000000000005"
+      },
+      "metric_attributes": {
+        "model": "gpt-6.1-sol-synthetic",
+        "success": true
+      },
+      "metric_envelope": {
+        "histogram": {
+          "aggregationTemporality": 1
+        },
+        "name": "codex.websocket.request.duration_ms",
+        "unit": "ms"
+      },
+      "performance_metric": {
+        "aggregation_temporality": 1,
+        "average": 40,
+        "bucket_counts": null,
+        "description": "",
+        "dimensions": {
+          "model": "gpt-6.1-sol-synthetic",
+          "success": true
+        },
+        "explicit_bounds": null,
+        "family": "transport_latency",
+        "kind": "histogram",
+        "max": 50,
+        "min": 30,
+        "name": "codex.websocket.request.duration_ms",
+        "provenance": "observed",
+        "sample_count": 2,
+        "scope": "observation",
+        "sum": 80,
+        "unit": "ms"
+      },
+      "resource": {
+        "env": "telemetryiq-synthetic-issue-237",
+        "future.resource": "retained-raw",
+        "service.name": "codex-app-server",
+        "service.version": "0.162.1"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex-app-server"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.162.1"
+              }
+            },
+            {
+              "key": "env",
+              "value": {
+                "stringValue": "telemetryiq-synthetic-issue-237"
+              }
+            },
+            {
+              "key": "future.resource",
+              "value": {
+                "stringValue": "retained-raw"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex",
+          "version": "0.162.1"
+        }
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:performance:686291c69adec64be76e3809e162cc301dfcaf04eebf848cf1643e2b30145544",
+    "event_type": "codex.turn.network_proxy",
+    "occurred_at": "2026-10-11T11:10:00.000000006Z",
+    "received_at": "2026-10-11T11:11:00Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.162.1",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:performance:686291c69adec64be76e3809e162cc301dfcaf04eebf848cf1643e2b30145544",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "metric_family": "turn_efficiency",
+      "metric_kind": "sum",
+      "metric_name": "codex.turn.network_proxy",
+      "metric_unit": "1",
+      "metric_value": 2,
+      "model": "gpt-6.1-sol-synthetic",
+      "unavailable_fields": [
+        "session_lifecycle",
+        "task_outcome",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:performance:686291c69adec64be76e3809e162cc301dfcaf04eebf848cf1643e2b30145544",
+        "ordering_key": "01791717000000000006:codex:performance:686291c69adec64be76e3809e162cc301dfcaf04eebf848cf1643e2b30145544",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex 0.162.1 performance metrics have no provider session or task key"
+        }
+      },
+      "datapoint": {
+        "asInt": "2",
+        "attributes": [
+          {
+            "key": "model",
+            "value": {
+              "stringValue": "gpt-6.1-sol-synthetic"
+            }
+          },
+          {
+            "key": "active",
+            "value": {
+              "boolValue": true
+            }
+          }
+        ],
+        "timeUnixNano": "1791717000000000006"
+      },
+      "metric_attributes": {
+        "active": true,
+        "model": "gpt-6.1-sol-synthetic"
+      },
+      "metric_envelope": {
+        "name": "codex.turn.network_proxy",
+        "sum": {
+          "aggregationTemporality": 1,
+          "isMonotonic": true
+        },
+        "unit": "1"
+      },
+      "performance_metric": {
+        "aggregation_temporality": 1,
+        "description": "",
+        "dimensions": {
+          "active": true,
+          "model": "gpt-6.1-sol-synthetic"
+        },
+        "family": "turn_efficiency",
+        "is_monotonic": true,
+        "kind": "sum",
+        "name": "codex.turn.network_proxy",
+        "provenance": "observed",
+        "scope": "observation",
+        "unit": "1",
+        "value": 2
+      },
+      "resource": {
+        "env": "telemetryiq-synthetic-issue-237",
+        "future.resource": "retained-raw",
+        "service.name": "codex-app-server",
+        "service.version": "0.162.1"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex-app-server"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.162.1"
+              }
+            },
+            {
+              "key": "env",
+              "value": {
+                "stringValue": "telemetryiq-synthetic-issue-237"
+              }
+            },
+            {
+              "key": "future.resource",
+              "value": {
+                "stringValue": "retained-raw"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex",
+          "version": "0.162.1"
+        }
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:performance:81320c3e81a35cd588c38289dc6feaa280b1727d88cf4c39a07883b5639fb51d",
+    "event_type": "codex.turn.memory",
+    "occurred_at": "2026-10-11T11:10:00.000000007Z",
+    "received_at": "2026-10-11T11:11:00Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.162.1",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:performance:81320c3e81a35cd588c38289dc6feaa280b1727d88cf4c39a07883b5639fb51d",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "metric_family": "turn_efficiency",
+      "metric_kind": "sum",
+      "metric_name": "codex.turn.memory",
+      "metric_unit": "1",
+      "metric_value": 1,
+      "model": "gpt-6.1-sol-synthetic",
+      "unavailable_fields": [
+        "session_lifecycle",
+        "task_outcome",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:performance:81320c3e81a35cd588c38289dc6feaa280b1727d88cf4c39a07883b5639fb51d",
+        "ordering_key": "01791717000000000007:codex:performance:81320c3e81a35cd588c38289dc6feaa280b1727d88cf4c39a07883b5639fb51d",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex 0.162.1 performance metrics have no provider session or task key"
+        }
+      },
+      "datapoint": {
+        "asInt": "1",
+        "attributes": [
+          {
+            "key": "model",
+            "value": {
+              "stringValue": "gpt-6.1-sol-synthetic"
+            }
+          },
+          {
+            "key": "config_use_memories",
+            "value": {
+              "boolValue": true
+            }
+          },
+          {
+            "key": "feature_enabled",
+            "value": {
+              "boolValue": true
+            }
+          },
+          {
+            "key": "has_citations",
+            "value": {
+              "boolValue": false
+            }
+          },
+          {
+            "key": "read_allowed",
+            "value": {
+              "boolValue": true
+            }
+          }
+        ],
+        "timeUnixNano": "1791717000000000007"
+      },
+      "metric_attributes": {
+        "config_use_memories": true,
+        "feature_enabled": true,
+        "has_citations": false,
+        "model": "gpt-6.1-sol-synthetic",
+        "read_allowed": true
+      },
+      "metric_envelope": {
+        "name": "codex.turn.memory",
+        "sum": {
+          "aggregationTemporality": 1,
+          "isMonotonic": true
+        },
+        "unit": "1"
+      },
+      "performance_metric": {
+        "aggregation_temporality": 1,
+        "description": "",
+        "dimensions": {
+          "config_use_memories": true,
+          "feature_enabled": true,
+          "has_citations": false,
+          "model": "gpt-6.1-sol-synthetic",
+          "read_allowed": true
+        },
+        "family": "turn_efficiency",
+        "is_monotonic": true,
+        "kind": "sum",
+        "name": "codex.turn.memory",
+        "provenance": "observed",
+        "scope": "observation",
+        "unit": "1",
+        "value": 1
+      },
+      "resource": {
+        "env": "telemetryiq-synthetic-issue-237",
+        "future.resource": "retained-raw",
+        "service.name": "codex-app-server",
+        "service.version": "0.162.1"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex-app-server"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.162.1"
+              }
+            },
+            {
+              "key": "env",
+              "value": {
+                "stringValue": "telemetryiq-synthetic-issue-237"
+              }
+            },
+            {
+              "key": "future.resource",
+              "value": {
+                "stringValue": "retained-raw"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex",
+          "version": "0.162.1"
+        }
+      }
+    }
+  },
+  {
+    "schema_version": "0.1.0",
+    "event_id": "codex:performance:aa727db8e67db5666e8e9952252950bd981ac513c788083262d04adddd3de02d",
+    "event_type": "codex.rollout_compression.read",
+    "occurred_at": "2026-10-11T11:10:00.000000008Z",
+    "received_at": "2026-10-11T11:11:00Z",
+    "provider": "openai",
+    "tool": "codex",
+    "source_schema": "otel",
+    "source_version": "0.162.1",
+    "actor_id": "unavailable",
+    "device_id": "unavailable",
+    "session_id": "codex:performance:aa727db8e67db5666e8e9952252950bd981ac513c788083262d04adddd3de02d",
+    "task_id": null,
+    "repository_id": null,
+    "privacy_level": "operational",
+    "attributes": {
+      "metric_family": "rollout_efficiency",
+      "metric_kind": "sum",
+      "metric_name": "codex.rollout_compression.read",
+      "metric_unit": "1",
+      "metric_value": 3,
+      "unavailable_fields": [
+        "session_lifecycle",
+        "task_outcome",
+        "prompt_content",
+        "response_content",
+        "repository_context",
+        "provider_cost"
+      ]
+    },
+    "provider_extensions": {
+      "correlation": {
+        "dedup_key": "codex:performance:aa727db8e67db5666e8e9952252950bd981ac513c788083262d04adddd3de02d",
+        "ordering_key": "01791717000000000008:codex:performance:aa727db8e67db5666e8e9952252950bd981ac513c788083262d04adddd3de02d",
+        "task_boundary": {
+          "confidence": "unknown",
+          "reason": "Codex 0.162.1 performance metrics have no provider session or task key"
+        }
+      },
+      "datapoint": {
+        "asInt": "3",
+        "attributes": [
+          {
+            "key": "outcome",
+            "value": {
+              "stringValue": "success"
+            }
+          },
+          {
+            "key": "format",
+            "value": {
+              "stringValue": "jsonl"
+            }
+          },
+          {
+            "key": "stage",
+            "value": {
+              "stringValue": "complete"
+            }
+          }
+        ],
+        "timeUnixNano": "1791717000000000008"
+      },
+      "metric_attributes": {
+        "format": "jsonl",
+        "outcome": "success",
+        "stage": "complete"
+      },
+      "metric_envelope": {
+        "name": "codex.rollout_compression.read",
+        "sum": {
+          "aggregationTemporality": 1,
+          "isMonotonic": true
+        },
+        "unit": "1"
+      },
+      "performance_metric": {
+        "aggregation_temporality": 1,
+        "description": "",
+        "dimensions": {
+          "format": "jsonl",
+          "outcome": "success",
+          "stage": "complete"
+        },
+        "family": "rollout_efficiency",
+        "is_monotonic": true,
+        "kind": "sum",
+        "name": "codex.rollout_compression.read",
+        "provenance": "observed",
+        "scope": "observation",
+        "unit": "1",
+        "value": 3
+      },
+      "resource": {
+        "env": "telemetryiq-synthetic-issue-237",
+        "future.resource": "retained-raw",
+        "service.name": "codex-app-server",
+        "service.version": "0.162.1"
+      },
+      "resource_metric": {
+        "resource": {
+          "attributes": [
+            {
+              "key": "service.name",
+              "value": {
+                "stringValue": "codex-app-server"
+              }
+            },
+            {
+              "key": "service.version",
+              "value": {
+                "stringValue": "0.162.1"
+              }
+            },
+            {
+              "key": "env",
+              "value": {
+                "stringValue": "telemetryiq-synthetic-issue-237"
+              }
+            },
+            {
+              "key": "future.resource",
+              "value": {
+                "stringValue": "retained-raw"
+              }
+            }
+          ]
+        }
+      },
+      "scope": {
+        "attributes": {},
+        "name": "codex"
+      },
+      "scope_metric": {
+        "scope": {
+          "name": "codex",
+          "version": "0.162.1"
+        }
+      }
+    }
+  }
+]

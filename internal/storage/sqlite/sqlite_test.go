@@ -66,6 +66,13 @@ func TestSessionIdentityUsesCodexThreadID(t *testing.T) {
 	}
 }
 
+func TestSessionIdentityKeepsCodexPerformanceMetricsObservationScoped(t *testing.T) {
+	scope, source := sessionIdentity([]canonical.Event{{Tool: "codex", SessionID: "codex:performance:synthetic"}})
+	if scope != identityObservation || source != "content-derived" {
+		t.Fatalf("identity = %q, %q", scope, source)
+	}
+}
+
 // TestSessionIdentityClaudeTraceScopePrecedesProvider pins the load-bearing
 // ordering in identity classification: a claude-code:trace:<id> key must resolve
 // to an observation (trace.id), while a plain claude-code:<session.id> key

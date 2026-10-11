@@ -451,13 +451,14 @@ export function codexPRLinkOTLPLogs(): string {
 function codexOTLPMetrics(
   metrics: Array<Record<string, unknown>>,
   version = "0.153.4",
+  serviceName = "codex_exec",
 ): string {
   return JSON.stringify({
     resourceMetrics: [
       {
         resource: {
           attributes: [
-            { key: "service.name", value: { stringValue: "codex_exec" } },
+            { key: "service.name", value: { stringValue: serviceName } },
             { key: "service.version", value: { stringValue: version } },
           ],
         },
@@ -498,6 +499,59 @@ export function codexTurnTokenOTLPMetrics(): string {
       },
     },
   ]);
+}
+
+// Codex CLI 0.162.1 product-facing metrics are emitted by codex-app-server
+// without a provider session key. The live gate therefore proves they remain
+// observation-scoped while reaching the shared performance scorecard.
+export function codexPerformanceOTLPMetrics(): string {
+  const sharedAttributes = [
+    { key: "model", value: { stringValue: "gpt-6.1-sol-live" } },
+    { key: "originator", value: { stringValue: "codex_cli_rs" } },
+  ];
+  return codexOTLPMetrics(
+    [
+      {
+        name: "codex.turn.e2e_duration_ms",
+        unit: "ms",
+        histogram: {
+          aggregationTemporality: 1,
+          dataPoints: [
+            {
+              attributes: sharedAttributes,
+              count: "2",
+              sum: 3600,
+              min: 1200,
+              max: 2400,
+              bucketCounts: ["0", "1", "1"],
+              explicitBounds: [1000, 2000],
+              timeUnixNano: "1791717000000000000",
+            },
+          ],
+        },
+      },
+      {
+        name: "codex.turn.memory",
+        unit: "1",
+        sum: {
+          aggregationTemporality: 1,
+          isMonotonic: true,
+          dataPoints: [
+            {
+              attributes: [
+                ...sharedAttributes,
+                { key: "feature_enabled", value: { boolValue: true } },
+              ],
+              asInt: "1",
+              timeUnixNano: "1791717000000000001",
+            },
+          ],
+        },
+      },
+    ],
+    "0.162.1",
+    "codex-app-server",
+  );
 }
 
 // Codex CLI 0.154.0 was observed exporting this resource/scope/span shape via

@@ -189,6 +189,14 @@ The MCP inventory insight response contains `data.totals`, `data.servers`, and `
 
 The operation stats insight response (`GET /api/v1/insights/operations`) reads retained `canonical.Operation` records rather than timeline event attributes. It returns total operations, category counts, outcome counts, duration sample counts, and average duration only where a reviewed provider field reports `duration_ms`. Missing operation durations remain unavailable and are never represented as zero.
 
+`GET /api/v1/insights/model-performance` keeps outcome-contract `models` and
+ranking semantics unchanged and adds `data.efficiency_metrics`. Each row names
+the metric/family/provider/tool/model, instrument kind/unit, evidence scope and
+state, safe product dimensions, and present-only histogram
+`sample_count`/`total`/`average`/`min`/`max` or counter `value`. Codex 0.162.1
+performance metrics lack a provider session key, so their scope is
+`observation`; they never contribute to model ranking or operation totals.
+
 `GET /api/v1/insights/integration-states` returns the latest retained evidence
 per provider/tool/kind/name/state. `cache_hit`, `cache_load`, `discovered`,
 `cache_published`, `refreshed`, `disabled`, and `used` remain distinct; only an
@@ -206,8 +214,9 @@ configuration directory and reuses its installation-specific privacy salt.
 The API never logs raw intake payloads. Session endpoints and Codex rollout intake require a bearer token; the auth-token CLI command deliberately prints the protected local token for dashboard setup. Health and OTLP intake remain unauthenticated for exporter compatibility, and the daemon remains loopback-only by default.
 
 Live OTLP persistence accepts `POST /v1/logs` (provider log events and reviewed Codex/Claude Code operation records), a
-`POST /v1/metrics` path that persists reviewed Codex `codex.skill.injected` and
+`POST /v1/metrics` path that persists reviewed Codex `codex.skill.injected`,
 integration-state metrics (plugin cache, MCP discovery/cache publication, app refresh),
+and 0.162.1 latency/efficiency metrics,
 Claude Code `claude_code.token.usage`, and Cursor Enterprise
 `cursor.token.usage` datapoints as canonical events, and a
 `POST /v1/traces` path that accepts JSON and protobuf and persists Claude Code's

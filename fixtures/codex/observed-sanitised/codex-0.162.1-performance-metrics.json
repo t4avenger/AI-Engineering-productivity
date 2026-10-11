@@ -1,0 +1,209 @@
+{
+  "fixture_version": 1,
+  "fixture_origin": "observed-sanitised",
+  "provider": "openai",
+  "tool": "codex",
+  "tool_version": "0.162.1",
+  "captured_at": "2026-10-11T11:10:00Z",
+  "sanitisation_reviewed": true,
+  "payload": {
+    "resourceMetrics": [
+      {
+        "resource": {
+          "attributes": [
+            { "key": "service.name", "value": { "stringValue": "codex-app-server" } },
+            { "key": "service.version", "value": { "stringValue": "0.162.1" } },
+            { "key": "env", "value": { "stringValue": "telemetryiq-synthetic-issue-237" } },
+            { "key": "future.resource", "value": { "stringValue": "retained-raw" } }
+          ]
+        },
+        "scopeMetrics": [
+          {
+            "scope": { "name": "codex", "version": "0.162.1" },
+            "metrics": [
+              {
+                "name": "codex.turn.e2e_duration_ms",
+                "description": "Duration in milliseconds.",
+                "unit": "ms",
+                "histogram": {
+                  "aggregationTemporality": 1,
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        { "key": "model", "value": { "stringValue": "gpt-6.1-sol-synthetic" } },
+                        { "key": "originator", "value": { "stringValue": "codex_cli_rs" } },
+                        { "key": "session_source", "value": { "stringValue": "cli" } }
+                      ],
+                      "count": "2",
+                      "sum": 3600,
+                      "min": 1200,
+                      "max": 2400,
+                      "bucketCounts": ["0", "1", "1"],
+                      "explicitBounds": [1000, 2000],
+                      "timeUnixNano": "1791717000000000000"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "codex.turn.ttft.duration_ms",
+                "unit": "ms",
+                "histogram": {
+                  "aggregationTemporality": 1,
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        { "key": "model", "value": { "stringValue": "gpt-6.1-sol-synthetic" } },
+                        { "key": "future.dimension", "value": { "stringValue": "retained-raw" } }
+                      ],
+                      "count": "2",
+                      "sum": 900,
+                      "min": 400,
+                      "max": 500,
+                      "timeUnixNano": "1791717000000000001"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "codex.responses_api_inference_time.duration_ms",
+                "unit": "ms",
+                "histogram": {
+                  "aggregationTemporality": 1,
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        { "key": "model", "value": { "stringValue": "gpt-6.1-sol-synthetic" } }
+                      ],
+                      "count": "2",
+                      "sum": 2300,
+                      "min": 1000,
+                      "max": 1300,
+                      "timeUnixNano": "1791717000000000002"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "codex.tool.call.duration_ms",
+                "unit": "ms",
+                "histogram": {
+                  "aggregationTemporality": 1,
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        { "key": "model", "value": { "stringValue": "gpt-6.1-sol-synthetic" } },
+                        { "key": "tool", "value": { "stringValue": "exec_command" } },
+                        { "key": "success", "value": { "boolValue": true } },
+                        { "key": "command_category", "value": { "stringValue": "read" } }
+                      ],
+                      "count": "3",
+                      "sum": 150,
+                      "min": 25,
+                      "max": 75,
+                      "timeUnixNano": "1791717000000000003"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "codex.rollout.size_bytes",
+                "histogram": {
+                  "aggregationTemporality": 1,
+                  "dataPoints": [
+                    {
+                      "count": "1",
+                      "sum": 2048,
+                      "min": 2048,
+                      "max": 2048,
+                      "timeUnixNano": "1791717000000000004"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "codex.websocket.request.duration_ms",
+                "unit": "ms",
+                "histogram": {
+                  "aggregationTemporality": 1,
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        { "key": "model", "value": { "stringValue": "gpt-6.1-sol-synthetic" } },
+                        { "key": "success", "value": { "boolValue": true } }
+                      ],
+                      "count": "2",
+                      "sum": 80,
+                      "min": 30,
+                      "max": 50,
+                      "timeUnixNano": "1791717000000000005"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "codex.turn.network_proxy",
+                "unit": "1",
+                "sum": {
+                  "aggregationTemporality": 1,
+                  "isMonotonic": true,
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        { "key": "model", "value": { "stringValue": "gpt-6.1-sol-synthetic" } },
+                        { "key": "active", "value": { "boolValue": true } }
+                      ],
+                      "asInt": "2",
+                      "timeUnixNano": "1791717000000000006"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "codex.turn.memory",
+                "unit": "1",
+                "sum": {
+                  "aggregationTemporality": 1,
+                  "isMonotonic": true,
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        { "key": "model", "value": { "stringValue": "gpt-6.1-sol-synthetic" } },
+                        { "key": "config_use_memories", "value": { "boolValue": true } },
+                        { "key": "feature_enabled", "value": { "boolValue": true } },
+                        { "key": "has_citations", "value": { "boolValue": false } },
+                        { "key": "read_allowed", "value": { "boolValue": true } }
+                      ],
+                      "asInt": "1",
+                      "timeUnixNano": "1791717000000000007"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "codex.rollout_compression.read",
+                "unit": "1",
+                "sum": {
+                  "aggregationTemporality": 1,
+                  "isMonotonic": true,
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        { "key": "outcome", "value": { "stringValue": "success" } },
+                        { "key": "format", "value": { "stringValue": "jsonl" } },
+                        { "key": "stage", "value": { "stringValue": "complete" } }
+                      ],
+                      "asInt": "3",
+                      "timeUnixNano": "1791717000000000008"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "evidence": "Observed Codex CLI 0.162.1 codex-app-server metric shapes from isolated synthetic codex exec and PTY-backed CLI runs on 2026-10-11; values and identifiers replaced with synthetic equivalents while field names, types, temporality, and histogram structure were retained. Raw captures remained outside the repository."
+}
