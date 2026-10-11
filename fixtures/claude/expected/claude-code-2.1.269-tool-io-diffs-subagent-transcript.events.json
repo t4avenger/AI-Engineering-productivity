@@ -43,6 +43,13 @@
         "is_sidechain": false,
         "prompt_content": "\u003ccommand-name\u003e/review\u003c/command-name\u003e\n\u003ccommand-message\u003ereview\u003c/command-message\u003e\n\u003ccommand-args\u003e\u003c/command-args\u003e\nReview the recent changes and record a todo.",
         "user_type": "external"
+      },
+      "transcript_record": {
+        "message": {
+          "role": "user"
+        },
+        "parentUuid": null,
+        "timestamp": "2026-09-12T11:00:00.000Z"
       }
     }
   },
@@ -96,6 +103,12 @@
         "response_content": "I'll review and update the module.",
         "thinking": "Plan: read the module, edit it, write notes, run tests.",
         "user_type": "external"
+      },
+      "transcript_record": {
+        "message": {
+          "role": "assistant"
+        },
+        "timestamp": "2026-09-12T11:00:01.000Z"
       }
     }
   },
@@ -146,6 +159,22 @@
           "reason": "Claude Code transcript records have no reviewed task-boundary signal"
         },
         "uuid": "a2000000-0000-4000-8000-000000000002"
+      },
+      "transcript_result": {
+        "cwd": "/home/synthetic/project",
+        "entrypoint": "cli",
+        "gitBranch": "main",
+        "isSidechain": false,
+        "message": {
+          "role": "user"
+        },
+        "parentUuid": "a2000000-0000-4000-8000-000000000002",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:02.000Z",
+        "type": "user",
+        "userType": "external",
+        "uuid": "a3000000-0000-4000-8000-000000000003",
+        "version": "2.1.269"
       }
     }
   },
@@ -198,6 +227,12 @@
         "git_branch": "main",
         "is_sidechain": false,
         "user_type": "external"
+      },
+      "transcript_record": {
+        "message": {
+          "role": "assistant"
+        },
+        "timestamp": "2026-09-12T11:00:03.000Z"
       }
     }
   },
@@ -248,6 +283,22 @@
           "reason": "Claude Code transcript records have no reviewed task-boundary signal"
         },
         "uuid": "a4000000-0000-4000-8000-000000000004"
+      },
+      "transcript_result": {
+        "cwd": "/home/synthetic/project",
+        "entrypoint": "cli",
+        "gitBranch": "main",
+        "isSidechain": false,
+        "message": {
+          "role": "user"
+        },
+        "parentUuid": "a4000000-0000-4000-8000-000000000004",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:04.000Z",
+        "type": "user",
+        "userType": "external",
+        "uuid": "a5000000-0000-4000-8000-000000000005",
+        "version": "2.1.269"
       }
     }
   },
@@ -298,6 +349,22 @@
           "reason": "Claude Code transcript records have no reviewed task-boundary signal"
         },
         "uuid": "a4000000-0000-4000-8000-000000000004"
+      },
+      "transcript_result": {
+        "cwd": "/home/synthetic/project",
+        "entrypoint": "cli",
+        "gitBranch": "main",
+        "isSidechain": false,
+        "message": {
+          "role": "user"
+        },
+        "parentUuid": "a4000000-0000-4000-8000-000000000004",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:04.000Z",
+        "type": "user",
+        "userType": "external",
+        "uuid": "a5000000-0000-4000-8000-000000000005",
+        "version": "2.1.269"
       }
     }
   },
@@ -350,6 +417,12 @@
         "git_branch": "main",
         "is_sidechain": false,
         "user_type": "external"
+      },
+      "transcript_record": {
+        "message": {
+          "role": "assistant"
+        },
+        "timestamp": "2026-09-12T11:00:05.000Z"
       }
     }
   },
@@ -400,6 +473,22 @@
           "reason": "Claude Code transcript records have no reviewed task-boundary signal"
         },
         "uuid": "a6000000-0000-4000-8000-000000000006"
+      },
+      "transcript_result": {
+        "cwd": "/home/synthetic/project",
+        "entrypoint": "cli",
+        "gitBranch": "main",
+        "isSidechain": false,
+        "message": {
+          "role": "user"
+        },
+        "parentUuid": "a6000000-0000-4000-8000-000000000006",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:06.000Z",
+        "type": "user",
+        "userType": "external",
+        "uuid": "a7000000-0000-4000-8000-000000000007",
+        "version": "2.1.269"
       }
     }
   },
@@ -449,6 +538,22 @@
           "reason": "Claude Code transcript records have no reviewed task-boundary signal"
         },
         "uuid": "a6000000-0000-4000-8000-000000000006"
+      },
+      "transcript_result": {
+        "cwd": "/home/synthetic/project",
+        "entrypoint": "cli",
+        "gitBranch": "main",
+        "isSidechain": false,
+        "message": {
+          "role": "user"
+        },
+        "parentUuid": "a6000000-0000-4000-8000-000000000006",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:06.000Z",
+        "type": "user",
+        "userType": "external",
+        "uuid": "a7000000-0000-4000-8000-000000000007",
+        "version": "2.1.269"
       }
     }
   },
@@ -501,6 +606,12 @@
         "is_sidechain": false,
         "response_content": "Delegating a search to a sub-agent.",
         "user_type": "external"
+      },
+      "transcript_record": {
+        "message": {
+          "role": "assistant"
+        },
+        "timestamp": "2026-09-12T11:00:07.000Z"
       }
     }
   },
@@ -551,6 +662,22 @@
           "reason": "Claude Code transcript records have no reviewed task-boundary signal"
         },
         "uuid": "a8000000-0000-4000-8000-000000000008"
+      },
+      "transcript_result": {
+        "cwd": "/home/synthetic/project",
+        "entrypoint": "cli",
+        "gitBranch": "main",
+        "isSidechain": false,
+        "message": {
+          "role": "user"
+        },
+        "parentUuid": "a8000000-0000-4000-8000-000000000008",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:10.000Z",
+        "type": "user",
+        "userType": "external",
+        "uuid": "ab000000-0000-4000-8000-000000000011",
+        "version": "2.1.269"
       }
     }
   },
@@ -604,6 +731,12 @@
         "is_sidechain": true,
         "thinking": "Searching for TODO markers in internal.",
         "user_type": "external"
+      },
+      "transcript_record": {
+        "message": {
+          "role": "assistant"
+        },
+        "timestamp": "2026-09-12T11:00:08.000Z"
       }
     }
   },
@@ -656,6 +789,22 @@
       },
       "transcript": {
         "is_sidechain": true
+      },
+      "transcript_result": {
+        "cwd": "/home/synthetic/project",
+        "entrypoint": "cli",
+        "gitBranch": "main",
+        "isSidechain": true,
+        "message": {
+          "role": "user"
+        },
+        "parentUuid": "a9000000-0000-4000-8000-000000000009",
+        "sessionId": "33333333-3333-4333-8333-333333333333",
+        "timestamp": "2026-09-12T11:00:09.000Z",
+        "type": "user",
+        "userType": "external",
+        "uuid": "aa000000-0000-4000-8000-000000000010",
+        "version": "2.1.269"
       }
     }
   }

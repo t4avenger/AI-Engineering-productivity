@@ -32,6 +32,7 @@ func (c transcriptToolCall) mcpCorrelationEvent(receivedAt time.Time) canonical.
 		"mcp_call":    call,
 	}
 	c.attachPRLinkEvidence(attributes, extensions)
+	c.attachResultRecord(extensions)
 	return c.correlationEventShape(eventID, eventTypeMCPCall, receivedAt, attributes, extensions)
 }
 

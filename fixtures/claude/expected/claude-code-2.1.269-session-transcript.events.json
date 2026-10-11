@@ -43,6 +43,12 @@
         "is_sidechain": false,
         "prompt_content": "Please summarise the module layout.",
         "user_type": "external"
+      },
+      "transcript_record": {
+        "message": {
+          "role": "user"
+        },
+        "parentUuid": null
       }
     }
   },
@@ -100,10 +106,21 @@
         "entrypoint": "cli",
         "git_branch": "main",
         "is_sidechain": false,
+        "message_id": "claude-code:msg_synthetic_0001",
         "request_id": "claude-code:req_synthetic_0001",
         "response_content": "The module splits into ingest, normalise, and storage.",
+        "stop_reason": "end_turn",
         "thinking": "The user wants a layout summary.",
         "user_type": "external"
+      },
+      "transcript_record": {
+        "message": {
+          "role": "assistant",
+          "type": "message",
+          "usage": {
+            "service_tier": "standard"
+          }
+        }
       }
     }
   },
@@ -156,9 +173,21 @@
         "entrypoint": "cli",
         "git_branch": "main",
         "is_sidechain": false,
+        "message_id": "claude-code:msg_synthetic_0002",
         "request_id": "claude-code:req_synthetic_0002",
         "response_content": "Each layer owns one concern and they compose in that order.",
+        "stop_reason": "end_turn",
         "user_type": "external"
+      },
+      "transcript_record": {
+        "message": {
+          "role": "assistant",
+          "type": "message",
+          "usage": {
+            "service_tier": "standard"
+          }
+        },
+        "timestamp": "2026-09-12T09:14:01.640Z"
       }
     }
   }

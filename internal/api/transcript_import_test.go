@@ -454,3 +454,49 @@ func requireTranscriptAssistantEvent(t *testing.T, timeline eventListResponse) t
 	t.Fatalf("no assistant_message event in timeline: %#v", timeline.Data)
 	return timelineEvent{}
 }
+
+// TestTranscriptImportRetainsRecordFieldsThroughReadAPI is the #263 live daemon
+// ingest→read gate: the live-captured 2.1.286 transcript is POSTed to
+// /v1/claude/transcript and the event inspector read API must serve promptId as
+// correlation.prompt_id on both the user_message and the tool_result-only
+// record's tool_call, the new typed envelope fields, and the raw residual
+// (turnPosition, wireToolInputs, sourceToolAssistantUUID) — while the existing
+// session header, pr_link, and conversation consumers are unchanged.
+func TestTranscriptImportRetainsRecordFieldsThroughReadAPI(t *testing.T) {
+	_, server := transcriptTestServer(t, true)
+	postAcceptedTranscript(t, server.URL, string(transcriptFixturePayloadNDJSON(t, "claude-code-2.1.286-tool-output-pr-link-transcript.json")))
+
+	const sessionID = "claude-code:25125125-1251-4251-8251-251251251251"
+	cases := []struct {
+		eventID string
+		block   string
+		key     string
+	}{
+		{eventID: sessionID + ":00000001-0000-4000-8000-000000000251", block: "transcript", key: "permission_mode"},
+		{eventID: sessionID + ":00000001-0000-4000-8000-000000000251", block: "transcript_record", key: "turnPosition"},
+		{eventID: sessionID + ":00000002-0000-4000-8000-000000000251", block: "transcript", key: "message_id"},
+		{eventID: sessionID + ":00000002-0000-4000-8000-000000000251", block: "transcript_record", key: "wireToolInputs"},
+		{eventID: sessionID + ":toolcall:toolu_synthetic_pr_link_output", block: "transcript_result", key: "sourceToolAssistantUUID"},
+	}
+	for _, tc := range cases {
+		detail := getEventDetail(t, server.URL+"/api/v1/sessions/"+sessionID+"/events/"+tc.eventID)
+		block, _ := detail.Data.ProviderExtensions[tc.block].(map[string]any)
+		if block[tc.key] == nil {
+			t.Fatalf("%s %s.%s not served: %#v", tc.eventID, tc.block, tc.key, detail.Data.ProviderExtensions)
+		}
+	}
+	for _, eventID := range []string{sessionID + ":00000001-0000-4000-8000-000000000251", sessionID + ":toolcall:toolu_synthetic_pr_link_output"} {
+		detail := getEventDetail(t, server.URL+"/api/v1/sessions/"+sessionID+"/events/"+eventID)
+		correlation, _ := detail.Data.ProviderExtensions["correlation"].(map[string]any)
+		if correlation["prompt_id"] != "synthetic-pr-link-prompt" {
+			t.Fatalf("%s correlation.prompt_id = %#v", eventID, correlation["prompt_id"])
+		}
+	}
+
+	session := getInsightJSON[sessionDetailResponse](t, server.URL+"/api/v1/sessions/"+sessionID)
+	for key, want := range map[string]string{"entrypoint": "observed", "git_branch": "observed", "pr_link": "observed", "conversation": "observed"} {
+		if session.Data.Availability[key] != want {
+			t.Fatalf("session availability %s = %q, want %q", key, session.Data.Availability[key], want)
+		}
+	}
+}

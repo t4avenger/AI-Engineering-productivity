@@ -43,6 +43,13 @@
         "is_sidechain": false,
         "prompt_content": "Read the overview doc, list the docs directory, then record notes.",
         "user_type": "external"
+      },
+      "transcript_record": {
+        "message": {
+          "role": "user"
+        },
+        "parentUuid": null,
+        "timestamp": "2026-09-12T10:00:00.000Z"
       }
     }
   },
@@ -93,9 +100,18 @@
         "entrypoint": "cli",
         "git_branch": "main",
         "is_sidechain": false,
+        "message_id": "claude-code:msg_mcp_0001",
         "request_id": "claude-code:req_mcp_0001",
         "response_content": "I'll read the overview and list the directory.",
+        "stop_reason": "tool_use",
         "user_type": "external"
+      },
+      "transcript_record": {
+        "message": {
+          "role": "assistant",
+          "type": "message"
+        },
+        "timestamp": "2026-09-12T10:00:02.000Z"
       }
     }
   },
@@ -147,6 +163,16 @@
         "server_name": "synthetic-fs",
         "tool_name": "read_file",
         "tool_use_id": "toolu_mcp_read"
+      },
+      "transcript_result": {
+        "message": {
+          "role": "user"
+        },
+        "parentUuid": "20000000-0000-4000-8000-000000000002",
+        "sessionId": "22222222-2222-4222-8222-222222222222",
+        "timestamp": "2026-09-12T10:00:03.000Z",
+        "type": "user",
+        "uuid": "30000000-0000-4000-8000-000000000003"
       }
     }
   },
@@ -197,6 +223,16 @@
           "reason": "Claude Code transcript records have no reviewed task-boundary signal"
         },
         "uuid": "20000000-0000-4000-8000-000000000002"
+      },
+      "transcript_result": {
+        "message": {
+          "role": "user"
+        },
+        "parentUuid": "20000000-0000-4000-8000-000000000002",
+        "sessionId": "22222222-2222-4222-8222-222222222222",
+        "timestamp": "2026-09-12T10:00:03.000Z",
+        "type": "user",
+        "uuid": "30000000-0000-4000-8000-000000000003"
       }
     }
   },
@@ -247,8 +283,17 @@
         "entrypoint": "cli",
         "git_branch": "main",
         "is_sidechain": false,
+        "message_id": "claude-code:msg_mcp_0002",
         "request_id": "claude-code:req_mcp_0002",
+        "stop_reason": "tool_use",
         "user_type": "external"
+      },
+      "transcript_record": {
+        "message": {
+          "role": "assistant",
+          "type": "message"
+        },
+        "timestamp": "2026-09-12T10:00:05.000Z"
       }
     }
   },
@@ -351,6 +396,16 @@
         "server_name": "synthetic-fs",
         "tool_name": "write_file",
         "tool_use_id": "toolu_mcp_write"
+      },
+      "transcript_result": {
+        "message": {
+          "role": "user"
+        },
+        "parentUuid": "40000000-0000-4000-8000-000000000004",
+        "sessionId": "22222222-2222-4222-8222-222222222222",
+        "timestamp": "2026-09-12T10:00:06.000Z",
+        "type": "user",
+        "uuid": "50000000-0000-4000-8000-000000000005"
       }
     }
   }
