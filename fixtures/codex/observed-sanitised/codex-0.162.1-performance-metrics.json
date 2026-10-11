@@ -142,6 +142,24 @@
                 }
               },
               {
+                "name": "codex.websocket.request",
+                "unit": "1",
+                "sum": {
+                  "aggregationTemporality": 2,
+                  "isMonotonic": true,
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        { "key": "model", "value": { "stringValue": "gpt-6.1-sol-synthetic" } },
+                        { "key": "success", "value": { "boolValue": true } }
+                      ],
+                      "asInt": "4",
+                      "timeUnixNano": "1791717000000000005"
+                    }
+                  ]
+                }
+              },
+              {
                 "name": "codex.turn.network_proxy",
                 "unit": "1",
                 "sum": {

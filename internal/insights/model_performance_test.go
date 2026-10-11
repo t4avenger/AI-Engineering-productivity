@@ -113,7 +113,7 @@ func assertEfficiencyHistogram(t *testing.T, turn PerformanceMetricSummary) {
 
 func TestModelPerformanceKeepsLatestCumulativeMetric(t *testing.T) {
 	events := []canonical.Event{
-		performanceEvent("cumulative-new", "codex.websocket.request", "transport_activity", "sum", 2, time.Unix(2, 0), map[string]any{"value": int64(5)}),
+		performanceEvent("cumulative-new", "codex.websocket.request", "transport_activity", "sum", 2, time.Unix(1, 1), map[string]any{"value": int64(5)}),
 		performanceEvent("cumulative-old", "codex.websocket.request", "transport_activity", "sum", 2, time.Unix(1, 0), map[string]any{"value": int64(3)}),
 	}
 	got := ModelPerformanceFromEvents(events)

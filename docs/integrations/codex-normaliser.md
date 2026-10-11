@@ -239,7 +239,9 @@ maps the fixture-proven turn E2E/TTFT/TTFM, response inference/overhead/engine,
 tool-call, memory/network-proxy, rollout size/compression, and websocket
 families. Each datapoint becomes an observation-scoped canonical event with
 stable `metric_name`, `metric_family`, `metric_kind`, `metric_unit`, model when
-present, and present-only histogram/counter measures. The complete resource,
+present, and present-only histogram/counter measures. An explicit histogram
+`count: 0` remains observed; an absent `sum` leaves total and average absent,
+and average is emitted only when both sum is present and count is positive. The complete resource,
 scope, instrument envelope, dimensions, datapoint, aggregation temporality,
 monotonicity, buckets, bounds, exemplars, flags, and unknown fields remain in
 provider extensions.

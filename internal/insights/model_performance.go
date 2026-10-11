@@ -107,9 +107,10 @@ func ModelPerformanceFromEvents(events []canonical.Event) ModelPerformance {
 }
 
 type performanceMetricAccumulator struct {
-	summary     PerformanceMetricSummary
-	temporality int64
-	latestKey   string
+	summary          PerformanceMetricSummary
+	temporality      int64
+	latestOccurredAt time.Time
+	latestEventID    string
 }
 
 func performanceMetricsFromEvents(events []canonical.Event) []PerformanceMetricSummary {
@@ -131,23 +132,32 @@ func accumulatePerformanceMetric(rows map[string]*performanceMetricAccumulator, 
 	}
 	temporality := int64Value(metric["aggregation_temporality"])
 	key := performanceSummaryKey(summary, temporality)
-	latestKey := event.OccurredAt.UTC().Format(time.RFC3339Nano) + "\x00" + event.EventID
 	row, exists := rows[key]
 	if !exists {
-		rows[key] = &performanceMetricAccumulator{summary: summary, temporality: temporality, latestKey: latestKey}
+		rows[key] = &performanceMetricAccumulator{
+			summary: summary, temporality: temporality,
+			latestOccurredAt: event.OccurredAt, latestEventID: event.EventID,
+		}
 		return
 	}
 	if temporality == 1 {
 		mergeDeltaPerformance(&row.summary, summary)
-		if latestKey > row.latestKey {
-			row.latestKey = latestKey
+		if performanceEventIsLater(event, row) {
+			row.latestOccurredAt = event.OccurredAt
+			row.latestEventID = event.EventID
 		}
 		return
 	}
-	if latestKey > row.latestKey {
+	if performanceEventIsLater(event, row) {
 		row.summary = summary
-		row.latestKey = latestKey
+		row.latestOccurredAt = event.OccurredAt
+		row.latestEventID = event.EventID
 	}
+}
+
+func performanceEventIsLater(event canonical.Event, row *performanceMetricAccumulator) bool {
+	return event.OccurredAt.After(row.latestOccurredAt) ||
+		(event.OccurredAt.Equal(row.latestOccurredAt) && event.EventID > row.latestEventID)
 }
 
 func performanceMetricSummaries(rows map[string]*performanceMetricAccumulator) []PerformanceMetricSummary {

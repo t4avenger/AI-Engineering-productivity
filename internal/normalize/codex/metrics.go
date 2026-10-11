@@ -77,6 +77,42 @@ type integrationMetricEventInput struct {
 	receivedAt              time.Time
 }
 
+type metricNormalizationContext struct {
+	resource         map[string]any
+	resourceEnvelope map[string]any
+	scopeID          string
+	scopeEnvelope    map[string]any
+	version          string
+	receivedAt       time.Time
+}
+
+type productMetricEventInput struct {
+	context        metricNormalizationContext
+	item           otlpMetric
+	fields         map[string]any
+	datapoint      map[string]any
+	timeUnixNano   string
+	index          int
+	attributes     map[string]any
+	metricEvidence map[string]any
+}
+
+type productHistogramEventInput struct {
+	context metricNormalizationContext
+	item    otlpMetric
+	spec    productMetricSpec
+	point   histogramDataPoint
+	index   int
+}
+
+type productSumEventInput struct {
+	context metricNormalizationContext
+	item    otlpMetric
+	spec    productMetricSpec
+	point   metricDataPoint
+	index   int
+}
+
 type resourceMetric struct {
 	Resource struct {
 		Attributes []attribute `json:"attributes"`
@@ -227,9 +263,16 @@ func skillEventsFromResource(resource resourceMetric, receivedAt time.Time) ([]c
 	version := stringValue(resourceAttrs[serviceVersionAttribute], unavailable)
 	var events []canonical.Event
 	for _, scope := range resource.ScopeMetrics {
-		scopeID := metricScopeIdentity(scope)
+		context := metricNormalizationContext{
+			resource:         resourceAttrs,
+			resourceEnvelope: rawObjectWithout(resource.raw, "scopeMetrics"),
+			scopeID:          metricScopeIdentity(scope),
+			scopeEnvelope:    rawObjectWithout(scope.raw, "metrics"),
+			version:          version,
+			receivedAt:       receivedAt,
+		}
 		for _, item := range scope.Metrics {
-			extracted, err := skillEventsFromMetric(resourceAttrs, scopeID, version, item, receivedAt)
+			extracted, err := skillEventsFromMetric(context, item)
 			if err != nil {
 				return nil, err
 			}
@@ -258,25 +301,25 @@ func rawMetricEnvelope(raw map[string]any) map[string]any {
 	return envelope
 }
 
-func skillEventsFromMetric(resourceAttrs map[string]any, scopeID string, version string, item otlpMetric, receivedAt time.Time) ([]canonical.Event, error) {
-	if events := productEventsFromMetric(resourceAttrs, scopeID, version, item, receivedAt); len(events) > 0 {
+func skillEventsFromMetric(context metricNormalizationContext, item otlpMetric) ([]canonical.Event, error) {
+	if events := productEventsFromMetric(context, item); len(events) > 0 {
 		return events, nil
 	}
-	if events := integrationEventsFromMetric(resourceAttrs, scopeID, version, item, receivedAt); len(events) > 0 {
+	if events := integrationEventsFromMetric(context.resource, context.scopeID, context.version, item, context.receivedAt); len(events) > 0 {
 		return events, nil
 	}
 	if item.Name == skillTurnDurationMetric && item.Histogram != nil {
-		return skillTurnEventsFromHistogram(resourceAttrs, version, item.Histogram, receivedAt), nil
+		return skillTurnEventsFromHistogram(context.resource, context.version, item.Histogram, context.receivedAt), nil
 	}
 	if item.Name == turnTokenUsageMetric && item.Histogram != nil {
-		return tokenUsageEventsFromHistogram(resourceAttrs, scopeID, version, item.Histogram, receivedAt), nil
+		return tokenUsageEventsFromHistogram(context.resource, context.scopeID, context.version, item.Histogram, context.receivedAt), nil
 	}
 	if item.Name != skillInjectedMetric || item.Sum == nil {
 		return nil, nil
 	}
 	var events []canonical.Event
 	for index, point := range item.Sum.DataPoints {
-		event, ok, err := skillInjectedEvent(resourceAttrs, version, point, index, receivedAt)
+		event, ok, err := skillInjectedEvent(context.resource, context.version, point, index, context.receivedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -295,7 +338,7 @@ func isCodexMetricService(value any) bool {
 	return name == "codex_exec" || name == "codex_cli_rs" || name == "codex-app-server"
 }
 
-func productEventsFromMetric(resource map[string]any, scopeID, version string, item otlpMetric, receivedAt time.Time) []canonical.Event {
+func productEventsFromMetric(context metricNormalizationContext, item otlpMetric) []canonical.Event {
 	spec, supported := productMetricSpecs[item.Name]
 	if !supported {
 		return nil
@@ -303,7 +346,8 @@ func productEventsFromMetric(resource map[string]any, scopeID, version string, i
 	if spec.kind == "histogram" && item.Histogram != nil {
 		events := make([]canonical.Event, 0, len(item.Histogram.DataPoints))
 		for index, point := range item.Histogram.DataPoints {
-			if event, ok := productHistogramEvent(resource, scopeID, version, item, spec, point, index, receivedAt); ok {
+			input := productHistogramEventInput{context: context, item: item, spec: spec, point: point, index: index}
+			if event, ok := productHistogramEvent(input); ok {
 				events = append(events, event)
 			}
 		}
@@ -312,7 +356,8 @@ func productEventsFromMetric(resource map[string]any, scopeID, version string, i
 	if spec.kind == "sum" && item.Sum != nil {
 		events := make([]canonical.Event, 0, len(item.Sum.DataPoints))
 		for index, point := range item.Sum.DataPoints {
-			if event, ok := productSumEvent(resource, scopeID, version, item, spec, point, index, receivedAt); ok {
+			input := productSumEventInput{context: context, item: item, spec: spec, point: point, index: index}
+			if event, ok := productSumEvent(input); ok {
 				events = append(events, event)
 			}
 		}
@@ -321,46 +366,57 @@ func productEventsFromMetric(resource map[string]any, scopeID, version string, i
 	return nil
 }
 
-func productHistogramEvent(resource map[string]any, scopeID, version string, item otlpMetric, spec productMetricSpec, point histogramDataPoint, index int, receivedAt time.Time) (canonical.Event, bool) {
-	count := optionalMetricInt(point.Count)
-	sum := optionalMetricFloat(point.Sum)
-	if count == nil || *count <= 0 || sum == nil {
+func productHistogramEvent(input productHistogramEventInput) (canonical.Event, bool) {
+	count := optionalMetricInt(input.point.Count)
+	if count == nil {
 		return canonical.Event{}, false
 	}
-	fields := attributes(point.Attributes)
-	metric := productMetricEvidence(item, spec, fields)
+	fields := attributes(input.point.Attributes)
+	metric := productMetricEvidence(input.item, input.spec, fields)
 	metric["sample_count"] = *count
-	metric["sum"] = *sum
-	attributes := productMetricAttributes(item, spec, fields)
+	attributes := productMetricAttributes(input.item, input.spec, fields)
 	attributes["sample_count"] = *count
-	attributes["metric_sum"] = *sum
-	average := *sum / float64(*count)
-	attributes["metric_average"] = average
-	metric["average"] = average
-	if minimum := optionalMetricFloat(point.Min); minimum != nil {
+	if sum := optionalMetricFloat(input.point.Sum); sum != nil {
+		metric["sum"] = *sum
+		attributes["metric_sum"] = *sum
+		if *count > 0 {
+			average := *sum / float64(*count)
+			attributes["metric_average"] = average
+			metric["average"] = average
+		}
+	}
+	if minimum := optionalMetricFloat(input.point.Min); minimum != nil {
 		attributes["metric_min"] = *minimum
 		metric["min"] = *minimum
 	}
-	if maximum := optionalMetricFloat(point.Max); maximum != nil {
+	if maximum := optionalMetricFloat(input.point.Max); maximum != nil {
 		attributes["metric_max"] = *maximum
 		metric["max"] = *maximum
 	}
-	metric["bucket_counts"] = point.BucketCounts
-	metric["explicit_bounds"] = point.ExplicitBounds
-	return productMetricEvent(resource, scopeID, version, item, spec, fields, point.raw, point.TimeUnixNano, index, attributes, metric, receivedAt), true
+	metric["bucket_counts"] = input.point.BucketCounts
+	metric["explicit_bounds"] = input.point.ExplicitBounds
+	return productMetricEvent(productMetricEventInput{
+		context: input.context, item: input.item, fields: fields,
+		datapoint: input.point.raw, timeUnixNano: input.point.TimeUnixNano, index: input.index,
+		attributes: attributes, metricEvidence: metric,
+	}), true
 }
 
-func productSumEvent(resource map[string]any, scopeID, version string, item otlpMetric, spec productMetricSpec, point metricDataPoint, index int, receivedAt time.Time) (canonical.Event, bool) {
-	value := optionalMetricInt(point.AsInt)
+func productSumEvent(input productSumEventInput) (canonical.Event, bool) {
+	value := optionalMetricInt(input.point.AsInt)
 	if value == nil {
 		return canonical.Event{}, false
 	}
-	fields := attributes(point.Attributes)
-	metric := productMetricEvidence(item, spec, fields)
+	fields := attributes(input.point.Attributes)
+	metric := productMetricEvidence(input.item, input.spec, fields)
 	metric["value"] = *value
-	attributes := productMetricAttributes(item, spec, fields)
+	attributes := productMetricAttributes(input.item, input.spec, fields)
 	attributes["metric_value"] = *value
-	return productMetricEvent(resource, scopeID, version, item, spec, fields, point.raw, point.TimeUnixNano, index, attributes, metric, receivedAt), true
+	return productMetricEvent(productMetricEventInput{
+		context: input.context, item: input.item, fields: fields,
+		datapoint: input.point.raw, timeUnixNano: input.point.TimeUnixNano, index: input.index,
+		attributes: attributes, metricEvidence: metric,
+	}), true
 }
 
 func productMetricEvidence(item otlpMetric, spec productMetricSpec, fields map[string]any) map[string]any {
@@ -417,17 +473,20 @@ func productMetricDimensions(fields map[string]any, names []string) map[string]a
 	return dimensions
 }
 
-func productMetricEvent(resource map[string]any, scopeID, version string, item otlpMetric, spec productMetricSpec, fields, datapoint map[string]any, timeUnixNano string, index int, attributes, metric map[string]any, receivedAt time.Time) canonical.Event {
-	occurredAt := metricTime(timeUnixNano, receivedAt)
-	identity := strings.Join([]string{item.Name, timeUnixNano, metricResourceIdentity(resource, codexMetricIdentityAttributes(resource)), scopeID, strconv.Itoa(index), stableJSON(fields), stableJSON(datapoint)}, "|")
+func productMetricEvent(input productMetricEventInput) canonical.Event {
+	occurredAt := metricTime(input.timeUnixNano, input.context.receivedAt)
+	identity := strings.Join([]string{
+		input.item.Name, input.timeUnixNano, stableJSON(input.context.resourceEnvelope), stableJSON(input.context.scopeEnvelope),
+		strconv.Itoa(input.index), stableJSON(input.fields), stableJSON(input.datapoint),
+	}, "|")
 	eventID := contentID("codex:performance:", []byte(identity))
 	extensions := map[string]any{
-		"correlation": productMetricCorrelation(eventID, occurredAt), "performance_metric": metric,
-		"datapoint": datapoint, "resource": rawCodexAttributes(resource), "metric_attributes": rawCodexAttributes(fields),
+		"correlation": productMetricCorrelation(eventID, occurredAt), "performance_metric": input.metricEvidence,
+		"datapoint": input.datapoint, "resource": rawCodexAttributes(input.context.resource), "metric_attributes": rawCodexAttributes(input.fields),
 	}
-	event := tokenEvent(eventID, occurredAt, receivedAt, version, attributes, extensions)
-	event.EventType = item.Name
-	applyCodexEnvironment(&event, fields, resource)
+	event := tokenEvent(eventID, occurredAt, input.context.receivedAt, input.context.version, input.attributes, extensions)
+	event.EventType = input.item.Name
+	applyCodexEnvironment(&event, input.fields, input.context.resource)
 	return event
 }
 

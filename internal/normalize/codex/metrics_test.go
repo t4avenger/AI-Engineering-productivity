@@ -98,8 +98,8 @@ func TestNormalizeMetricsPerformanceGolden(t *testing.T) {
 	if !reflect.DeepEqual(first, second) {
 		t.Fatal("performance metric normalisation must be deterministic")
 	}
-	if len(first) != 9 {
-		t.Fatalf("event count = %d, want 9", len(first))
+	if len(first) != 10 {
+		t.Fatalf("event count = %d, want 10", len(first))
 	}
 
 	byType := assertPerformanceMetricEvidence(t, first)
@@ -148,6 +148,15 @@ func assertPerformanceMetricProjection(t *testing.T, byType map[string]canonical
 	if byType["codex.turn.network_proxy"].Attributes["metric_value"] != int64(2) {
 		t.Fatalf("sum projection = %#v", byType["codex.turn.network_proxy"].Attributes)
 	}
+	transport := byType["codex.websocket.request"]
+	transportMetric := transport.ProviderExtensions["performance_metric"].(map[string]any)
+	if transport.Attributes["metric_value"] != int64(4) || transportMetric["aggregation_temporality"] != json.Number("2") {
+		t.Fatalf("transport activity projection = %#v", transportMetric)
+	}
+	transportDimensions := transportMetric["dimensions"].(map[string]any)
+	if transportDimensions["model"] != "gpt-6.1-sol-synthetic" || transportDimensions["success"] != true {
+		t.Fatalf("transport activity dimensions = %#v", transportDimensions)
+	}
 	resource := turn.ProviderExtensions["resource"].(map[string]any)
 	if resource["future.resource"] != "retained-raw" {
 		t.Fatalf("unknown resource field missing: %#v", resource)
@@ -155,10 +164,66 @@ func assertPerformanceMetricProjection(t *testing.T, byType map[string]canonical
 }
 
 func TestNormalizeMetricsPerformanceRejectsMalformedMeasures(t *testing.T) {
-	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.turn.e2e_duration_ms","histogram":{"dataPoints":[{"count":"0","sum":"12"},{"count":"1","sum":"invalid"},{"count":"1","sum":"-1"}]}},{"name":"codex.turn.memory","sum":{"dataPoints":[{"asInt":"-1"},{"asInt":"invalid"}]}}]}]}]}`)
+	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.turn.e2e_duration_ms","histogram":{"dataPoints":[{"sum":"12"},{"count":"invalid","sum":"12"}]}},{"name":"codex.turn.memory","sum":{"dataPoints":[{"asInt":"-1"},{"asInt":"invalid"}]}}]}]}]}`)
 	_, err := NormalizeMetrics(payload, time.Unix(1, 0))
 	if !errors.Is(err, ErrUnsupportedMetrics) {
 		t.Fatalf("got %v, want ErrUnsupportedMetrics", err)
+	}
+}
+
+func TestNormalizeMetricsPerformancePreservesZeroCountAndMissingSum(t *testing.T) {
+	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}}]},"scopeMetrics":[{"metrics":[{"name":"codex.turn.e2e_duration_ms","histogram":{"dataPoints":[{"count":"0","sum":"12","bucketCounts":["0"]},{"count":"2","bucketCounts":["2"]}]}}]}]}]}`)
+	events, err := NormalizeMetrics(payload, time.Unix(1, 0))
+	if err != nil || len(events) != 2 {
+		t.Fatalf("events = %#v, err = %v", events, err)
+	}
+	zeroCount := performanceEventBySampleCount(t, events, 0)
+	zeroMetric := zeroCount.ProviderExtensions["performance_metric"].(map[string]any)
+	if zeroCount.Attributes["sample_count"] != int64(0) || zeroCount.Attributes["metric_sum"] != float64(12) || zeroMetric["sum"] != float64(12) {
+		t.Fatalf("zero-count total not preserved: %#v", zeroCount)
+	}
+	if _, present := zeroCount.Attributes["metric_average"]; present {
+		t.Fatalf("zero-count average must be absent: %#v", zeroCount.Attributes)
+	}
+
+	missingSum := performanceEventBySampleCount(t, events, 2)
+	missingMetric := missingSum.ProviderExtensions["performance_metric"].(map[string]any)
+	if missingSum.Attributes["sample_count"] != int64(2) {
+		t.Fatalf("missing-sum count not preserved: %#v", missingSum.Attributes)
+	}
+	for _, key := range []string{"metric_sum", "metric_average"} {
+		if _, present := missingSum.Attributes[key]; present {
+			t.Fatalf("missing sum fabricated %s: %#v", key, missingSum.Attributes)
+		}
+	}
+	if _, present := missingMetric["sum"]; present {
+		t.Fatalf("missing sum fabricated in evidence: %#v", missingMetric)
+	}
+}
+
+func performanceEventBySampleCount(t *testing.T, events []canonical.Event, count int64) canonical.Event {
+	t.Helper()
+	for _, event := range events {
+		if event.Attributes["sample_count"] == count {
+			return event
+		}
+	}
+	t.Fatalf("sample count %d not found in %#v", count, events)
+	return canonical.Event{}
+}
+
+func TestNormalizeMetricsPerformanceIdentityIncludesCompleteEnvelopes(t *testing.T) {
+	payload := []byte(`{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.instance.id","value":{"stringValue":"one"}}]},"scopeMetrics":[{"scope":{"name":"codex","version":"one"},"metrics":[{"name":"codex.turn.memory","sum":{"dataPoints":[{"asInt":"1","timeUnixNano":"1791717000000000000"}]}}]},{"scope":{"name":"codex","version":"two"},"metrics":[{"name":"codex.turn.memory","sum":{"dataPoints":[{"asInt":"1","timeUnixNano":"1791717000000000000"}]}}]}]},{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"codex_exec"}},{"key":"service.instance.id","value":{"stringValue":"two"}}]},"scopeMetrics":[{"scope":{"name":"codex","version":"one"},"metrics":[{"name":"codex.turn.memory","sum":{"dataPoints":[{"asInt":"1","timeUnixNano":"1791717000000000000"}]}}]}]}]}`)
+	events, err := NormalizeMetrics(payload, time.Unix(1, 0))
+	if err != nil || len(events) != 3 {
+		t.Fatalf("events = %#v, err = %v", events, err)
+	}
+	ids := map[string]struct{}{}
+	for _, event := range events {
+		ids[event.EventID] = struct{}{}
+	}
+	if len(ids) != len(events) {
+		t.Fatalf("complete resource/scope envelopes must distinguish event IDs: %#v", events)
 	}
 }
 
